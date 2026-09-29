@@ -1,0 +1,69 @@
+name: Extract
+
+# Started by TradeTracker's Supabase project: a daily cron for every tracked company, and the Refresh button for one.
+# The runner signs in to the control plane with GitHub OIDC; it holds no secrets.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Existing business_kpi_runs id
+        required: false
+        type: string
+      symbols:
+        description: "Comma-separated tickers; every tracked company when empty"
+        required: false
+        type: string
+      quarters:
+        description: Quarters of history to keep
+        required: true
+        default: "20"
+        type: string
+      force_refresh:
+        description: Re-read every filing and re-propose KPI lists
+        required: true
+        default: false
+        type: boolean
+      trigger_type:
+        description: Audit trigger classification
+        required: true
+        default: manual
+        type: choice
+        options:
+          - manual
+          - scheduled
+          - backfill
+          - watchlist_add
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: extract-${{ inputs.run_id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      BUSINESS_KPI_WORKFLOW_URL: https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install '.[test]'
+      - run: pytest
+      - name: Read filings and store KPIs
+        # Inputs reach the command as environment variables, never as interpolated shell text.
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+          SYMBOLS: ${{ inputs.symbols }}
+          QUARTERS: ${{ inputs.quarters || '20' }}
+          TRIGGER: ${{ inputs.trigger_type || 'manual' }}
+          FORCE: ${{ inputs.force_refresh && '--force' || '' }}
+        run: python -m kpi_extractor --run-id "$RUN_ID" --symbols "$SYMBOLS" --quarters "$QUARTERS" --trigger "$TRIGGER" --workers 4 $FORCE

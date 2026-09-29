@@ -1,0 +1,207 @@
+import json
+from datetime import date
+from types import SimpleNamespace
+
+from kpi_extractor import ai
+from kpi_extractor.ai import Spec
+from kpi_extractor.document import parse_document
+from kpi_extractor.evaluate import score
+from kpi_extractor.extract import read_values
+from kpi_extractor.pipeline import SymbolPipeline, _template, apply_maintenance
+from kpi_extractor.xbrl import XbrlCandidate
+
+RELEASE = """
+<p>In the quarter, 3-nanometer accounted for 30% of wafer revenue; 5-nanometer accounted for 33%.</p>
+<p>A year ago, 3-nanometer accounted for 20% of wafer revenue.</p>
+<p>Other nodes: 37%.</p>
+"""
+
+SPEC = Spec.model_validate({"groups": [{"key": "technology", "label": "Revenue by Technology", "kind": "mix", "kpis": [
+    {"key": "n3", "label": "3nm", "unit": "percent"}, {"key": "n5", "label": "5nm", "unit": "percent"},
+    {"key": "other", "label": "Other", "unit": "percent"},
+]}]})
+EXPECTED = date(2026, 6, 30)
+
+
+def _quote(document, kpi, needle, value):
+    block = next(key for key, item in document.blocks.items() if needle in item.text)
+    return {"kpi": kpi, "block": block, "quote": needle, "value_text": value}
+
+
+def _answer(document, n3="3-nanometer accounted for 30%", n3_value="30%"):
+    return {"period_end": "2026-06-30", "values": [
+        _quote(document, "technology.n3", n3, n3_value),
+        _quote(document, "technology.n5", "5-nanometer accounted for 33%", "33%"),
+        _quote(document, "technology.other", "Other nodes: 37%", "37%"),
+    ]}
+
+
+class FakeControl:
+    def __init__(self, answers):
+        self.answers = answers
+        self.calls = []
+
+    def ai(self, symbol, purpose, system, user, thinking, model="flash"):
+        self.calls.append((purpose, model))
+        return json.dumps(self.answers[(purpose, model)])
+
+    def call(self, operation, **payload):
+        self.calls.append((operation, None))
+        return {}
+
+
+def _pipeline(control, values=()):
+    pipeline = SymbolPipeline(control, "TSM", quarters=4, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(name="TSMC", fiscal_year_end="1231", foreign=True)
+    pipeline.values = {(v["group_key"], v["kpi_key"], v["fiscal_year"], v["fiscal_period"]): v for v in values}
+    return pipeline
+
+
+def _history(document, answer, period_end="2026-03-31", fiscal_period="Q1"):
+    """Last quarter's stored values, found in the same places as this quarter's answer (with different numbers)."""
+    items, _ = read_values(document, SPEC, ai.Located.model_validate(answer), None)
+    return [{"group_key": f"kpi_{item.group.key}", "kpi_key": item.kpi.key, "fiscal_year": "2026", "fiscal_period": fiscal_period,
+             "period_end": period_end, "method": "ai", "validation_status": "verified", "value": item.value - 1,
+             "locator": item.locator, "group_label": item.group.label, "kpi_label": item.kpi.label} for item in items]
+
+
+def test_first_quarters_are_read_by_both_models():
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    control = FakeControl({("locate", "flash"): _answer(document), ("locate", "pro"): _answer(document)})
+    read, _problems, _located = _pipeline(control)._read("prompt", document, SPEC, EXPECTED)
+    assert {item.kpi.key: item.value for item in read} == {"n3": 30, "n5": 33, "other": 37}
+    assert ("locate", "pro") in control.calls and ("review", "pro") not in control.calls
+
+
+def test_flash_alone_when_everything_is_where_it_was_last_quarter():
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    control = FakeControl({("locate", "flash"): _answer(document)})
+    pipeline = _pipeline(control, _history(document, _answer(document)))
+    read, _, _ = pipeline._read("prompt", document, SPEC, EXPECTED)
+    assert len(read) == 3
+    assert control.calls == [("locate", "flash")]
+    assert pipeline.result.flash_only_reads == 1
+
+
+def test_a_reading_in_a_new_place_brings_in_pro_and_a_review():
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    control = FakeControl({
+        ("locate", "flash"): _answer(document, "3-nanometer accounted for 20%", "20%"),
+        ("locate", "pro"): _answer(document),
+        ("review", "pro"): {"choices": {"technology.n3": "B"}},
+    })
+    history = _history(document, _answer(document))
+    history[0]["locator"] = {"block": "P9", "quote": "Leading-edge 3-nanometer share: 29%", "value_text": "29%"}
+    read, _, _ = _pipeline(control, history)._read("prompt", document, SPEC, EXPECTED)
+    values = {item.kpi.key: item for item in read}
+    assert values["n3"].value == 30 and "confirmed by review" in values["n3"].notes
+    assert ("review", "pro") in control.calls
+
+
+def test_review_rejecting_both_readings_drops_the_kpi():
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    flash = {"period_end": "2026-06-30", "values": [_quote(document, "technology.n3", "3-nanometer accounted for 20%", "20%")]}
+    control = FakeControl({
+        ("locate", "flash"): flash,
+        ("locate", "pro"): {"period_end": "2026-06-30", "values": []},
+        ("review", "pro"): {"choices": {"technology.n3": "none"}},
+    })
+    read, problems, _ = _pipeline(control)._read("prompt", document, SPEC, EXPECTED)
+    assert read == []
+    assert any("kept neither" in problem for problem in problems)
+
+
+def test_quote_templates_ignore_numbers_and_period_words():
+    assert _template("DAP was 3.60 billion on average for June 2026") == _template("DAP was 3.54 billion on average for March 2026")
+    assert _template("DAP was 3.60 billion") != _template("MAP was 3.60 billion")
+
+
+def test_audit_adds_kpis_and_retires_only_what_exists():
+    updated = apply_maintenance(SPEC, ai.Maintenance.model_validate({
+        "add_kpis": {"technology": [{"key": "n2", "label": "2nm", "unit": "percent"},
+                                    {"key": "n3", "label": "duplicate", "unit": "percent"},
+                                    {"key": "bad", "label": "Amount", "unit": "currency"}]},
+        "add_groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric",
+                        "kpis": [{"key": "wafers", "label": "Wafer Shipments", "unit": "count"}]}],
+        "retire": ["technology.other", "technology.missing"],
+    }))
+    keys = {group.key: [kpi.key for kpi in group.kpis] for group in updated.groups}
+    assert keys == {"technology": ["n3", "n5", "n2"], "operating": ["wafers"]}
+    assert apply_maintenance(SPEC, ai.Maintenance()) is None
+
+
+def test_ai_chosen_xbrl_rows_must_add_up_to_revenue():
+    candidate = XbrlCandidate("geography", "Revenue by Geography", 2, "us-gaap:Revenues", 200.0, "USD", {
+        "uscanada": ("US & Canada", 80.0), "europe": ("Europe", 70.0), "rest": ("Rest of World", 50.0), "us": ("U.S.", 75.0),
+    })
+    group = candidate.group(["uscanada", "europe", "rest"])
+    assert [key for key, _label, _value in group.members] == ["uscanada", "europe", "rest"]
+    assert candidate.group(["uscanada", "europe", "us"]) is None
+
+
+def test_curation_asks_once_for_the_same_rows():
+    candidate = XbrlCandidate("geography", "Revenue by Geography", 2, "us-gaap:Revenues", 200.0, "USD", {
+        "uscanada": ("US & Canada", 80.0), "europe": ("Europe", 70.0), "rest": ("Rest of World", 50.0), "us": ("U.S.", 75.0),
+    })
+    control = FakeControl({("curate", "pro"): {"members": ["uscanada", "europe", "rest"]}})
+    pipeline = _pipeline(control)
+    assert pipeline._curate(candidate) is not None and pipeline._curate(candidate) is not None
+    assert control.calls.count(("curate", "pro")) == 1
+
+
+def test_jumps_stand_only_with_a_quote_found_in_the_document():
+    document = parse_document("<p>Following the acquisition of Acme, subscribers rose to 90 million this quarter.</p>"
+                              "<p>Subscribers: 90 million</p>", "https://www.sec.gov/x.htm")
+    spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric",
+                                            "kpis": [{"key": "subs", "label": "Subscribers", "unit": "count"}]}]})
+    block = next(key for key, item in document.blocks.items() if "Subscribers:" in item.text)
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "values": [
+        {"kpi": "operating.subs", "block": block, "quote": "Subscribers: 90 million", "value_text": "90 million"}]})
+    for quote, expected in (("Following the acquisition of Acme, subscribers rose", "verified"),
+                            ("Invented sentence that is not in the filing at all", "needs_review")):
+        read, _ = read_values(document, spec, located, None)
+        read[0].status, read[0].notes = "needs_review", ["changed 3.0x in a quarter"]
+        control = FakeControl({("explain", "pro"): {"items": {"operating.subs": {"legitimate": True, "quote": quote}}}})
+        _pipeline(control)._explain_jumps(read, document, spec)
+        assert read[0].status == expected
+
+
+def test_furnished_filings_are_classified_once():
+    ref = SimpleNamespace(confirmed=False, accession="0001-26-1", exhibits=[], form="6-K", filed=date(2026, 7, 16),
+                          role="earnings_release", source_url="https://www.sec.gov/x.htm")
+    control = FakeControl({("classify", "flash"): {"kind": "other"}})
+    pipeline = _pipeline(control)
+    assert pipeline._is_earnings_document(ref) is False
+    assert pipeline._is_earnings_document(ref) is False  # the stored verdict is reused
+    assert control.calls.count(("classify", "flash")) == 1
+
+
+def test_large_documents_are_narrowed_to_the_sections_flash_picks():
+    html = "<p>Quarter ended June 30, 2026</p>" + "".join(f"<p>Note {i}: leases and other matters.</p>" * 40 for i in range(60))
+    html += "<table><tr><td>Platform</td><td>2026</td></tr><tr><td>HPC</td><td>830,369</td></tr></table>"
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table_id = next(iter(document.tables))
+    control = FakeControl({("select", "flash"): {"ids": [table_id, "made_up"]}})
+    pipeline = _pipeline(control)
+    import kpi_extractor.pipeline as module
+    limit, module.MAX_DOCUMENT_CHARS = module.MAX_DOCUMENT_CHARS, 5_000
+    try:
+        text = pipeline._prompt_document(document, SPEC)
+    finally:
+        module.MAX_DOCUMENT_CHARS = limit
+    assert "HPC" in text and "Quarter ended June 30, 2026" in text and len(text) < 5_000
+
+
+def test_golden_scoring():
+    base = {"group_key": "kpi_t", "fiscal_year": "2026", "fiscal_period": "Q2", "period_end": "2026-06-30",
+            "unit": "percent", "validation_status": "verified"}
+    captured = {"TSM": [{**base, "kpi_key": "n3", "value": 30, "kpi_label": "3nm"},
+                        {**base, "kpi_key": "n5", "value": 31, "kpi_label": "5nm"}]}
+    golden = [
+        {"symbol": "TSM", "period_end": "2026-06-30", "label": r"^3\s*nm", "unit": "percent", "value": 30},
+        {"symbol": "TSM", "period_end": "2026-06-30", "label": r"^5\s*nm", "unit": "percent", "value": 33},
+        {"symbol": "TSM", "period_end": "2026-06-30", "label": r"^7\s*nm", "unit": "percent", "value": 11},
+        {"symbol": "TSM", "period_end": "2026-06-30", "label": r"headcount", "unit": "count", "value": 1, "optional": True},
+    ]
+    report = score(golden, captured)
+    assert (report["correct"], report["wrong"], report["missing"], report["total"]) == (1, 1, 1, 3)
