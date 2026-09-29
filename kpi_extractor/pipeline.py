@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 from . import ai
 from .ai import AiResponseError, Located, Spec
+from .control import ControlError
 from .derive import derive_periods
 from .document import Document, clean, parse_document
 from .extract import ReadValue, check_period, describe, locator_hint, read_values, validate_groups
@@ -32,6 +33,7 @@ AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
 _MAX_ATTEMPTS = 3
 _NOT_EARNINGS = "classified as not an earnings document"
+_AI_PENDING = "AI review unavailable; retried next run"
 
 
 @dataclass
@@ -138,10 +140,17 @@ class SymbolPipeline:
                                                       annual=breakdowns.annual, year_offset=self.offset)
             groups = [(group, []) for group in breakdowns.groups]
             taken = {group.key for group in breakdowns.groups}
+            ai_pending = False
             for candidate in breakdowns.rejected:
                 if candidate.key in taken:
                     continue
-                group = self._curate(candidate)
+                try:
+                    group = self._curate(candidate)
+                except ControlError:
+                    # The AI is unavailable (e.g. out of credit): keep every reconciled breakdown now and let the
+                    # next run retry the review, instead of losing the whole filing.
+                    ai_pending = True
+                    continue
                 if group is not None:
                     groups.append((group, ["rows chosen by review"]))
                     taken.add(group.key)
@@ -157,9 +166,10 @@ class SymbolPipeline:
                         notes=extra_notes, ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
                         period_end=breakdowns.period_end, locator={"concept": group.concept, "total": group.total},
                     ))
-            self._store_filing(ref, "processed" if records else "skipped", records=records,
-                               period_end=breakdowns.period_end, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
-                               notes=[] if records else ["no revenue breakdown reconciles to reported revenue"])
+            status = "failed" if ai_pending else "processed" if records else "skipped"
+            notes = [_AI_PENDING] if ai_pending else [] if records else ["no revenue breakdown reconciles to reported revenue"]
+            self._store_filing(ref, status, records=records, period_end=breakdowns.period_end,
+                               fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
 
@@ -190,8 +200,8 @@ class SymbolPipeline:
         try:
             answer = self._ask(ai.prompt(self.company, classification_excerpt(ref), ai.CLASSIFY_TASK),
                                "classify", ai.Classification, thinking_first=False, model="flash")
-        except AiResponseError:
-            return False
+        except (AiResponseError, ControlError):
+            return False  # nothing is recorded, so the next run classifies it again
         if answer.kind == "other":
             self._store_filing(ref, "skipped", notes=[_NOT_EARNINGS])
             return False
@@ -249,7 +259,7 @@ class SymbolPipeline:
             answer = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.MAINTAIN_TASK, data),
                                "maintain", ai.Maintenance, thinking_first=True, model="pro")
             updated = apply_maintenance(spec, answer)
-        except (AiResponseError, ValueError) as error:
+        except (AiResponseError, ControlError, ValueError) as error:
             self.result.errors.append(f"KPI list audit: {error}"[:300])
             return None
         if updated is None:
@@ -443,8 +453,8 @@ class SymbolPipeline:
         try:
             answer = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.EXPLAIN_TASK, lines),
                                "explain", ai.Explanations, thinking_first=True, model="pro")
-        except AiResponseError:
-            return
+        except (AiResponseError, ControlError):
+            return  # the flagged values stay needs_review
         haystack = _document_text(document)
         for item in flagged:
             verdict = answer.items.get(f"{item.group.key}.{item.kpi.key}")

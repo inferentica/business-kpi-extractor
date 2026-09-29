@@ -252,3 +252,26 @@ def test_a_document_adding_up_to_full_year_revenue_is_annual():
     assert _pipeline(FakeControl({}), [annual])._reports_full_year(items, EXPECTED) is True
     annual["locator"] = {"total": 4_000_000_000}
     assert _pipeline(FakeControl({}), [annual])._reports_full_year(items, EXPECTED) is False
+
+
+def test_an_unavailable_ai_does_not_cost_the_filing_or_the_company():
+    from kpi_extractor.control import ControlError
+
+    class DownControl(FakeControl):
+        def ai(self, *args, **kwargs):
+            raise ControlError("ai failed (500): DeepSeek API error: 402")
+
+    ref = SimpleNamespace(confirmed=False, accession="0001-26-2", exhibits=[], form="6-K", filed=date(2026, 7, 16),
+                          role="earnings_release", source_url="https://www.sec.gov/x.htm")
+    control = DownControl({})
+    pipeline = _pipeline(control)
+    assert pipeline._is_earnings_document(ref) is False
+    assert ("store", None) not in control.calls  # not recorded, so the next run classifies it again
+    candidate = XbrlCandidate("geography", "Revenue by Geography", 2, "us-gaap:Revenues", 200.0, "USD",
+                              {"a": ("A", 80.0), "b": ("B", 70.0), "c": ("C", 60.0)})
+    try:
+        pipeline._curate(candidate)
+    except ControlError:
+        pass
+    else:
+        raise AssertionError("curation must surface the outage so the filing is retried")
