@@ -206,9 +206,13 @@ Track:
 shipped or deliveries, wafer shipments, backlog or remaining performance obligations, bookings, gross bookings/GMV, \
 trips, same-store sales, store count, net revenue retention, ARR, ad impressions and price per ad growth.
 
-Never track: total revenue on its own, costs, margins, operating or net income, EPS, cash flow or balance sheet lines, \
-non-GAAP adjustments, guidance or outlook, dividends and buybacks, or anything not given as a number for the \
-reported quarter.
+Never track: total revenue on its own, revenue or profit growth rates (including FX-neutral or constant-currency \
+growth), costs, margins, operating or net income, EPS, cash flow or balance sheet lines, content, purchase or lease \
+obligations, non-GAAP adjustments, guidance or outlook, dividends and buybacks, or anything not given as a number for \
+the reported quarter.
+
+When the documents give a breakdown as amounts (for example a financial report's revenue by technology in NT$), track \
+the amounts as a revenue_breakdown; when they also state the shares in percent, track those as a mix as well.
 
 Rules:
 - kind "revenue_breakdown": currency amounts that together make up revenue. Include the table's total row as a KPI and \

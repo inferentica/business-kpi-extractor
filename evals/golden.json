@@ -274,5 +274,14 @@
   "unit": "currency",
   "value": 4033515000,
   "source": "Netflix 2Q26 10-Q XBRL"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2025-12-31",
+  "label": "high performance computing|^hpc",
+  "unit": "currency",
+  "value": 2192931000000,
+  "fiscal_period": "FY",
+  "source": "TSMC 2025 20-F XBRL: markets of customers"
  }
 ]

@@ -62,7 +62,8 @@ def _history(document, answer, period_end="2026-03-31", fiscal_period="Q1"):
     items, _ = read_values(document, SPEC, ai.Located.model_validate(answer), None)
     return [{"group_key": f"kpi_{item.group.key}", "kpi_key": item.kpi.key, "fiscal_year": "2026", "fiscal_period": fiscal_period,
              "period_end": period_end, "method": "ai", "validation_status": "verified", "value": item.value - 1,
-             "locator": item.locator, "group_label": item.group.label, "kpi_label": item.kpi.label} for item in items]
+             "locator": item.locator, "group_label": item.group.label, "kpi_label": item.kpi.label,
+             "source_url": "https://www.sec.gov/x.htm"} for item in items]
 
 
 def test_first_quarters_are_read_by_both_models():
@@ -205,3 +206,49 @@ def test_golden_scoring():
     ]
     report = score(golden, captured)
     assert (report["correct"], report["wrong"], report["missing"], report["total"]) == (1, 1, 1, 3)
+
+
+BREAKDOWN_RELEASE = """
+<p>Revenue by segment (in millions)</p>
+<table>
+  <tr><td></td><td colspan="2">Q2 2026</td><td colspan="2">Q2 2025</td></tr>
+  <tr><td>Cloud</td><td>$</td><td>700</td><td>$</td><td>500</td></tr>
+  <tr><td>Devices</td><td>$</td><td>300</td><td>$</td><td>250</td></tr>
+  <tr><td>Total revenue</td><td>$</td><td>1,000</td><td>$</td><td>750</td></tr>
+</table>
+"""
+BREAKDOWN_SPEC = Spec.model_validate({"groups": [{"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown",
+    "total_kpi": "total", "kpis": [{"key": "cloud", "label": "Cloud", "unit": "currency"},
+                                   {"key": "devices", "label": "Devices", "unit": "currency"},
+                                   {"key": "total", "label": "Total revenue", "unit": "currency"}]}]})
+
+
+def _breakdown_answer():
+    return {"period_end": "2026-06-30", "values": [
+        {"kpi": "segments.cloud", "table": "T0", "row": 1, "col": 1, "scale": 1000000},
+        {"kpi": "segments.devices", "table": "T0", "row": 2, "col": 1, "scale": 1000000},
+        {"kpi": "segments.total", "table": "T0", "row": 3, "col": 1, "scale": 1000000},
+    ]}
+
+
+def test_breakdown_totals_do_not_block_flash_alone():
+    document = parse_document(BREAKDOWN_RELEASE, "https://www.sec.gov/x.htm")
+    items, _ = read_values(document, BREAKDOWN_SPEC, ai.Located.model_validate(_breakdown_answer()), "USD")
+    history = [{"group_key": "kpi_segments", "kpi_key": item.kpi.key, "fiscal_year": "2026", "fiscal_period": "Q1",
+                "period_end": "2026-03-31", "method": "ai", "validation_status": "verified", "value": item.value * 0.9,
+                "locator": item.locator, "source_url": "https://www.sec.gov/x.htm"}
+               for item in items if item.kpi.key != "total"]
+    control = FakeControl({("locate", "flash"): _breakdown_answer()})
+    pipeline = _pipeline(control, history)
+    read, _, _ = pipeline._read("prompt", document, BREAKDOWN_SPEC, EXPECTED)
+    assert control.calls == [("locate", "flash")] and len(read) == 3
+
+
+def test_a_document_adding_up_to_full_year_revenue_is_annual():
+    document = parse_document(BREAKDOWN_RELEASE, "https://www.sec.gov/x.htm")
+    items, _ = read_values(document, BREAKDOWN_SPEC, ai.Located.model_validate(_breakdown_answer()), "USD")
+    annual = {"group_key": "geography", "kpi_key": "us", "fiscal_year": "2026", "fiscal_period": "FY",
+              "period_end": "2026-06-30", "method": "xbrl", "value": 1, "locator": {"total": 1_000_000_000}}
+    assert _pipeline(FakeControl({}), [annual])._reports_full_year(items, EXPECTED) is True
+    annual["locator"] = {"total": 4_000_000_000}
+    assert _pipeline(FakeControl({}), [annual])._reports_full_year(items, EXPECTED) is False

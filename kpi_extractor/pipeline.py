@@ -323,6 +323,9 @@ class SymbolPipeline:
             read, problems, located = self._read(text, document, spec, expected)
             period_problem = check_period(located, expected)
             period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
+            if not located.annual and self._reports_full_year(read, period_end):
+                located.annual = True
+                problems.append("breakdown total matches full-year revenue: stored as the fiscal year")
             if located.annual:
                 # An annual report: its values are the full year, and Q4 is derived from them.
                 fiscal_year, fiscal_period = fiscal_label(period_end, self.profile.fiscal_year_end, annual=True,
@@ -373,7 +376,7 @@ class SymbolPipeline:
         currency = self._default_currency()
         flash = self._ask(text, "locate", Located, thinking_first=False, model="flash")
         flash_read, flash_problems = read_values(document, spec, flash, currency)
-        if self._flash_is_enough(flash, flash_read, spec, expected):
+        if self._flash_is_enough(flash, flash_read, spec, expected, document):
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
         self.result.pro_reads += 1
@@ -406,18 +409,21 @@ class SymbolPipeline:
         located = flash if flash.period_end else pro
         return agreed, problems, located
 
-    def _flash_is_enough(self, located: Located, read: list[ReadValue], spec: Spec, expected: date) -> bool:
-        if check_period(located, expected) or located.annual:
+    def _flash_is_enough(self, located: Located, read: list[ReadValue], spec: Spec, expected: date,
+                         document: Document) -> bool:
+        if check_period(located, expected) or located.annual or self._reports_full_year(read, expected):
             return False
-        last = self._last_locators(expected)
+        last = self._last_locators(expected, _source_template(document.source_url))
         if not last:
-            return False  # a company's first quarters are always read twice
+            return False  # a company's first quarters, and a new kind of document, are always read twice
         keys = {f"{item.group.key}.{item.kpi.key}" for item in read}
         if any(key not in keys for key in last):
             return False  # something found last quarter is missing now
         earlier = self._earlier_values(expected)
         for item in read:
             key = f"{item.group.key}.{item.kpi.key}"
+            if item.kpi.key == item.group.total_kpi:
+                continue  # totals are not stored; the parts must still add up to them
             if key not in last or not _same_place(item.locator, last[key]):
                 return False
             if item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in earlier.get(key, [])):
@@ -503,11 +509,13 @@ class SymbolPipeline:
 
     # History used by the checks and hints.
 
-    def _ai_history(self, before: date) -> dict[str, dict]:
-        """The latest AI value of each KPI before a date."""
+    def _ai_history(self, before: date, source: str | None = None) -> dict[str, dict]:
+        """The latest AI value of each KPI before a date (optionally only from one kind of document)."""
         latest: dict[str, dict] = {}
         for value in self.values.values():
             if value["method"] != "ai" or value["period_end"] >= before.isoformat():
+                continue
+            if source is not None and _source_template(value.get("source_url") or "") != source:
                 continue
             key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
             if value["period_end"] > latest.get(key, {}).get("period_end", ""):
@@ -517,14 +525,35 @@ class SymbolPipeline:
     def _hints(self, before: date) -> dict[str, str]:
         return {key: hint for key, value in self._ai_history(before).items() if (hint := locator_hint(value.get("locator")))}
 
-    def _last_locators(self, before: date) -> dict[str, dict]:
-        """Where each KPI was found in the previous quarter (only KPIs reported that quarter)."""
-        history = self._ai_history(before)
+    def _last_locators(self, before: date, source: str) -> dict[str, dict]:
+        """Where each KPI was found the previous quarter in the same kind of document (TSMC's earnings release and its
+        financial report carry different KPIs, and are compared only with their own kind)."""
+        history = {key: value for key, value in self._ai_history(before, source).items()}
         if not history:
             return {}
         newest = max(value["period_end"] for value in history.values())
         return {key: value["locator"] for key, value in history.items()
                 if value["period_end"] == newest and value.get("locator") and value["validation_status"] == "verified"}
+
+    def _reports_full_year(self, read: list[ReadValue], period_end: date) -> bool:
+        """Whether a breakdown in this document adds up to the fiscal year's revenue in XBRL (an annual report the
+        AI took for a quarter), whatever the AI said."""
+        annual_totals = [
+            float(value["locator"]["total"]) for value in self.values.values()
+            if value["method"] == "xbrl" and value["fiscal_period"] == "FY" and (value.get("locator") or {}).get("total")
+            and abs(_days(value["period_end"], period_end.isoformat())) <= 12
+        ]
+        if not annual_totals:
+            return False
+        sums: dict[str, float] = {}
+        for item in read:
+            if item.group.kind != "revenue_breakdown":
+                continue
+            if item.kpi.key == item.group.total_kpi:
+                sums[item.group.key] = item.value
+            elif item.group.total_kpi is None:
+                sums[item.group.key] = sums.get(item.group.key, 0.0) + item.value
+        return any(abs(total - annual) <= abs(annual) * 0.01 for total in sums.values() for annual in annual_totals)
 
     def _earlier_values(self, before: date) -> dict[str, list[float]]:
         earlier: dict[str, list[float]] = {}
@@ -660,6 +689,11 @@ def _same_place(now: dict, before: dict) -> bool:
     if "row_label" in now and "row_label" in before:
         return clean(now["row_label"]).lower() == clean(before["row_label"]).lower() and bool(now["row_label"])
     return False
+
+
+def _source_template(url: str) -> str:
+    """A document's kind from its file name with the dates and numbers taken out ("a2q26e_withguidance.htm")."""
+    return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
 
 
 def _is_jump(note: str) -> bool:
