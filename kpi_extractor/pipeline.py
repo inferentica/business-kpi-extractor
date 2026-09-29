@@ -444,7 +444,8 @@ class SymbolPipeline:
             retry_text = text + "\n\nYour previous answer had pointers that do not hold:\n" + "\n".join(f"- {p}" for p in invalid[:20])
             flash = self._ask(retry_text, "locate", Located, thinking_first=False, model="flash")
             flash_read, flash_problems = read_values(document, spec, flash, currency)
-        if self._flash_is_enough(flash, flash_read, spec, expected, document):
+        if self._flash_is_enough(flash, flash_read, spec, expected, document) or (
+                not flash_read and self._kind_reports_nothing(document, expected, version)):
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
         self.result.pro_reads += 1
@@ -506,6 +507,18 @@ class SymbolPipeline:
         if problems or not self._flash_is_enough(located, read, spec, expected, document) or self._far_above_quarters(read):
             return None
         return read, located
+
+    def _kind_reports_nothing(self, document: Document, expected: date, version: int | None) -> bool:
+        """Whether both models already read this kind of document for this KPI list and found nothing in it (TSMC's
+        earnings release once its amounts come from the quarterly report). Flash finding nothing again then stands."""
+        if version is None:
+            return False
+        source = _source_template(document.source_url)
+        return any(filing.get("spec_version") == version and filing["status"] == "skipped"
+                   and _READ_BY_AI in (filing.get("notes") or []) and filing.get("value_count", 0) == 0
+                   and _source_template(filing.get("source_url") or "") == source
+                   and (filing.get("period_end") or "9999") < expected.isoformat()
+                   for filing in self.filings.values())
 
     def _flash_is_enough(self, located: Located, read: list[ReadValue], spec: Spec, expected: date,
                          document: Document) -> bool:

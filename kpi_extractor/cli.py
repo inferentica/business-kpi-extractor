@@ -23,7 +23,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--quarters", type=int, default=20, help="Quarters of history to keep (1-40)")
     parser.add_argument("--force", action="store_true", help="Re-read filings and re-propose KPI lists")
     parser.add_argument("--trigger", default="manual", choices=["scheduled", "manual", "watchlist_add", "backfill"])
-    parser.add_argument("--workers", type=int, default=os.cpu_count() or 2)
+    # Companies mostly wait on the AI, so more run at once than there are cores.
+    parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--dry-run", action="store_true", help="Local development: no AI, no writes")
     return parser.parse_args(argv)
 

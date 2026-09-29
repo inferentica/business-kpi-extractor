@@ -146,3 +146,14 @@ def test_a_prior_year_column_is_never_replayed():
 def test_the_stated_quarter_end_wins_over_the_nominal_one():
     document = parse_document("<p>Results for the quarter ended June 27, 2026. As of June 27, 2026.</p>", URL.format(n=2))
     assert reported_period(document, Q2) == date(2026, 6, 27)
+
+
+def test_a_kind_of_document_both_models_found_empty_is_read_by_flash_alone():
+    document = parse_document("<p>Monthly revenue report for June.</p>", URL.format(n=2))
+    empty = {"period_end": "2026-06-30", "values": []}
+    control = NoAi({("locate", "flash"): empty})
+    pipeline = _pipeline(control, [])
+    pipeline.filings = {"q1": {"accession": "q1", "spec_version": 1, "status": "skipped", "value_count": 0,
+                               "notes": ["read by AI"], "source_url": URL.format(n=1), "period_end": "2026-03-31"}}
+    read, _, _ = pipeline._read(lambda: "prompt", document, SPEC, Q2, version=1)
+    assert read == [] and control.calls == [("locate", "flash")]

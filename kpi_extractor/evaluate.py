@@ -97,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--golden", default=str(GOLDEN))
     parser.add_argument("--quarters", type=int, default=6)
-    parser.add_argument("--workers", type=int, default=os.cpu_count() or 2)
+    parser.add_argument("--workers", type=int, default=6)
     args = parser.parse_args(argv)
     configure_identity()
     golden = json.loads(Path(args.golden).read_text())
