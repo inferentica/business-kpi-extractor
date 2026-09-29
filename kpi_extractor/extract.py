@@ -190,12 +190,15 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         raise LocateError("fewer than two rows")
     currency = _currency(total_row[2] if total_row else None, KpiSpec(key="x", label="x", unit="currency"),
                          default_currency) if unit == "currency" else None
+    # What the next quarter's replay needs: the total row's label (None when the table has none) and the scale used.
+    total_label = _row_label(table.rows[locator.total_row], locator.col)[:80] if total_row is not None else None
     values = []
     for key, (label, value, index) in parts.items():
         if key not in kept:
             continue
         record = {"table": locator.table, "row": index, "col": locator.col, "row_label": label[:80],
-                  "context": table.context[-80:], "whole_table": True}
+                  "context": table.context[-80:], "whole_table": True, "total_row_label": total_label,
+                  "scale": scale if unit == "currency" else None}
         values.append(ReadValue(group, KpiSpec(key=row_key(label), label=label[:80], unit=unit), value, currency, record))
     if total_row is not None:
         record = {"table": locator.table, "row": locator.total_row, "col": locator.col, "row_label": "Total", "whole_table": True}
@@ -219,7 +222,7 @@ def _locator_record(document: Document, locator: Locator) -> dict:
         table = document.tables[locator.table]
         row = table.rows[locator.row] if locator.row < len(table.rows) else []
         return {"table": locator.table, "row": locator.row, "col": locator.col,
-                "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:]}
+                "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:], "scale": locator.scale}
     return {"block": locator.block, "quote": clean(locator.quote or "")[:160], "value_text": locator.value_text}
 
 

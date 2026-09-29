@@ -13,6 +13,7 @@ from __future__ import annotations
 import copy
 import re
 import string
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -23,6 +24,7 @@ from .derive import derive_periods
 from .document import Document, clean, parse_document
 from .extract import ReadValue, check_period, describe, locator_hint, read_values, validate_groups
 from .fiscal import fiscal_label, learn_year_offset
+from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
 from .xbrl import XbrlCandidate, extract_breakdowns, official_labels
 
@@ -34,6 +36,9 @@ _DONE = {"processed", "needs_review", "skipped"}
 _MAX_ATTEMPTS = 3
 _NOT_EARNINGS = "classified as not an earnings document"
 _AI_PENDING = "AI review unavailable; retried next run"
+_READ_BY_AI = "read by AI"
+_READ_BY_REPLAY = "read by replay"
+_NOT_REPORTED = "not reported: "
 
 
 @dataclass
@@ -45,6 +50,7 @@ class SymbolResult:
     ai_calls: int = 0
     pro_reads: int = 0
     flash_only_reads: int = 0
+    replayed_reads: int = 0
     errors: list[str] = field(default_factory=list)
 
 
@@ -63,27 +69,44 @@ class SymbolPipeline:
         self.filings: dict[str, dict] = {}
         self.values: dict[tuple, dict] = {}
         self.names: dict = {}
-        self._xbrl_cache: dict[str, object] = {}
+        self._xbrl_cache: dict[str, Future] = {}
+        self._exhibits: dict[str, Future] = {}
+        # Downloads and XBRL parsing start ahead of the filing being worked on.
+        self._prefetch = ThreadPoolExecutor(max_workers=3)
         self._documents: dict[str, Document] = {}
         self._prompt_documents: dict[str, str] = {}
         self._curations: dict[tuple, list[str]] = {}
+        self._replayed = False
 
     @property
     def company(self) -> str:
         return f"{self.profile.name} ({self.symbol})"
 
     def run(self) -> SymbolResult:
+        try:
+            return self._run()
+        finally:
+            self._prefetch.shutdown(wait=False, cancel_futures=True)
+
+    def _run(self) -> SymbolResult:
         state = self.control.call("symbol_state", symbol=self.symbol)
         self.filings = {filing["accession"]: filing for filing in state.get("filings") or []}
         self.values = {value_key(value): value for value in state.get("values") or []}
         self.names = (state.get("spec") or {}).get("names") or {}
         self.profile, company = company_profile(self.symbol)
         reports = sorted(periodic_reports(company, self.since), key=lambda ref: ref.filed)
+        for ref in reversed(reports):
+            if self.force or self._pending(ref):
+                self._xbrl_cache[ref.accession] = self._prefetch.submit(ref.filing.xbrl)
         self.offset = self._year_offset(reports)
         for ref in reports:
             self._process_report(ref)
         releases = [ref for ref in sorted(earnings_releases(company, self.profile, self.since), key=lambda ref: ref.filed)
                     if self._is_earnings_document(ref)]
+        for ref in releases:
+            if self.force or self._pending(ref):
+                for exhibit in ref.exhibits[:6]:
+                    self._exhibit(exhibit)
         spec, version, proposed = self._spec(state.get("spec"), releases)
         if spec is not None:
             processed = [ref for ref in releases if self._process_release(ref, spec, version)]
@@ -101,10 +124,20 @@ class SymbolPipeline:
 
     # Periodic reports: official XBRL breakdowns, with rows chosen by the AI where the rules fall short.
 
+    def _pending(self, ref: FilingRef) -> bool:
+        """Whether a filing still has to be read (a spec change can still re-read a finished release)."""
+        previous = self.filings.get(ref.accession)
+        return not previous or (previous["status"] not in _DONE and previous.get("attempts", 0) < _MAX_ATTEMPTS)
+
     def _xbrl(self, ref: FilingRef):
         if ref.accession not in self._xbrl_cache:
-            self._xbrl_cache[ref.accession] = ref.filing.xbrl()
-        return self._xbrl_cache[ref.accession]
+            self._xbrl_cache[ref.accession] = self._prefetch.submit(ref.filing.xbrl)
+        return self._xbrl_cache[ref.accession].result()
+
+    def _exhibit(self, exhibit) -> Future:
+        if exhibit.url not in self._exhibits:
+            self._exhibits[exhibit.url] = self._prefetch.submit(exhibit_html, exhibit)
+        return self._exhibits[exhibit.url]
 
     def _year_offset(self, reports: list[FilingRef]) -> int:
         for ref in reversed(reports):
@@ -329,9 +362,13 @@ class SymbolPipeline:
             fiscal_year, fiscal_period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)
             document = self._document(ref)
             period_hint = f"quarter ended about {expected} (fiscal {fiscal_period} {fiscal_year})"
-            text = ai.prompt(self.company, self._prompt_document(document, spec), ai.LOCATE_TASK,
-                             ai.locate_data(period_hint, spec, self._hints(expected)))
-            read, problems, located = self._read(text, document, spec, expected)
+
+            def text() -> str:  # built only when the AI reads, so a replayed quarter costs no selection call
+                return ai.prompt(self.company, self._prompt_document(document, spec), ai.LOCATE_TASK,
+                                 ai.locate_data(period_hint, spec, self._hints(expected)))
+
+            read, problems, located = self._read(text, document, spec, expected, version)
+            how = _READ_BY_REPLAY if self._replayed else _READ_BY_AI
             period_problem = check_period(located, expected)
             period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
             if not located.annual and (self._reports_full_year(read, period_end)
@@ -347,8 +384,10 @@ class SymbolPipeline:
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
             verified = sum(1 for record in records if record["validation_status"] == "verified")
             status = "processed" if verified else "needs_review" if records else "skipped"
+            unreported = _unreported(spec, read)
+            notes = [how, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []), *problems[:20]]
             self._store_filing(ref, status, records=records, spec_version=version, period_end=period_end,
-                               fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=problems[:20])
+                               fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001
             self._fail_filing(ref, error, spec_version=version)
         return True
@@ -384,11 +423,19 @@ class SymbolPipeline:
             ))
         return records
 
-    def _read(self, text: str, document: Document, spec: Spec, expected: date):
-        """Flash first. Its reading stands alone only when every KPI was found where it was found last quarter, no value
-        repeats an earlier period's number (the tell of a prior-year column) and every check passes; otherwise Pro reads
-        the document independently, values stand where the two agree, and Pro reviews the rest."""
+    def _read(self, text, document: Document, spec: Spec, expected: date, version: int | None = None):
+        """Code first: last quarter's rows and sentences read again, standing only on the checks a Flash reading must
+        pass. Then Flash. Its reading stands alone only when every KPI was found where it was found last quarter, no
+        value repeats an earlier period's number (the tell of a prior-year column) and every check passes; otherwise
+        Pro reads the document independently, values stand where the two agree, and Pro reviews the rest."""
         currency = self._default_currency()
+        self._replayed = False
+        replayed = self._replay(document, spec, expected, version, currency)
+        if replayed is not None:
+            self._replayed = True
+            self.result.replayed_reads += 1
+            return replayed[0], [], replayed[1]
+        text = text() if callable(text) else text
         flash = self._ask(text, "locate", Located, thinking_first=False, model="flash")
         flash_read, flash_problems = read_values(document, spec, flash, currency)
         invalid = [problem for problem in flash_problems if _INVALID_POINTER.search(problem)]
@@ -429,6 +476,36 @@ class SymbolPipeline:
                 agreed.append(chosen)
         located = flash if flash.period_end else pro
         return agreed, problems, located
+
+    def _replay(self, document: Document, spec: Spec, expected: date, version: int | None, currency: str | None):
+        """Last quarter's reading repeated by code, when the same KPI list read it. KPIs that list has but last quarter
+        did not report are looked for by the AI at least every other quarter, so a newly reported KPI is not missed."""
+        if version is None:
+            return None
+        source = _source_template(document.source_url)
+        last = self._last_locators(expected, source)
+        if not last:
+            return None
+        accession = next((value.get("source_accession") for key, value in self._ai_history(expected, source).items()
+                          if key in last), None)
+        filing = self.filings.get(accession or "") or {}
+        if filing.get("spec_version") != version:
+            return None
+        whole = {key.split(".", 1)[0] for key, locator in last.items() if locator.get("whole_table")}
+        missing = {f"{group.key}.{kpi.key}" for group in spec.groups if group.key not in whole for kpi in group.kpis
+                   if kpi.key != group.total_kpi} - last.keys()
+        if missing:
+            notes = filing.get("notes") or []
+            reported = next((note for note in notes if note.startswith(_NOT_REPORTED)), _NOT_REPORTED)
+            if _READ_BY_AI not in notes or not missing <= set(reported.removeprefix(_NOT_REPORTED).split(", ")):
+                return None
+        located = replay(document, last, expected)
+        if located is None:
+            return None
+        read, problems = read_values(document, spec, located, currency)
+        if problems or not self._flash_is_enough(located, read, spec, expected, document) or self._far_above_quarters(read):
+            return None
+        return read, located
 
     def _flash_is_enough(self, located: Located, read: list[ReadValue], spec: Spec, expected: date,
                          document: Document) -> bool:
@@ -515,7 +592,7 @@ class SymbolPipeline:
             combined: Document | None = None
             exhibits = [exhibit for ref in refs for exhibit in ref.exhibits[:6]][:26]
             for index, exhibit in enumerate(exhibits):
-                raw = exhibit_html(exhibit)
+                raw = self._exhibit(exhibit).result()
                 if raw is None:
                     continue
                 part = parse_document(raw, exhibit.url, prefix=f"{string.ascii_uppercase[index]}_")
@@ -730,6 +807,14 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
     if not changed:
         return None
     return Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names})
+
+
+def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
+    """The listed KPIs a document did not report, apart from breakdowns read as whole tables (their rows vary)."""
+    whole = {item.group.key for item in read if item.locator.get("whole_table")}
+    found = {f"{item.group.key}.{item.kpi.key}" for item in read}
+    return [f"{group.key}.{kpi.key}" for group in spec.groups if group.key not in whole for kpi in group.kpis
+            if kpi.key != group.total_kpi and f"{group.key}.{kpi.key}" not in found]
 
 
 def _same(left: float, right: float) -> bool:

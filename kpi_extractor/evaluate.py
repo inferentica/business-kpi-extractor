@@ -10,12 +10,12 @@ import json
 import os
 import re
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
+from .cli import company_pool
 from .control import ControlPlane
-from .pipeline import SymbolPipeline
+from .pipeline import SymbolPipeline, SymbolResult
 from .sec import configure_identity
 
 GOLDEN = Path("evals/golden.json")  # relative to the repository root, where the workflow runs
@@ -42,6 +42,16 @@ class EvalControl:
 
     def ai(self, *args, **kwargs) -> str:
         return self.plane.ai(*args, **kwargs)
+
+
+def evaluate_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolResult, list[dict]]:
+    """One company in its own process; what it would have stored comes back with its result."""
+    control = EvalControl(plane)
+    try:
+        result = SymbolPipeline(control, symbol, quarters, True, log=lambda line: print(line, flush=True)).run()
+    except Exception as error:  # noqa: BLE001
+        result = SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
+    return result, control.values.get(symbol, [])
 
 
 def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
@@ -87,21 +97,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--golden", default=str(GOLDEN))
     parser.add_argument("--quarters", type=int, default=6)
-    parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument("--workers", type=int, default=os.cpu_count() or 2)
     args = parser.parse_args(argv)
     configure_identity()
     golden = json.loads(Path(args.golden).read_text())
     symbols = sorted({item["symbol"] for item in golden})
     plane = ControlPlane(os.environ["BUSINESS_KPI_WORKFLOW_URL"])
-    control = EvalControl(plane)
     started = plane.call("start", runId=None, triggerType="eval", symbols=symbols, quarters=args.quarters, forceRefresh=True)
     plane.run_id = started["runId"]
-    with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        results = list(pool.map(lambda symbol: SymbolPipeline(control, symbol, args.quarters, True).run(), symbols))
-    report = score(golden, control.values)
+    with company_pool(max(1, min(args.workers, len(symbols)))) as pool:
+        outcomes = list(pool.map(evaluate_symbol, [plane] * len(symbols), symbols, [args.quarters] * len(symbols)))
+    results = [result for result, _values in outcomes]
+    captured = {symbol: values for symbol, (_result, values) in zip(symbols, outcomes)}
+    report = score(golden, captured)
     report["aiCalls"] = sum(result.ai_calls for result in results)
     report["flashOnlyReads"] = sum(result.flash_only_reads for result in results)
     report["proReads"] = sum(result.pro_reads for result in results)
+    report["replayedReads"] = sum(result.replayed_reads for result in results)
     report["errors"] = {result.symbol: result.errors[:5] for result in results if result.errors}
     plane.call("finish", summary={key: value for key, value in report.items() if key != "results"})
     lines = [f"Golden set: {report['correct']}/{report['total']} correct, {report['wrong']} wrong, {report['missing']} missing "
@@ -116,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
     if summary:
         Path(summary).write_text(text + "\n")
     Path("eval-results").mkdir(exist_ok=True)
-    Path("eval-results/report.json").write_text(json.dumps({**report, "captured": control.values}, default=str, indent=1))
+    Path("eval-results/report.json").write_text(json.dumps({**report, "captured": captured}, default=str, indent=1))
     return 0 if report["wrong"] == 0 else 1
 
 

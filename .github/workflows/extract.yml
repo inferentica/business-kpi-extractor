@@ -49,15 +49,16 @@ jobs:
     env:
       BUSINESS_KPI_WORKFLOW_URL: https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - run: pip install '.[test]'
-      - run: pytest
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - run: uv pip install .
       - name: Read filings and store KPIs
         # Inputs reach the command as environment variables, never as interpolated shell text.
         env:
@@ -66,4 +67,4 @@ jobs:
           QUARTERS: ${{ inputs.quarters || '20' }}
           TRIGGER: ${{ inputs.trigger_type || 'manual' }}
           FORCE: ${{ inputs.force_refresh && '--force' || '' }}
-        run: python -m kpi_extractor --run-id "$RUN_ID" --symbols "$SYMBOLS" --quarters "$QUARTERS" --trigger "$TRIGGER" --workers 4 $FORCE
+        run: python -m kpi_extractor --run-id "$RUN_ID" --symbols "$SYMBOLS" --quarters "$QUARTERS" --trigger "$TRIGGER" $FORCE
