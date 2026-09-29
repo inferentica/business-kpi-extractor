@@ -26,8 +26,8 @@ from .fiscal import fiscal_label, learn_year_offset
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
 from .xbrl import XbrlCandidate, extract_breakdowns, official_labels
 
-# About 40k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
-MAX_DOCUMENT_CHARS = 160_000
+# About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
+MAX_DOCUMENT_CHARS = 120_000
 AI_GROUP_PREFIX = "kpi_"
 AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
@@ -94,6 +94,7 @@ class SymbolPipeline:
                     spec, version = updated
                     for ref in releases:
                         self._process_release(ref, spec, version)
+        self._refile_annuals()
         self._derive()
         self._harmonize_labels()
         return self.result
@@ -333,7 +334,8 @@ class SymbolPipeline:
             read, problems, located = self._read(text, document, spec, expected)
             period_problem = check_period(located, expected)
             period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
-            if not located.annual and self._reports_full_year(read, period_end):
+            if not located.annual and (self._reports_full_year(read, period_end)
+                                       or (fiscal_period == "Q4" and self._far_above_quarters(read))):
                 located.annual = True
                 problems.append("breakdown total matches full-year revenue: stored as the fiscal year")
             if located.annual:
@@ -354,15 +356,17 @@ class SymbolPipeline:
     def _release_records(self, read: list[ReadValue], spec: Spec, ref: FilingRef, document: Document, fiscal_year: str,
                          fiscal_period: str, period_end: date, period_problem: str | None) -> list[dict]:
         # A breakdown's total row is its reconciliation target, not a segment of its own.
-        totals = {item.group.key: item.value for item in read
-                  if item.group.kind == "revenue_breakdown" and item.kpi.key == item.group.total_kpi}
+        def is_total(item: ReadValue) -> bool:
+            return item.is_total or item.kpi.key == item.group.total_kpi
+
+        totals = {item.group.key: item.value for item in read if item.group.kind == "revenue_breakdown" and is_total(item)}
         parts_sum: dict[str, float] = {}
         for item in read:
-            if item.group.key in totals and item.kpi.key != item.group.total_kpi:
+            if item.group.key in totals and not is_total(item):
                 parts_sum[item.group.key] = parts_sum.get(item.group.key, 0.0) + item.value
         records = []
         for item in read:
-            if item.group.key in totals and item.kpi.key == item.group.total_kpi:
+            if is_total(item):
                 continue
             notes, status = list(item.notes), item.status
             if period_problem:
@@ -371,7 +375,8 @@ class SymbolPipeline:
             records.append(self._record(
                 group_key=AI_GROUP_PREFIX + item.group.key, group_label=item.group.label,
                 group_kind=item.group.kind, group_order=AI_GROUP_ORDER + spec.groups.index(item.group),
-                kpi_key=item.kpi.key, kpi_label=item.kpi.label, kpi_order=item.group.kpis.index(item.kpi),
+                kpi_key=item.kpi.key, kpi_label=item.kpi.label,
+                kpi_order=item.group.kpis.index(item.kpi) if item.kpi in item.group.kpis else 100 + int(item.locator.get("row", 0)),
                 unit=item.kpi.unit, value=item.value, currency=item.currency, method="ai",
                 validation_status=status, reconciliation_error_pct=(parts_sum[item.group.key] - total) / total if total else None,
                 notes=notes, ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period, period_end=period_end,
@@ -386,6 +391,12 @@ class SymbolPipeline:
         currency = self._default_currency()
         flash = self._ask(text, "locate", Located, thinking_first=False, model="flash")
         flash_read, flash_problems = read_values(document, spec, flash, currency)
+        invalid = [problem for problem in flash_problems if _INVALID_POINTER.search(problem)]
+        if invalid:
+            # One retry with the reader told which pointers failed (e.g. a text block cited as a table).
+            retry_text = text + "\n\nYour previous answer had pointers that do not hold:\n" + "\n".join(f"- {p}" for p in invalid[:20])
+            flash = self._ask(retry_text, "locate", Located, thinking_first=False, model="flash")
+            flash_read, flash_problems = read_values(document, spec, flash, currency)
         if self._flash_is_enough(flash, flash_read, spec, expected, document):
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
@@ -432,7 +443,7 @@ class SymbolPipeline:
         earlier = self._earlier_values(expected)
         for item in read:
             key = f"{item.group.key}.{item.kpi.key}"
-            if item.kpi.key == item.group.total_kpi:
+            if item.is_total or item.kpi.key == item.group.total_kpi:
                 continue  # totals are not stored; the parts must still add up to them
             if key not in last or not _same_place(item.locator, last[key]):
                 return False
@@ -545,6 +556,49 @@ class SymbolPipeline:
         return {key: value["locator"] for key, value in history.items()
                 if value["period_end"] == newest and value.get("locator") and value["validation_status"] == "verified"}
 
+    def _far_above_quarters(self, read: list[ReadValue]) -> bool:
+        """Whether a breakdown's total is several times its usual quarter (an annual report read as a quarter)."""
+        for item in read:
+            if item.group.kind != "revenue_breakdown" or not (item.is_total or item.kpi.key == item.group.total_kpi):
+                continue
+            quarters = sorted({float(v["locator"]["total"]) for v in self.values.values()
+                               if v["group_key"] == AI_GROUP_PREFIX + item.group.key and v["fiscal_period"] in ("Q1", "Q2", "Q3")
+                               and (v.get("locator") or {}).get("total")})
+            if len(quarters) >= 2 and item.value >= 2.5 * quarters[len(quarters) // 2]:
+                return True
+        return False
+
+    def _refile_annuals(self) -> None:
+        """Repairs full-year figures stored as Q4 before these checks existed: every AI value from that filing moves
+        to FY, and the Q4 rows are rejected so Q4 is derived as FY − Q1 − Q2 − Q3."""
+        annual_totals = {v["period_end"]: float(v["locator"]["total"]) for v in self.values.values()
+                         if v["method"] == "xbrl" and v["fiscal_period"] == "FY" and (v.get("locator") or {}).get("total")}
+        quarter_totals: dict[str, list[float]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["fiscal_period"] in ("Q1", "Q2", "Q3") and (v.get("locator") or {}).get("total"):
+                quarter_totals.setdefault(v["group_key"], []).append(float(v["locator"]["total"]))
+        misfiled = set()
+        for v in self.values.values():
+            total = (v.get("locator") or {}).get("total")
+            if v["method"] != "ai" or v["fiscal_period"] != "Q4" or v["validation_status"] == "rejected" or not total:
+                continue
+            total = float(total)
+            annual = next((a for end, a in annual_totals.items() if abs(_days(end, v["period_end"])) <= 12), None)
+            quarters = sorted(quarter_totals.get(v["group_key"], []))
+            if ((annual and abs(total - annual) <= abs(annual) * 0.01)
+                    or (len(quarters) >= 2 and total >= 2.5 * quarters[len(quarters) // 2])):
+                misfiled.add((v["source_accession"], v["fiscal_year"]))
+        if not misfiled:
+            return
+        moved = []
+        for v in list(self.values.values()):
+            if v["method"] == "ai" and v["fiscal_period"] == "Q4" and (v["source_accession"], v["fiscal_year"]) in misfiled:
+                moved.append({**v, "fiscal_period": "FY", "notes": [*(v.get("notes") or []), "full-year figures, re-filed from Q4"]})
+                moved.append({**v, "validation_status": "rejected", "notes": ["full-year figures filed as Q4; see FY"]})
+        for start in range(0, len(moved), 400):
+            self._store(values=moved[start:start + 400])
+        self.log(f"{self.symbol}: re-filed {len(misfiled)} annual report(s) stored as Q4")
+
     def _reports_full_year(self, read: list[ReadValue], period_end: date) -> bool:
         """Whether a breakdown in this document adds up to the fiscal year's revenue in XBRL (an annual report the
         AI took for a quarter), whatever the AI said."""
@@ -596,7 +650,7 @@ class SymbolPipeline:
         changed = []
         for record in derive_periods(list(self.values.values())):
             existing = self.values.get(value_key(record))
-            if existing and existing["method"] != "derived":
+            if existing and existing["method"] != "derived" and existing["validation_status"] != "rejected":
                 continue
             if (existing and float(existing["value"]) == float(record["value"])
                     and existing["validation_status"] == record["validation_status"]):
@@ -704,6 +758,9 @@ def _same_place(now: dict, before: dict) -> bool:
 def _source_template(url: str) -> str:
     """A document's kind from its file name with the dates and numbers taken out ("a2q26e_withguidance.htm")."""
     return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
+
+
+_INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in")
 
 
 def _is_jump(note: str) -> bool:

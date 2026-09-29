@@ -5,8 +5,9 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from .ai import GroupSpec, KpiSpec, Located, Locator, Spec
+from .ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
 from .document import Document, clean, parse_number
+from .xbrl import member_key, remove_subtotals
 
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
 BREAKDOWN_TOLERANCE = 0.01
@@ -30,15 +31,32 @@ class ReadValue:
     locator: dict
     notes: list[str] = field(default_factory=list)
     status: str = "verified"
+    # The breakdown's total row: its reconciliation target, never stored as a part.
+    is_total: bool = False
 
 
 def read_values(document: Document, spec: Spec, located: Located, default_currency: str | None) -> tuple[list[ReadValue], list[str]]:
     """Every locator resolved against the document; locators that do not hold up are dropped with a note."""
     kpis = {f"{group.key}.{kpi.key}": (group, kpi) for group in spec.groups for kpi in group.kpis}
+    groups = {group.key: group for group in spec.groups}
     values: list[ReadValue] = []
     problems: list[str] = []
     seen: set[str] = set()
+    table_groups: set[str] = set()
+    for locator in located.tables:
+        group = groups.get(locator.group)
+        if group is None or group.kind == "metric" or locator.group in table_groups:
+            continue
+        try:
+            rows = _read_table(document, locator, group, default_currency)
+        except LocateError as error:
+            problems.append(f"{locator.group}: {error}")
+            continue
+        table_groups.add(locator.group)
+        values.extend(rows)
     for locator in located.values:
+        if locator.kpi.split(".", 1)[0] in table_groups:
+            continue  # the whole table was read for this group
         if locator.kpi not in kpis or locator.kpi in seen:
             continue
         group, kpi = kpis[locator.kpi]
@@ -52,7 +70,17 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
     return values, problems
 
 
+_PEOPLE = re.compile(r"employee|headcount|workforce|staff", re.I)
+
+
 def _read(document: Document, locator: Locator, kpi: KpiSpec, default_currency: str | None) -> tuple[float, str | None, list[str]]:
+    value, currency, notes = _read_raw(document, locator, kpi, default_currency)
+    if kpi.unit == "count" and _PEOPLE.search(kpi.label) and value > 5_000_000:
+        raise LocateError(f"{kpi.label} of {value:,.0f} is not a plausible headcount")
+    return value, currency, notes
+
+
+def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_currency: str | None) -> tuple[float, str | None, list[str]]:
     notes: list[str] = []
     if locator.table is not None:
         table = document.tables.get(locator.table)
@@ -66,9 +94,15 @@ def _read(document: Document, locator: Locator, kpi: KpiSpec, default_currency: 
         if kpi.unit == "percent" and not parsed.percent and not re.search(r"%|\bpercent", f"{' '.join(table.rows[locator.row])} {header}", re.I):
             raise LocateError(f"{text!r} is not a percentage")
         value = parsed.value
-        if kpi.unit in ("currency", "count") and parsed.scale_word is None:
+        if kpi.unit == "count" and parsed.scale_word is None:
+            # A table's "(in millions, except employee data)" describes its amounts, not its counts: a count takes a
+            # scale only from its own row label ("Paid memberships (in millions)") or from the reading.
+            row_scale = _row_scale(" ".join(table.rows[locator.row]))
+            value *= row_scale or (locator.scale if locator.scale in (1, 1e3, 1e6, 1e9) else 1)
+            return value, None, notes
+        if kpi.unit == "currency" and parsed.scale_word is None:
             declared = table.declared_scale()
-            if declared is None and kpi.unit == "currency":
+            if declared is None:
                 declared = document.default_scale()
             if declared is not None:
                 if locator.scale not in (None, declared):
@@ -99,6 +133,77 @@ def _read(document: Document, locator: Locator, kpi: KpiSpec, default_currency: 
     return parsed.value, _currency(value_text, kpi, default_currency), notes
 
 
+def row_key(label: str) -> str:
+    """A table row's KPI key: its label normalized the same way across filings ("3-nanometer" → "r3nanometer")."""
+    key = member_key(label)
+    return (key if key[:1].isalpha() else f"r{key}")[:48] or "row"
+
+
+_ROW_SCALE = re.compile(r"\((?:in\s+)?(?P<word>thousands|millions|billions)\)", re.I)
+
+
+def _row_scale(text: str) -> float | None:
+    match = _ROW_SCALE.search(text)
+    return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[match.group("word").lower()] if match else None
+
+
+def _read_table(document: Document, locator: TableLocator, group: GroupSpec, default_currency: str | None) -> list[ReadValue]:
+    """Every row of a breakdown or mix table in the reported column, labelled by its own row label. Rows that are the
+    sum of other rows (an "advanced technologies" subtotal) are dropped, so each part is counted once."""
+    table = document.tables.get(locator.table)
+    if table is None:
+        raise LocateError(f"unknown table {locator.table}")
+    unit = "percent" if group.kind == "mix" else "currency"
+    header = " ".join(" ".join(row) for row in table.rows[:3])
+    scale = 1.0
+    if unit == "currency":
+        scale = table.declared_scale() or document.default_scale() or (
+            locator.scale if locator.scale in (1, 1e3, 1e6, 1e9) else None)
+        if scale is None:
+            raise LocateError("amount scale unknown")
+
+    def read_row(index: int) -> tuple[str, float, str] | None:
+        text = table.cell(index, locator.col)
+        parsed = parse_number(text)
+        if parsed is None or index >= len(table.rows):
+            return None
+        label = _row_label(table.rows[index], locator.col)
+        if unit == "percent" and not parsed.percent and "%" not in header and "percent" not in header.lower():
+            raise LocateError(f"{text!r} in row {index} is not a percentage")
+        value = parsed.value if parsed.scale_word or unit == "percent" else parsed.value * scale
+        return label, value, text
+
+    parts: dict[str, tuple[str, float, int]] = {}
+    for index in range(locator.first_row, locator.last_row + 1):
+        if index == locator.total_row:
+            continue
+        row = read_row(index)
+        if row is None or not row[0]:
+            continue
+        key = member_key(row[0])
+        if key not in parts:
+            parts[key] = (row[0], row[1], index)
+    total_row = read_row(locator.total_row) if locator.total_row is not None else None
+    total = total_row[1] if total_row else (100.0 if unit == "percent" else None)
+    kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total)
+    if len(kept) < 2:
+        raise LocateError("fewer than two rows")
+    currency = _currency(total_row[2] if total_row else None, KpiSpec(key="x", label="x", unit="currency"),
+                         default_currency) if unit == "currency" else None
+    values = []
+    for key, (label, value, index) in parts.items():
+        if key not in kept:
+            continue
+        record = {"table": locator.table, "row": index, "col": locator.col, "row_label": label[:80],
+                  "context": table.context[-80:], "whole_table": True}
+        values.append(ReadValue(group, KpiSpec(key=row_key(label), label=label[:80], unit=unit), value, currency, record))
+    if total_row is not None:
+        record = {"table": locator.table, "row": locator.total_row, "col": locator.col, "row_label": "Total", "whole_table": True}
+        values.append(ReadValue(group, KpiSpec(key=group.total_kpi or "total", label="Total", unit=unit), total_row[1],
+                                currency, record, is_total=True))
+    return values
+
+
 def _currency(text: str | None, kpi: KpiSpec, default_currency: str | None) -> str | None:
     if kpi.unit not in ("currency", "ratio"):
         return None
@@ -113,10 +218,15 @@ def _locator_record(document: Document, locator: Locator) -> dict:
     if locator.table is not None:
         table = document.tables[locator.table]
         row = table.rows[locator.row] if locator.row < len(table.rows) else []
-        label = next((cell for cell in row if cell and not re.search(r"\d", cell)), row[0] if row else "")
-        return {"table": locator.table, "row": locator.row, "col": locator.col, "row_label": label[:80],
-                "context": table.context[-80:]}
+        return {"table": locator.table, "row": locator.row, "col": locator.col,
+                "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:]}
     return {"block": locator.block, "quote": clean(locator.quote or "")[:160], "value_text": locator.value_text}
+
+
+def _row_label(row: list[str], col: int) -> str:
+    """A row's label: the first cell with words to the left of the value (not a "$ -" filler in another column)."""
+    return next((cell for cell in row[:col] if re.search(r"[A-Za-z]", cell)),
+                next((cell for cell in row if re.search(r"[A-Za-z]", cell) and not re.search(r"\d", cell)), ""))
 
 
 def locator_hint(locator: dict | None) -> str | None:
@@ -153,8 +263,8 @@ def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None
                 if abs(total - 100) > MIX_TOLERANCE:
                     reason = f"shares add up to {total:.1f}%"
         elif group.kind == "revenue_breakdown":
-            total_item = next((item for item in items if item.kpi.key == group.total_kpi), None)
-            parts = [item for item in items if item.kpi.key != group.total_kpi]
+            total_item = next((item for item in items if item.is_total or item.kpi.key == group.total_kpi), None)
+            parts = [item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]
             if total_item is None or not total_item.value:
                 reason = "no total revenue to reconcile against"
             elif len(parts) < 2:

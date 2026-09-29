@@ -164,6 +164,8 @@ def parse_number(text: str | None) -> ParsedNumber | None:
 
 
 def parse_document(raw_html: bytes | str, source_url: str, prefix: str = "") -> Document:
+    if isinstance(raw_html, str) and raw_html.lstrip().startswith("<?xml"):
+        raw_html = raw_html.encode("utf-8")  # lxml refuses text that declares its own encoding
     root = html.fromstring(raw_html)
     for node in root.xpath("//script|//style|//head"):
         node.drop_tree()

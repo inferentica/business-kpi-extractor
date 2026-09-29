@@ -116,10 +116,29 @@ class Locator(BaseModel):
         return self
 
 
+class TableLocator(BaseModel):
+    """A whole breakdown or mix laid out as one table: code reads every row between first_row and last_row in the
+    reported column, so renamed, split or new rows (a new node, a regrouped region) are never missed."""
+    group: str
+    table: str
+    col: int
+    first_row: int
+    last_row: int
+    total_row: int | None = None
+    scale: float | None = None
+
+    @model_validator(mode="after")
+    def _rows(self) -> "TableLocator":
+        if self.last_row < self.first_row:
+            raise ValueError(f"{self.group}: last_row before first_row")
+        return self
+
+
 class Located(BaseModel):
     period_end: str | None = None
     # The document reports only the full fiscal year (an annual report); its values are for the year, not a quarter.
     annual: bool = False
+    tables: list[TableLocator] = Field(default_factory=list)
     values: list[Locator] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)
 
@@ -143,6 +162,25 @@ class Maintenance(BaseModel):
     add_kpis: dict[str, list[KpiSpec]] = Field(default_factory=dict)
     retire: list[str] = Field(default_factory=list)
 
+    @classmethod
+    def lenient(cls, data: dict) -> "Maintenance":
+        """Keeps every valid addition and drops malformed ones, instead of rejecting the whole audit."""
+        groups = []
+        for raw in (data.get("add_groups") or [])[:4]:
+            try:
+                groups.append(GroupSpec.model_validate(raw))
+            except ValidationError:
+                continue
+        kpis: dict[str, list[KpiSpec]] = {}
+        for group_key, items in (data.get("add_kpis") or {}).items():
+            for raw in items or []:
+                try:
+                    kpis.setdefault(group_key, []).append(KpiSpec.model_validate(raw))
+                except ValidationError:
+                    continue
+        retire = [str(item) for item in (data.get("retire") or []) if isinstance(item, str)]
+        return cls(add_groups=groups, add_kpis=kpis, retire=retire)
+
 
 class Curation(BaseModel):
     """Rows of an XBRL candidate that together make up revenue; empty when no subset does."""
@@ -164,7 +202,10 @@ class AiResponseError(ValueError):
 
 def parse(text: str, model):
     try:
-        return model.model_validate(json.loads(_strip_fences(text)))
+        data = json.loads(_strip_fences(text))
+        if model is Maintenance and isinstance(data, dict):
+            return Maintenance.lenient(data)
+        return model.model_validate(data)
     except (json.JSONDecodeError, ValidationError) as error:
         raise AiResponseError(str(error)[:500]) from error
 
@@ -212,7 +253,10 @@ obligations, non-GAAP adjustments, guidance or outlook, dividends and buybacks, 
 the reported quarter.
 
 When the documents give a breakdown as amounts (for example a financial report's revenue by technology in NT$), track \
-the amounts as a revenue_breakdown; when they also state the shares in percent, track those as a mix as well.
+the amounts as a revenue_breakdown and do not also track its percentage shares: shares are computed from amounts. \
+Track a percentage mix only when the company gives no amounts for it, and only when it states every share.
+Do not track a breakdown that has the same rows as one listed under "Already covered by XBRL", even under another \
+title.
 
 Rules:
 - kind "revenue_breakdown": currency amounts that together make up revenue. Include the table's total row as a KPI and \
@@ -222,14 +266,18 @@ name it in "total_kpi". Skip any breakdown listed under "Already covered by XBRL
 - unit is one of currency, percent, count, ratio (a percentage growth rate is "percent").
 - keys are short snake_case and stable.
 
-Naming (for your groups and for "names"):
-- Breakdown and mix titles read "Revenue by <Dimension>" in Title Case, with the dimension the company uses: Segment, \
-Product, Platform, Technology, Geography, Region, End Market, Customer Type. A mix of something other than revenue \
-says so ("Wafer Shipments by Technology").
+Naming (for your groups and for "names") — concise, plain English a reader understands without the filing, and \
+professional; use the company's official name only when it is itself clear:
+- Breakdown titles read "Revenue by <Dimension>" in Title Case with a one- or two-word dimension: Segment, Product, \
+Platform, Technology, Geography, Region, End Market, Customer. Never "Revenue by Client and Gaming Business" or \
+"Revenue by Google Services Product": say "Revenue by Segment" or "Revenue by Product".
 - Row labels use the company's own names and casing (iPhone, HPC, Family of Apps, 3nm), never XBRL words such as \
 "Member", "Segment" suffixes the company does not use, or "srt"/"us-gaap" prefixes.
-- Metric labels are short and professional, with the company's abbreviation when it uses one: "Daily Active People \
-(DAP)", "Paid Memberships", "Average Revenue per Person (ARPP)".
+- Metric labels are short Title Case nouns: "Employees", "Daily Active People (DAP)", "Paid Memberships", "AWS Revenue \
+Run Rate", "Satellites in Orbit". Spell out internal shorthand (WW → Worldwide, Y/Y → Year over Year, 3P → \
+Third-Party). Avoid the word "mix" unless it is the company's own term; describe a share plainly ("Third-Party Seller \
+Share of Units"). Keep well-known abbreviations the company uses (AWS, DAP, ARPU) and add the full words in brackets \
+only when they help.
 - When a group you track is the same breakdown as one listed under "Name these XBRL breakdowns" (for example the \
 quarterly version of an annual XBRL breakdown), give both the same title and row labels, so they read as one view.
 - "names" renames each breakdown listed under "Name these XBRL breakdowns": {{"<breakdown key>": {{"label": "...", \
@@ -243,12 +291,19 @@ JSON shape:
 
 LOCATE_TASK = f"""Find where each KPI below has its value for the reported quarter. {DOCUMENT_FORMAT}
 
-For each KPI either:
+For a revenue_breakdown or mix laid out as one table, point to the table once instead of to each row:
+  {{"group": "<group>", "table": "B_T68", "col": 1, "first_row": 2, "last_row": 12, "total_row": 13, "scale": 1000}}
+  Code reads every row from first_row to last_row in that column, including rows not in the KPI list (a new node, a \
+regrouped region), so include every row of the breakdown and nothing else; total_row is the breakdown's total (null if \
+none). Use this in "tables".
+
+For each other KPI, in "values", either:
 - a table cell: {{"kpi": "<group>.<kpi>", "table": "A_T3", "row": 5, "col": 2, "scale": 1000000}}
-  "scale" is the multiplier declared for the table's amounts ("in millions" = 1000000, "in thousands" = 1000, none = 1).
+  "scale" is the multiplier that applies to that row ("in millions" = 1000000, "in thousands" = 1000, none = 1). A \
+header such as "(in millions, except employee data)" does not apply to the rows it excepts: use 1 for them.
 - or text: {{"kpi": "<group>.<kpi>", "block": "A_P7", "quote": "<exact excerpt, max 160 chars>", "value_text": "3.60 billion"}}
   The quote is copied character for character from that block and contains value_text, the number exactly as written \
-with its unit word or % sign.
+with its unit word or % sign. Ids containing P are text blocks: quote them; only ids containing T are tables.
 
 Rules:
 - Use the reported quarter's column (three months ended at the period end), never the prior-year quarter, the prior \
@@ -259,7 +314,7 @@ quarter, year-to-date or full-year columns.
 - If the document reports only full-year figures for the period (an annual report with no three-month column), use \
 the full-year column, set "annual": true, and use the fiscal year end as "period_end".
 
-JSON shape: {{"period_end": "2026-06-30", "annual": false, "values": [...], "missing": ["operating.dap"]}}"""
+JSON shape: {{"period_end": "2026-06-30", "annual": false, "tables": [...], "values": [...], "missing": ["operating.dap"]}}"""
 
 REVIEW_TASK = """Two independent readings of this document disagree on the KPIs below. For each, decide which reading \
 is the value for the reported quarter, checking the document yourself. Answer "A" or "B", or "none" if neither is the \
@@ -295,7 +350,9 @@ and that follow the same rules as the list (no totals alone, costs, margins, pro
 Keep keys short snake_case and never reuse an existing key. Name things as the existing list does. Return empty lists \
 when nothing is missing.
 
-JSON shape: {{"add_groups": [], "add_kpis": {{"revenue_by_technology": [{{"key": "n2", "label": "2nm", "unit": "percent"}}]}}, "retire": []}}"""
+JSON shape (every group needs key, label, kind and kpis; every KPI needs key, label and unit):
+{{"add_groups": [{{"key": "operating", "label": "Operating Metrics", "kind": "metric", "kpis": [{{"key": "wafers", "label": "Wafer Shipments", "unit": "count"}}]}}],
+ "add_kpis": {{"revenue_by_technology": [{{"key": "n2", "label": "2nm", "unit": "currency"}}]}}, "retire": []}}"""
 
 CURATE_TASK = """An XBRL revenue breakdown does not add up to reported revenue as tagged: it may include a parent row \
 together with its children, a detail row that overlaps another (e.g. "U.S." beside "U.S. and Canada"), or rows from \

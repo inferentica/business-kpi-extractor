@@ -23,7 +23,8 @@ class ControlPlane:
         self.run_id: str | None = None
         self._token: tuple[str, float] | None = None
 
-    def call(self, operation: str, timeout: float = 90, attempts: int = 3, **payload) -> dict:
+    def call(self, operation: str, timeout: float = 90, attempts: int = 5, **payload) -> dict:
+        # Up to ~30 s of backoff: long enough to ride out a database or gateway blip (a Bad Gateway lasted ~15 s).
         body = {"operation": operation, **({"runId": self.run_id} if self.run_id else {}), **payload}
         data = json.dumps(body, default=str).encode()
         for attempt in range(1, attempts + 1):
