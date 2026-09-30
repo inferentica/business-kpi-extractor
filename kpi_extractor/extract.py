@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from .ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
-from .document import Document, clean, parse_number
+from .document import Document, Table, clean, declared_currency, parse_number
 from .xbrl import member_key, remove_subtotals
 
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
@@ -114,7 +114,8 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
                     notes.append("scale read by AI")
             else:
                 raise LocateError("amount scale unknown")
-        return value, _currency(text, kpi, default_currency), notes
+        context = f"{table.context} {' '.join(' '.join(row) for row in table.rows[:4])}"
+        return value, _currency(text, kpi, default_currency, context), notes
     block = document.blocks.get(locator.block or "")
     if block is None:
         raise LocateError(f"unknown text block {locator.block}")
@@ -138,7 +139,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
             value *= declared
         elif value < 1_000:
             raise LocateError(f"{value_text!r} has no amount scale")
-    return value, _currency(f"{value_text} {quote}", kpi, default_currency), notes
+    return value, _currency(f"{value_text} {quote}", kpi, default_currency, block.text), notes
 
 
 def row_key(label: str) -> str:
@@ -196,8 +197,10 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total)
     if len(kept) < 2:
         raise LocateError("fewer than two rows")
-    currency = _currency(total_row[2] if total_row else None, KpiSpec(key="x", label="x", unit="currency"),
-                         default_currency) if unit == "currency" else None
+    context = f"{table.context} {header}"
+    currency = _currency(total_row[2] if total_row else table.cell(locator.first_row, locator.col),
+                         KpiSpec(key="x", label="x", unit="currency"), default_currency,
+                         context if declared_currency(context) else document.declared_currency()) if unit == "currency" else None
     # What the next quarter's replay needs: the total row's label (None when the table has none) and the scale used.
     total_label = _row_label(table.rows[locator.total_row], locator.col)[:80] if total_row is not None else None
     values = []
@@ -206,7 +209,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
             continue
         record = {"table": locator.table, "row": index, "col": locator.col, "row_label": label[:80],
                   "context": table.context[-80:], "whole_table": True, "total_row_label": total_label,
-                  "scale": scale if unit == "currency" else None}
+                  "scale": scale if unit == "currency" else None,
+                  "header": column_header(table, locator.first_row, locator.col)}
         values.append(ReadValue(group, KpiSpec(key=row_key(label), label=label[:80], unit=unit), value, currency, record))
     if total_row is not None:
         record = {"table": locator.table, "row": locator.total_row, "col": locator.col, "row_label": "Total", "whole_table": True}
@@ -215,13 +219,31 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     return values
 
 
-def _currency(text: str | None, kpi: KpiSpec, default_currency: str | None) -> str | None:
+def _currency(text: str | None, kpi: KpiSpec, default_currency: str | None, context: str = "") -> str | None:
+    """A value's currency, most specific evidence first: a marker on the value itself (NT$, US$, €), then what its
+    table or passage declares, then the company's reporting currency. A bare "$" is only a dollar sign: in TSMC's
+    reports it means New Taiwan dollars, so it defers to the declaration and the reporting currency."""
     if kpi.unit not in ("currency", "ratio"):
         return None
     for marker, code in _CURRENCY_MARKERS:
-        if text and marker in text:
+        if marker != "$" and text and marker in text:
             return code
+    declared = declared_currency(context)
+    if declared:
+        return declared
+    if text and "$" in text:
+        return default_currency or "USD"
     return default_currency if kpi.unit == "currency" else None
+
+
+def column_header(table: Table, first_data_row: int, col: int) -> str:
+    """The words heading a column ("Three Months Ended @ #") with dates and numbers blanked, so a quarter's column and a
+    six-month or prior-year column never pass for one another when a reading is replayed."""
+    cells = [row[col] for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row) and re.search(r"[A-Za-z]", row[col])]
+    text = clean(" ".join(cells)).lower()
+    text = re.sub(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
+                  r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b", "@", text)
+    return re.sub(r"[\d.,]+", "#", text)[:120]
 
 
 def _locator_record(document: Document, locator: Locator) -> dict:
@@ -230,7 +252,8 @@ def _locator_record(document: Document, locator: Locator) -> dict:
         table = document.tables[locator.table]
         row = table.rows[locator.row] if locator.row < len(table.rows) else []
         return {"table": locator.table, "row": locator.row, "col": locator.col,
-                "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:], "scale": locator.scale}
+                "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:], "scale": locator.scale,
+                "header": column_header(table, locator.row, locator.col)}
     return {"block": locator.block, "quote": clean(locator.quote or "")[:160], "value_text": locator.value_text}
 
 

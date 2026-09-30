@@ -72,13 +72,16 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
         ]
         expected = float(item["value"])
         tolerance = float(item.get("tolerance", 1e-6))
-        if any(abs(float(value["value"]) - expected) <= max(abs(expected) * tolerance, 1e-9) for value in candidates):
+        # The whole observation must match: the number, and its currency where the golden value names one.
+        if any(abs(float(value["value"]) - expected) <= max(abs(expected) * tolerance, 1e-9)
+               and value.get("currency") == item.get("currency", value.get("currency")) for value in candidates):
             outcome = "correct"
         elif candidates:
             outcome = "wrong"
         else:
             outcome = "optional" if item.get("optional") else "missing"
-        results.append({**item, "outcome": outcome, "found": [float(value["value"]) for value in candidates][:3]})
+        results.append({**item, "outcome": outcome,
+                        "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates][:3]})
     counted = [result for result in results if result["outcome"] != "optional"]
     correct = sum(1 for result in counted if result["outcome"] == "correct")
     wrong = sum(1 for result in counted if result["outcome"] == "wrong")
@@ -121,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
              "", "| Company | Period | KPI | Expected | Found | Outcome |", "|---|---|---|---|---|---|"]
     for result in report["results"]:
         lines.append(f"| {result['symbol']} | {result['period_end']} | {result['label']} | {result['value']:,} | "
-                     f"{', '.join(f'{value:,.6g}' for value in result['found']) or '—'} | {result['outcome']} |")
+                     f"{', '.join(result['found']) or '—'} | {result['outcome']} |")
     text = "\n".join(lines)
     print(text)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -129,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         Path(summary).write_text(text + "\n")
     Path("eval-results").mkdir(exist_ok=True)
     Path("eval-results/report.json").write_text(json.dumps({**report, "captured": captured}, default=str, indent=1))
-    return 0 if report["wrong"] == 0 else 1
+    return 0 if report["wrong"] == 0 and report["missing"] == 0 else 1  # a required value not found fails the run
 
 
 if __name__ == "__main__":

@@ -331,3 +331,29 @@ def test_the_audit_never_adds_a_mix_of_a_breakdown_tracked_as_amounts():
         {"key": "technology_mix", "label": "Revenue by Technology Mix", "kind": "mix",
          "kpis": [{"key": "n3", "label": "3nm", "unit": "percent"}]}]})
     assert apply_maintenance(spec, answer) is None
+
+
+def test_a_fast_growers_real_q4_is_not_taken_for_a_year():
+    base = {"group_key": "kpi_product", "kpi_key": "a", "method": "ai", "validation_status": "verified", "value": 1.0,
+            "group_label": "x", "kpi_label": "x", "source_accession": "x"}
+    history = [{**base, "fiscal_year": str(2021 + i // 4), "fiscal_period": f"Q{i % 4 + 1}", "period_end": end,
+                "locator": {"total": total}}
+               for i, (end, total) in enumerate([("2021-03-31", 100), ("2021-06-30", 100), ("2021-09-30", 100),
+                                                 ("2026-03-31", 270), ("2026-06-30", 280), ("2026-09-30", 290)])]
+    history.append({**base, "fiscal_year": "2026", "fiscal_period": "Q4", "period_end": "2026-12-31",
+                    "source_accession": "q4", "locator": {"total": 300}})
+    pipeline = _pipeline(FakeControl({}), history)
+    pipeline._refile_annuals()
+    assert pipeline.values[("kpi_product", "a", "2026", "Q4")]["validation_status"] == "verified"
+
+
+def test_a_renamed_xbrl_member_keeps_its_series():
+    from kpi_extractor.xbrl import XbrlGroup
+    stored = {"group_key": "products", "kpi_key": "gaming", "fiscal_year": "2025", "fiscal_period": "FY",
+              "period_end": "2025-06-30", "method": "xbrl", "validation_status": "verified", "value": 23_455_000_000}
+    pipeline = _pipeline(FakeControl({}), [stored, {**stored, "kpi_key": "linkedin", "value": 17_812_000_000}])
+    group = XbrlGroup("products", "Revenue by Product", 1, [("xbox", "Xbox", 21_790_000_000),
+                                                             ("linkedin", "LinkedIn", 19_820_000_000)],
+                      41_610_000_000, 0.0, "USD", "us-gaap:Revenues",
+                      prior={"xbox": 23_455_000_000, "linkedin": 17_812_000_000})
+    assert pipeline._renamed_members(group, True, date(2026, 6, 30)) == {"xbox": "gaming"}

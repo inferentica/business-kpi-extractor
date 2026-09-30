@@ -191,7 +191,9 @@ class SymbolPipeline:
             records = []
             for group, extra_notes in groups:
                 named = self.names.get(group.key) or {}
+                aliases = self._renamed_members(group, breakdowns.annual, breakdowns.period_end)
                 for order, (member, label, value) in enumerate(group.members):
+                    member = aliases.get(member, member)
                     records.append(self._record(
                         group_key=group.key, group_label=named.get("label") or group.label, group_kind="revenue_breakdown",
                         group_order=group.order, kpi_key=member, kpi_label=(named.get("members") or {}).get(member) or label,
@@ -206,6 +208,26 @@ class SymbolPipeline:
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
+
+    def _renamed_members(self, group, annual: bool, period_end: date) -> dict[str, str]:
+        """New member key → the key the same series was stored under, for members a filing renamed. The filing restates
+        the prior year under its new names, so a renamed member's prior-year figure equals, to the unit, what the
+        earlier filing reported under the old name (Microsoft's "Xbox" in its FY2026 10-K is FY2025's "Gaming")."""
+        stored = [v for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
+                  and v["validation_status"] == "verified" and (v["fiscal_period"] == "FY") == annual]
+        known = {v["kpi_key"] for v in stored}
+        current = {member for member, _label, _value in group.members}
+        prior_end = (period_end - timedelta(days=365)).isoformat()
+        aliases: dict[str, str] = {}
+        for member in current - known:
+            prior = group.prior.get(member)
+            if not prior:
+                continue
+            matches = {v["kpi_key"] for v in stored if v["kpi_key"] not in current and _same(float(v["value"]), prior)
+                       and abs(_days(v["period_end"], prior_end)) <= 12}
+            if len(matches) == 1:
+                aliases[member] = matches.pop()
+        return aliases
 
     def _curate(self, candidate: XbrlCandidate):
         """Pro picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""
@@ -375,7 +397,7 @@ class SymbolPipeline:
             period_problem = check_period(located, expected)
             period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
             if not located.annual and (self._reports_full_year(read, period_end)
-                                       or (fiscal_period == "Q4" and self._far_above_quarters(read))):
+                                       or (fiscal_period == "Q4" and self._far_above_quarters(read, period_end))):
                 located.annual = True
                 problems.append("breakdown total matches full-year revenue: stored as the fiscal year")
             if located.annual:
@@ -508,7 +530,7 @@ class SymbolPipeline:
         if located is None:
             return None
         read, problems = read_values(document, spec, located, currency)
-        if problems or not self._flash_is_enough(located, read, spec, expected, document) or self._far_above_quarters(read):
+        if problems or not self._flash_is_enough(located, read, spec, expected, document) or self._far_above_quarters(read, expected):
             return None
         return read, located
 
@@ -651,27 +673,31 @@ class SymbolPipeline:
         return {key: value["locator"] for key, value in history.items()
                 if value["period_end"] == newest and value.get("locator") and value["validation_status"] == "verified"}
 
-    def _far_above_quarters(self, read: list[ReadValue]) -> bool:
-        """Whether a breakdown's total is several times its usual quarter (an annual report read as a quarter)."""
+    def _far_above_quarters(self, read: list[ReadValue], period_end: date) -> bool:
+        """Whether a breakdown's total is several times the quarter just before it (an annual report read as a
+        quarter). Only the adjacent quarter counts: a fast grower's Q4 is far above its quarters of years ago."""
         for item in read:
             if item.group.kind != "revenue_breakdown" or not (item.is_total or item.kpi.key == item.group.total_kpi):
                 continue
-            quarters = sorted({float(v["locator"]["total"]) for v in self.values.values()
-                               if v["group_key"] == AI_GROUP_PREFIX + item.group.key and v["fiscal_period"] in ("Q1", "Q2", "Q3")
-                               and (v.get("locator") or {}).get("total")})
-            if len(quarters) >= 2 and item.value >= 2.5 * quarters[len(quarters) // 2]:
+            before = self._quarter_total_before(AI_GROUP_PREFIX + item.group.key, period_end.isoformat())
+            if before and item.value >= 2.5 * before:
                 return True
         return False
+
+    def _quarter_total_before(self, group_key: str, period_end: str) -> float | None:
+        """The reported total of the group's latest quarter within 120 days before period_end."""
+        candidates = [v for v in self.values.values()
+                      if v["group_key"] == group_key and v["fiscal_period"] in ("Q1", "Q2", "Q3", "Q4")
+                      and v["validation_status"] != "rejected" and (v.get("locator") or {}).get("total")
+                      and 0 < _days(period_end, v["period_end"]) <= 120]
+        latest = max(candidates, key=lambda v: v["period_end"], default=None)
+        return float(latest["locator"]["total"]) if latest else None
 
     def _refile_annuals(self) -> None:
         """Repairs full-year figures stored as Q4 before these checks existed: every AI value from that filing moves
         to FY, and the Q4 rows are rejected so Q4 is derived as FY − Q1 − Q2 − Q3."""
         annual_totals = {v["period_end"]: float(v["locator"]["total"]) for v in self.values.values()
                          if v["method"] == "xbrl" and v["fiscal_period"] == "FY" and (v.get("locator") or {}).get("total")}
-        quarter_totals: dict[str, list[float]] = {}
-        for v in self.values.values():
-            if v["method"] == "ai" and v["fiscal_period"] in ("Q1", "Q2", "Q3") and (v.get("locator") or {}).get("total"):
-                quarter_totals.setdefault(v["group_key"], []).append(float(v["locator"]["total"]))
         misfiled = set()
         for v in self.values.values():
             total = (v.get("locator") or {}).get("total")
@@ -679,9 +705,8 @@ class SymbolPipeline:
                 continue
             total = float(total)
             annual = next((a for end, a in annual_totals.items() if abs(_days(end, v["period_end"])) <= 12), None)
-            quarters = sorted(quarter_totals.get(v["group_key"], []))
-            if ((annual and abs(total - annual) <= abs(annual) * 0.01)
-                    or (len(quarters) >= 2 and total >= 2.5 * quarters[len(quarters) // 2])):
+            before = self._quarter_total_before(v["group_key"], v["period_end"])
+            if (annual and abs(total - annual) <= abs(annual) * 0.01) or (before and total >= 2.5 * before):
                 misfiled.add((v["source_accession"], v["fiscal_year"]))
         if not misfiled:
             return
@@ -753,8 +778,8 @@ class SymbolPipeline:
                        if value["method"] == "derived" and value["validation_status"] != "rejected" and key not in produced)
         for record in derived:
             existing = self.values.get(value_key(record))
-            if existing and existing["method"] != "derived" and existing["validation_status"] != "rejected":
-                continue
+            if existing and existing["method"] != "derived" and existing["validation_status"] == "verified":
+                continue  # a reported figure wins; a flagged partial reading (TSMC's release percentages) does not
             if (existing and float(existing["value"]) == float(record["value"])
                     and existing["validation_status"] == record["validation_status"]):
                 continue
@@ -774,16 +799,16 @@ class SymbolPipeline:
                       spec_version: int | None = None, notes: list[str] | None = None) -> None:
         records = records or []
         previous = self.filings.get(ref.accession)
-        if ref.role == "earnings_release":
-            # A re-read replaces the filing's earlier reading: values it no longer produces (a KPI key the new list
-            # renamed, a figure now read differently) stop being served.
-            fresh = {value_key(record) for record in records}
-            records = records + [
-                {**value, "validation_status": "rejected", "notes": ["replaced by a newer reading of this filing"]}
-                for value in self.values.values()
-                if value["method"] == "ai" and value.get("source_accession") == ref.accession
-                and value["validation_status"] != "rejected" and value_key(value) not in fresh
-            ]
+        # A re-read replaces the filing's earlier reading: values it no longer produces (a KPI key the new list renamed,
+        # a figure now read differently, rows an older extractor kept) stop being served.
+        method = "ai" if ref.role == "earnings_release" else "xbrl"
+        fresh = {value_key(record) for record in records}
+        records = records + [
+            {**value, "validation_status": "rejected", "notes": ["replaced by a newer reading of this filing"]}
+            for value in self.values.values()
+            if value["method"] == method and value.get("source_accession") == ref.accession
+            and value["validation_status"] != "rejected" and value_key(value) not in fresh
+        ]
         filing = {
             "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(), "document_role": ref.role,
             "period_end": period_end.isoformat() if period_end else None, "fiscal_year": fiscal_year,

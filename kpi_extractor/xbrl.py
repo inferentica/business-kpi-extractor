@@ -50,6 +50,9 @@ class XbrlGroup:
     reconciliation_error: float | None
     currency: str | None
     concept: str
+    # The same breakdown one year earlier as this filing restates it (member key → value): renamed members (Microsoft's
+    # "Gaming" became "Xbox") are recognized by matching these to what the earlier filing reported.
+    prior: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -131,7 +134,10 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     frame["_start"] = pd.to_datetime(frame["period_start"], errors="coerce")
     frame["_end"] = pd.to_datetime(frame["period_end"], errors="coerce")
     days = (frame["_end"] - frame["_start"]).dt.days
-    in_period = (frame["_end"].dt.date == period_end) & (days.between(330, 400) if annual else days.between(80, 100))
+    duration = days.between(330, 400) if annual else days.between(80, 100)
+    prior_end = frame["_end"].dt.date.map(lambda end: end is not None and not pd.isna(end) and 358 <= (period_end - end).days <= 372)
+    prior_frame = frame[duration & prior_end & frame["numeric_value"].notna()]
+    in_period = (frame["_end"].dt.date == period_end) & duration
     frame = frame[in_period & frame["numeric_value"].notna()]
     dimension_columns = [column for column in frame.columns if column.startswith("dim_")]
     axis_qnames = {_axis_name(column): column[4:].replace("_", ":", 1) for column in dimension_columns}
@@ -213,7 +219,9 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         leaves = drop_overlaps(remove_subtotals(members, total), total)
         error = (sum(leaves.values()) - total) / total if len(leaves) >= 2 else None
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
-            groups.append(XbrlGroup(key, title, order, named(leaves), total, error, currencies.get(concept), concept))
+            prior = _single_axis_members(prior_frame, concept, axis, dimension_columns)
+            groups.append(XbrlGroup(key, title, order, named(leaves), total, error, currencies.get(concept), concept,
+                                    {k: v for k, _n, v in named(prior)}))
             continue
         # Worth an AI review only when it could plausibly be a breakdown: a standard axis, or a custom one whose rows
         # are of the right order of magnitude.
@@ -224,6 +232,17 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     groups.sort(key=lambda group: (group.order, group.key))
     total_revenue = next((totals[concept] for concept in REVENUE_CONCEPTS if concept in totals), None)
     return XbrlBreakdowns(period_end, annual, _fiscal_year(entity), groups, total_revenue, rejected)
+
+
+def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str]) -> dict[str, float]:
+    """Members of one axis for one concept, from facts tagged with that axis alone."""
+    members: dict[str, float] = {}
+    for _, fact in frame[frame["concept"] == concept].iterrows():
+        dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
+        dimensions = {a: m for a, m in dimensions.items() if (a, local_name(m)) not in _NEUTRAL_MEMBERS}
+        if len(dimensions) == 1 and axis in dimensions:
+            members.setdefault(dimensions[axis], float(fact["numeric_value"]))
+    return members
 
 
 def drop_overlaps(members: dict[str, float], total: float | None) -> dict[str, float]:

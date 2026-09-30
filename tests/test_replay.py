@@ -170,3 +170,20 @@ def test_a_partial_flash_reading_of_an_empty_kind_still_goes_to_pro():
                                "notes": ["read by AI"], "source_url": URL.format(n=1), "period_end": "2026-03-31"}}
     pipeline._read(lambda: "prompt", document, SPEC, Q2, version=1)
     assert ("locate", "pro") in control.calls
+
+
+def test_a_six_month_column_is_never_replayed_as_the_quarter():
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    last = {f"{v['group_key'][4:]}.{v['kpi_key']}": v["locator"] for v in _history(first)}
+    six = report("June 30", 21, 45, 61, 82, 310).replace("Three Months Ended", "Six Months Ended")
+    assert replay(parse_document(six, URL.format(n=2)), last, Q2) is None
+
+
+def test_a_quote_about_another_node_is_never_taken_for_this_one():
+    document = parse_document("<p>In the quarter, 3-nanometer shipments accounted for 28% of wafer revenue.</p>"
+                              "<p>5-nanometer process technology accounted for 35%.</p>", URL.format(n=1))
+    block = next(key for key, item in document.blocks.items() if "3-nanometer" in item.text)
+    last = {"technology.n3": {"block": block, "quote": "3-nanometer shipments accounted for 28%", "value_text": "28%"}}
+    changed = parse_document("<p>In the quarter, 5-nanometer shipments accounted for 35% of wafer revenue.</p>",
+                             URL.format(n=2))
+    assert replay(changed, last, Q2) is None

@@ -92,3 +92,18 @@ def test_figures_quoted_from_text_take_their_blocks_scale():
         {"kpi": "product.systems", "block": block, "quote": "Net system sales 5,596.1 6,564.8", "value_text": "6,564.8"}]})
     values, problems = read_values(document, spec, located, "EUR")  # the company's XBRL currency
     assert problems == [] and values[0].value == 6_564_800_000 and values[0].currency == "EUR"
+
+
+def test_a_bare_dollar_sign_follows_the_reports_declared_currency():
+    document = parse_document(REPORT, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "tables": [
+        {"group": "technology", "table": table, "col": 1, "first_row": 2, "last_row": 6, "total_row": 7}]})
+    values, _ = read_values(document, SPEC, located, "USD")  # even when told the company reports in dollars
+    assert {item.currency for item in values} == {"TWD"}
+
+
+def test_a_passing_mention_of_a_currency_is_not_a_declaration():
+    from kpi_extractor.document import declared_currency
+    assert declared_currency("Sales to Europe are billed in euros. (In millions) Revenue $ 1,000") is None
+    assert declared_currency("(Unaudited, €, in millions, except per share data)") == "EUR"

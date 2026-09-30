@@ -9,7 +9,7 @@ from datetime import date
 
 from .ai import Located, Locator, TableLocator
 from .document import Document, Table, clean, parse_number
-from .extract import PERIOD_TOLERANCE_DAYS, _row_label
+from .extract import PERIOD_TOLERANCE_DAYS, _row_label, column_header
 from .xbrl import member_key
 
 _MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
@@ -67,7 +67,7 @@ def _replay_value(document: Document, key: str, locator: dict) -> Locator | None
     for table in _tables_by_preference(document, locator.get("table")):
         rows = [index for index, row in enumerate(table.rows)
                 if clean(_row_label(row, col)).lower() == label and parse_number(table.cell(index, col))]
-        if len(rows) == 1 and current_column(table, rows[0], col):
+        if len(rows) == 1 and current_column(table, rows[0], col) and _same_header(table, rows[0], col, locator):
             matches.append((table.id, rows[0]))
     if not matches or (len(matches) > 1 and matches[0][0] != locator.get("table")):
         return None  # the row is gone, or several tables carry it and none is last quarter's
@@ -96,7 +96,7 @@ def _replay_table(document: Document, group: str, parts: list[dict]) -> TableLoc
             last_row = total_row - 1  # rows added since last quarter (a new node) sit above the total
         if total_row is not None and first_row <= total_row <= last_row:
             continue
-        if not current_column(table, first_row, col):
+        if not current_column(table, first_row, col) or not _same_header(table, first_row, col, first):
             continue
         return TableLocator(group=group, table=table.id, col=col, first_row=first_row, last_row=last_row,
                             total_row=total_row, scale=first.get("scale"))
@@ -122,7 +122,7 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | None
         pattern, position, group, value_group = [], 0, 0, None
         for token in tokens:
             pattern.append(re.escape(quote[position:token.start()]))
-            if token is numbers[index] or (loose and token.group()[0].isdigit()):
+            if token is numbers[index] or (loose and token.group()[0].isdigit() and not _names(quote, token)):
                 group += 1
                 value_group = group if token is numbers[index] else value_group
                 pattern.append(r"(\d[\d.,]*)")
@@ -143,6 +143,17 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | None
     if new_value not in match.group(0):
         return None
     return Locator(kpi=key, block=block_id, quote=match.group(0), value_text=new_value)
+
+
+def _names(text: str, token: re.Match) -> bool:
+    """Whether a number is part of a name rather than a figure: "3-nanometer", "5G", "M365" keep their number."""
+    before, after = text[max(0, token.start() - 1):token.start()], text[token.end():token.end() + 2]
+    return bool(re.match(r"-?[A-Za-z]", after)) or bool(re.match(r"[A-Za-z]", before))
+
+
+def _same_header(table: Table, first_data_row: int, col: int, locator: dict) -> bool:
+    """The column is headed as last quarter's was (three months, not six; this year's quarter, not a year to date)."""
+    return "header" not in locator or column_header(table, first_data_row, col) == locator["header"]
 
 
 def _tables_by_preference(document: Document, table_id: str | None) -> list[Table]:

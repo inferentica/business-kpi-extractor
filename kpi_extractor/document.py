@@ -24,6 +24,28 @@ _AMOUNT = re.compile(r"[^\w]*\d[\d,.]*\s*[%)]*")
 _TABLE_SCALE = re.compile(r"\b(?:in|amounts in|\(in)\s+(?:[A-Z]{0,3}\$\s*|NT\$\s*|US\$\s*)?(?P<word>thousands|millions|billions)\b", re.I)
 
 
+_DECLARED_CURRENCIES = (
+    (re.compile(r"new taiwan dollars?|\bNT\$|\bNTD\b", re.I), "TWD"),
+    (re.compile(r"\beuros?\b|€", re.I), "EUR"),
+    (re.compile(r"\brenminbi\b|\bRMB\b", re.I), "CNY"),
+    (re.compile(r"\bjapanese yen\b|¥", re.I), "JPY"),
+    (re.compile(r"hong kong dollars?|\bHK\$", re.I), "HKD"),
+    (re.compile(r"pounds? sterling|£", re.I), "GBP"),
+    (re.compile(r"\bU\.?S\.? dollars?\b|\bUS\$|\bUSD\b", re.I), "USD"),
+)
+
+
+def declared_currency(text: str) -> str | None:
+    """The one currency an amount declaration names ("Amounts in Thousands of New Taiwan Dollars", "(€, in
+    millions)"): only the words around a scale phrase count, never a passing mention of a currency."""
+    found = set()
+    for match in _TABLE_SCALE.finditer(text or ""):
+        before = re.split(r"[.;:]\s", text[max(0, match.start() - 40):match.start()])[-1]  # the same clause only
+        window = before + text[match.start():match.end() + 60]
+        found |= {code for pattern, code in _DECLARED_CURRENCIES if pattern.search(window)}
+    return found.pop() if len(found) == 1 else None
+
+
 @dataclass
 class Table:
     id: str
@@ -86,6 +108,15 @@ class Document:
             text = item.text if isinstance(item, TextBlock) else f"{item.context} {' '.join(' '.join(r) for r in item.rows[:3])}"
             for match in _TABLE_SCALE.finditer(text):
                 found.add(_SCALE_WORDS[match.group("word").lower().rstrip("s")])
+        return found.pop() if len(found) == 1 else None
+
+    def declared_currency(self) -> str | None:
+        """The one currency a document's amount declarations name, if any."""
+        found = set()
+        for item in [*self.blocks.values(), *self.tables.values()]:
+            text = item.text if isinstance(item, TextBlock) else f"{item.context} {' '.join(' '.join(r) for r in item.rows[:3])}"
+            if code := declared_currency(text):
+                found.add(code)
         return found.pop() if len(found) == 1 else None
 
     def outline(self, max_chars: int = 60_000) -> str:
