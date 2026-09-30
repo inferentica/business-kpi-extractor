@@ -379,3 +379,27 @@ def test_a_breakdown_that_can_never_reconcile_becomes_metrics():
     kinds = {group.key: (group.kind, [kpi.key for kpi in group.kpis]) for group in normalized.groups}
     assert kinds == {"segments": ("revenue_breakdown", ["a", "b", "total"]),
                      "operating": ("metric", ["ai_semiconductor"])}
+
+
+def test_stored_whole_table_rows_move_to_the_listed_keys():
+    spec = Spec.model_validate({"groups": [{"key": "technology", "label": "Revenue by Technology", "kind": "revenue_breakdown",
+                                            "total_kpi": "wafer", "kpis": [
+        {"key": "nm3", "label": "3nm", "unit": "currency"}, {"key": "nm5", "label": "5nm", "unit": "currency"},
+        {"key": "wafer", "label": "Wafer revenue", "unit": "currency"}]}]})
+    base = {"group_key": "kpi_technology", "fiscal_year": "2026", "fiscal_period": "Q2", "period_end": "2026-06-30",
+            "method": "ai", "group_kind": "revenue_breakdown", "group_label": "Revenue by Technology", "source_accession": "r"}
+    rows = [{**base, "kpi_key": "r3nanometer", "kpi_label": "3-nanometer", "value": 320.0, "validation_status": "verified"},
+            {**base, "kpi_key": "nm3", "kpi_label": "3nm", "value": 30.0, "validation_status": "needs_review",
+             "source_accession": "release"}]
+    pipeline = _pipeline(FakeControl({}), rows)
+    pipeline._adopt_listed_keys(spec)
+    assert pipeline.values[("kpi_technology", "nm3", "2026", "Q2")]["value"] == 320.0
+    assert pipeline.values[("kpi_technology", "r3nanometer", "2026", "Q2")]["validation_status"] == "rejected"
+
+
+def test_an_audit_that_only_adds_is_recognized():
+    from kpi_extractor.pipeline import only_adds
+    added = apply_maintenance(SPEC, ai.Maintenance.model_validate({
+        "add_kpis": {"technology": [{"key": "n2", "label": "2nm", "unit": "percent"}]}}))
+    retired = apply_maintenance(SPEC, ai.Maintenance.model_validate({"retire": ["technology.other"]}))
+    assert only_adds(SPEC, added) and not only_adds(SPEC, retired)

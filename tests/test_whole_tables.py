@@ -41,7 +41,7 @@ def test_a_whole_table_brings_every_row_and_drops_subtotals():
     values, problems = read_values(document, SPEC, located, "TWD")
     assert problems == []
     parts = {item.kpi.label: item.value for item in values if not item.is_total}
-    assert parts == {"2-nanometer": 31_934_248_000, "3-nanometer": 320_558_574_000,
+    assert parts == {"2-nanometer": 31_934_248_000, "3nm": 320_558_574_000,  # a listed KPI keeps its listed name
                      "5-nanometer": 350_112_503_000, "Others": 100_000_000_000}
     assert all(item.kpi.key[0].isalpha() for item in values)
     validate_groups(values, previous={})
@@ -128,3 +128,17 @@ def test_only_the_rows_a_total_covers_are_kept():
     values, problems = read_values(document, spec, located, "USD")
     assert problems == []
     assert {item.kpi.label: item.value for item in values if not item.is_total} == {"Client": 2.5e9, "Gaming": 1.1e9}
+
+
+def test_table_rows_take_the_listed_kpi_keys():
+    from kpi_extractor.extract import _listed_kpi
+    group = SPEC.groups[0]
+    assert _listed_kpi(group, "3-nanometer").key == "n3"
+    listed = Spec.model_validate({"groups": [{"key": "p", "label": "Revenue by Product Type", "kind": "revenue_breakdown",
+                                              "total_kpi": "total", "kpis": [
+        {"key": "net_product_sales", "label": "Net product sales", "unit": "currency"},
+        {"key": "nm3", "label": "3nm", "unit": "currency"},
+        {"key": "total", "label": "Total net sales", "unit": "currency"}]}]}).groups[0]
+    assert _listed_kpi(listed, "Net product sales").key == "net_product_sales"
+    assert _listed_kpi(listed, "3-nanometer").key == "nm3"
+    assert _listed_kpi(listed, "Net service sales") is None

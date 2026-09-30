@@ -142,6 +142,23 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
     return value, _currency(f"{value_text} {quote}", kpi, default_currency, block.text), notes
 
 
+def _identity(text: str) -> str:
+    """A label or key reduced to what it names: "3-nanometer", "3nm" and "nm3" are one node; "Net product sales" and
+    "net_product_sales" one line."""
+    key = member_key(text.replace("_", " "))
+    key = re.sub(r"nanometers?", "nm", key)
+    return re.sub(r"^nm(\d+)$", r"\1nm", key)
+
+
+def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
+    """The KPI on the company's list a table row is, so a whole-table reading and a row-by-row reading of one table use
+    one key (Flash and Pro then agree, and a breakdown is never stored twice under two names)."""
+    wanted = _identity(label)
+    matches = [kpi for kpi in group.kpis if kpi.key != group.total_kpi
+               and wanted in (_identity(kpi.label), _identity(kpi.key))]
+    return matches[0] if len(matches) == 1 else None
+
+
 def row_key(label: str) -> str:
     """A table row's KPI key: its label normalized the same way across filings ("3-nanometer" → "r3nanometer")."""
     key = member_key(label)
@@ -218,7 +235,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                   "context": table.context[-80:], "whole_table": True, "total_row_label": total_label,
                   "scale": scale if unit == "currency" else None,
                   "header": column_header(table, locator.first_row, locator.col)}
-        values.append(ReadValue(group, KpiSpec(key=row_key(label), label=label[:80], unit=unit), value, currency, record))
+        values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit),
+                                value, currency, record))
     if total_row is not None:
         record = {"table": locator.table, "row": total_index, "col": locator.col, "row_label": "Total", "whole_table": True}
         values.append(ReadValue(group, KpiSpec(key=group.total_kpi or "total", label="Total", unit=unit), total_row[1],

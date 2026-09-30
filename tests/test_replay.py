@@ -89,7 +89,7 @@ def test_next_quarter_is_read_again_by_code_with_new_rows_and_new_numbers():
     assert problems == []
     read = {item.kpi.key: item.value for item in values if not item.is_total}
     assert read["members"] == 310_000_000
-    assert read["r3nanometer"] == 25_000 and "a16" not in read  # the new row sits above the old first row
+    assert read["n3"] == 25_000 and "a16" not in read  # the listed 3nm KPI keeps its key  # the new row sits above the old first row
 
 
 def test_a_replayed_quarter_needs_no_ai_call():

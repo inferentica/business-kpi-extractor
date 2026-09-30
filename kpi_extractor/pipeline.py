@@ -22,7 +22,7 @@ from .ai import AiResponseError, Located, Spec
 from .control import ControlError
 from .derive import derive_periods
 from .document import Document, clean, parse_document
-from .extract import ReadValue, check_period, describe, locator_hint, read_values, validate_groups
+from .extract import ReadValue, _listed_kpi, check_period, describe, locator_hint, read_values, validate_groups
 from .fiscal import fiscal_label, learn_year_offset
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
@@ -118,11 +118,24 @@ class SymbolPipeline:
             processed = [ref for ref in releases if self._process_release(ref, spec, version)]
             latest_end = releases[-1].period_end if releases else None
             if not proposed and any(ref.period_end == latest_end for ref in processed):
+                previous_spec = spec
                 updated = self._maintain(spec, version, [ref for ref in releases if ref.period_end == latest_end])
                 if updated is not None:
                     spec, version = updated
-                    for ref in releases:
-                        self._process_release(ref, spec, version)
+                    if only_adds(previous_spec, spec):
+                        # New KPIs are looked for in the last four quarters; older filings keep their readings and
+                        # simply move to the new list version (a full re-read took TSMC 38 of 63 minutes).
+                        cutoff = latest_end - timedelta(days=370)
+                        for ref in releases:
+                            if ref.period_end >= cutoff:
+                                self._process_release(ref, spec, version)
+                            else:
+                                self._carry_to_version(ref, version)
+                    else:
+                        for ref in releases:
+                            self._process_release(ref, spec, version)
+        if spec is not None:
+            self._adopt_listed_keys(spec)
         self._refile_annuals()
         self._recheck_flagged()
         self._unify_series()
@@ -433,6 +446,16 @@ class SymbolPipeline:
             self._fail_filing(ref, error, spec_version=version)
         return True
 
+    def _carry_to_version(self, ref: FilingRef, version: int) -> None:
+        filing = self.filings.get(ref.accession)
+        if not filing or filing.get("status") not in _DONE:
+            return
+        carried = {"accession": ref.accession, "spec_version": version, "status": filing["status"],
+                   "attempts": filing.get("attempts", 1), "value_count": filing.get("value_count", 0),
+                   "notes": filing.get("notes") or []}
+        self._store(filings=[carried])
+        self.filings[ref.accession] = {**filing, "spec_version": version}
+
     def _release_records(self, read: list[ReadValue], spec: Spec, ref: FilingRef, document: Document, fiscal_year: str,
                          fiscal_period: str, period_end: date, period_problem: str | None) -> list[dict]:
         # A breakdown's total row is its reconciliation target, not a segment of its own.
@@ -739,6 +762,27 @@ class SymbolPipeline:
             self._store(values=moved[start:start + 400])
         self.log(f"{self.symbol}: re-filed {len(misfiled)} annual report(s) stored as Q4")
 
+    def _adopt_listed_keys(self, spec: Spec) -> None:
+        """Stored rows of a table read whole move to the key of the listed KPI they are ("3-nanometer" → nm3), the key a
+        row-by-row reading uses, so one quarter never holds a figure twice and years line up for Q4. No AI involved."""
+        groups = {AI_GROUP_PREFIX + group.key: group for group in spec.groups}
+        moved = []
+        for v in list(self.values.values()):
+            group = groups.get(v["group_key"])
+            if group is None or v["method"] != "ai" or v["validation_status"] == "rejected":
+                continue
+            kpi = _listed_kpi(group, v["kpi_label"]) or _listed_kpi(group, v["kpi_key"])
+            if kpi is None or kpi.key == v["kpi_key"]:
+                continue
+            target = self.values.get((v["group_key"], kpi.key, v["fiscal_year"], v["fiscal_period"]))
+            if target and target["validation_status"] == "verified" and v["validation_status"] != "verified":
+                moved.append({**v, "validation_status": "rejected", "notes": [f"same figure as {kpi.key}"]})
+                continue
+            moved.append({**v, "kpi_key": kpi.key, "kpi_label": kpi.label})
+            moved.append({**v, "validation_status": "rejected", "notes": [f"continued as {kpi.key}"]})
+        for start in range(0, len(moved), 400):
+            self._store(values=moved[start:start + 400])
+
     def _unify_series(self) -> None:
         """One key per business across a company's whole XBRL history, so Q4 = year − quarters always lines up.
         Two kinds of evidence link keys: the same XBRL element (a label change: "Dynamics" became "Dynamics products and
@@ -968,6 +1012,9 @@ class SymbolPipeline:
         values = list({value_key(value): value for value in values or []}.values())  # one row per key per write
         self.control.call("store", symbol=self.symbol, filings=filings or [], values=values)
         for value in values:
+            existing = self.values.get(value_key(value))
+            if existing and _keeps_verified(existing, value):
+                continue  # as store_business_kpis does: another filing's unchecked reading never replaces a verified one
             self.values[value_key(value)] = value
         self.result.values += len(values)
 
@@ -983,6 +1030,12 @@ def keep_current_groups(proposed: Spec, current: Spec) -> Spec:
         return proposed
     groups = [*(group.model_dump() for group in proposed.groups), *(group.model_dump() for group in kept)]
     return Spec.model_validate({"groups": groups[:ai.MAX_GROUPS], "names": proposed.names})
+
+
+def only_adds(before: Spec, after: Spec) -> bool:
+    """Whether a new list keeps every KPI of the old one as it was, adding only."""
+    kept = {(group.key, group.kind, kpi.key, kpi.unit) for group in after.groups for kpi in group.kpis}
+    return all((group.key, group.kind, kpi.key, kpi.unit) in kept for group in before.groups for kpi in group.kpis)
 
 
 def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
@@ -1021,6 +1074,11 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
     if not changed:
         return None
     return ai.normalize_spec(Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names}))
+
+
+def _keeps_verified(existing: dict, incoming: dict) -> bool:
+    return (existing["validation_status"] == "verified" and incoming["validation_status"] == "needs_review"
+            and existing.get("source_accession") != incoming.get("source_accession"))
 
 
 def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
