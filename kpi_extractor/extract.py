@@ -198,6 +198,10 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     total_row = read_row(total_index) if total_index is not None else None
     total = total_row[1] if total_row else (100.0 if unit == "percent" else None)
     kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total)
+    if total and unit == "currency" and total_index is not None and abs(sum(kept.values()) - total) > abs(total) * 0.001:
+        block = _block_summing_to(parts, total_index, total)
+        if block:
+            kept = {key: parts[key][1] for key in block}
     if len(kept) < 2:
         raise LocateError("fewer than two rows")
     context = f"{table.context} {header}"
@@ -220,6 +224,22 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         values.append(ReadValue(group, KpiSpec(key=group.total_kpi or "total", label="Total", unit=unit), total_row[1],
                                 currency, record, is_total=True))
     return values
+
+
+def _block_summing_to(parts: dict, total_index: int, total: float) -> list[str] | None:
+    """The rows right next to a total row that add up to it, when the rows read span more than it covers: AMD's
+    segment table lists Data Center and Embedded beside the Client and Gaming rows its "Client and Gaming" total sums."""
+    ordered = sorted(parts, key=lambda key: parts[key][2])
+    above = [key for key in ordered if parts[key][2] < total_index][::-1]
+    below = [key for key in ordered if parts[key][2] > total_index]
+    for side in (above, below):
+        running, block = 0.0, []
+        for key in side:
+            running += parts[key][1]
+            block.append(key)
+            if len(block) >= 2 and abs(running - total) <= abs(total) * 0.001:
+                return block
+    return None
 
 
 def _total_row_by_sum(table: Table, locator: TableLocator, parts: dict, read_row) -> int | None:

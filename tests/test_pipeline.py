@@ -365,3 +365,17 @@ def test_one_business_keeps_one_series_across_renamed_and_reused_elements():
     live = {(v["fiscal_year"], v["fiscal_period"]): v["kpi_key"] for v in pipeline.values.values()
             if v["validation_status"] != "rejected" and v["kpi_key"] != "linkedin"}
     assert set(live.values()) == {"searchadvertising"} and len(live) == 4
+
+
+def test_a_breakdown_that_can_never_reconcile_becomes_metrics():
+    spec = Spec.model_validate({"groups": [
+        {"key": "product_line", "label": "Revenue by Product Line", "kind": "revenue_breakdown",
+         "kpis": [{"key": "ai_semiconductor", "label": "AI Semiconductor", "unit": "currency"}]},
+        {"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown", "total_kpi": "total",
+         "kpis": [{"key": "a", "label": "A", "unit": "currency"}, {"key": "b", "label": "B", "unit": "currency"},
+                  {"key": "total", "label": "Total", "unit": "currency"}]},
+    ]})
+    normalized = ai.normalize_spec(spec)
+    kinds = {group.key: (group.kind, [kpi.key for kpi in group.kpis]) for group in normalized.groups}
+    assert kinds == {"segments": ("revenue_breakdown", ["a", "b", "total"]),
+                     "operating": ("metric", ["ai_semiconductor"])}

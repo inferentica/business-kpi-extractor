@@ -82,6 +82,9 @@ def main(argv: list[str] | None = None) -> int:
             "proReads": sum(result.pro_reads for result in results),
             "replayedReads": sum(result.replayed_reads for result in results),
             "q4Gaps": {result.symbol: result.q4_gaps[:10] for result in results if result.q4_gaps},
+            # Companies whose earnings-document values are mostly unverified: a list or reading that needs attention.
+            "lowCoverage": {result.symbol: f"{result.release_verified}/{result.release_values}" for result in results
+                            if result.release_values >= 5 and result.release_verified < 0.5 * result.release_values},
             "failedCompanies": [result.symbol for result in results if result.errors and not result.filings],
             "errors": {result.symbol: result.errors[:5] for result in results if result.errors},
         }

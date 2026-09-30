@@ -54,6 +54,9 @@ class SymbolResult:
     replayed_reads: int = 0
     # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.
     q4_gaps: list[str] = field(default_factory=list)
+    # Values read from earnings documents that are not rejected, and how many of them are verified (shown to users).
+    release_values: int = 0
+    release_verified: int = 0
     errors: list[str] = field(default_factory=list)
 
 
@@ -126,6 +129,11 @@ class SymbolPipeline:
         self._derive()
         self._harmonize_labels()
         self.result.q4_gaps = self._q4_gaps()
+        live = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] != "rejected"]
+        self.result.release_values = len(live)
+        self.result.release_verified = sum(1 for v in live if v["validation_status"] == "verified")
+        if len(live) >= 5 and self.result.release_verified < 0.5 * len(live):
+            self.log(f"{self.symbol}: only {self.result.release_verified} of {len(live)} release values are verified")
         if self.result.q4_gaps:
             self.log(f"{self.symbol}: no Q4 for {', '.join(self.result.q4_gaps[:10])}")
         return self.result
@@ -267,7 +275,14 @@ class SymbolPipeline:
 
     def _spec(self, row: dict | None, releases: list[FilingRef]) -> tuple[Spec | None, int, bool]:
         if row and not self.force:
-            return Spec.model_validate({"groups": row["groups"], "names": row.get("names") or {}}), int(row["version"]), False
+            stored = Spec.model_validate({"groups": row["groups"], "names": row.get("names") or {}})
+            spec, version = ai.normalize_spec(stored), int(row["version"])
+            if spec.model_dump() != stored.model_dump():
+                # A stored list that breaks the rules is repaired once; its filings are then read with the new version.
+                version += 1
+                self._store_spec(spec, row.get("names") or {}, version, row.get("source_accession") or "")
+                self.log(f"{self.symbol}: KPI list v{version}: breakdowns that cannot reconcile became metrics")
+            return spec, version, False
         if not releases:
             return None, 0, False
         latest = releases[-1]
@@ -293,6 +308,7 @@ class SymbolPipeline:
             return None, 0, False
         if current is not None:
             spec = keep_current_groups(spec, current)
+        spec = ai.normalize_spec(spec)
         # Names may only rename breakdowns and members that exist.
         names = {
             key: {"label": name.label, "members": {m: l for m, l in name.members.items() if m in breakdowns[key]["members"]}}
@@ -1004,7 +1020,7 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
             changed = True
     if not changed:
         return None
-    return Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names})
+    return ai.normalize_spec(Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names}))
 
 
 def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:

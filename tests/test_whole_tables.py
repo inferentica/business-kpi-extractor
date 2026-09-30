@@ -107,3 +107,24 @@ def test_a_passing_mention_of_a_currency_is_not_a_declaration():
     from kpi_extractor.document import declared_currency
     assert declared_currency("Sales to Europe are billed in euros. (In millions) Revenue $ 1,000") is None
     assert declared_currency("(Unaudited, €, in millions, except per share data)") == "EUR"
+
+
+def test_only_the_rows_a_total_covers_are_kept():
+    document = parse_document("""<p>(In millions)</p><table>
+      <tr><td></td><td>Three Months Ended June 27, 2026</td></tr>
+      <tr><td>Data Center</td><td>$ 4,000</td></tr>
+      <tr><td>Client</td><td>2,500</td></tr>
+      <tr><td>Gaming</td><td>1,100</td></tr>
+      <tr><td>Client and Gaming</td><td>3,600</td></tr>
+      <tr><td>Embedded</td><td>900</td></tr>
+    </table>""", "https://www.sec.gov/x.htm")
+    spec = Spec.model_validate({"groups": [{"key": "cg", "label": "Client and Gaming", "kind": "revenue_breakdown",
+                                            "total_kpi": "total", "kpis": [
+        {"key": "client", "label": "Client", "unit": "currency"}, {"key": "gaming", "label": "Gaming", "unit": "currency"},
+        {"key": "total", "label": "Client and Gaming", "unit": "currency"}]}]})
+    table = next(iter(document.tables))
+    located = ai.Located.model_validate({"period_end": "2026-06-27", "tables": [
+        {"group": "cg", "table": table, "col": 1, "first_row": 1, "last_row": 5, "total_row": 4}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == []
+    assert {item.kpi.label: item.value for item in values if not item.is_total} == {"Client": 2.5e9, "Gaming": 1.1e9}

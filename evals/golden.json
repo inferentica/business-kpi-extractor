@@ -344,5 +344,33 @@
     "value": 5189000000,
     "currency": "USD",
     "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4)"
+  },
+  {
+    "symbol": "AMD",
+    "period_end": "2026-06-27",
+    "label": "^client$",
+    "unit": "currency",
+    "value": 3062000000,
+    "currency": "USD",
+    "source": "AMD 2Q26 release: segment and disaggregated revenue, Client"
+  },
+  {
+    "symbol": "AMD",
+    "period_end": "2026-06-27",
+    "label": "^gaming$",
+    "unit": "currency",
+    "value": 779000000,
+    "currency": "USD",
+    "source": "AMD 2Q26 release: segment and disaggregated revenue, Gaming"
+  },
+  {
+    "symbol": "AVGO",
+    "period_end": "2026-08-02",
+    "label": "ai semiconductor",
+    "unit": "currency",
+    "value": 16700000000,
+    "tolerance": 0.004,
+    "currency": "USD",
+    "source": "Broadcom 3Q26 release: AI semiconductor revenue of $16.7 billion"
   }
 ]

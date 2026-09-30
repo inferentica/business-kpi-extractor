@@ -260,7 +260,8 @@ title.
 
 Rules:
 - kind "revenue_breakdown": currency amounts that together make up revenue. Include the table's total row as a KPI and \
-name it in "total_kpi". Skip any breakdown listed under "Already covered by XBRL".
+name it in "total_kpi", with at least two parts beside it; a single amount (e.g. AI revenue) is a metric, not a \
+breakdown. Skip any breakdown listed under "Already covered by XBRL".
 - kind "mix": percentages that add up to about 100.
 - kind "metric": standalone operating metrics; put them all in one group keyed "operating", labelled "Operating Metrics".
 - unit is one of currency, percent, count, ratio (a percentage growth rate is "percent").
@@ -391,3 +392,30 @@ def kpi_lines(spec: Spec, hints: dict[str, str] | None = None) -> str:
 
 def locate_data(period_hint: str, spec: Spec, hints: dict[str, str]) -> str:
     return f"Reported quarter: {period_hint}\nKPIs:\n{kpi_lines(spec, hints)}"
+
+
+def normalize_spec(spec: Spec) -> Spec:
+    """A list whose every breakdown can be checked: a revenue breakdown needs its total and at least two parts, a mix at
+    least two shares. Anything less can never reconcile (Broadcom's lone "AI Semiconductor" amount was a one-row
+    breakdown, hidden every quarter), so its KPIs become metrics, which are checked one by one."""
+    groups, loose = [], []
+    for group in spec.groups:
+        parts = [kpi for kpi in group.kpis if kpi.key != group.total_kpi]
+        if group.kind == "revenue_breakdown" and (group.total_kpi is None or len(parts) < 2):
+            loose += parts if group.total_kpi is None or parts else group.kpis
+        elif group.kind == "mix" and len(group.kpis) < 2:
+            loose += group.kpis
+        else:
+            groups.append(group.model_dump())
+    if not loose:
+        return spec
+    metrics = next((group for group in groups if group["kind"] == "metric"), None)
+    if metrics is None:
+        metrics = {"key": "operating", "label": "Operating Metrics", "kind": "metric", "total_kpi": None, "kpis": []}
+        groups.append(metrics)
+    taken = {kpi["key"] for kpi in metrics["kpis"]}
+    for kpi in loose:
+        if kpi.key not in taken and len(metrics["kpis"]) < MAX_KPIS_PER_GROUP:
+            metrics["kpis"].append(kpi.model_dump())
+            taken.add(kpi.key)
+    return Spec.model_validate({"groups": [g for g in groups if g["kpis"]][:MAX_GROUPS], "names": spec.names})
