@@ -299,7 +299,9 @@ def column_header(table: Table, first_data_row: int, col: int) -> str:
     text = clean(" ".join(cells)).lower()
     text = re.sub(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
                   r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b", "@", text)
-    return re.sub(r"[\d.,]+", "#", text)[:120]
+    # A duration names the column ("3 months", "six months", "26 weeks"), so its number is kept; dates and years blank.
+    text = re.sub(r"\b(\d{1,2})(\s*-?\s*)(months?|weeks?|quarters?)\b", r"<\1 \3>", text)
+    return re.sub(r"(?<![<\d])[\d.,]+(?![\d]* (?:months?|weeks?|quarters?)>)", "#", text)[:120]
 
 
 def _locator_record(document: Document, locator: Locator) -> dict:

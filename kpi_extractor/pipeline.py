@@ -221,15 +221,18 @@ class SymbolPipeline:
             for group, extra_notes in groups:
                 named = self.names.get(group.key) or {}
                 # Rows that land on one key ("Other" and "All other") are parts of it: they add up.
-                merged: dict[str, tuple[str, str, float]] = {}
+                # Their nine months to date add up the same way, or Q4 = year − nine months would be wrong.
+                merged: dict[str, tuple[str, str, float, float | None]] = {}
                 for reported, label, value in group.members:
                     member = reported
+                    ytd = group.year_to_date.get(reported)
                     if member in merged:
-                        first, first_label, total = merged[member]
-                        merged[member] = (first, first_label, total + value)
+                        first, first_label, total, ytd_total = merged[member]
+                        merged[member] = (first, first_label, total + value,
+                                          None if ytd is None or ytd_total is None else ytd_total + ytd)
                     else:
-                        merged[member] = (reported, label, value)
-                for order, (member, (reported, label, value)) in enumerate(merged.items()):
+                        merged[member] = (reported, label, value, ytd)
+                for order, (member, (reported, label, value, ytd)) in enumerate(merged.items()):
                     records.append(self._record(
                         group_key=group.key, group_label=named.get("label") or group.label, group_kind="revenue_breakdown",
                         group_order=group.order, kpi_key=member, kpi_label=(named.get("members") or {}).get(member) or label,
@@ -239,8 +242,8 @@ class SymbolPipeline:
                         period_end=breakdowns.period_end, locator={
                             "concept": group.concept, "total": group.total, "member": group.elements.get(reported),
                             "prior": group.prior.get(reported),
-                            **({"ytd": group.year_to_date[reported], "ytd_total": group.year_to_date_total}
-                               if reported in group.year_to_date and group.year_to_date_total else {}),
+                            **({"ytd": ytd, "ytd_total": group.year_to_date_total}
+                               if ytd is not None and group.year_to_date_total else {}),
                         },
                     ))
             for group, _notes in groups:
@@ -455,10 +458,16 @@ class SymbolPipeline:
             how = _READ_BY_REPLAY if self._replayed else _READ_BY_AI
             period_problem = check_period(located, expected)
             period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
-            if not located.annual and (self._reports_full_year(read, period_end)
-                                       or (fiscal_period == "Q4" and self._far_above_quarters(read, period_end))):
+            # A document counts as annual only on evidence: its breakdown adds up to the XBRL full year, or its
+            # column says so. A total far above the quarter before is only a reason to look again.
+            if not located.annual and (self._reports_full_year(read, period_end) or _annual_columns(read)):
                 located.annual = True
-                problems.append("breakdown total matches full-year revenue: stored as the fiscal year")
+                problems.append("breakdown reports the full year: stored as the fiscal year")
+            elif not located.annual and fiscal_period == "Q4" and self._far_above_quarters(read, period_end):
+                for item in read:
+                    if item.group.kind == "revenue_breakdown":
+                        item.status = "needs_review"
+                        item.notes.append("total far above the quarter before: check the period")
             if located.annual:
                 # An annual report: its values are the full year, and Q4 is derived from them.
                 fiscal_year, fiscal_period = fiscal_label(period_end, self.profile.fiscal_year_end, annual=True,
@@ -774,8 +783,8 @@ class SymbolPipeline:
                 continue
             total = float(total)
             annual = next((a for end, a in annual_totals.items() if abs(_days(end, v["period_end"])) <= 12), None)
-            before = self._quarter_total_before(v["group_key"], v["period_end"])
-            if (annual and abs(total - annual) <= abs(annual) * 0.01) or (before and total >= 2.5 * before):
+            header = str((v.get("locator") or {}).get("header") or "")
+            if (annual and abs(total - annual) <= abs(annual) * 0.01) or _ANNUAL_HEADER.search(header):
                 misfiled.add((v["source_accession"], v["fiscal_year"]))
         if not misfiled:
             return
@@ -1018,14 +1027,16 @@ class SymbolPipeline:
         previous = self.filings.get(ref.accession)
         # A re-read replaces the filing's earlier reading: values it no longer produces (a KPI key the new list renamed,
         # a figure now read differently, rows an older extractor kept) stop being served.
+        # Only a reading that finished replaces the last one: a failed or empty attempt keeps the good values it had.
         method = "ai" if ref.role == "earnings_release" else "xbrl"
-        fresh = {value_key(record) for record in records}
-        records = records + [
-            {**value, "validation_status": "rejected", "notes": ["replaced by a newer reading of this filing"]}
-            for value in self.values.values()
-            if value["method"] == method and value.get("source_accession") == ref.accession
-            and value["validation_status"] != "rejected" and value_key(value) not in fresh
-        ]
+        if status in ("processed", "needs_review"):
+            fresh = {value_key(record) for record in records}
+            records = records + [
+                {**value, "validation_status": "rejected", "notes": ["replaced by a newer reading of this filing"]}
+                for value in self.values.values()
+                if value["method"] == method and value.get("source_accession") == ref.accession
+                and value["validation_status"] != "rejected" and value_key(value) not in fresh
+            ]
         filing = {
             "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(), "document_role": ref.role,
             "period_end": period_end.isoformat() if period_end else None, "fiscal_year": fiscal_year,
@@ -1110,6 +1121,15 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
     if not changed:
         return None
     return ai.normalize_spec(Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names}))
+
+
+_ANNUAL_HEADER = re.compile(r"twelve months|<12 months>|<5[23] weeks>|fifty-(two|three) weeks|years? ended|fiscal years?|full year")
+
+
+def _annual_columns(read: list[ReadValue]) -> bool:
+    """Whether the breakdown was read from a column its header calls a year ("Twelve Months Ended", "Year Ended")."""
+    headers = [str(item.locator.get("header") or "") for item in read if item.group.kind == "revenue_breakdown"]
+    return bool(headers) and all(_ANNUAL_HEADER.search(header) for header in headers)
 
 
 def _keeps_verified(existing: dict, incoming: dict) -> bool:

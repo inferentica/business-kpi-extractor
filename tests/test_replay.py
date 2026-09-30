@@ -187,3 +187,26 @@ def test_a_quote_about_another_node_is_never_taken_for_this_one():
     changed = parse_document("<p>In the quarter, 5-nanometer shipments accounted for 35% of wafer revenue.</p>",
                              URL.format(n=2))
     assert replay(changed, last, Q2) is None
+
+
+def test_a_six_month_column_written_in_digits_is_never_replayed():
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300).replace("Three Months Ended", "3 Months Ended"),
+                           URL.format(n=1))
+    last = {f"{v['group_key'][4:]}.{v['kpi_key']}": v["locator"] for v in _history(first)}
+    six = report("June 30", 21, 45, 61, 82, 310).replace("Three Months Ended", "6 Months Ended")
+    assert replay(parse_document(six, URL.format(n=2)), last, Q2) is None
+
+
+def test_a_quote_about_3_nm_never_becomes_5_nm():
+    document = parse_document("<p>Revenue from 3 nm technology accounted for 28% of wafer revenue.</p>", URL.format(n=1))
+    block = next(iter(document.blocks))
+    last = {"technology.n3": {"block": block, "quote": "3 nm technology accounted for 28%", "value_text": "28%"}}
+    changed = parse_document("<p>Revenue from 5 nm technology accounted for 35% of wafer revenue.</p>", URL.format(n=2))
+    assert replay(changed, last, Q2) is None
+
+
+def test_a_reading_without_header_evidence_goes_back_to_the_ai():
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    last = {f"{v['group_key'][4:]}.{v['kpi_key']}": {k: x for k, x in v["locator"].items() if k != "header"}
+            for v in _history(first) if "quote" not in v["locator"]}
+    assert replay(parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2)), last, Q2) is None

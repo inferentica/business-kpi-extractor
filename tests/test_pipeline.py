@@ -422,3 +422,26 @@ def test_a_recast_year_ago_quarter_is_adopted_from_the_later_filing():
     restated = {r["kpi_key"]: r["value"] for r in rows if r["validation_status"] == "verified"}
     assert restated == {"server": 27.0, "office": 19.0, "dynamics": 4.0}
     assert all(r["fiscal_period"] == "Q1" and r["fiscal_year"] == "2023" for r in rows)
+
+
+def test_a_failed_re_read_keeps_the_filings_good_values():
+    from kpi_extractor.sec import FilingRef
+    good = {"group_key": "kpi_segments", "kpi_key": "cloud", "fiscal_year": "2026", "fiscal_period": "Q2",
+            "period_end": "2026-06-30", "method": "ai", "validation_status": "verified", "value": 5.0,
+            "source_accession": "a1", "group_label": "x", "kpi_label": "x"}
+    pipeline = _pipeline(FakeControl({}), [good])
+    ref = FilingRef("a1", "8-K", date(2026, 7, 15), "earnings_release", "https://www.sec.gov/x.htm")
+    pipeline._fail_filing(ref, RuntimeError("AI unavailable"))
+    assert pipeline.values[("kpi_segments", "cloud", "2026", "Q2")]["validation_status"] == "verified"
+
+
+def test_a_big_q4_is_never_moved_to_the_year_by_size_alone():
+    base = {"group_key": "kpi_product", "kpi_key": "a", "method": "ai", "validation_status": "verified", "value": 1.0,
+            "group_label": "x", "kpi_label": "x", "group_kind": "revenue_breakdown"}
+    rows = [{**base, "fiscal_year": "2026", "fiscal_period": "Q3", "period_end": "2026-09-30", "source_accession": "q3",
+             "locator": {"total": 100, "header": "three months ended @ # #"}},
+            {**base, "fiscal_year": "2026", "fiscal_period": "Q4", "period_end": "2026-12-31", "source_accession": "q4",
+             "locator": {"total": 260, "header": "three months ended @ # #"}}]
+    pipeline = _pipeline(FakeControl({}), rows)
+    pipeline._refile_annuals()
+    assert pipeline.values[("kpi_product", "a", "2026", "Q4")]["validation_status"] == "verified"

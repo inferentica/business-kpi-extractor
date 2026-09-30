@@ -147,13 +147,15 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | None
 
 def _names(text: str, token: re.Match) -> bool:
     """Whether a number is part of a name rather than a figure: "3-nanometer", "5G", "M365" keep their number."""
-    before, after = text[max(0, token.start() - 1):token.start()], text[token.end():token.end() + 2]
-    return bool(re.match(r"-?[A-Za-z]", after)) or bool(re.match(r"[A-Za-z]", before))
+    before, after = text[max(0, token.start() - 1):token.start()], text[token.end():token.end() + 3]
+    # "3-nanometer", "3 nm", "5G", "M365": a number that a word follows or precedes names something.
+    return bool(re.match(r"[-\s]?[A-Za-z]", after)) or bool(re.match(r"[A-Za-z]", before))
 
 
 def _same_header(table: Table, first_data_row: int, col: int, locator: dict) -> bool:
     """The column is headed as last quarter's was (three months, not six; this year's quarter, not a year to date)."""
-    return "header" not in locator or column_header(table, first_data_row, col) == locator["header"]
+    # A reading stored before headers were recorded carries no evidence of its column: the AI reads it once more.
+    return "header" in locator and column_header(table, first_data_row, col) == locator["header"]
 
 
 def _tables_by_preference(document: Document, table_id: str | None) -> list[Table]:

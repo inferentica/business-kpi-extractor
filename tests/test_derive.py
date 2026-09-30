@@ -90,3 +90,14 @@ def test_quarters_are_laid_out_like_their_year():
                    _value(period, "tiny", 0.1)]
     derived = {row["kpi_key"]: row["value"] for row in derive_periods(values) if row["fiscal_period"] == "Q4"}
     assert derived == {"us": 40, "other": pytest.approx(60 - 3 * 12.1)}
+
+
+def test_a_derived_q4_that_does_not_reconcile_is_not_verified():
+    values = [_value("FY", "a", 120, method="xbrl"), _value("FY", "b", 30, method="xbrl")]
+    for row in values:
+        row["locator"] = {"total": 150}
+    third = [_value("Q3", "a", 30), _value("Q3", "b", 10)]
+    third[0]["locator"] = {"total": 40, "ytd": 30, "ytd_total": 100}  # a nine-month figure that lost a merged row
+    third[1]["locator"] = {"total": 40, "ytd": 10, "ytd_total": 100}
+    derived = [row for row in derive_periods(values + third) if row["fiscal_period"] == "Q4"]
+    assert derived and all(row["validation_status"] == "needs_review" for row in derived)

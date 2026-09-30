@@ -67,10 +67,7 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
     if all(total is not None for total in totals) and (annual is None or annual_total is not None):
         total = annual_total - sum(totals) if annual else sum(totals)
         if total:
-            error = (sum(row["value"] for row in rows) - total) / total
-            for row in rows:
-                row["reconciliation_error_pct"] = error
-                row["locator"] = {"total": total}
+            _reconcile(rows, total)
     return rows
 
 
@@ -117,11 +114,22 @@ def _combine_year_to_date(annual: dict, third: dict) -> list[dict]:
     if annual_total is not None:
         total = annual_total - float(nine_total)
         if total:
-            error = (sum(row["value"] for row in rows) - total) / total
-            for row in rows:
-                row["reconciliation_error_pct"] = error
-                row["locator"] = {"total": total}
+            _reconcile(rows, total)
     return rows
+
+
+MAX_DERIVED_GAP = 0.001
+
+
+def _reconcile(rows: list[dict], total: float) -> None:
+    """A derived period is verified only if its parts add up to its derived total, like any reported one."""
+    error = (sum(row["value"] for row in rows) - total) / total
+    for row in rows:
+        row["reconciliation_error_pct"] = error
+        row["locator"] = {"total": total}
+        if abs(error) > MAX_DERIVED_GAP and row["validation_status"] == "verified":
+            row["validation_status"] = "needs_review"
+            row["notes"] = [*row["notes"], f"derived parts differ from the derived total by {error:.1%}"]
 
 
 def _total(period: dict) -> float | None:
