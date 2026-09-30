@@ -199,8 +199,16 @@ class SymbolPipeline:
             for group, extra_notes in groups:
                 named = self.names.get(group.key) or {}
                 aliases = self._series_keys(group, breakdowns.annual, breakdowns.period_end, ref.accession)
-                for order, (reported, label, value) in enumerate(group.members):
+                # Rows that land on one series ("Other" and "All other") are parts of it: they add up.
+                merged: dict[str, tuple[str, str, float]] = {}
+                for reported, label, value in group.members:
                     member = aliases.get(reported, reported)
+                    if member in merged:
+                        first, first_label, total = merged[member]
+                        merged[member] = (first, first_label, total + value)
+                    else:
+                        merged[member] = (reported, label, value)
+                for order, (member, (reported, label, value)) in enumerate(merged.items()):
                     records.append(self._record(
                         group_key=group.key, group_label=named.get("label") or group.label, group_kind="revenue_breakdown",
                         group_order=group.order, kpi_key=member, kpi_label=(named.get("members") or {}).get(member) or label,
@@ -908,7 +916,7 @@ class SymbolPipeline:
         self._store_filing(ref, "failed", spec_version=spec_version, notes=[message])
 
     def _store(self, *, filings: list[dict] | None = None, values: list[dict] | None = None) -> None:
-        values = values or []
+        values = list({value_key(value): value for value in values or []}.values())  # one row per key per write
         self.control.call("store", symbol=self.symbol, filings=filings or [], values=values)
         for value in values:
             self.values[value_key(value)] = value
