@@ -840,7 +840,10 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
                 group.kpis.append(kpi)
                 existing.add(kpi.key)
                 changed = True
+    amounts = {_dimension(group.label) for group in groups if group.kind == "revenue_breakdown"}
     for group in answer.add_groups:
+        if group.kind == "mix" and _dimension(group.label) in amounts:
+            continue  # shares of a breakdown already tracked as amounts add nothing (TSMC's technology mix)
         if group.key not in by_key and len(groups) < ai.MAX_GROUPS:
             groups.append(group)
             by_key[group.key] = group
@@ -864,6 +867,12 @@ def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
     found = {f"{item.group.key}.{item.kpi.key}" for item in read}
     return [f"{group.key}.{kpi.key}" for group in spec.groups if group.key not in whole for kpi in group.kpis
             if kpi.key != group.total_kpi and f"{group.key}.{kpi.key}" not in found]
+
+
+def _dimension(label: str) -> str:
+    """What a breakdown splits revenue by: "Revenue by Technology Mix" and "Revenue by Technology" → "technology"."""
+    words = re.sub(r"\b(wafer|net|revenue|sales|by|mix|share|shares|of|the)\b", " ", label.lower())
+    return " ".join(words.split())
 
 
 def _same(left: float, right: float) -> bool:

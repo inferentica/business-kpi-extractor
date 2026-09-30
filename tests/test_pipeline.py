@@ -322,3 +322,12 @@ def test_a_re_proposed_list_keeps_the_groups_it_dropped():
         {"key": "tech", "label": "Revenue by technology", "kind": "mix", "kpis": [{"key": "n3", "label": "3nm", "unit": "percent"}]},
     ]})
     assert [group.key for group in keep_current_groups(proposed, current).groups] == ["tech", "platform"]
+
+
+def test_the_audit_never_adds_a_mix_of_a_breakdown_tracked_as_amounts():
+    spec = Spec.model_validate({"groups": [{"key": "technology", "label": "Revenue by Technology", "kind": "revenue_breakdown",
+                                            "kpis": [{"key": "n3", "label": "3nm", "unit": "currency"}]}]})
+    answer = ai.Maintenance.model_validate({"add_groups": [
+        {"key": "technology_mix", "label": "Revenue by Technology Mix", "kind": "mix",
+         "kpis": [{"key": "n3", "label": "3nm", "unit": "percent"}]}]})
+    assert apply_maintenance(spec, answer) is None
