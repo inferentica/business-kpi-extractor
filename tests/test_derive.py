@@ -1,3 +1,4 @@
+import pytest
 from kpi_extractor.derive import derive_periods
 
 
@@ -80,3 +81,12 @@ def test_q4_is_the_year_less_the_third_quarters_nine_months():
     derived = {row["kpi_key"]: row for row in derive_periods(values + third) if row["fiscal_period"] == "Q4"}
     assert derived["a"]["value"] == 30 and derived["b"]["value"] == 10
     assert derived["a"]["locator"] == {"total": 40} and derived["a"]["reconciliation_error_pct"] == 0
+
+
+def test_quarters_are_laid_out_like_their_year():
+    values = [_value("FY", "us", 100), _value("FY", "other", 60)]
+    for period in ("Q1", "Q2", "Q3"):
+        values += [_value(period, "us", 20), _value(period, "other", 5), _value(period, "europe", 7),
+                   _value(period, "tiny", 0.1)]
+    derived = {row["kpi_key"]: row["value"] for row in derive_periods(values) if row["fiscal_period"] == "Q4"}
+    assert derived == {"us": 40, "other": pytest.approx(60 - 3 * 12.1)}

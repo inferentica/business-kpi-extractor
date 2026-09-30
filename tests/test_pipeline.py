@@ -403,3 +403,22 @@ def test_an_audit_that_only_adds_is_recognized():
         "add_kpis": {"technology": [{"key": "n2", "label": "2nm", "unit": "percent"}]}}))
     retired = apply_maintenance(SPEC, ai.Maintenance.model_validate({"retire": ["technology.other"]}))
     assert only_adds(SPEC, added) and not only_adds(SPEC, retired)
+
+
+def test_a_recast_year_ago_quarter_is_adopted_from_the_later_filing():
+    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.xbrl import XbrlGroup
+    base = {"group_key": "products", "fiscal_year": "2023", "fiscal_period": "Q1", "period_end": "2022-09-30",
+            "method": "xbrl", "validation_status": "verified", "source_accession": "q1fy23", "group_label": "x",
+            "group_kind": "revenue_breakdown", "locator": {"total": 50.0}}
+    stored = [{**base, "kpi_key": "server", "kpi_label": "Server", "value": 30.0},
+              {**base, "kpi_key": "office", "kpi_label": "Office", "value": 20.0}]
+    pipeline = _pipeline(FakeControl({}), stored)
+    group = XbrlGroup("products", "Revenue by Product", 1, [("server", "Server", 33.0), ("office", "Office", 22.0),
+                                                             ("dynamics", "Dynamics", 5.0)], 60.0, 0.0, "USD", "c",
+                      prior={"server": 27.0, "office": 19.0, "dynamics": 4.0})
+    ref = FilingRef("q1fy24", "10-Q", date(2023, 10, 24), "periodic_report", "https://www.sec.gov/x.htm")
+    rows = pipeline._restated_prior(group, False, date(2023, 9, 30), ref)
+    restated = {r["kpi_key"]: r["value"] for r in rows if r["validation_status"] == "verified"}
+    assert restated == {"server": 27.0, "office": 19.0, "dynamics": 4.0}
+    assert all(r["fiscal_period"] == "Q1" and r["fiscal_year"] == "2023" for r in rows)

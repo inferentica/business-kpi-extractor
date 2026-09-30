@@ -26,7 +26,7 @@ from .extract import ReadValue, _listed_kpi, check_period, describe, locator_hin
 from .fiscal import fiscal_label, learn_year_offset
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
-from .xbrl import XbrlCandidate, extract_breakdowns, official_labels
+from .xbrl import XbrlCandidate, drop_overlaps, extract_breakdowns, official_labels, remove_subtotals
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
 MAX_DOCUMENT_CHARS = 120_000
@@ -243,12 +243,42 @@ class SymbolPipeline:
                                if reported in group.year_to_date and group.year_to_date_total else {}),
                         },
                     ))
+            for group, _notes in groups:
+                records += self._restated_prior(group, breakdowns.annual, breakdowns.period_end, ref)
             status = "failed" if ai_pending else "processed" if records else "skipped"
             notes = [_AI_PENDING] if ai_pending else [] if records else ["no revenue breakdown reconciles to reported revenue"]
             self._store_filing(ref, status, records=records, period_end=breakdowns.period_end,
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
+
+    def _restated_prior(self, group, annual: bool, period_end: date, ref: FilingRef) -> list[dict]:
+        """The year-ago period as this filing restates it, when the company has since recast the breakdown (Microsoft's
+        FY2023 10-K split out Dynamics; its FY2024 10-Qs restate the FY2023 quarters that way). The year and its
+        quarters then share one basis and Q4 can be derived. A period whose stored figures already match is untouched;
+        restated rows must add up to that period's reported revenue."""
+        target = (period_end - timedelta(days=365)).isoformat()
+        stored = [v for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
+                  and v["validation_status"] == "verified" and (v["fiscal_period"] == "FY") == annual
+                  and abs(_days(v["period_end"], target)) <= 12]
+        if not stored or not group.prior:
+            return []
+        total = float((stored[0].get("locator") or {}).get("total") or 0)
+        restated = drop_overlaps(remove_subtotals(dict(group.prior), total), total) if total else {}
+        if len(restated) < 2 or abs(sum(restated.values()) - total) > abs(total) * 0.001:
+            return []
+        if sorted(round(float(v["value"])) for v in stored) == sorted(round(value) for value in restated.values()):
+            return []  # already on the current basis
+        base = stored[0]
+        rows = [{**base, "kpi_key": key, "kpi_label": dict((k, l) for k, l, _v in group.members).get(key, key),
+                 "kpi_order": order, "value": value, "source_accession": ref.accession, "source_url": ref.source_url,
+                 "filed_at": ref.filed.isoformat(), "validation_status": "verified", "reconciliation_error_pct": 0,
+                 "notes": [f"restated in the {ref.form} filed {ref.filed}"],
+                 "locator": {"concept": group.concept, "total": total, "member": group.elements.get(key)}}
+                for order, (key, value) in enumerate(sorted(restated.items(), key=lambda item: -item[1]))]
+        rows += [{**v, "validation_status": "rejected", "notes": [f"restated in the {ref.form} filed {ref.filed}"]}
+                 for v in stored if v["kpi_key"] not in restated]
+        return rows
 
     def _curate(self, candidate: XbrlCandidate):
         """Pro picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""
@@ -871,7 +901,13 @@ class SymbolPipeline:
             if notes and all(_is_jump(note) and note.endswith("in a quarter") for note in notes):
                 key = f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}"
                 before = self._previous(date.fromisoformat(v["period_end"][:10]), annual=True).get(key)
-                if before is None or 1 / MAX_YEAR_RATIO <= float(v["value"]) / before <= MAX_YEAR_RATIO:
+                siblings = by_filing.get((v.get("source_accession") or "", v["period_end"]), [])
+                parts = sum(float(o["value"]) for o in siblings if o["group_key"] == v["group_key"])
+                total = float((v.get("locator") or {}).get("total") or 0)
+                if total and abs(parts - total) <= abs(total) * 0.001:
+                    # A new node ramping 3.5× in a year is growth; the year's table adding up exactly is the check.
+                    cleared.append({**v, "validation_status": "verified", "notes": ["the year's breakdown reconciles"]})
+                elif before is None or 1 / MAX_YEAR_RATIO <= float(v["value"]) / before <= MAX_YEAR_RATIO:
                     cleared.append({**v, "validation_status": "verified", "notes": ["checked against the prior year"]})
         for (accession, _end), rows in by_filing.items():
             for group_key in {v["group_key"] for v in rows if v["group_kind"] == "revenue_breakdown"}:

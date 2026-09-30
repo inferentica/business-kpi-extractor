@@ -19,6 +19,8 @@ def derive_periods(values: list[dict]) -> list[dict]:
     for (_group, _year), periods in by_group_year.items():
         annual, quarters = periods.get("FY"), [periods.get(quarter) for quarter in QUARTERS]
         fourth = periods.get("Q4")
+        if annual and all(quarters):
+            quarters = [_align(annual, quarter) for quarter in quarters]
         if annual and _method(annual) in ("xbrl", "ai") and (fourth is None or _only_derived(fourth)):
             third = quarters[-1]
             if third and _same_keys(annual, third) and _has_year_to_date(third):
@@ -70,6 +72,28 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
                 row["reconciliation_error_pct"] = error
                 row["locator"] = {"total": total}
     return rows
+
+
+def _align(annual: dict, quarter: dict) -> dict:
+    """A quarter laid out like its year before subtracting:
+    - rows the year folds into "Other" (Nvidia's 10-K shows four regions, its 10-Qs six) are added to the quarter's
+      "Other";
+    - an immaterial row the year does not list (TSMC's 10nm, under 1% of the quarter) is left out."""
+    extra = [key for key in quarter if key not in annual]
+    if not extra:
+        return quarter
+    aligned = {key: value for key, value in quarter.items() if key in annual}
+    total = sum(float(value["value"]) for value in quarter.values()) or 1.0
+    folded = 0.0
+    for key in extra:
+        value = float(quarter[key]["value"])
+        if "other" in annual and "other" in quarter:
+            folded += value
+        elif abs(value) >= 0.01 * abs(total):
+            return quarter  # a material row the year lacks: the two do not describe one breakdown
+    if folded:
+        aligned["other"] = {**quarter["other"], "value": float(quarter["other"]["value"]) + folded}
+    return aligned
 
 
 def _has_year_to_date(period: dict) -> bool:
