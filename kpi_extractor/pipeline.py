@@ -784,7 +784,7 @@ class SymbolPipeline:
             total = float(total)
             annual = next((a for end, a in annual_totals.items() if abs(_days(end, v["period_end"])) <= 12), None)
             header = str((v.get("locator") or {}).get("header") or "")
-            if (annual and abs(total - annual) <= abs(annual) * 0.01) or _ANNUAL_HEADER.search(header):
+            if (annual and abs(total - annual) <= abs(annual) * 0.01) or _annual_header(header):
                 misfiled.add((v["source_accession"], v["fiscal_year"]))
         if not misfiled:
             return
@@ -1124,12 +1124,17 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
 
 
 _ANNUAL_HEADER = re.compile(r"twelve months|<12 months>|<5[23] weeks>|fifty-(two|three) weeks|years? ended|fiscal years?|full year")
+_QUARTER_HEADER = re.compile(r"three months|<3 months>|thirteen weeks|<1[34] weeks>|quarter")
+
+
+def _annual_header(header: str) -> bool:
+    return bool(_ANNUAL_HEADER.search(header)) and not _QUARTER_HEADER.search(header)
 
 
 def _annual_columns(read: list[ReadValue]) -> bool:
     """Whether the breakdown was read from a column its header calls a year ("Twelve Months Ended", "Year Ended")."""
     headers = [str(item.locator.get("header") or "") for item in read if item.group.kind == "revenue_breakdown"]
-    return bool(headers) and all(_ANNUAL_HEADER.search(header) for header in headers)
+    return bool(headers) and all(_annual_header(header) for header in headers)
 
 
 def _keeps_verified(existing: dict, incoming: dict) -> bool:
