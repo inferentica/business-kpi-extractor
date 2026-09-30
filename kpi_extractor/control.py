@@ -33,7 +33,13 @@ class ControlPlane:
             })
             try:
                 with urllib.request.urlopen(request, timeout=timeout) as response:
-                    return json.loads(response.read() or b"{}")
+                    body = response.read() or b"{}"
+                try:
+                    return json.loads(body)
+                except json.JSONDecodeError as error:
+                    # The function stopped at its wall-clock limit after sending keep-alive spaces: a failed call.
+                    if attempt == attempts:
+                        raise ControlError(f"{operation} failed: reply cut off after {len(body)} bytes") from error
             except urllib.error.HTTPError as error:
                 detail = error.read().decode(errors="replace")[:500]
                 if error.code not in _RETRYABLE_STATUS or attempt == attempts:

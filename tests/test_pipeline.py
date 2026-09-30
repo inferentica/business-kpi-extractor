@@ -445,3 +445,17 @@ def test_a_big_q4_is_never_moved_to_the_year_by_size_alone():
     pipeline = _pipeline(FakeControl({}), rows)
     pipeline._refile_annuals()
     assert pipeline.values[("kpi_product", "a", "2026", "Q4")]["validation_status"] == "verified"
+
+
+def test_a_restated_prior_year_is_not_adopted_and_nor_is_a_partial_restatement():
+    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.xbrl import XbrlGroup
+    base = {"group_key": "products", "fiscal_year": "2023", "fiscal_period": "Q1", "period_end": "2022-09-30",
+            "method": "xbrl", "validation_status": "verified", "source_accession": "q1fy23", "group_label": "x",
+            "group_kind": "revenue_breakdown", "locator": {"total": 50.0}}
+    pipeline = _pipeline(FakeControl({}), [{**base, "kpi_key": "server", "value": 30.0}, {**base, "kpi_key": "office", "value": 20.0}])
+    ref = FilingRef("q1fy24", "10-Q", date(2023, 10, 24), "periodic_report", "https://www.sec.gov/x.htm")
+    partial = XbrlGroup("products", "x", 1, [("server", "Server", 33.0), ("office", "Office", 22.0), ("dynamics", "D", 5.0)],
+                        60.0, 0.0, "USD", "c", prior={"server": 27.0, "office": 19.0, "product": 4.0})
+    assert pipeline._restated_prior(partial, False, date(2023, 9, 30), ref) == []
+    assert pipeline._restated_prior(partial, True, date(2023, 9, 30), ref) == []

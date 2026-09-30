@@ -260,15 +260,21 @@ class SymbolPipeline:
         FY2023 10-K split out Dynamics; its FY2024 10-Qs restate the FY2023 quarters that way). The year and its
         quarters then share one basis and Q4 can be derived. A period whose stored figures already match is untouched;
         restated rows must add up to that period's reported revenue."""
+        if annual:
+            # A 10-K restates the prior year, but no filing restates that year's quarters: the year stays as it was
+            # reported so it and its quarters share one basis (Microsoft's FY2022 against its FY2022 10-Qs).
+            return []
         target = (period_end - timedelta(days=365)).isoformat()
         stored = [v for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
-                  and v["validation_status"] == "verified" and (v["fiscal_period"] == "FY") == annual
+                  and v["validation_status"] == "verified" and v["fiscal_period"] != "FY"
                   and abs(_days(v["period_end"], target)) <= 12]
-        if not stored or not group.prior:
+        if not stored:
             return []
         total = float((stored[0].get("locator") or {}).get("total") or 0)
-        restated = drop_overlaps(remove_subtotals(dict(group.prior), total), total) if total else {}
-        if len(restated) < 2 or abs(sum(restated.values()) - total) > abs(total) * 0.001:
+        # Exactly this filing's own rows, as restated for the year-ago quarter; never a subset guessed to fit.
+        restated = {key: group.prior[key] for key, _label, _value in group.members if key in group.prior}
+        if (not total or len(restated) != len(group.members) or len(restated) < 2
+                or abs(sum(restated.values()) - total) > abs(total) * 0.0001):
             return []
         if sorted(round(float(v["value"])) for v in stored) == sorted(round(value) for value in restated.values()):
             return []  # already on the current basis
@@ -326,7 +332,8 @@ class SymbolPipeline:
             if spec.model_dump() != stored.model_dump():
                 # A stored list that breaks the rules is repaired once; its filings are then read with the new version.
                 version += 1
-                self._store_spec(spec, row.get("names") or {}, version, row.get("source_accession") or "")
+                self._store_spec(spec, row.get("names") or {}, version,
+                                 row.get("source_accession") or (releases[-1].accession if releases else "normalized"))
                 self.log(f"{self.symbol}: KPI list v{version}: breakdowns that cannot reconcile became metrics")
             return spec, version, False
         if not releases:
