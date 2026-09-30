@@ -20,6 +20,7 @@ _SCALE_AFTER = re.compile(r"^(?:\s*(?P<word>thousand|million|billion|trillion)s?
 _SCALE_ABBREVIATIONS = {"bn": "billion", "b": "billion", "m": "million", "k": "thousand"}
 _RELEVANT = re.compile(r"revenue|net sales|\bsales\b|shipment|subscri|users|members|platform|technolog|geograph|region",
                        re.I)
+_AMOUNT = re.compile(r"[^\w]*\d[\d,.]*\s*[%)]*")
 _TABLE_SCALE = re.compile(r"\b(?:in|amounts in|\(in)\s+(?:[A-Z]{0,3}\$\s*|NT\$\s*|US\$\s*)?(?P<word>thousands|millions|billions)\b", re.I)
 
 
@@ -253,7 +254,15 @@ def _table_rows(element) -> list[list[str]]:
             positions[start] = text
         positions = _fold_symbols(positions)
         folded.append([(start, span, positions[start]) for start, span, _text in cells if positions[start]])
+    # Numbers are right-aligned: a wide number cell belongs to the last column it spans. TSMC's reports give the "$"
+    # row's number a narrower cell than the rows below it, but every amount in a column ends at the same grid line.
+    right_edges: dict[int, int] = {}
+    for cells in folded:
+        for start, span, text in cells:
+            if span > 1 and _AMOUNT.fullmatch(text):
+                right_edges[start + span - 1] = right_edges.get(start + span - 1, 0) + 1
     numeric_columns = {start for cells in folded for start, span, text in cells if span == 1 and re.search(r"\d", text)}
+    numeric_columns |= {column for column, rows in right_edges.items() if rows >= 2}
     grid = []
     for cells in folded:
         row = [""] * width

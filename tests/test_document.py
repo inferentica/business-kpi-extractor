@@ -77,3 +77,18 @@ def test_large_documents_reach_the_ai_as_their_revenue_sections():
     assert len(focused) <= 4_000
     assert "High Performance Computing" in focused and "three months ended June 30, 2026" in focused
     assert len(focused) < len(document.render()) / 5
+
+
+def test_right_aligned_amounts_in_cells_of_different_widths_share_one_column():
+    from kpi_extractor.document import parse_document
+    document = parse_document("""<table>
+      <tr><td colspan="3">Resolution</td><td colspan="3"></td><td colspan="12">2025</td><td colspan="3"></td><td colspan="12">2024</td></tr>
+      <tr><td colspan="3">3-nanometer</td><td colspan="3"></td><td colspan="6">$</td><td colspan="3">160,180,187</td>
+          <td colspan="6"></td><td colspan="6">$</td><td colspan="3">45,448,960</td></tr>
+      <tr><td colspan="3">5-nanometer</td><td colspan="6"></td><td colspan="6">254,408,255</td><td colspan="9"></td><td colspan="6">190,695,754</td></tr>
+      <tr><td colspan="3">Wafer revenue</td><td colspan="3"></td><td colspan="6">$</td><td colspan="3">714,028,927</td>
+          <td colspan="6"></td><td colspan="6">$</td><td colspan="3">521,896,971</td></tr>
+    </table>""", "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables.values()))
+    assert [row[1] for row in table.rows] == ["2025", "$160,180,187", "254,408,255", "$714,028,927"]
+    assert [row[2] for row in table.rows] == ["2024", "$45,448,960", "190,695,754", "$521,896,971"]

@@ -446,7 +446,7 @@ class SymbolPipeline:
             flash = self._ask(retry_text, "locate", Located, thinking_first=False, model="flash")
             flash_read, flash_problems = read_values(document, spec, flash, currency)
         if self._flash_is_enough(flash, flash_read, spec, expected, document) or (
-                not flash_read and self._kind_reports_nothing(document, expected, version)):
+                not flash.tables and not flash.values and self._kind_reports_nothing(document, expected, version)):
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
         self.result.pro_reads += 1
@@ -511,7 +511,8 @@ class SymbolPipeline:
 
     def _kind_reports_nothing(self, document: Document, expected: date, version: int | None) -> bool:
         """Whether both models already read this kind of document for this KPI list and found nothing in it (TSMC's
-        earnings release once its amounts come from the quarterly report). Flash finding nothing again then stands."""
+        earnings release once its amounts come from the quarterly report). Flash pointing at nothing again then stands;
+        a pointer that does not hold (a partial table) still goes to Pro."""
         if version is None:
             return False
         source = _source_template(document.source_url)
