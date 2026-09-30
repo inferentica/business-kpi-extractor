@@ -369,11 +369,14 @@ product ramp, or a change of definition the company states). If real, quote the 
 JSON shape: {"items": {"<group>.<kpi>": {"legitimate": true, "quote": "..."}}}"""
 
 
-def propose_data(covered: list[str], to_name: list[str]) -> str:
+def propose_data(covered: list[str], to_name: list[str], current: "Spec | None" = None) -> str:
     covered_text = "\n".join(f"- {label}" for label in covered) or "- none"
     naming_text = "\n".join(to_name) or "- none"
+    current_text = ("" if current is None or not current.groups else
+                    "\n\nCurrent list (keep every group and key the documents still report; improve labels and add "
+                    f"what is missing, but never rename a key):\n{kpi_lines(current)}")
     return (f"Already covered by XBRL (do not repeat):\n{covered_text}\n\n"
-            f"Name these XBRL breakdowns (key: current title; member key = current label):\n{naming_text}")
+            f"Name these XBRL breakdowns (key: current title; member key = current label):\n{naming_text}{current_text}")
 
 
 def kpi_lines(spec: Spec, hints: dict[str, str] | None = None) -> str:

@@ -263,11 +263,14 @@ class SymbolPipeline:
             document = self._document(*latest_quarter)
             text = self._prompt_document(document, None)
             # Pro, reasoning first: the KPI list and names shape every later quarter.
-            spec = self._ask(ai.prompt(self.company, text, ai.PROPOSE_TASK, ai.propose_data(covered, to_name)),
+            current = Spec.model_validate({"groups": row["groups"]}) if row else None
+            spec = self._ask(ai.prompt(self.company, text, ai.PROPOSE_TASK, ai.propose_data(covered, to_name, current)),
                              "propose", Spec, thinking_first=True, model="pro")
         except Exception as error:  # noqa: BLE001
             self.result.errors.append(f"KPI list: {error}"[:300])
             return None, 0, False
+        if current is not None:
+            spec = keep_current_groups(spec, current)
         # Names may only rename breakdowns and members that exist.
         names = {
             key: {"label": name.label, "members": {m: l for m, l in name.members.items() if m in breakdowns[key]["members"]}}
@@ -805,6 +808,19 @@ class SymbolPipeline:
         for value in values:
             self.values[value_key(value)] = value
         self.result.values += len(values)
+
+
+def keep_current_groups(proposed: Spec, current: Spec) -> Spec:
+    """A re-proposed list never silently drops a group the current list tracks (TSMC's platform and geography once
+    vanished on a re-read); only the quarterly audit retires what a company stopped reporting."""
+    keys = {group.key for group in proposed.groups}
+    labels = {(group.kind, group.label.lower()) for group in proposed.groups}
+    kept = [group for group in current.groups
+            if group.key not in keys and (group.kind, group.label.lower()) not in labels]
+    if not kept:
+        return proposed
+    groups = [*(group.model_dump() for group in proposed.groups), *(group.model_dump() for group in kept)]
+    return Spec.model_validate({"groups": groups[:ai.MAX_GROUPS], "names": proposed.names})
 
 
 def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:

@@ -9,7 +9,9 @@ def derive_periods(values: list[dict]) -> list[dict]:
     from earnings releases. Only when every period lists the same KPIs, so a renamed segment never yields a bogus value."""
     by_group_year: dict[tuple[str, str], dict[str, dict[str, dict]]] = {}
     for value in values:
-        if value["group_kind"] != "revenue_breakdown" or value["validation_status"] == "rejected":
+        # Only verified figures feed the arithmetic: a flagged partial reading (TSMC's release naming a few nodes beside
+        # the report's full table) must neither block a derived quarter nor enter one.
+        if value["group_kind"] != "revenue_breakdown" or value["validation_status"] != "verified":
             continue
         periods = by_group_year.setdefault((value["group_key"], value["fiscal_year"]), {})
         periods.setdefault(value["fiscal_period"], {})[value["kpi_key"]] = value

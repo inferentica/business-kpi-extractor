@@ -310,3 +310,15 @@ def test_a_quarter_is_compared_with_the_last_quarter_not_the_full_year():
     assert pipeline._previous(date(2026, 3, 29)) == {}  # Q3 is outside the quarter window; FY never counts
     assert pipeline._previous(date(2025, 12, 31)) == {"product.systems": 5553.8}
     assert pipeline._previous(date(2026, 12, 31), annual=True) == {"product.systems": 24474.3}
+
+
+def test_a_re_proposed_list_keeps_the_groups_it_dropped():
+    from kpi_extractor.pipeline import keep_current_groups
+    current = Spec.model_validate({"groups": [
+        {"key": "technology", "label": "Revenue by Technology", "kind": "mix", "kpis": [{"key": "n3", "label": "3nm", "unit": "percent"}]},
+        {"key": "platform", "label": "Revenue by Platform", "kind": "mix", "kpis": [{"key": "hpc", "label": "HPC", "unit": "percent"}]},
+    ]})
+    proposed = Spec.model_validate({"groups": [
+        {"key": "tech", "label": "Revenue by technology", "kind": "mix", "kpis": [{"key": "n3", "label": "3nm", "unit": "percent"}]},
+    ]})
+    assert [group.key for group in keep_current_groups(proposed, current).groups] == ["tech", "platform"]

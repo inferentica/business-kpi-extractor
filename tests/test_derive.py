@@ -56,3 +56,13 @@ def test_q4_from_an_annual_report_read_by_the_ai():
     values += [_value(period, "hpc", 20, method="ai", group="kpi_platform") for period in ("Q1", "Q2", "Q3")]
     [q4] = derive_periods(values)
     assert (q4["fiscal_period"], q4["value"]) == ("Q4", 40)
+
+
+def test_flagged_partial_readings_neither_block_nor_enter_a_derived_q4():
+    values = [_value("FY", "a", 100, method="ai"), _value("FY", "b", 40, method="ai")]
+    for period, a, b in (("Q1", 20, 10), ("Q2", 25, 10), ("Q3", 30, 10)):
+        values += [_value(period, "a", a, method="ai"), _value(period, "b", b, method="ai"),
+                   _value(period, "n3", 5, method="ai", status="needs_review")]
+    values.append(_value("Q4", "n3", 6, method="ai", status="needs_review"))
+    derived = {row["kpi_key"]: row["value"] for row in derive_periods(values) if row["fiscal_period"] == "Q4"}
+    assert derived == {"a": 25, "b": 10}
