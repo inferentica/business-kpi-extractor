@@ -739,7 +739,13 @@ class SymbolPipeline:
 
     def _derive(self) -> None:
         changed = []
-        for record in derive_periods(list(self.values.values())):
+        derived = derive_periods(list(self.values.values()))
+        produced = {value_key(record) for record in derived}
+        # Derived values whose inputs are gone or were replaced (e.g. a Q4 from a rejected reading) are withdrawn.
+        changed.extend({**value, "validation_status": "rejected", "notes": ["inputs no longer available"]}
+                       for key, value in self.values.items()
+                       if value["method"] == "derived" and value["validation_status"] != "rejected" and key not in produced)
+        for record in derived:
             existing = self.values.get(value_key(record))
             if existing and existing["method"] != "derived" and existing["validation_status"] != "rejected":
                 continue
@@ -762,18 +768,28 @@ class SymbolPipeline:
                       spec_version: int | None = None, notes: list[str] | None = None) -> None:
         records = records or []
         previous = self.filings.get(ref.accession)
+        if ref.role == "earnings_release":
+            # A re-read replaces the filing's earlier reading: values it no longer produces (a KPI key the new list
+            # renamed, a figure now read differently) stop being served.
+            fresh = {value_key(record) for record in records}
+            records = records + [
+                {**value, "validation_status": "rejected", "notes": ["replaced by a newer reading of this filing"]}
+                for value in self.values.values()
+                if value["method"] == "ai" and value.get("source_accession") == ref.accession
+                and value["validation_status"] != "rejected" and value_key(value) not in fresh
+            ]
         filing = {
             "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(), "document_role": ref.role,
             "period_end": period_end.isoformat() if period_end else None, "fiscal_year": fiscal_year,
             "fiscal_period": fiscal_period, "status": status, "spec_version": spec_version,
-            "value_count": len(records), "attempts": (previous.get("attempts", 0) + 1) if previous else 1,
+            "value_count": sum(1 for record in records if record["validation_status"] != "rejected"), "attempts": (previous.get("attempts", 0) + 1) if previous else 1,
             "notes": [note[:300] for note in (notes or [])][:30], "source_url": ref.source_url,
         }
         self._store(filings=[filing], values=records)
         self.filings[ref.accession] = filing
         self.result.filings += 1
         self.result.needs_review += sum(1 for record in records if record["validation_status"] == "needs_review")
-        self.log(f"{self.symbol}: {ref.form} {ref.filed} {status} ({len(records)} values)")
+        self.log(f"{self.symbol}: {ref.form} {ref.filed} {status} ({filing['value_count']} values)")
 
     def _fail_filing(self, ref: FilingRef, error: Exception, spec_version: int | None = None) -> None:
         message = f"{type(error).__name__}: {error}"[:300]

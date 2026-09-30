@@ -128,9 +128,17 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         raise LocateError(f"no number in {value_text!r}")
     if kpi.unit == "percent" and not parsed.percent and not re.search(r"\bpercent\b", quote, re.I):
         raise LocateError(f"{value_text!r} is not a percentage")
-    if kpi.unit == "currency" and parsed.scale_word is None and parsed.value < 1_000:
-        raise LocateError(f"{value_text!r} has no amount scale")
-    return parsed.value, _currency(value_text, kpi, default_currency), notes
+    value = parsed.value
+    if kpi.unit == "currency" and parsed.scale_word is None:
+        declared = block.declared_scale() or document.default_scale()
+        if declared is None and locator.scale in (1, 1e3, 1e6, 1e9):
+            declared = locator.scale
+            notes.append("scale read by AI")
+        if declared is not None:
+            value *= declared
+        elif value < 1_000:
+            raise LocateError(f"{value_text!r} has no amount scale")
+    return value, _currency(f"{value_text} {quote}", kpi, default_currency), notes
 
 
 def row_key(label: str) -> str:

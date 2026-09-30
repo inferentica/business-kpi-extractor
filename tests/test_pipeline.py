@@ -284,3 +284,18 @@ def test_a_text_block_cited_as_a_table_is_retried_with_how_to_quote_it():
     message = _explain_pointer(f"technology.n3: unknown table {block}", document)
     assert f'"block": "{block}"' in message and "not a table" in message
     assert _explain_pointer("technology.n3: unknown table A_T9", document) == "technology.n3: unknown table A_T9"
+
+
+def test_a_re_read_withdraws_what_the_earlier_reading_of_that_filing_had():
+    from kpi_extractor.sec import FilingRef
+    control = FakeControl({})
+    old = {"group_key": "kpi_revenue_by_product", "kpi_key": "systems", "fiscal_year": "2026", "fiscal_period": "Q2",
+           "period_end": "2026-06-30", "method": "ai", "validation_status": "verified", "value": 5.0,
+           "source_accession": "a1", "group_label": "x", "kpi_label": "x"}
+    pipeline = _pipeline(control, [old])
+    ref = FilingRef("a1", "6-K", date(2026, 7, 15), "earnings_release", "https://www.sec.gov/x.htm")
+    new = {**old, "group_key": "kpi_revenue_by_product_line", "value": 6.0}
+    pipeline._store_filing(ref, "processed", records=[new])
+    assert pipeline.values[("kpi_revenue_by_product", "systems", "2026", "Q2")]["validation_status"] == "rejected"
+    assert pipeline.values[("kpi_revenue_by_product_line", "systems", "2026", "Q2")]["validation_status"] == "verified"
+    assert pipeline.filings["a1"]["value_count"] == 1

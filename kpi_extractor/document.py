@@ -57,6 +57,12 @@ class TextBlock:
     def render(self) -> str:
         return f"[{self.id}] {self.text}"
 
+    def declared_scale(self) -> float | None:
+        """The one amount scale a text block declares, e.g. "(Unaudited, €, in millions)" over figures that reach us as
+        text (ASML's statements are slide images with their figures as hidden text)."""
+        found = {_SCALE_WORDS[match.group("word").lower().rstrip("s")] for match in _TABLE_SCALE.finditer(self.text)}
+        return found.pop() if len(found) == 1 else None
+
 
 @dataclass
 class Document:

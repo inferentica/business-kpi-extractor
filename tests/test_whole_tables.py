@@ -80,3 +80,15 @@ def test_an_audit_answer_with_one_malformed_group_keeps_the_rest():
                       '{"key": "n1", "label": "1.6nm", "unit": "currency"}]}}', ai.Maintenance)
     assert [group.key for group in answer.add_groups] == ["operating"]
     assert [kpi.key for kpi in answer.add_kpis["technology"]] == ["n1"]
+
+
+def test_figures_quoted_from_text_take_their_blocks_scale():
+    document = parse_document("<p>Three months ended (Unaudited, €, in millions) 2025 2026 Net system sales 5,596.1 "
+                              "6,564.8 Total net sales 7,691.7 9,326.5</p>", "https://www.sec.gov/x.htm")
+    spec = Spec.model_validate({"groups": [{"key": "product", "label": "Revenue by Product", "kind": "revenue_breakdown",
+                                            "kpis": [{"key": "systems", "label": "Net System Sales", "unit": "currency"}]}]})
+    block = next(iter(document.blocks))
+    located = ai.Located.model_validate({"period_end": "2026-06-28", "values": [
+        {"kpi": "product.systems", "block": block, "quote": "Net system sales 5,596.1 6,564.8", "value_text": "6,564.8"}]})
+    values, problems = read_values(document, spec, located, "EUR")  # the company's XBRL currency
+    assert problems == [] and values[0].value == 6_564_800_000 and values[0].currency == "EUR"
