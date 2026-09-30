@@ -81,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
             "flashOnlyReads": sum(result.flash_only_reads for result in results),
             "proReads": sum(result.pro_reads for result in results),
             "replayedReads": sum(result.replayed_reads for result in results),
+            "q4Gaps": {result.symbol: result.q4_gaps[:10] for result in results if result.q4_gaps},
             "failedCompanies": [result.symbol for result in results if result.errors and not result.filings],
             "errors": {result.symbol: result.errors[:5] for result in results if result.errors},
         }

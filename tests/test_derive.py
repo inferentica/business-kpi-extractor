@@ -66,3 +66,17 @@ def test_flagged_partial_readings_neither_block_nor_enter_a_derived_q4():
     values.append(_value("Q4", "n3", 6, method="ai", status="needs_review"))
     derived = {row["kpi_key"]: row["value"] for row in derive_periods(values) if row["fiscal_period"] == "Q4"}
     assert derived == {"a": 25, "b": 10}
+
+
+def test_q4_is_the_year_less_the_third_quarters_nine_months():
+    values = [_value("FY", "a", 100, method="xbrl"), _value("FY", "b", 40, method="xbrl")]
+    for row in values:
+        row["locator"] = {"total": 140}
+    # Q1 was restated after its report, so its old figures no longer add up with the year; the nine months do.
+    values += [_value("Q1", "a", 99), _value("Q1", "b", 1), _value("Q2", "a", 25), _value("Q2", "b", 10)]
+    third = [_value("Q3", "a", 30), _value("Q3", "b", 10)]
+    third[0]["locator"] = {"total": 40, "ytd": 70, "ytd_total": 100}
+    third[1]["locator"] = {"total": 40, "ytd": 30, "ytd_total": 100}
+    derived = {row["kpi_key"]: row for row in derive_periods(values + third) if row["fiscal_period"] == "Q4"}
+    assert derived["a"]["value"] == 30 and derived["b"]["value"] == 10
+    assert derived["a"]["locator"] == {"total": 40} and derived["a"]["reconciliation_error_pct"] == 0

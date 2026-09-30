@@ -19,9 +19,14 @@ def derive_periods(values: list[dict]) -> list[dict]:
     for (_group, _year), periods in by_group_year.items():
         annual, quarters = periods.get("FY"), [periods.get(quarter) for quarter in QUARTERS]
         fourth = periods.get("Q4")
-        if (annual and _method(annual) in ("xbrl", "ai") and all(quarters) and (fourth is None or _only_derived(fourth))
-                and _same_keys(annual, *quarters)):
-            derived.extend(_combine(annual, quarters, "Q4"))
+        if annual and _method(annual) in ("xbrl", "ai") and (fourth is None or _only_derived(fourth)):
+            third = quarters[-1]
+            if third and _same_keys(annual, third) and _has_year_to_date(third):
+                # The third-quarter report's nine months to date share the year's basis even when earlier quarters
+                # were restated mid-year, so Q4 = year − nine months is the most faithful difference.
+                derived.extend(_combine_year_to_date(annual, third))
+            elif all(quarters) and _same_keys(annual, *quarters):
+                derived.extend(_combine(annual, quarters, "Q4"))
         if not annual or _only_derived(annual):
             parts = [*quarters, fourth]
             if all(parts) and _same_keys(*parts) and all(_method(part) == "ai" for part in parts):
@@ -59,6 +64,34 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
     annual_total = _total(annual) if annual else None
     if all(total is not None for total in totals) and (annual is None or annual_total is not None):
         total = annual_total - sum(totals) if annual else sum(totals)
+        if total:
+            error = (sum(row["value"] for row in rows) - total) / total
+            for row in rows:
+                row["reconciliation_error_pct"] = error
+                row["locator"] = {"total": total}
+    return rows
+
+
+def _has_year_to_date(period: dict) -> bool:
+    return all(isinstance((value.get("locator") or {}).get("ytd"), (int, float)) for value in period.values()) and \
+        isinstance((next(iter(period.values())).get("locator") or {}).get("ytd_total"), (int, float))
+
+
+def _combine_year_to_date(annual: dict, third: dict) -> list[dict]:
+    rows = []
+    for key, year in annual.items():
+        nine = third[key]
+        value = year["value"] - nine["locator"]["ytd"]
+        verified = year["validation_status"] == "verified" and nine["validation_status"] == "verified"
+        notes = [] if verified else ["derived from values that need review"]
+        if value < 0 <= year["value"]:
+            verified, notes = False, [*notes, "derived Q4 is negative"]
+        rows.append({**year, "fiscal_period": "Q4", "value": value, "method": "derived",
+                     "validation_status": "verified" if verified else "needs_review",
+                     "reconciliation_error_pct": None, "notes": notes, "locator": None})
+    annual_total, nine_total = _total(annual), next(iter(third.values()))["locator"]["ytd_total"]
+    if annual_total is not None:
+        total = annual_total - float(nine_total)
         if total:
             error = (sum(row["value"] for row in rows) - total) / total
             for row in rows:

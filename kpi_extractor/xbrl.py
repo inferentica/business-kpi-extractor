@@ -53,6 +53,11 @@ class XbrlGroup:
     # The same breakdown one year earlier as this filing restates it (member key → value): renamed members (Microsoft's
     # "Gaming" became "Xbox") are recognized by matching these to what the earlier filing reported.
     prior: dict[str, float] = field(default_factory=dict)
+    # Member key → its XBRL element ("msft:XBOXMember"): the same element keeps one series when only its label changes.
+    elements: dict[str, str] = field(default_factory=dict)
+    # A third-quarter 10-Q's nine months to date (member key → value, plus the total), so Q4 is the year less these.
+    year_to_date: dict[str, float] = field(default_factory=dict)
+    year_to_date_total: float | None = None
 
 
 @dataclass
@@ -137,6 +142,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     duration = days.between(330, 400) if annual else days.between(80, 100)
     prior_end = frame["_end"].dt.date.map(lambda end: end is not None and not pd.isna(end) and 358 <= (period_end - end).days <= 372)
     prior_frame = frame[duration & prior_end & frame["numeric_value"].notna()]
+    ytd_frame = frame[(frame["_end"].dt.date == period_end) & days.between(250, 290) & frame["numeric_value"].notna()]
     in_period = (frame["_end"].dt.date == period_end) & duration
     frame = frame[in_period & frame["numeric_value"].notna()]
     dimension_columns = [column for column in frame.columns if column.startswith("dim_")]
@@ -216,12 +222,21 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
                 out.append((member_key(name), name, value))
             return out
 
+        def elements(rows: dict[str, float]) -> dict[str, str]:
+            return {member_key(label(member) or labels.get(member) or humanize(member)): member for member in rows}
+
         leaves = drop_overlaps(remove_subtotals(members, total), total)
         error = (sum(leaves.values()) - total) / total if len(leaves) >= 2 else None
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
             prior = _single_axis_members(prior_frame, concept, axis, dimension_columns)
+            ytd = {k: v for k, _n, v in named(_single_axis_members(ytd_frame, concept, axis, dimension_columns))}
+            ytd_totals = ytd_frame[(ytd_frame["concept"] == concept)
+                                   & ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] if dimension_columns else []
+            leaf_keys = {k for k, _n, _v in named(leaves)}
             groups.append(XbrlGroup(key, title, order, named(leaves), total, error, currencies.get(concept), concept,
-                                    {k: v for k, _n, v in named(prior)}))
+                                    {k: v for k, _n, v in named(prior)}, elements(leaves),
+                                    {k: v for k, v in ytd.items() if k in leaf_keys},
+                                    float(ytd_totals.iloc[0]) if len(ytd_totals) else None))
             continue
         # Worth an AI review only when it could plausibly be a breakdown: a standard axis, or a custom one whose rows
         # are of the right order of magnitude.

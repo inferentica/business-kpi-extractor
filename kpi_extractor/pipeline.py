@@ -37,6 +37,7 @@ _MAX_ATTEMPTS = 3
 _NOT_EARNINGS = "classified as not an earnings document"
 _AI_PENDING = "AI review unavailable; retried next run"
 _READ_BY_AI = "read by AI"
+MAX_YEAR_RATIO = 3.0
 _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 
@@ -51,6 +52,8 @@ class SymbolResult:
     pro_reads: int = 0
     flash_only_reads: int = 0
     replayed_reads: int = 0
+    # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.
+    q4_gaps: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
@@ -118,8 +121,12 @@ class SymbolPipeline:
                     for ref in releases:
                         self._process_release(ref, spec, version)
         self._refile_annuals()
+        self._recheck_flagged()
         self._derive()
         self._harmonize_labels()
+        self.result.q4_gaps = self._q4_gaps()
+        if self.result.q4_gaps:
+            self.log(f"{self.symbol}: no Q4 for {', '.join(self.result.q4_gaps[:10])}")
         return self.result
 
     # Periodic reports: official XBRL breakdowns, with rows chosen by the AI where the rules fall short.
@@ -191,16 +198,20 @@ class SymbolPipeline:
             records = []
             for group, extra_notes in groups:
                 named = self.names.get(group.key) or {}
-                aliases = self._renamed_members(group, breakdowns.annual, breakdowns.period_end)
-                for order, (member, label, value) in enumerate(group.members):
-                    member = aliases.get(member, member)
+                aliases = self._series_keys(group, breakdowns.annual, breakdowns.period_end, ref.accession)
+                for order, (reported, label, value) in enumerate(group.members):
+                    member = aliases.get(reported, reported)
                     records.append(self._record(
                         group_key=group.key, group_label=named.get("label") or group.label, group_kind="revenue_breakdown",
                         group_order=group.order, kpi_key=member, kpi_label=(named.get("members") or {}).get(member) or label,
                         kpi_order=order, unit="currency", value=value, currency=group.currency, method="xbrl",
                         validation_status="verified", reconciliation_error_pct=group.reconciliation_error,
                         notes=extra_notes, ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
-                        period_end=breakdowns.period_end, locator={"concept": group.concept, "total": group.total},
+                        period_end=breakdowns.period_end, locator={
+                            "concept": group.concept, "total": group.total, "member": group.elements.get(reported),
+                            **({"ytd": group.year_to_date[reported], "ytd_total": group.year_to_date_total}
+                               if reported in group.year_to_date and group.year_to_date_total else {}),
+                        },
                     ))
             status = "failed" if ai_pending else "processed" if records else "skipped"
             notes = [_AI_PENDING] if ai_pending else [] if records else ["no revenue breakdown reconciles to reported revenue"]
@@ -209,25 +220,36 @@ class SymbolPipeline:
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
 
-    def _renamed_members(self, group, annual: bool, period_end: date) -> dict[str, str]:
-        """New member key → the key the same series was stored under, for members a filing renamed. The filing restates
-        the prior year under its new names, so a renamed member's prior-year figure equals, to the unit, what the
-        earlier filing reported under the old name (Microsoft's "Xbox" in its FY2026 10-K is FY2025's "Gaming")."""
-        stored = [v for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
-                  and v["validation_status"] == "verified" and (v["fiscal_period"] == "FY") == annual]
-        known = {v["kpi_key"] for v in stored}
-        current = {member for member, _label, _value in group.members}
+    def _series_keys(self, group, annual: bool, period_end: date, accession: str) -> dict[str, str]:
+        """Reported member key → the key its series is stored under, so one business stays one series:
+        - the same XBRL element keeps the key it first had, whatever its label says now (Microsoft's "Dynamics" became
+          "Dynamics products and cloud services");
+        - a new element continues the series whose prior-year figure it restates to the unit (the FY2026 10-K's
+          "Xbox" restates FY2025 exactly as the FY2025 10-K reported "Gaming")."""
+        earlier = sorted((v for v in self.values.values()
+                          if v["method"] == "xbrl" and v["group_key"] == group.key and v["validation_status"] != "rejected"
+                          and v.get("source_accession") != accession and v["period_end"] < period_end.isoformat()),
+                         key=lambda v: v["period_end"])
+        by_element: dict[str, str] = {}
+        for v in earlier:
+            element = (v.get("locator") or {}).get("member")
+            if element:
+                by_element.setdefault(element, v["kpi_key"])
         prior_end = (period_end - timedelta(days=365)).isoformat()
-        aliases: dict[str, str] = {}
-        for member in current - known:
-            prior = group.prior.get(member)
-            if not prior:
+        prior_rows = [v for v in earlier if (v["fiscal_period"] == "FY") == annual and abs(_days(v["period_end"], prior_end)) <= 12]
+        keys: dict[str, str] = {}
+        for member, _label, _value in group.members:
+            element = group.elements.get(member)
+            if element and element in by_element:
+                keys[member] = by_element[element]
                 continue
-            matches = {v["kpi_key"] for v in stored if v["kpi_key"] not in current and _same(float(v["value"]), prior)
-                       and abs(_days(v["period_end"], prior_end)) <= 12}
+            prior = group.prior.get(member)
+            matches = {v["kpi_key"] for v in prior_rows if prior and _same(float(v["value"]), prior)}
             if len(matches) == 1:
-                aliases[member] = matches.pop()
-        return aliases
+                keys[member] = matches.pop()
+        # Two members never share one series; a clash keeps both as reported.
+        taken = [key for key in keys.values()]
+        return {member: key for member, key in keys.items() if taken.count(key) == 1}
 
     def _curate(self, candidate: XbrlCandidate):
         """Pro picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""
@@ -713,11 +735,69 @@ class SymbolPipeline:
         moved = []
         for v in list(self.values.values()):
             if v["method"] == "ai" and v["fiscal_period"] == "Q4" and (v["source_accession"], v["fiscal_year"]) in misfiled:
-                moved.append({**v, "fiscal_period": "FY", "notes": [*(v.get("notes") or []), "full-year figures, re-filed from Q4"]})
+                # A jump flagged while the year was mistaken for a quarter says nothing about the year.
+                notes = [note for note in (v.get("notes") or []) if not _is_jump(note)]
+                status = "verified" if v["validation_status"] == "needs_review" and not notes else v["validation_status"]
+                moved.append({**v, "fiscal_period": "FY", "validation_status": status,
+                              "notes": [*notes, "full-year figures, re-filed from Q4"]})
                 moved.append({**v, "validation_status": "rejected", "notes": ["full-year figures filed as Q4; see FY"]})
         for start in range(0, len(moved), 400):
             self._store(values=moved[start:start + 400])
         self.log(f"{self.symbol}: re-filed {len(misfiled)} annual report(s) stored as Q4")
+
+    def _q4_gaps(self) -> list[str]:
+        periods: dict[tuple[str, str], set[str]] = {}
+        for v in self.values.values():
+            if v["group_kind"] == "revenue_breakdown" and v["validation_status"] == "verified":
+                periods.setdefault((v["group_label"], v["fiscal_year"]), set()).add(v["fiscal_period"])
+        return sorted(f"{label} {year}" for (label, year), found in periods.items()
+                      if {"FY", "Q1", "Q2", "Q3"} <= found and "Q4" not in found)
+
+    def _recheck_flagged(self) -> None:
+        """Clears flags that stored figures themselves disprove, without reading anything again:
+        - a full year flagged for jumping against a quarter is compared with the year before instead;
+        - a table read whole without its total row reconciles to a figure the same filing reports for the same period
+          (TSMC's geography to its net revenue, its nodes to wafer revenue), to within 0.001%."""
+        cleared = []
+        by_filing: dict[tuple[str, str], list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["validation_status"] != "rejected":
+                by_filing.setdefault((v.get("source_accession") or "", v["period_end"]), []).append(v)
+        for v in self.values.values():
+            if v["method"] != "ai" or v["validation_status"] != "needs_review" or v["fiscal_period"] != "FY":
+                continue
+            notes = v.get("notes") or []
+            if notes and all(_is_jump(note) and note.endswith("in a quarter") for note in notes):
+                key = f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}"
+                before = self._previous(date.fromisoformat(v["period_end"][:10]), annual=True).get(key)
+                if before is None or 1 / MAX_YEAR_RATIO <= float(v["value"]) / before <= MAX_YEAR_RATIO:
+                    cleared.append({**v, "validation_status": "verified", "notes": ["checked against the prior year"]})
+        for (accession, _end), rows in by_filing.items():
+            for group_key in {v["group_key"] for v in rows if v["group_kind"] == "revenue_breakdown"}:
+                members = [m for m in rows if m["group_key"] == group_key]
+                total = sum(float(m["value"]) for m in members)
+                for m in members:
+                    notes = m.get("notes") or []
+                    if (m["validation_status"] == "needs_review" and notes and all(_is_jump(note) for note in notes)
+                            and total and abs(float(m["value"])) < 0.01 * abs(total)):
+                        cleared.append({**m, "validation_status": "verified", "notes": ["immaterial row; the total checks it"]})
+            groups: dict[str, list[dict]] = {}
+            for v in rows:
+                groups.setdefault(v["group_key"], []).append(v)
+            for group_key, members in groups.items():
+                if not all(m["validation_status"] == "needs_review" and (m.get("locator") or {}).get("whole_table")
+                           and (m.get("notes") or []) == ["no total revenue to reconcile against"] for m in members):
+                    continue
+                parts = sum(float(m["value"]) for m in members)
+                anchors = [float(o["value"]) for o in rows if o["group_key"] != group_key and o["validation_status"] == "verified"]
+                anchors += [float((o.get("locator") or {}).get("total")) for o in rows
+                            if o["group_key"] != group_key and o["validation_status"] == "verified" and (o.get("locator") or {}).get("total")]
+                if len(members) >= 2 and any(abs(parts - anchor) <= abs(anchor) * 1e-5 for anchor in anchors):
+                    cleared += [{**m, "validation_status": "verified", "locator": {**m["locator"], "total": parts},
+                                 "reconciliation_error_pct": 0, "notes": ["reconciled to another figure in the same report"]}
+                                for m in members]
+        for start in range(0, len(cleared), 400):
+            self._store(values=cleared[start:start + 400])
 
     def _reports_full_year(self, read: list[ReadValue], period_end: date) -> bool:
         """Whether a breakdown in this document adds up to the fiscal year's revenue in XBRL (an annual report the

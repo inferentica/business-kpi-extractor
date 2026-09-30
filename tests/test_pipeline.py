@@ -350,10 +350,35 @@ def test_a_fast_growers_real_q4_is_not_taken_for_a_year():
 def test_a_renamed_xbrl_member_keeps_its_series():
     from kpi_extractor.xbrl import XbrlGroup
     stored = {"group_key": "products", "kpi_key": "gaming", "fiscal_year": "2025", "fiscal_period": "FY",
-              "period_end": "2025-06-30", "method": "xbrl", "validation_status": "verified", "value": 23_455_000_000}
-    pipeline = _pipeline(FakeControl({}), [stored, {**stored, "kpi_key": "linkedin", "value": 17_812_000_000}])
+              "period_end": "2025-06-30", "method": "xbrl", "validation_status": "verified", "value": 23_455_000_000,
+              "source_accession": "fy25", "locator": {"member": "msft:GamingMember"}}
+    dynamics = {**stored, "kpi_key": "dynamics", "value": 7_827_000_000,
+                "locator": {"member": "msft:DynamicsProductsAndCloudServicesMember"}}
+    stale = {**stored, "kpi_key": "xbox", "fiscal_year": "2026", "period_end": "2026-06-30", "source_accession": "fy26"}
+    pipeline = _pipeline(FakeControl({}), [stored, dynamics, stale])
     group = XbrlGroup("products", "Revenue by Product", 1, [("xbox", "Xbox", 21_790_000_000),
-                                                             ("linkedin", "LinkedIn", 19_820_000_000)],
-                      41_610_000_000, 0.0, "USD", "us-gaap:Revenues",
-                      prior={"xbox": 23_455_000_000, "linkedin": 17_812_000_000})
-    assert pipeline._renamed_members(group, True, date(2026, 6, 30)) == {"xbox": "gaming"}
+                                                             ("dynamicsproductsandcloudservices", "Dynamics products", 9_006_000_000)],
+                      30_796_000_000, 0.0, "USD", "us-gaap:Revenues",
+                      prior={"xbox": 23_455_000_000, "dynamicsproductsandcloudservices": 7_827_000_000},
+                      elements={"xbox": "msft:XBOXMember",
+                                "dynamicsproductsandcloudservices": "msft:DynamicsProductsAndCloudServicesMember"})
+    assert pipeline._series_keys(group, True, date(2026, 6, 30), "fy26") == {
+        "xbox": "gaming", "dynamicsproductsandcloudservices": "dynamics"}
+
+
+def test_flags_the_stored_figures_disprove_are_cleared():
+    base = {"method": "ai", "group_kind": "revenue_breakdown", "fiscal_year": "2024", "fiscal_period": "Q2",
+            "period_end": "2024-06-30", "source_accession": "r", "group_label": "x", "kpi_label": "x"}
+    geography = [{**base, "group_key": "kpi_geo", "kpi_key": k, "value": v, "validation_status": "needs_review",
+                  "notes": ["no total revenue to reconcile against"], "locator": {"whole_table": True}}
+                 for k, v in (("us", 70.0), ("taiwan", 30.0))]
+    product = [{**base, "group_key": "kpi_product", "kpi_key": "wafer", "value": 90.0, "validation_status": "verified",
+                "notes": [], "locator": {"total": 100.0}},
+               {**base, "group_key": "kpi_product", "kpi_key": "n10", "value": 0.5, "validation_status": "needs_review",
+                "notes": ["changed 3.2x in a quarter"], "locator": {}},
+               {**base, "group_key": "kpi_product", "kpi_key": "other", "value": 9.5, "validation_status": "verified",
+                "notes": [], "locator": {"total": 100.0}}]
+    pipeline = _pipeline(FakeControl({}), geography + product)
+    pipeline._recheck_flagged()
+    assert pipeline.values[("kpi_geo", "us", "2024", "Q2")]["validation_status"] == "verified"
+    assert pipeline.values[("kpi_product", "n10", "2024", "Q2")]["validation_status"] == "verified"

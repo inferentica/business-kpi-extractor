@@ -192,7 +192,10 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         key = member_key(row[0])
         if key not in parts:
             parts[key] = (row[0], row[1], index)
-    total_row = read_row(locator.total_row) if locator.total_row is not None else None
+    total_index = locator.total_row
+    if total_index is None and unit == "currency" and parts:
+        total_index = _total_row_by_sum(table, locator, parts, read_row)
+    total_row = read_row(total_index) if total_index is not None else None
     total = total_row[1] if total_row else (100.0 if unit == "percent" else None)
     kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total)
     if len(kept) < 2:
@@ -202,7 +205,7 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                          KpiSpec(key="x", label="x", unit="currency"), default_currency,
                          context if declared_currency(context) else document.declared_currency()) if unit == "currency" else None
     # What the next quarter's replay needs: the total row's label (None when the table has none) and the scale used.
-    total_label = _row_label(table.rows[locator.total_row], locator.col)[:80] if total_row is not None else None
+    total_label = _row_label(table.rows[total_index], locator.col)[:80] if total_row is not None else None
     values = []
     for key, (label, value, index) in parts.items():
         if key not in kept:
@@ -213,10 +216,25 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                   "header": column_header(table, locator.first_row, locator.col)}
         values.append(ReadValue(group, KpiSpec(key=row_key(label), label=label[:80], unit=unit), value, currency, record))
     if total_row is not None:
-        record = {"table": locator.table, "row": locator.total_row, "col": locator.col, "row_label": "Total", "whole_table": True}
+        record = {"table": locator.table, "row": total_index, "col": locator.col, "row_label": "Total", "whole_table": True}
         values.append(ReadValue(group, KpiSpec(key=group.total_kpi or "total", label="Total", unit=unit), total_row[1],
                                 currency, record, is_total=True))
     return values
+
+
+def _total_row_by_sum(table: Table, locator: TableLocator, parts: dict, read_row) -> int | None:
+    """The row just below (or above) the rows read whose figure is their sum, when the reader named no total row:
+    TSMC's "Net revenue" line under its geography table. Found by the numbers, never by the label alone."""
+    parts_sum = sum(value for _label, value, _index in parts.values())
+    for index in (locator.last_row + 1, locator.last_row + 2, locator.first_row - 1):
+        if 0 <= index < len(table.rows):
+            try:
+                row = read_row(index)
+            except LocateError:
+                continue
+            if row and parts_sum and abs(row[1] - parts_sum) <= abs(parts_sum) * 0.001:
+                return index
+    return None
 
 
 def _currency(text: str | None, kpi: KpiSpec, default_currency: str | None, context: str = "") -> str | None:
@@ -311,7 +329,10 @@ def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None
             for item in items:
                 item.status = "needs_review"
                 item.notes.append(reason)
+        parts_total = sum(item.value for item in items if not (item.is_total or item.kpi.key == group.total_kpi))
         for item in items:
+            if group.kind == "revenue_breakdown" and parts_total and abs(item.value) < 0.01 * abs(parts_total):
+                continue  # an immaterial row (TSMC's residual 10nm) swings wildly; the group total still checks it
             before = previous.get(f"{group_key}.{item.kpi.key}")
             jump = _jump(item, before)
             if jump:
