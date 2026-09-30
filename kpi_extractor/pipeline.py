@@ -441,7 +441,8 @@ class SymbolPipeline:
         invalid = [problem for problem in flash_problems if _INVALID_POINTER.search(problem)]
         if invalid:
             # One retry with the reader told which pointers failed (e.g. a text block cited as a table).
-            retry_text = text + "\n\nYour previous answer had pointers that do not hold:\n" + "\n".join(f"- {p}" for p in invalid[:20])
+            retry_text = text + "\n\nYour previous answer had pointers that do not hold:\n" + "\n".join(
+                f"- {_explain_pointer(problem, document)}" for problem in invalid[:20])
             flash = self._ask(retry_text, "locate", Located, thinking_first=False, model="flash")
             flash_read, flash_problems = read_values(document, spec, flash, currency)
         if self._flash_is_enough(flash, flash_read, spec, expected, document) or (
@@ -859,6 +860,19 @@ def _source_template(url: str) -> str:
 
 
 _INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in")
+
+
+def _explain_pointer(problem: str, document: Document) -> str:
+    """Retry feedback that names the fix: a text block cited as a table (ASML's statements are slide images whose
+    figures come through as text) must be quoted instead."""
+    match = re.search(r"unknown table (\S+)", problem)
+    if match and match.group(1) in document.blocks:
+        block = match.group(1)
+        return (f"{problem}: {block} is a text block, not a table. Cite it as "
+                f'{{"kpi": ..., "block": "{block}", "quote": "<the label and the numbers, copied exactly>", '
+                f'"value_text": "<the one number for the reported period>"}}; the column headers at the start of the '
+                "block give the order of the periods.")
+    return problem
 
 
 def _is_jump(note: str) -> bool:

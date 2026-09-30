@@ -275,3 +275,12 @@ def test_an_unavailable_ai_does_not_cost_the_filing_or_the_company():
         pass
     else:
         raise AssertionError("curation must surface the outage so the filing is retried")
+
+
+def test_a_text_block_cited_as_a_table_is_retried_with_how_to_quote_it():
+    from kpi_extractor.pipeline import _explain_pointer
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    block = next(iter(document.blocks))
+    message = _explain_pointer(f"technology.n3: unknown table {block}", document)
+    assert f'"block": "{block}"' in message and "not a table" in message
+    assert _explain_pointer("technology.n3: unknown table A_T9", document) == "technology.n3: unknown table A_T9"
