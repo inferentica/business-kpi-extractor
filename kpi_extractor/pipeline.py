@@ -122,6 +122,7 @@ class SymbolPipeline:
                         self._process_release(ref, spec, version)
         self._refile_annuals()
         self._recheck_flagged()
+        self._unify_series()
         self._derive()
         self._harmonize_labels()
         self.result.q4_gaps = self._q4_gaps()
@@ -198,11 +199,10 @@ class SymbolPipeline:
             records = []
             for group, extra_notes in groups:
                 named = self.names.get(group.key) or {}
-                aliases = self._series_keys(group, breakdowns.annual, breakdowns.period_end, ref.accession)
-                # Rows that land on one series ("Other" and "All other") are parts of it: they add up.
+                # Rows that land on one key ("Other" and "All other") are parts of it: they add up.
                 merged: dict[str, tuple[str, str, float]] = {}
                 for reported, label, value in group.members:
-                    member = aliases.get(reported, reported)
+                    member = reported
                     if member in merged:
                         first, first_label, total = merged[member]
                         merged[member] = (first, first_label, total + value)
@@ -217,6 +217,7 @@ class SymbolPipeline:
                         notes=extra_notes, ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
                         period_end=breakdowns.period_end, locator={
                             "concept": group.concept, "total": group.total, "member": group.elements.get(reported),
+                            "prior": group.prior.get(reported),
                             **({"ytd": group.year_to_date[reported], "ytd_total": group.year_to_date_total}
                                if reported in group.year_to_date and group.year_to_date_total else {}),
                         },
@@ -227,37 +228,6 @@ class SymbolPipeline:
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
-
-    def _series_keys(self, group, annual: bool, period_end: date, accession: str) -> dict[str, str]:
-        """Reported member key → the key its series is stored under, so one business stays one series:
-        - the same XBRL element keeps the key it first had, whatever its label says now (Microsoft's "Dynamics" became
-          "Dynamics products and cloud services");
-        - a new element continues the series whose prior-year figure it restates to the unit (the FY2026 10-K's
-          "Xbox" restates FY2025 exactly as the FY2025 10-K reported "Gaming")."""
-        earlier = sorted((v for v in self.values.values()
-                          if v["method"] == "xbrl" and v["group_key"] == group.key and v["validation_status"] != "rejected"
-                          and v.get("source_accession") != accession and v["period_end"] < period_end.isoformat()),
-                         key=lambda v: v["period_end"])
-        by_element: dict[str, str] = {}
-        for v in earlier:
-            element = (v.get("locator") or {}).get("member")
-            if element:
-                by_element.setdefault(element, v["kpi_key"])
-        prior_end = (period_end - timedelta(days=365)).isoformat()
-        prior_rows = [v for v in earlier if (v["fiscal_period"] == "FY") == annual and abs(_days(v["period_end"], prior_end)) <= 12]
-        keys: dict[str, str] = {}
-        for member, _label, _value in group.members:
-            element = group.elements.get(member)
-            if element and element in by_element:
-                keys[member] = by_element[element]
-                continue
-            prior = group.prior.get(member)
-            matches = {v["kpi_key"] for v in prior_rows if prior and _same(float(v["value"]), prior)}
-            if len(matches) == 1:
-                keys[member] = matches.pop()
-        # Two members never share one series; a clash keeps both as reported.
-        taken = [key for key in keys.values()]
-        return {member: key for member, key in keys.items() if taken.count(key) == 1}
 
     def _curate(self, candidate: XbrlCandidate):
         """Pro picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""
@@ -752,6 +722,69 @@ class SymbolPipeline:
         for start in range(0, len(moved), 400):
             self._store(values=moved[start:start + 400])
         self.log(f"{self.symbol}: re-filed {len(misfiled)} annual report(s) stored as Q4")
+
+    def _unify_series(self) -> None:
+        """One key per business across a company's whole XBRL history, so Q4 = year − quarters always lines up.
+        Two kinds of evidence link keys: the same XBRL element (a label change: "Dynamics" became "Dynamics products and
+        cloud services"), and a member whose restated prior-year figure equals, to the unit, what another key reported
+        for that year (a new element: Microsoft's "Xbox" restates FY2025 "Gaming"). Microsoft moved Search between two
+        elements and back, so neither alone suffices; together they link the whole history. A linked set that ever has
+        two of its keys in one period is two businesses after all and is left alone. The series takes its latest key,
+        so it carries the latest name."""
+        rows = [v for v in self.values.values() if v["method"] == "xbrl" and v["validation_status"] != "rejected"]
+        parent: dict[tuple[str, str], tuple[str, str]] = {}
+
+        def find(node):
+            parent.setdefault(node, node)
+            while parent[node] != node:
+                parent[node] = parent[parent[node]]
+                node = parent[node]
+            return node
+
+        def union(a, b):
+            parent[find(a)] = find(b)
+
+        by_element: dict[tuple[str, str], tuple[str, str]] = {}
+        index: dict[tuple[str, bool], list[dict]] = {}
+        for v in rows:
+            node = (v["group_key"], v["kpi_key"])
+            find(node)
+            element = (v.get("locator") or {}).get("member")
+            if element:
+                if (v["group_key"], element) in by_element:
+                    union(node, by_element[(v["group_key"], element)])
+                else:
+                    by_element[(v["group_key"], element)] = node
+            index.setdefault((v["group_key"], v["fiscal_period"] == "FY"), []).append(v)
+        for v in rows:
+            prior = (v.get("locator") or {}).get("prior")
+            if not prior:
+                continue
+            target = (date.fromisoformat(v["period_end"][:10]) - timedelta(days=365)).isoformat()
+            matches = {(o["group_key"], o["kpi_key"]) for o in index.get((v["group_key"], v["fiscal_period"] == "FY"), [])
+                       if abs(_days(o["period_end"], target)) <= 12 and _same(float(o["value"]), float(prior))}
+            if len(matches) == 1:
+                union((v["group_key"], v["kpi_key"]), matches.pop())
+        components: dict[tuple[str, str], list[dict]] = {}
+        for v in rows:
+            components.setdefault(find((v["group_key"], v["kpi_key"])), []).append(v)
+        rekeyed = []
+        for members in components.values():
+            keys = {v["kpi_key"] for v in members}
+            if len(keys) < 2:
+                continue
+            periods = [(v["fiscal_year"], v["fiscal_period"]) for v in members]
+            if len(periods) != len(set(periods)):
+                continue  # two of its keys in one period: different businesses after all
+            canonical = max(members, key=lambda v: (v["period_end"], v["fiscal_period"] == "FY"))["kpi_key"]
+            for v in members:
+                if v["kpi_key"] != canonical:
+                    rekeyed.append({**v, "kpi_key": canonical})
+                    rekeyed.append({**v, "validation_status": "rejected", "notes": [f"continued as {canonical}"]})
+        for start in range(0, len(rekeyed), 400):
+            self._store(values=rekeyed[start:start + 400])
+        if rekeyed:
+            self.log(f"{self.symbol}: {len(rekeyed) // 2} XBRL values joined to their series")
 
     def _q4_gaps(self) -> list[str]:
         periods: dict[tuple[str, str], set[str]] = {}

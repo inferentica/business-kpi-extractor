@@ -70,6 +70,10 @@ class XbrlCandidate:
     total: float
     currency: str | None
     members: dict[str, tuple[str, float]]  # member key → (label, value)
+    prior: dict[str, float] = field(default_factory=dict)
+    elements: dict[str, str] = field(default_factory=dict)
+    year_to_date: dict[str, float] = field(default_factory=dict)
+    year_to_date_total: float | None = None
 
     def group(self, chosen: list[str]) -> XbrlGroup | None:
         """The group formed by the chosen rows, if they add up to revenue; otherwise None."""
@@ -80,7 +84,10 @@ class XbrlCandidate:
         if abs(error) > MAX_RECONCILIATION_ERROR:
             return None
         rows.sort(key=lambda row: -row[2])
-        return XbrlGroup(self.key, self.label, self.order, rows, self.total, error, self.currency, self.concept)
+        keys = {key for key, _label, _value in rows}
+        return XbrlGroup(self.key, self.label, self.order, rows, self.total, error, self.currency, self.concept,
+                         self.prior, self.elements,
+                         {k: v for k, v in self.year_to_date.items() if k in keys}, self.year_to_date_total)
 
 
 @dataclass
@@ -227,23 +234,23 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
 
         leaves = drop_overlaps(remove_subtotals(members, total), total)
         error = (sum(leaves.values()) - total) / total if len(leaves) >= 2 else None
+        prior = {k: v for k, _n, v in named(_single_axis_members(prior_frame, concept, axis, dimension_columns))}
+        ytd = {k: v for k, _n, v in named(_single_axis_members(ytd_frame, concept, axis, dimension_columns))}
+        ytd_totals = ytd_frame[(ytd_frame["concept"] == concept)
+                               & ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] if dimension_columns else []
+        ytd_total = float(ytd_totals.iloc[0]) if len(ytd_totals) else None
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
-            prior = _single_axis_members(prior_frame, concept, axis, dimension_columns)
-            ytd = {k: v for k, _n, v in named(_single_axis_members(ytd_frame, concept, axis, dimension_columns))}
-            ytd_totals = ytd_frame[(ytd_frame["concept"] == concept)
-                                   & ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] if dimension_columns else []
             leaf_keys = {k for k, _n, _v in named(leaves)}
             groups.append(XbrlGroup(key, title, order, named(leaves), total, error, currencies.get(concept), concept,
-                                    {k: v for k, _n, v in named(prior)}, elements(leaves),
-                                    {k: v for k, v in ytd.items() if k in leaf_keys},
-                                    float(ytd_totals.iloc[0]) if len(ytd_totals) else None))
+                                    prior, elements(leaves), {k: v for k, v in ytd.items() if k in leaf_keys}, ytd_total))
             continue
         # Worth an AI review only when it could plausibly be a breakdown: a standard axis, or a custom one whose rows
         # are of the right order of magnitude.
         positive = sum(value for value in members.values() if value > 0)
         if 3 <= len(members) <= 40 and (standard or 0.5 * total <= positive <= 3 * total):
             rejected.append(XbrlCandidate(key, title, order, concept, total, currencies.get(concept),
-                                          {k: (n, v) for k, n, v in named(members)}))
+                                          {k: (n, v) for k, n, v in named(members)}, prior, elements(members),
+                                          ytd, ytd_total))
     groups.sort(key=lambda group: (group.order, group.key))
     total_revenue = next((totals[concept] for concept in REVENUE_CONCEPTS if concept in totals), None)
     return XbrlBreakdowns(period_end, annual, _fiscal_year(entity), groups, total_revenue, rejected)
