@@ -101,3 +101,18 @@ def test_a_derived_q4_that_does_not_reconcile_is_not_verified():
     third[1]["locator"] = {"total": 40, "ytd": 10, "ytd_total": 100}
     derived = [row for row in derive_periods(values + third) if row["fiscal_period"] == "Q4"]
     assert derived and all(row["validation_status"] == "needs_review" for row in derived)
+
+
+def test_a_recast_year_takes_its_nine_months_from_next_years_third_quarter():
+    values = [_value("FY", "a", 100, method="xbrl", year="2023"), _value("FY", "b", 60, method="xbrl", year="2023"),
+              _value("FY", "c", 40, method="xbrl", year="2023")]
+    for row in values:
+        row["locator"] = {"total": 200}
+    old = [_value("Q3", "a", 30, year="2023"), _value("Q3", "b", 30, year="2023")]  # before the recast: no "c"
+    for row in old:
+        row["locator"] = {"total": 60, "ytd": 70, "ytd_total": 150}
+    later = [_value("Q3", k, 1, year="2024") for k in ("a", "b", "c")]
+    for row, prior in zip(later, (70, 45, 35)):
+        row["locator"] = {"total": 3, "prior_ytd": prior, "prior_ytd_total": 150}
+    derived = {r["kpi_key"]: r["value"] for r in derive_periods(values + old + later) if r["fiscal_period"] == "Q4" and r["fiscal_year"] == "2023"}
+    assert derived == {"a": 30, "b": 15, "c": 5}

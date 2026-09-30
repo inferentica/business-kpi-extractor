@@ -26,7 +26,7 @@ from .extract import ReadValue, _listed_kpi, check_period, describe, locator_hin
 from .fiscal import fiscal_label, learn_year_offset
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
-from .xbrl import XbrlCandidate, drop_overlaps, extract_breakdowns, official_labels, remove_subtotals
+from .xbrl import XbrlCandidate, extract_breakdowns, official_labels
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
 MAX_DOCUMENT_CHARS = 120_000
@@ -222,17 +222,17 @@ class SymbolPipeline:
                 named = self.names.get(group.key) or {}
                 # Rows that land on one key ("Other" and "All other") are parts of it: they add up.
                 # Their nine months to date add up the same way, or Q4 = year − nine months would be wrong.
-                merged: dict[str, tuple[str, str, float, float | None]] = {}
+                merged: dict[str, list] = {}
                 for reported, label, value in group.members:
-                    member = reported
-                    ytd = group.year_to_date.get(reported)
-                    if member in merged:
-                        first, first_label, total, ytd_total = merged[member]
-                        merged[member] = (first, first_label, total + value,
-                                          None if ytd is None or ytd_total is None else ytd_total + ytd)
+                    ytd, prior_ytd = group.year_to_date.get(reported), group.prior_year_to_date.get(reported)
+                    if reported in merged:
+                        row = merged[reported]
+                        row[2] += value
+                        row[3] = None if ytd is None or row[3] is None else row[3] + ytd
+                        row[4] = None if prior_ytd is None or row[4] is None else row[4] + prior_ytd
                     else:
-                        merged[member] = (reported, label, value, ytd)
-                for order, (member, (reported, label, value, ytd)) in enumerate(merged.items()):
+                        merged[reported] = [reported, label, value, ytd, prior_ytd]
+                for order, (member, (reported, label, value, ytd, prior_ytd)) in enumerate(merged.items()):
                     records.append(self._record(
                         group_key=group.key, group_label=named.get("label") or group.label, group_kind="revenue_breakdown",
                         group_order=group.order, kpi_key=member, kpi_label=(named.get("members") or {}).get(member) or label,
@@ -244,50 +244,16 @@ class SymbolPipeline:
                             "prior": group.prior.get(reported),
                             **({"ytd": ytd, "ytd_total": group.year_to_date_total}
                                if ytd is not None and group.year_to_date_total else {}),
+                            **({"prior_ytd": prior_ytd, "prior_ytd_total": group.prior_year_to_date_total}
+                               if prior_ytd is not None and group.prior_year_to_date_total else {}),
                         },
                     ))
-            for group, _notes in groups:
-                records += self._restated_prior(group, breakdowns.annual, breakdowns.period_end, ref)
             status = "failed" if ai_pending else "processed" if records else "skipped"
             notes = [_AI_PENDING] if ai_pending else [] if records else ["no revenue breakdown reconciles to reported revenue"]
             self._store_filing(ref, status, records=records, period_end=breakdowns.period_end,
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
-
-    def _restated_prior(self, group, annual: bool, period_end: date, ref: FilingRef) -> list[dict]:
-        """The year-ago period as this filing restates it, when the company has since recast the breakdown (Microsoft's
-        FY2023 10-K split out Dynamics; its FY2024 10-Qs restate the FY2023 quarters that way). The year and its
-        quarters then share one basis and Q4 can be derived. A period whose stored figures already match is untouched;
-        restated rows must add up to that period's reported revenue."""
-        if annual:
-            # A 10-K restates the prior year, but no filing restates that year's quarters: the year stays as it was
-            # reported so it and its quarters share one basis (Microsoft's FY2022 against its FY2022 10-Qs).
-            return []
-        target = (period_end - timedelta(days=365)).isoformat()
-        stored = [v for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
-                  and v["validation_status"] == "verified" and v["fiscal_period"] != "FY"
-                  and abs(_days(v["period_end"], target)) <= 12]
-        if not stored:
-            return []
-        total = float((stored[0].get("locator") or {}).get("total") or 0)
-        # Exactly this filing's own rows, as restated for the year-ago quarter; never a subset guessed to fit.
-        restated = {key: group.prior[key] for key, _label, _value in group.members if key in group.prior}
-        if (not total or len(restated) != len(group.members) or len(restated) < 2
-                or abs(sum(restated.values()) - total) > abs(total) * 0.0001):
-            return []
-        if sorted(round(float(v["value"])) for v in stored) == sorted(round(value) for value in restated.values()):
-            return []  # already on the current basis
-        base = stored[0]
-        rows = [{**base, "kpi_key": key, "kpi_label": dict((k, l) for k, l, _v in group.members).get(key, key),
-                 "kpi_order": order, "value": value, "source_accession": ref.accession, "source_url": ref.source_url,
-                 "filed_at": ref.filed.isoformat(), "validation_status": "verified", "reconciliation_error_pct": 0,
-                 "notes": [f"restated in the {ref.form} filed {ref.filed}"],
-                 "locator": {"concept": group.concept, "total": total, "member": group.elements.get(key)}}
-                for order, (key, value) in enumerate(sorted(restated.items(), key=lambda item: -item[1]))]
-        rows += [{**v, "validation_status": "rejected", "notes": [f"restated in the {ref.form} filed {ref.filed}"]}
-                 for v in stored if v["kpi_key"] not in restated]
-        return rows
 
     def _curate(self, candidate: XbrlCandidate):
         """Pro picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""

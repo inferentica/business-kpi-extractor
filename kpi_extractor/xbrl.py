@@ -58,6 +58,9 @@ class XbrlGroup:
     # A third-quarter 10-Q's nine months to date (member key → value, plus the total), so Q4 is the year less these.
     year_to_date: dict[str, float] = field(default_factory=dict)
     year_to_date_total: float | None = None
+    # The year-ago nine months as this filing restates them: last year's Q4 = last year − these, on one basis.
+    prior_year_to_date: dict[str, float] = field(default_factory=dict)
+    prior_year_to_date_total: float | None = None
 
 
 @dataclass
@@ -74,6 +77,8 @@ class XbrlCandidate:
     elements: dict[str, str] = field(default_factory=dict)
     year_to_date: dict[str, float] = field(default_factory=dict)
     year_to_date_total: float | None = None
+    prior_year_to_date: dict[str, float] = field(default_factory=dict)
+    prior_year_to_date_total: float | None = None
 
     def group(self, chosen: list[str]) -> XbrlGroup | None:
         """The group formed by the chosen rows, if they add up to revenue; otherwise None."""
@@ -87,7 +92,8 @@ class XbrlCandidate:
         keys = {key for key, _label, _value in rows}
         return XbrlGroup(self.key, self.label, self.order, rows, self.total, error, self.currency, self.concept,
                          self.prior, self.elements,
-                         {k: v for k, v in self.year_to_date.items() if k in keys}, self.year_to_date_total)
+                         {k: v for k, v in self.year_to_date.items() if k in keys}, self.year_to_date_total,
+                         self.prior_year_to_date, self.prior_year_to_date_total)
 
 
 @dataclass
@@ -150,6 +156,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     prior_end = frame["_end"].dt.date.map(lambda end: end is not None and not pd.isna(end) and 358 <= (period_end - end).days <= 372)
     prior_frame = frame[duration & prior_end & frame["numeric_value"].notna()]
     ytd_frame = frame[(frame["_end"].dt.date == period_end) & days.between(250, 290) & frame["numeric_value"].notna()]
+    prior_ytd_frame = frame[prior_end & days.between(250, 290) & frame["numeric_value"].notna()]
     in_period = (frame["_end"].dt.date == period_end) & duration
     frame = frame[in_period & frame["numeric_value"].notna()]
     dimension_columns = [column for column in frame.columns if column.startswith("dim_")]
@@ -239,10 +246,16 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         ytd_totals = ytd_frame[(ytd_frame["concept"] == concept)
                                & ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] if dimension_columns else []
         ytd_total = float(ytd_totals.iloc[0]) if len(ytd_totals) else None
+        prior_ytd = {k: v for k, _n, v in named(_single_axis_members(prior_ytd_frame, concept, axis, dimension_columns))}
+        prior_ytd_totals = prior_ytd_frame[(prior_ytd_frame["concept"] == concept)
+                                           & prior_ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] \
+            if dimension_columns else []
+        prior_ytd_total = float(prior_ytd_totals.iloc[0]) if len(prior_ytd_totals) else None
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
             leaf_keys = {k for k, _n, _v in named(leaves)}
             groups.append(XbrlGroup(key, title, order, named(leaves), total, error, currencies.get(concept), concept,
-                                    prior, elements(leaves), {k: v for k, v in ytd.items() if k in leaf_keys}, ytd_total))
+                                    prior, elements(leaves), {k: v for k, v in ytd.items() if k in leaf_keys}, ytd_total,
+                                    {k: v for k, v in prior_ytd.items() if k in leaf_keys}, prior_ytd_total))
             continue
         # Worth an AI review only when it could plausibly be a breakdown: a standard axis, or a custom one whose rows
         # are of the right order of magnitude.
@@ -250,7 +263,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         if 3 <= len(members) <= 40 and (standard or 0.5 * total <= positive <= 3 * total):
             rejected.append(XbrlCandidate(key, title, order, concept, total, currencies.get(concept),
                                           {k: (n, v) for k, n, v in named(members)}, prior, elements(members),
-                                          ytd, ytd_total))
+                                          ytd, ytd_total, prior_ytd, prior_ytd_total))
     groups.sort(key=lambda group: (group.order, group.key))
     total_revenue = next((totals[concept] for concept in REVENUE_CONCEPTS if concept in totals), None)
     return XbrlBreakdowns(period_end, annual, _fiscal_year(entity), groups, total_revenue, rejected)
