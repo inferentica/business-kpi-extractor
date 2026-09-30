@@ -45,9 +45,17 @@ class ControlPlane:
         raise ControlError(f"{operation} failed")
 
     def ai(self, symbol: str, purpose: str, system: str, user: str, thinking: bool, model: str = "flash") -> str:
-        response = self.call("ai", timeout=390, attempts=2, symbol=symbol, purpose=purpose, model=model, system=system,
-                             user=user, thinking=thinking)
-        return str(response.get("content") or "")
+        # The reply streams keep-alive spaces before its JSON, so a long reasoning call outlasts the gateway's idle
+        # limit; a failure after the first byte arrives as {"error": ...} and is retried once.
+        for attempt in (1, 2):
+            response = self.call("ai", timeout=390, attempts=2, symbol=symbol, purpose=purpose, model=model,
+                                 system=system, user=user, thinking=thinking)
+            if not response.get("error"):
+                return str(response.get("content") or "")
+            if attempt == 2:
+                raise ControlError(f"ai failed: {str(response['error'])[:300]}")
+            time.sleep(5)
+        return ""
 
     def _oidc_token(self) -> str:
         if self._token and time.monotonic() < self._token[1]:
