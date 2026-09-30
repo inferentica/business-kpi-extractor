@@ -299,3 +299,14 @@ def test_a_re_read_withdraws_what_the_earlier_reading_of_that_filing_had():
     assert pipeline.values[("kpi_revenue_by_product", "systems", "2026", "Q2")]["validation_status"] == "rejected"
     assert pipeline.values[("kpi_revenue_by_product_line", "systems", "2026", "Q2")]["validation_status"] == "verified"
     assert pipeline.filings["a1"]["value_count"] == 1
+
+
+def test_a_quarter_is_compared_with_the_last_quarter_not_the_full_year():
+    base = {"group_key": "kpi_product", "kpi_key": "systems", "method": "ai", "validation_status": "verified"}
+    pipeline = _pipeline(FakeControl({}), [
+        {**base, "fiscal_year": "2025", "fiscal_period": "Q3", "period_end": "2025-09-28", "value": 5553.8},
+        {**base, "fiscal_year": "2025", "fiscal_period": "FY", "period_end": "2025-12-31", "value": 24474.3},
+    ])
+    assert pipeline._previous(date(2026, 3, 29)) == {}  # Q3 is outside the quarter window; FY never counts
+    assert pipeline._previous(date(2025, 12, 31)) == {"product.systems": 5553.8}
+    assert pipeline._previous(date(2026, 12, 31), annual=True) == {"product.systems": 24474.3}

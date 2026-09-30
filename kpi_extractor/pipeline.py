@@ -379,7 +379,7 @@ class SymbolPipeline:
                 # An annual report: its values are the full year, and Q4 is derived from them.
                 fiscal_year, fiscal_period = fiscal_label(period_end, self.profile.fiscal_year_end, annual=True,
                                                           year_offset=self.offset)
-            validate_groups(read, self._previous(period_end))
+            validate_groups(read, self._previous(period_end, annual=located.annual))
             self._explain_jumps(read, document, spec)
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
             verified = sum(1 for record in records if record["validation_status"] == "verified")
@@ -718,12 +718,14 @@ class SymbolPipeline:
                 earlier.setdefault(key, []).append(float(value["value"]))
         return earlier
 
-    def _previous(self, before: date) -> dict[str, float]:
-        """The latest verified value of each AI KPI in the quarter before, for jump checks."""
-        window_start = (before - timedelta(days=120)).isoformat()
+    def _previous(self, before: date, annual: bool = False) -> dict[str, float]:
+        """The latest verified value of each AI KPI in the period before, for jump checks: the quarter before a
+        quarter, the year before a year (a year is never compared with a quarter)."""
+        window_start = (before - timedelta(days=400 if annual else 120)).isoformat()
         latest: dict[str, dict] = {}
         for value in self.values.values():
             if (value["method"] != "ai" or value["validation_status"] != "verified"
+                    or (value["fiscal_period"] == "FY") != annual
                     or not window_start <= value["period_end"] < before.isoformat()):
                 continue
             key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
