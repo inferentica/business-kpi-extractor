@@ -472,3 +472,36 @@ def test_the_split_the_quarters_use_is_kept():
                                                           ("emea", "EMEA", 9.0)])
     chosen = pipeline._continuing_split(group, date(2025, 11, 2))
     assert [key for key, _l, _v in chosen.members] == ["americas", "asiapacific", "emea"]
+
+
+def test_an_ai_breakdown_must_total_a_reported_figure():
+    base = {"fiscal_year": "2026", "fiscal_period": "Q2", "period_end": "2026-06-27", "group_label": "x", "kpi_label": "x",
+            "group_kind": "revenue_breakdown", "source_accession": "a"}
+    xbrl = [{**base, "group_key": "segments", "kpi_key": "clientandgaming", "method": "xbrl", "value": 3841.0,
+             "validation_status": "verified", "locator": {"total": 11563.0}}]
+    good = [{**base, "group_key": "kpi_cg", "kpi_key": k, "method": "ai", "value": v, "validation_status": "verified",
+             "locator": {"total": 3841.0}} for k, v in (("client", 3062.0), ("gaming", 779.0))]
+    bad = [{**base, "group_key": "kpi_wrong", "kpi_key": k, "method": "ai", "value": v, "validation_status": "verified",
+            "locator": {"total": 9000.0}} for k, v in (("a", 5000.0), ("b", 4000.0))]
+    pipeline = _pipeline(FakeControl({}), xbrl + good + bad)
+    pipeline._anchor_ai_breakdowns()
+    assert pipeline.values[("kpi_cg", "client", "2026", "Q2")]["validation_status"] == "verified"
+    assert pipeline.values[("kpi_wrong", "a", "2026", "Q2")]["validation_status"] == "needs_review"
+
+
+def test_the_year_ago_column_confirms_a_reading_in_a_new_place():
+    html = """<table><tr><td></td><td>Three Months Ended June 30, 2026</td><td>Three Months Ended June 30, 2025</td></tr>
+      <tr><td>Client</td><td>3,062</td><td>2,499</td></tr><tr><td>Gaming</td><td>779</td><td>1,122</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating Metrics", "kind": "metric", "kpis": [
+        {"key": "client", "label": "Client", "unit": "count"}, {"key": "gaming", "label": "Gaming", "unit": "count"}]}]})
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "values": [
+        {"kpi": "ops.client", "table": table, "row": 1, "col": 1}, {"kpi": "ops.gaming", "table": table, "row": 2, "col": 1}]})
+    read, _ = read_values(document, spec, located, "USD")
+    base = {"group_key": "kpi_ops", "fiscal_year": "2025", "fiscal_period": "Q2", "period_end": "2025-06-28", "method": "ai",
+            "validation_status": "verified"}
+    pipeline = _pipeline(FakeControl({}), [{**base, "kpi_key": "client", "value": 2499.0}, {**base, "kpi_key": "gaming", "value": 1122.0}])
+    assert pipeline._year_ago_confirms(read, document, EXPECTED)
+    pipeline = _pipeline(FakeControl({}), [{**base, "kpi_key": "client", "value": 2499.0}, {**base, "kpi_key": "gaming", "value": 999.0}])
+    assert not pipeline._year_ago_confirms(read, document, EXPECTED)

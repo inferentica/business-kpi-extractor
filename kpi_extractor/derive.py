@@ -28,17 +28,17 @@ def derive_periods(values: list[dict]) -> list[dict]:
             if nine:
                 # Q4 = year − nine months, the nine months on the year's own basis: the year's Q3 10-Q, or when the
                 # 10-K recast the breakdown (Microsoft split out Dynamics), next year's Q3 10-Q restating them.
-                derived.extend(_combine_year_to_date(annual, *nine))
+                derived.extend(_whole_rows(_combine_year_to_date(annual, *nine)))
             elif all(quarters) and _same_keys(annual, *quarters):
-                derived.extend(_combine(annual, quarters, "Q4"))
+                derived.extend(_whole_rows(_combine(annual, quarters, "Q4")))
             elif restated:
                 # A layout no 10-Q ever used (Microsoft's FY2023 10-K): next year's 10-K and Q3 10-Q restate the year
                 # and its nine months on one later basis, so Q4 is exact on that basis.
-                derived.extend(_combine_year_to_date(*restated))
+                derived.extend(_whole_rows(_combine_year_to_date(*restated)))
         if not annual or _only_derived(annual):
             parts = [*quarters, fourth]
             if all(parts) and _same_keys(*parts) and all(_method(part) == "ai" for part in parts):
-                derived.extend(_combine(None, parts, "FY"))
+                derived.extend(_whole_rows(_combine(None, parts, "FY")))
     return derived
 
 
@@ -161,7 +161,8 @@ MAX_DERIVED_GAP = 0.001
 
 
 def _reconcile(rows: list[dict], total: float) -> None:
-    """A derived period is verified only if its parts add up to its derived total, like any reported one."""
+    """A derived period is verified only if its parts add up to its derived total, like any reported one, and it is
+    published whole: one flagged part (a negative Q4) flags them all."""
     error = (sum(row["value"] for row in rows) - total) / total
     for row in rows:
         row["reconciliation_error_pct"] = error
@@ -169,6 +170,20 @@ def _reconcile(rows: list[dict], total: float) -> None:
         if abs(error) > MAX_DERIVED_GAP and row["validation_status"] == "verified":
             row["validation_status"] = "needs_review"
             row["notes"] = [*row["notes"], f"derived parts differ from the derived total by {error:.1%}"]
+    _whole(rows)
+
+
+def _whole_rows(rows: list[dict]) -> list[dict]:
+    _whole(rows)
+    return rows
+
+
+def _whole(rows: list[dict]) -> None:
+    if any(row["validation_status"] != "verified" for row in rows):
+        for row in rows:
+            if row["validation_status"] == "verified":
+                row["validation_status"] = "needs_review"
+                row["notes"] = [*row["notes"], "another part of this period needs review"]
 
 
 def _total(period: dict) -> float | None:

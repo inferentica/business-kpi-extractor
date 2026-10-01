@@ -9,6 +9,22 @@ on:
         required: true
         default: "6"
         type: string
+      second_reader:
+        description: Second reader when Flash's reading cannot stand alone
+        required: true
+        default: pro
+        type: choice
+        options:
+          - pro
+          - flash-thinking
+  # Weekly, and whenever the prompts or the reader change.
+  schedule:
+    - cron: "17 3 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - kpi_extractor/ai.py
+      - kpi_extractor/extract.py
 
 permissions:
   contents: read
@@ -34,6 +50,7 @@ jobs:
       - name: Score against the golden set
         env:
           QUARTERS: ${{ inputs.quarters || '6' }}
+          KPI_SECOND_READER: ${{ inputs.second_reader || 'pro' }}
         run: python -m kpi_extractor.evaluate --quarters "$QUARTERS"
       - uses: actions/upload-artifact@v6
         if: always()

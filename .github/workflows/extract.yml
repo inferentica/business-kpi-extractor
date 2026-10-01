@@ -58,7 +58,9 @@ jobs:
           activate-environment: true
           enable-cache: true
           cache-dependency-glob: pyproject.toml
-      - run: uv pip install .
+      - run: uv pip install '.[test]'
+      # The tests gate every extraction: a commit that breaks them never touches stored data.
+      - run: pytest -q -x
       - name: Read filings and store KPIs
         # Inputs reach the command as environment variables, never as interpolated shell text.
         env:

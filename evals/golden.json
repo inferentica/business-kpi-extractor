@@ -372,5 +372,68 @@
     "tolerance": 0.004,
     "currency": "USD",
     "source": "Broadcom 3Q26 release: AI semiconductor revenue of $16.7 billion"
+  },
+  {
+    "symbol": "AMZN",
+    "period_end": "2026-06-30",
+    "label": "net product sales|^products?$",
+    "unit": "currency",
+    "value": 77602000000,
+    "currency": "USD",
+    "source": "Amazon 2Q26 release: net product sales"
+  },
+  {
+    "symbol": "AMZN",
+    "period_end": "2026-06-30",
+    "label": "net service sales|^services?$",
+    "unit": "currency",
+    "value": 123004000000,
+    "currency": "USD",
+    "source": "Amazon 2Q26 release: net service sales"
+  },
+  {
+    "symbol": "GOOGL",
+    "period_end": "2026-06-30",
+    "label": "youtube ads",
+    "unit": "currency",
+    "value": 11055000000,
+    "currency": "USD",
+    "source": "Alphabet 2Q26 release: YouTube ads"
+  },
+  {
+    "symbol": "GOOGL",
+    "period_end": "2026-06-30",
+    "label": "google cloud",
+    "unit": "currency",
+    "value": 24768000000,
+    "currency": "USD",
+    "source": "Alphabet 2Q26 release: Google Cloud"
+  },
+  {
+    "symbol": "GOOGL",
+    "period_end": "2026-06-30",
+    "label": "search",
+    "unit": "currency",
+    "value": 63271000000,
+    "currency": "USD",
+    "source": "Alphabet 2Q26 release: Google Search & other"
+  },
+  {
+    "symbol": "ASML",
+    "period_end": "2026-06-28",
+    "label": "net system sales",
+    "unit": "currency",
+    "value": 6564800000,
+    "currency": "EUR",
+    "source": "ASML 2Q26 financial statements: net system sales \u20ac6,564.8 million"
+  },
+  {
+    "symbol": "ASML",
+    "period_end": "2026-06-28",
+    "label": "installed base|service and field option",
+    "unit": "currency",
+    "value": 2761700000,
+    "currency": "EUR",
+    "source": "ASML 2Q26 financial statements: net service and field option sales \u20ac2,761.7 million"
   }
 ]

@@ -11,6 +11,7 @@ AI decides and points; code reads and proves. Every AI answer is checked before 
 from __future__ import annotations
 
 import copy
+import os
 import re
 import string
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -21,7 +22,7 @@ from . import ai
 from .ai import AiResponseError, Located, Spec
 from .control import ControlError
 from .derive import derive_periods
-from .document import Document, clean, parse_document
+from .document import Document, clean, parse_document, parse_number
 from .extract import ReadValue, _listed_kpi, check_period, describe, locator_hint, read_values, validate_groups
 from .fiscal import fiscal_label, learn_year_offset
 from .replay import replay
@@ -54,6 +55,7 @@ class SymbolResult:
     replayed_reads: int = 0
     # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.
     q4_gaps: list[str] = field(default_factory=list)
+    skipped: bool = False
     # Values read from earnings documents that are not rejected, and how many of them are verified (shown to users).
     release_values: int = 0
     release_verified: int = 0
@@ -96,6 +98,13 @@ class SymbolPipeline:
 
     def _run(self) -> SymbolResult:
         state = self.control.call("symbol_state", symbol=self.symbol)
+        if state.get("locked"):
+            # Another run is working on this company; two at once would pay twice and overwrite each other.
+            self.result.skipped = True
+            self.log(f"{self.symbol}: another run is working on this company; skipped")
+            return self.result
+        self._curations = {(row["group_key"], row["members_key"]): list(row["chosen"])
+                           for row in state.get("curations") or []}
         self.filings = {filing["accession"]: filing for filing in state.get("filings") or []}
         self.values = {value_key(value): value for value in state.get("values") or []}
         self.names = (state.get("spec") or {}).get("names") or {}
@@ -138,6 +147,7 @@ class SymbolPipeline:
             self._adopt_listed_keys(spec)
         self._refile_annuals()
         self._recheck_flagged()
+        self._anchor_ai_breakdowns()
         self._unify_series()
         self._derive()
         self._harmonize_labels()
@@ -270,9 +280,9 @@ class SymbolPipeline:
 
     def _curate(self, candidate: XbrlCandidate):
         """Pro picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""
-        cache_key = (candidate.key, frozenset(candidate.members))
+        cache_key = (candidate.key, ",".join(sorted(candidate.members)))
         if cache_key in self._curations:
-            return candidate.group(self._curations[cache_key])
+            return candidate.group(self._curations[cache_key])  # Pro's choice, kept between runs
         rows = "\n".join(f"- {key}: {label} = {value:,.0f}" for key, (label, value) in candidate.members.items())
         data = (f"Breakdown: {candidate.label} ({candidate.concept})\nReported total revenue: {candidate.total:,.0f}\n"
                 f"Rows (member key: label = amount):\n{rows}")
@@ -282,6 +292,8 @@ class SymbolPipeline:
         except AiResponseError:
             return None
         self._curations[cache_key] = answer.members
+        self.control.call("store", symbol=self.symbol, filings=[], values=[], curations=[
+            {"group_key": candidate.key, "members_key": cache_key[1][:2000], "chosen": answer.members}])
         return candidate.group(answer.members)
 
     # Which furnished filings are earnings documents.
@@ -547,7 +559,9 @@ class SymbolPipeline:
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
         self.result.pro_reads += 1
-        pro = self._ask(text, "locate", Located, thinking_first=False, model="pro")
+        # The second reader: Pro, or Flash reasoning first when the evaluation compares them (KPI_SECOND_READER).
+        flash_second = os.environ.get("KPI_SECOND_READER") == "flash-thinking"
+        pro = self._ask(text, "locate", Located, thinking_first=flash_second, model="flash" if flash_second else "pro")
         pro_read, pro_problems = read_values(document, spec, pro, currency)
         by_flash = {f"{item.group.key}.{item.kpi.key}": item for item in flash_read}
         by_pro = {f"{item.group.key}.{item.kpi.key}": item for item in pro_read}
@@ -621,26 +635,62 @@ class SymbolPipeline:
 
     def _flash_is_enough(self, located: Located, read: list[ReadValue], spec: Spec, expected: date,
                          document: Document) -> bool:
+        """Whether one reading stands without a second: its period checks, no value repeats an earlier period's number,
+        every check passes, and either every KPI sits where it sat last quarter or the year-ago column confirms it."""
         if check_period(located, expected) or located.annual or self._reports_full_year(read, expected):
             return False
-        last = self._last_locators(expected, _source_template(document.source_url))
-        if not last:
-            return False  # a company's first quarters, and a new kind of document, are always read twice
-        keys = {f"{item.group.key}.{item.kpi.key}" for item in read}
-        if any(key not in keys for key in last):
-            return False  # something found last quarter is missing now
         earlier = self._earlier_values(expected)
         for item in read:
             key = f"{item.group.key}.{item.kpi.key}"
             if item.is_total or item.kpi.key == item.group.total_kpi:
                 continue  # totals are not stored; the parts must still add up to them
-            if key not in last or not _same_place(item.locator, last[key]):
-                return False
             if item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in earlier.get(key, [])):
                 return False  # the same number as an earlier period: likely a prior-period column
         trial = copy.deepcopy(read)
         validate_groups(trial, self._previous(expected))
-        return all(item.status == "verified" for item in trial)
+        if not all(item.status == "verified" for item in trial):
+            return False
+        return self._where_it_was(read, expected, document) or self._year_ago_confirms(read, document, expected)
+
+    def _where_it_was(self, read: list[ReadValue], expected: date, document: Document) -> bool:
+        last = self._last_locators(expected, _source_template(document.source_url))
+        if not last:
+            return False  # a company's first quarters, and a new kind of document, are not placed yet
+        keys = {f"{item.group.key}.{item.kpi.key}" for item in read}
+        if any(key not in keys for key in last):
+            return False  # something found last quarter is missing now
+        return all(item.is_total or item.kpi.key == item.group.total_kpi
+                   or (f"{item.group.key}.{item.kpi.key}" in last
+                       and _same_place(item.locator, last[f"{item.group.key}.{item.kpi.key}"]))
+                   for item in read)
+
+    def _year_ago_confirms(self, read: list[ReadValue], document: Document, expected: date) -> bool:
+        """The release's own year-ago column, read by code from the same row, equals what is stored for that quarter of
+        last year: the row is the KPI and the columns are understood. Needs two such confirmations and no figure whose
+        row shows no stored year-ago value; costs no AI."""
+        target = (expected - timedelta(days=365)).isoformat()
+        stored = {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
+                  for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
+                  and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
+        confirmed = 0
+        for item in read:
+            if item.is_total or item.kpi.key == item.group.total_kpi:
+                continue
+            before = stored.get(f"{item.group.key}.{item.kpi.key}")
+            table = document.tables.get(str(item.locator.get("table")))
+            if before is None or table is None or item.locator.get("row") is None:
+                continue
+            row, col = int(item.locator["row"]), int(item.locator["col"])
+            current = parse_number(table.cell(row, col))
+            if current is None or not current.value:
+                return False
+            factor = item.value / current.value
+            others = [parse_number(table.cell(row, other)) for other in range(len(table.rows[row])) if other != col]
+            if not any(cell and abs(cell.value * factor - before) <= abs(before) * 1e-4 for cell in others):
+                return False  # the row shows a year-ago figure we do not know: not confirmed
+            confirmed += 1
+        return confirmed >= 2
+
 
     def _explain_jumps(self, read: list[ReadValue], document: Document, spec: Spec) -> None:
         """Values flagged only for a sharp change get a reading by Pro; a real change backed by a quote stands."""
@@ -878,6 +928,34 @@ class SymbolPipeline:
             self._store(values=rekeyed[start:start + 400])
         if rekeyed:
             self.log(f"{self.symbol}: {len(rekeyed) // 2} XBRL values joined to their series")
+
+    def _anchor_ai_breakdowns(self) -> None:
+        """An AI breakdown's total must be a figure the company reported in XBRL for the same period: its revenue, or a
+        segment it splits (AMD's "Client and Gaming"). Checked every run, so a release read before its 10-Q arrived is
+        checked once it has. A breakdown that matches nothing reported is flagged, all of it."""
+        reported: dict[str, list[tuple[str, float]]] = {}
+        for v in self.values.values():
+            if v["method"] in ("xbrl", "derived") and not v["group_key"].startswith(AI_GROUP_PREFIX) \
+                    and v["validation_status"] == "verified":
+                figures = [float(v["value"])]
+                if (v.get("locator") or {}).get("total"):
+                    figures.append(float(v["locator"]["total"]))
+                reported.setdefault(v["fiscal_period"], []).extend((v["period_end"], f) for f in figures)
+        groups: dict[tuple, list[dict]] = {}
+        for v in self.values.values():
+            if (v["method"] == "ai" and v["group_kind"] == "revenue_breakdown" and v["validation_status"] == "verified"
+                    and (v.get("locator") or {}).get("total")):
+                groups.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), []).append(v)
+        flagged = []
+        for (_group, _year, period), rows in groups.items():
+            total, end = float(rows[0]["locator"]["total"]), rows[0]["period_end"]
+            nearby = [figure for figure_end, figure in reported.get(period, []) if abs(_days(figure_end, end)) <= 12]
+            if nearby and not any(abs(figure - total) <= abs(total) * 0.001 for figure in nearby):
+                flagged += [{**v, "validation_status": "needs_review",
+                             "notes": [*(v.get("notes") or []), "total matches no figure the company reported in XBRL"]}
+                            for v in rows]
+        for start in range(0, len(flagged), 400):
+            self._store(values=flagged[start:start + 400])
 
     def _q4_gaps(self) -> list[str]:
         periods: dict[tuple[str, str], set[str]] = {}
@@ -1132,6 +1210,8 @@ def _annual_columns(read: list[ReadValue]) -> bool:
 
 
 def _keeps_verified(existing: dict, incoming: dict) -> bool:
+    if "owner decision" in (existing.get("notes") or []):
+        return True  # approved or rejected by the owner in Bedrock: stays decided, as in store_business_kpis
     return (existing["validation_status"] == "verified" and incoming["validation_status"] == "needs_review"
             and existing.get("source_accession") != incoming.get("source_accession"))
 
