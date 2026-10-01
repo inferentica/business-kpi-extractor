@@ -428,3 +428,34 @@ def test_a_big_q4_is_never_moved_to_the_year_by_size_alone():
     assert pipeline.values[("kpi_product", "a", "2026", "Q4")]["validation_status"] == "verified"
 
 
+
+
+def test_carried_checkpoints_are_complete_for_the_request_check():
+    from kpi_extractor.sec import FilingRef
+    sent = []
+
+    class Capture(FakeControl):
+        def call(self, operation, **payload):
+            sent.append(payload)
+            return {}
+    pipeline = _pipeline(Capture({}), [])
+    pipeline.filings = {"a1": {"accession": "a1", "status": "processed", "attempts": 0, "value_count": 3, "notes": [],
+                               "period_end": "2025-06-30", "spec_version": 4}}
+    ref = FilingRef("a1", "6-K", date(2025, 7, 17), "earnings_release", "https://www.sec.gov/x.htm")
+    pipeline._carry_to_version(ref, 5)
+    filing = sent[-1]["filings"][0]
+    assert {"form", "filed_at", "document_role", "status"} <= filing.keys() and filing["attempts"] >= 1
+    assert filing["document_role"] in ("periodic_report", "earnings_release") and filing["spec_version"] == 5
+
+
+def test_one_flagged_part_flags_the_whole_breakdown():
+    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.sec import FilingRef
+    group = SPEC.groups[0]
+    read = [ReadValue(group, group.kpis[0], 30.0, None, {}), ReadValue(group, group.kpis[1], 33.0, None, {}),
+            ReadValue(group, group.kpis[2], 37.0, None, {}, status="needs_review", notes=["moved 31 points"])]
+    pipeline = _pipeline(FakeControl({}), [])
+    ref = FilingRef("a1", "6-K", date(2026, 7, 16), "earnings_release", "https://www.sec.gov/x.htm")
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    records = pipeline._release_records(read, SPEC, ref, document, "2026", "Q2", EXPECTED, None)
+    assert {record["validation_status"] for record in records} == {"needs_review"}

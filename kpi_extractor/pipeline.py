@@ -224,14 +224,12 @@ class SymbolPipeline:
                 # Their nine months to date add up the same way, or Q4 = year − nine months would be wrong.
                 merged: dict[str, list] = {}
                 for reported, label, value in group.members:
-                    ytd, prior_ytd = group.year_to_date.get(reported), group.prior_year_to_date.get(reported)
+                    # The reader already summed each key's nine-month figures; take them once per key.
                     if reported in merged:
-                        row = merged[reported]
-                        row[2] += value
-                        row[3] = None if ytd is None or row[3] is None else row[3] + ytd
-                        row[4] = None if prior_ytd is None or row[4] is None else row[4] + prior_ytd
+                        merged[reported][2] += value
                     else:
-                        merged[reported] = [reported, label, value, ytd, prior_ytd]
+                        merged[reported] = [reported, label, value, group.year_to_date.get(reported),
+                                            group.prior_year_to_date.get(reported)]
                 for order, (member, (reported, label, value, ytd, prior_ytd)) in enumerate(merged.items()):
                     records.append(self._record(
                         group_key=group.key, group_label=named.get("label") or group.label, group_kind="revenue_breakdown",
@@ -462,9 +460,11 @@ class SymbolPipeline:
         filing = self.filings.get(ref.accession)
         if not filing or filing.get("status") not in _DONE:
             return
-        carried = {"accession": ref.accession, "spec_version": version, "status": filing["status"],
-                   "attempts": filing.get("attempts", 1), "value_count": filing.get("value_count", 0),
-                   "notes": filing.get("notes") or []}
+        # A complete checkpoint: the request check requires the filing's identity, not only what changed.
+        carried = {"accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(),
+                   "document_role": ref.role, "source_url": ref.source_url, "period_end": filing.get("period_end"),
+                   "spec_version": version, "status": filing["status"], "attempts": max(1, filing.get("attempts") or 1),
+                   "value_count": filing.get("value_count", 0), "notes": filing.get("notes") or []}
         self._store(filings=[carried])
         self.filings[ref.accession] = {**filing, "spec_version": version}
 
@@ -479,11 +479,17 @@ class SymbolPipeline:
         for item in read:
             if item.group.key in totals and not is_total(item):
                 parts_sum[item.group.key] = parts_sum.get(item.group.key, 0.0) + item.value
+        # A breakdown or mix is published whole or not at all: one flagged part flags them all, so the last complete
+        # reading stays in place (the store never lets an unchecked row replace a verified one).
+        open_groups = {item.group.key for item in read if item.group.kind != "metric" and not is_total(item)
+                       and item.status != "verified"}
         records = []
         for item in read:
             if is_total(item):
                 continue
             notes, status = list(item.notes), item.status
+            if item.group.key in open_groups and status == "verified":
+                status, notes = "needs_review", [*notes, "another part of this breakdown needs review"]
             if period_problem:
                 status, notes = "needs_review", [*notes, period_problem]
             total = totals.get(item.group.key)

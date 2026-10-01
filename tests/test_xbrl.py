@@ -105,3 +105,9 @@ def test_breakdowns_without_a_reported_total_are_not_kept():
         _fact("us-gaap:Revenues", 40.0, "x:ProductBMember"),
     ])
     assert extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups == []
+
+
+def test_rows_sharing_a_key_add_their_nine_months_once():
+    from kpi_extractor.xbrl import _by_key
+    assert _by_key([("other", "Other", 30.0), ("other", "All other", 60.0), ("cloud", "Cloud", 5.0)]) == {
+        "other": 90.0, "cloud": 5.0}

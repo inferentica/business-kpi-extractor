@@ -241,12 +241,12 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
 
         leaves = drop_overlaps(remove_subtotals(members, total), total)
         error = (sum(leaves.values()) - total) / total if len(leaves) >= 2 else None
-        prior = {k: v for k, _n, v in named(_single_axis_members(prior_frame, concept, axis, dimension_columns))}
-        ytd = {k: v for k, _n, v in named(_single_axis_members(ytd_frame, concept, axis, dimension_columns))}
+        prior = _by_key(named(_single_axis_members(prior_frame, concept, axis, dimension_columns)))
+        ytd = _by_key(named(_single_axis_members(ytd_frame, concept, axis, dimension_columns)))
         ytd_totals = ytd_frame[(ytd_frame["concept"] == concept)
                                & ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] if dimension_columns else []
         ytd_total = float(ytd_totals.iloc[0]) if len(ytd_totals) else None
-        prior_ytd = {k: v for k, _n, v in named(_single_axis_members(prior_ytd_frame, concept, axis, dimension_columns))}
+        prior_ytd = _by_key(named(_single_axis_members(prior_ytd_frame, concept, axis, dimension_columns)))
         prior_ytd_totals = prior_ytd_frame[(prior_ytd_frame["concept"] == concept)
                                            & prior_ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] \
             if dimension_columns else []
@@ -267,6 +267,14 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     groups.sort(key=lambda group: (group.order, group.key))
     total_revenue = next((totals[concept] for concept in REVENUE_CONCEPTS if concept in totals), None)
     return XbrlBreakdowns(period_end, annual, _fiscal_year(entity), groups, total_revenue, rejected)
+
+
+def _by_key(rows: list[tuple[str, str, float]]) -> dict[str, float]:
+    """Values by member key, adding rows whose labels share a key ("Other" and "All other") instead of keeping one."""
+    out: dict[str, float] = {}
+    for key, _label, value in rows:
+        out[key] = out.get(key, 0.0) + value
+    return out
 
 
 def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str]) -> dict[str, float]:

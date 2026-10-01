@@ -67,7 +67,31 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             continue
         seen.add(locator.kpi)
         values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator), notes))
-    return values, problems
+    # One gate for every reading (replay, Flash, Pro): the column's own header outranks a period the AI states.
+    kept = []
+    for item in values:
+        mismatch = column_duration_problem(str(item.locator.get("header") or ""), located.annual)
+        if mismatch:
+            problems.append(f"{item.group.key}.{item.kpi.key}: {mismatch}")
+        else:
+            kept.append(item)
+    return kept, problems
+
+
+_QUARTER = re.compile(r"<3 months>|three months|<1[34] weeks>|thirteen weeks|fourteen weeks|quarter")
+_LONGER = re.compile(r"<(6|9|12) months>|(six|nine|twelve) months|<(2[67]|39|40|5[23]) weeks>|"
+                     r"(twenty-six|thirty-nine|fifty-two|fifty-three) weeks|years? ended|year to date|fiscal years?")
+
+
+def column_duration_problem(header: str, annual: bool) -> str | None:
+    """Why a column is not the period being read, judged from its header alone: a six-, nine- or twelve-month column
+    when a quarter is expected, or a quarter's column when the year is. Silent headers pass."""
+    quarter, longer = bool(_QUARTER.search(header)), bool(_LONGER.search(header))
+    if not annual and longer and not quarter:
+        return f"the column is headed {header!r}, not a quarter"
+    if annual and quarter and not longer:
+        return f"the column is headed {header!r}, not the year"
+    return None
 
 
 _PEOPLE = re.compile(r"employee|headcount|workforce|staff", re.I)
@@ -238,7 +262,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit),
                                 value, currency, record))
     if total_row is not None:
-        record = {"table": locator.table, "row": total_index, "col": locator.col, "row_label": "Total", "whole_table": True}
+        record = {"table": locator.table, "row": total_index, "col": locator.col, "row_label": "Total", "whole_table": True,
+                  "header": column_header(table, locator.first_row, locator.col)}
         values.append(ReadValue(group, KpiSpec(key=group.total_kpi or "total", label="Total", unit=unit), total_row[1],
                                 currency, record, is_total=True))
     return values

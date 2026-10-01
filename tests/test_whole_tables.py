@@ -142,3 +142,19 @@ def test_table_rows_take_the_listed_kpi_keys():
     assert _listed_kpi(listed, "Net product sales").key == "net_product_sales"
     assert _listed_kpi(listed, "3-nanometer").key == "nm3"
     assert _listed_kpi(listed, "Net service sales") is None
+
+
+def test_every_reading_refuses_a_column_headed_for_another_period():
+    from kpi_extractor.extract import column_duration_problem
+    assert column_duration_problem("<6 months> ended @ # #", annual=False)
+    assert column_duration_problem("six months ended @ #", annual=False)
+    assert column_duration_problem("three months ended @ #", annual=True)
+    assert column_duration_problem("three months ended @ # six months ended", annual=False) is None
+    assert column_duration_problem("# #", annual=False) is None
+    six = REPORT.replace("Three Months Ended June 30", "Six Months Ended June 30")
+    document = parse_document(six, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "tables": [
+        {"group": "technology", "table": table, "col": 1, "first_row": 2, "last_row": 6, "total_row": 7}]})
+    values, problems = read_values(document, SPEC, located, "TWD")
+    assert values == [] and any("not a quarter" in problem for problem in problems)
