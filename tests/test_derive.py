@@ -116,3 +116,18 @@ def test_a_recast_year_takes_its_nine_months_from_next_years_third_quarter():
         row["locator"] = {"total": 3, "prior_ytd": prior, "prior_ytd_total": 150}
     derived = {r["kpi_key"]: r["value"] for r in derive_periods(values + old + later) if r["fiscal_period"] == "Q4" and r["fiscal_year"] == "2023"}
     assert derived == {"a": 30, "b": 15, "c": 5}
+
+
+def test_a_layout_no_quarter_used_is_derived_on_next_years_restated_basis():
+    year = [_value("FY", k, v, method="xbrl", year="2023") for k, v in (("a", 100), ("b", 60), ("d", 40))]
+    for row in year:
+        row["locator"] = {"total": 200}
+    following = [_value("FY", k, v, method="xbrl", year="2024") for k, v in (("a", 110), ("e", 120))]
+    for row, prior in zip(following, (95, 105)):
+        row["locator"] = {"total": 230, "prior": prior}
+    third = [_value("Q3", k, 1, year="2024") for k in ("a", "e")]
+    for row, prior in zip(third, (70, 80)):
+        row["locator"] = {"total": 2, "prior_ytd": prior, "prior_ytd_total": 150}
+    derived = {r["kpi_key"]: r["value"] for r in derive_periods(year + following + third)
+               if r["fiscal_period"] == "Q4" and r["fiscal_year"] == "2023"}
+    assert derived == {"a": 25, "e": 25}

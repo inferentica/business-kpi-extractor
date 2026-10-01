@@ -22,13 +22,19 @@ def derive_periods(values: list[dict]) -> list[dict]:
         if annual and all(quarters):
             quarters = [_align(annual, quarter) for quarter in quarters]
         if annual and _method(annual) in ("xbrl", "ai") and (fourth is None or _only_derived(fourth)):
-            nine = _nine_months(annual, periods.get("Q3"), by_group_year.get((group, str(int(year) + 1)), {}).get("Q3"))
+            following = by_group_year.get((group, str(int(year) + 1)), {})
+            nine = _nine_months(annual, periods.get("Q3"), following.get("Q3"))
+            restated = _restated_year(annual, following.get("FY"), following.get("Q3"))
             if nine:
                 # Q4 = year − nine months, the nine months on the year's own basis: the year's Q3 10-Q, or when the
                 # 10-K recast the breakdown (Microsoft split out Dynamics), next year's Q3 10-Q restating them.
                 derived.extend(_combine_year_to_date(annual, *nine))
             elif all(quarters) and _same_keys(annual, *quarters):
                 derived.extend(_combine(annual, quarters, "Q4"))
+            elif restated:
+                # A layout no 10-Q ever used (Microsoft's FY2023 10-K): next year's 10-K and Q3 10-Q restate the year
+                # and its nine months on one later basis, so Q4 is exact on that basis.
+                derived.extend(_combine_year_to_date(*restated))
         if not annual or _only_derived(annual):
             parts = [*quarters, fourth]
             if all(parts) and _same_keys(*parts) and all(_method(part) == "ai" for part in parts):
@@ -108,6 +114,28 @@ def _nine_months(annual: dict, third: dict | None, next_third: dict | None) -> t
         if total is not None and set(values) == set(annual):
             return values, float(total), rows
     return None
+
+
+def _restated_year(annual: dict, next_year: dict | None, next_third: dict | None):
+    """The year and its nine months both as next year's filings restate them, when they cover the same rows and the
+    restated year adds up to the year's reported revenue."""
+    if not next_year or not next_third:
+        return None
+    priors = {key: (row.get("locator") or {}).get("prior") for key, row in next_year.items()}
+    if not all(isinstance(value, (int, float)) for value in priors.values()):
+        return None
+    total = _total(annual)
+    if total is None or abs(sum(priors.values()) - total) > abs(total) * 0.001:
+        return None
+    nine = _nine_months(next_year, None, next_third)
+    if not nine:
+        return None
+    base = next(iter(annual.values()))
+    year = {key: {**row, "fiscal_year": base["fiscal_year"], "period_end": base["period_end"], "value": priors[key],
+                  "locator": {**(row.get("locator") or {}), "total": total},
+                  "notes": [*(row.get("notes") or []), "on the layout of the following year's filings"]}
+            for key, row in next_year.items()}
+    return (year, *nine)
 
 
 def _combine_year_to_date(annual: dict, nine: dict, nine_total: float, sources: dict) -> list[dict]:

@@ -239,7 +239,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         def elements(rows: dict[str, float]) -> dict[str, str]:
             return {member_key(label(member) or labels.get(member) or humanize(member)): member for member in rows}
 
-        leaves = drop_overlaps(remove_subtotals(members, total), total)
+        leaves = drop_overlaps(remove_subtotals(_finer_partition(members, total), total), total)
         error = (sum(leaves.values()) - total) / total if len(leaves) >= 2 else None
         prior = _by_key(named(_single_axis_members(prior_frame, concept, axis, dimension_columns)))
         ytd = _by_key(named(_single_axis_members(ytd_frame, concept, axis, dimension_columns)))
@@ -285,6 +285,22 @@ def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension
         dimensions = {a: m for a, m in dimensions.items() if (a, local_name(m)) not in _NEUTRAL_MEMBERS}
         if len(dimensions) == 1 and axis in dimensions:
             members.setdefault(dimensions[axis], float(fact["numeric_value"]))
+    return members
+
+
+def _finer_partition(members: dict[str, float], total: float | None) -> dict[str, float]:
+    """When one axis carries two complete splits of revenue (Microsoft tags Product / Service and other beside its ten
+    product lines), the finer one: two or three rows that make up revenue alone are the coarse split."""
+    if not total or len(members) < 4:
+        return members
+    tolerance = abs(total) * MAX_RECONCILIATION_ERROR
+    if abs(sum(members.values()) - 2 * total) > 2 * tolerance:
+        return members
+    keys = list(members)
+    for size in (2, 3):
+        for combo in combinations(keys, size):
+            if abs(sum(members[key] for key in combo) - total) <= tolerance:
+                return {key: value for key, value in members.items() if key not in combo}
     return members
 
 

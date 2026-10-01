@@ -111,3 +111,9 @@ def test_rows_sharing_a_key_add_their_nine_months_once():
     from kpi_extractor.xbrl import _by_key
     assert _by_key([("other", "Other", 30.0), ("other", "All other", 60.0), ("cloud", "Cloud", 5.0)]) == {
         "other": 90.0, "cloud": 5.0}
+
+
+def test_two_complete_splits_on_one_axis_keep_the_finer():
+    from kpi_extractor.xbrl import _finer_partition
+    members = {"product": 64.0, "service": 268.0, "server": 129.0, "office": 111.0, "gaming": 22.0, "linkedin": 20.0, "other": 50.0}
+    assert set(_finer_partition(members, 332.0)) == {"server", "office", "gaming", "linkedin", "other"}
