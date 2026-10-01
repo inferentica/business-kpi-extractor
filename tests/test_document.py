@@ -92,3 +92,20 @@ def test_right_aligned_amounts_in_cells_of_different_widths_share_one_column():
     table = next(iter(document.tables.values()))
     assert [row[1] for row in table.rows] == ["2025", "$160,180,187", "254,408,255", "$714,028,927"]
     assert [row[2] for row in table.rows] == ["2024", "$45,448,960", "190,695,754", "$521,896,971"]
+
+
+def test_a_table_that_arrives_as_text_is_read_as_a_table():
+    from kpi_extractor.document import parse_document
+    text = ("<p>Three months ended Six months ended Jun 29, Jun 28, Jun 29, Jun 28, (Unaudited, €, in millions, except per "
+            "share data) 2025 2026 2025 2026 Net system sales 5,596.1 6,564.8 11,336.5 12,844.2 Net service and field "
+            "option sales 2,095.6 2,761.7 4,096.7 5,249.2 Total net sales 7,691.7 9,326.5 15,433.2 18,093.4 Total cost of "
+            "sales (3,562.2) (4,291.1) (7,124.0) (8,413.0)</p>")
+    document = parse_document(text, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables.values()))
+    assert table.rows[1][1:] == ["2025", "2026", "2025", "2026"]
+    assert table.rows[0][2] == "Three months ended" and table.rows[0][3] == "Six months ended"
+    assert table.rows[2] == ["Net system sales", "5,596.1", "6,564.8", "11,336.5", "12,844.2"]
+    assert table.declared_scale() == 1e6
+    margins = parse_document("<p>(Unaudited) 2025 2026 Gross margin 53.7 % 54.0 % Operating margin 34.6 % 37.1 % "
+                             "Net margin 29.8 % 31.3 %</p>", "https://www.sec.gov/x.htm")
+    assert next(iter(margins.tables.values())).rows[2] == ["Gross margin", "53.7%", "54.0%"]

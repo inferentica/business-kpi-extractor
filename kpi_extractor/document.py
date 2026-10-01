@@ -255,7 +255,52 @@ def parse_document(raw_html: bytes | str, source_url: str, prefix: str = "") -> 
         buffer.append(stripped)
         recent = f"{recent} {stripped}"[-_CONTEXT_CHARS:]
     flush()
+    _tables_from_text(document)
     return document
+
+
+_YEARS_RUN = re.compile(r"\b((?:(?:19|20)\d{2}\s+){1,7}(?:19|20)\d{2})\b")
+_DURATION = re.compile(r"(three|six|nine|twelve)\s+months\s+ended|years?\s+ended|quarter\s+ended", re.I)
+_NUMBER_CELL = r"\(?-?[\d,]+(?:\.\d+)?\)?\s*%?"
+
+
+def _row_pattern(numbers: int) -> re.Pattern:
+    """A label followed by exactly `numbers` figures."""
+    return re.compile(r"\s*([A-Za-z][A-Za-z&,'()/\- ]{2,80}?)\s+((?:" + _NUMBER_CELL + r"\s+){" + str(numbers - 1) + "}"
+                      + _NUMBER_CELL + r")(?=\s|$)")
+
+
+def _tables_from_text(document: Document) -> None:
+    """Tables that reach us as text (ASML's statements are slide images with their figures as hidden text): a block
+    with a run of years and then rows of a label and as many numbers becomes a table beside the block, headed by its
+    periods and durations, so it is read like any other table instead of quoted."""
+    for key in list(document.order):
+        block = document.blocks.get(key)
+        if block is None:
+            continue
+        years = _YEARS_RUN.search(block.text)
+        if not years:
+            continue
+        columns = years.group(1).split()
+        if len(columns) < 2:
+            continue
+        before, after = block.text[:years.start()], block.text[years.end():]
+        pattern = _row_pattern(len(columns))
+        rows, position = [], 0
+        while True:
+            match = pattern.match(after, position)
+            if not match:
+                break
+            rows.append([clean(match.group(1)), *(cell.replace(" ", "") for cell in re.findall(_NUMBER_CELL, match.group(2)))])
+            position = match.end()
+        if len(rows) < 3:
+            continue
+        durations = [m.group(0) for m in _DURATION.finditer(before)]
+        per = len(columns) // len(durations) if durations and len(columns) % len(durations) == 0 else 0
+        header = ["", *([durations[i // per] for i in range(len(columns))] if per else [""] * len(columns))]
+        table_key = f"{key}_T"
+        document.tables[table_key] = Table(table_key, clean(before)[-_CONTEXT_CHARS:], [header, ["", *columns], *rows])
+        document.order.insert(document.order.index(key) + 1, table_key)
 
 
 def _table_rows(element) -> list[list[str]]:
