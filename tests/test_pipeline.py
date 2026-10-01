@@ -547,3 +547,40 @@ def test_parts_held_for_another_part_are_released_once_it_clears():
     pipeline = _pipeline(FakeControl({}), rows)
     pipeline._release_held_breakdowns()
     assert pipeline.values[("kpi_technology", "nm5", "2024", "FY")]["validation_status"] == "verified"
+
+
+def test_the_year_ago_check_needs_every_value_and_a_column_of_the_same_length():
+    html = """<table><tr><td></td><td>Three Months Ended June 30, 2026</td><td>Six Months Ended June 30, 2026</td>
+      <td>Three Months Ended June 30, 2025</td></tr>
+      <tr><td>Client</td><td>3,062</td><td>5,947</td><td>2,499</td></tr><tr><td>Gaming</td><td>779</td><td>1,499</td><td>1,122</td></tr>
+      <tr><td>Embedded</td><td>977</td><td>1,850</td><td>824</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating Metrics", "kind": "metric", "kpis": [
+        {"key": k, "label": k.title(), "unit": "count"} for k in ("client", "gaming", "embedded")]}]})
+    def reading(col):
+        located = ai.Located.model_validate({"period_end": "2026-06-30", "values": [
+            {"kpi": f"ops.{k}", "table": table, "row": r, "col": col} for k, r in (("client", 1), ("gaming", 2), ("embedded", 3))]})
+        return read_values(document, spec, located, "USD")[0]
+    base = {"group_key": "kpi_ops", "fiscal_year": "2025", "fiscal_period": "Q2", "period_end": "2025-06-28", "method": "ai",
+            "validation_status": "verified"}
+    stored = [{**base, "kpi_key": "client", "value": 2499.0}, {**base, "kpi_key": "gaming", "value": 1122.0}]
+    # Embedded has no stored year-ago figure and no place last quarter: not accounted for.
+    assert not _pipeline(FakeControl({}), stored)._year_ago_confirms(reading(1), document, EXPECTED)
+    stored.append({**base, "kpi_key": "embedded", "value": 824.0})
+    assert _pipeline(FakeControl({}), stored)._year_ago_confirms(reading(1), document, EXPECTED)
+    # The six-month column's row also holds last year's quarter, but in a column of another length.
+    assert not _pipeline(FakeControl({}), stored)._year_ago_confirms(reading(2), document, EXPECTED)
+
+
+def test_a_breakdown_of_one_segment_is_titled_for_it():
+    base = {"fiscal_year": "2026", "fiscal_period": "Q2", "period_end": "2026-06-27", "kpi_label": "x",
+            "group_kind": "revenue_breakdown", "source_accession": "a"}
+    xbrl = [{**base, "group_key": "segments", "group_label": "Revenue by Segment", "kpi_key": "clientandgaming",
+             "kpi_label": "Client and Gaming", "method": "xbrl", "value": 3841.0, "validation_status": "verified",
+             "locator": {"total": 11563.0}}]
+    ai_rows = [{**base, "group_key": "kpi_cg", "group_label": "Revenue by Product", "kpi_key": k, "method": "ai", "value": v,
+                "validation_status": "verified", "locator": {"total": 3841.0}} for k, v in (("client", 3062.0), ("gaming", 779.0))]
+    pipeline = _pipeline(FakeControl({}), xbrl + ai_rows)
+    pipeline._anchor_ai_breakdowns()
+    assert pipeline.values[("kpi_cg", "client", "2026", "Q2")]["group_label"] == "Client and Gaming Revenue by Product"

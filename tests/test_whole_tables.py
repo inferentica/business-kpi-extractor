@@ -204,3 +204,17 @@ def test_a_node_ramping_from_an_immaterial_base_is_not_a_jump():
              ReadValue(group, KpiSpec(key="n5", label="5nm", unit="currency"), 415.0, "TWD", {})]
     validate_groups(items, previous={"technology.n3": 0.5, "technology.n5": 420.0})
     assert all(item.status == "verified" for item in items)
+
+
+def test_a_mix_total_row_is_not_a_share_and_q2_headers_are_quarters():
+    from kpi_extractor.extract import column_duration_problem
+    assert column_duration_problem("q2 fiscal year #", annual=False) is None
+    html = """<table><tr><td></td><td>2Q26</td></tr><tr><td>3nm</td><td>30%</td></tr><tr><td>5nm</td><td>35%</td></tr>
+      <tr><td>Others</td><td>35%</td></tr><tr><td>Total</td><td>100%</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    spec = Spec.model_validate({"groups": [{"key": "mix", "label": "Wafer Revenue by Technology", "kind": "mix",
+                                            "kpis": [{"key": "n3", "label": "3nm", "unit": "percent"}]}]})
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "tables": [
+        {"group": "mix", "table": next(iter(document.tables)), "col": 1, "first_row": 1, "last_row": 4}]})
+    values, problems = read_values(document, spec, located, None)
+    assert problems == [] and sum(item.value for item in values if not item.is_total) == 100

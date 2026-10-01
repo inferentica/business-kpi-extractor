@@ -39,9 +39,10 @@ def normalize_symbols(raw: str | list[str]) -> list[str]:
     return symbols
 
 
-def process_symbol(control, symbol: str, quarters: int, force: bool) -> SymbolResult:
+def process_symbol(control, symbol: str, quarters: int, force: bool, wait_for_lock: bool = False) -> SymbolResult:
     try:
-        return SymbolPipeline(control, symbol, quarters, force, log=lambda line: print(line, flush=True)).run()
+        return SymbolPipeline(control, symbol, quarters, force, log=lambda line: print(line, flush=True),
+                              wait_for_lock=wait_for_lock).run()
     except Exception as error:  # noqa: BLE001 - one company must not stop the run
         traceback.print_exc()
         return SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
@@ -70,8 +71,10 @@ def main(argv: list[str] | None = None) -> int:
 
         workers = max(1, min(args.workers, len(symbols) or 1))
         with company_pool(workers) as pool:
+            # A Refresh (or a newly watched company) waits for a run already on its company; scheduled runs move on.
+            waits = args.trigger in ("manual", "watchlist_add")
             results = list(pool.map(process_symbol, [control] * len(symbols), symbols,
-                                    [quarters] * len(symbols), [force] * len(symbols)))
+                                    [quarters] * len(symbols), [force] * len(symbols), [waits] * len(symbols)))
         summary = {
             "companies": len(results),
             "filings": sum(result.filings for result in results),

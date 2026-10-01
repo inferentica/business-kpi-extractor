@@ -78,7 +78,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
     return kept, problems
 
 
-_QUARTER = re.compile(r"<3 months>|three months|<1[34] weeks>|thirteen weeks|fourteen weeks|quarter")
+_QUARTER = re.compile(r"<3 months>|three months|<1[34] weeks>|thirteen weeks|fourteen weeks|quarter|\bq[1-4]\b|\b[1-4]q\b")
 _LONGER = re.compile(r"<(6|9|12) months>|(six|nine|twelve) months|<(2[67]|39|40|5[23]) weeks>|"
                      r"(twenty-six|thirty-nine|fifty-two|fifty-three) weeks|years? ended|year to date|fiscal years?")
 
@@ -237,6 +237,12 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
             parts[key] = (row[0], row[1], index)
     total_index = locator.total_row
     total_table, total_col = table, locator.col
+    if unit == "percent" and total_index is None:
+        # A mix's own "Total 100%" row is its total, not a share (it would make the shares add up to 200%).
+        hundred = [key for key, (_label, value, _index) in parts.items() if abs(value - 100) <= 0.5]
+        others = sum(value for key, (_label, value, _index) in parts.items() if key not in hundred)
+        if len(hundred) == 1 and abs(others - 100) <= MIX_TOLERANCE:
+            total_index = parts.pop(hundred[0])[2]
     if total_index is None and unit == "currency" and parts:
         total_index = _total_row_by_sum(table, locator, parts, read_row)
     if total_index is None and unit == "currency" and parts:
