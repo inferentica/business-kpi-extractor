@@ -8,6 +8,7 @@ from datetime import date, timedelta
 
 from edgar import Company, set_identity
 
+from .archive import exhibits_from_record, exhibits_record
 from .fiscal import nominal_quarter_end_before
 
 PERIODIC_FORMS = ("10-Q", "10-K", "20-F", "40-F")
@@ -69,7 +70,7 @@ def periodic_reports(company: Company, since: date) -> list[FilingRef]:
     return refs
 
 
-def earnings_releases(company: Company, profile: CompanyProfile, since: date) -> list[FilingRef]:
+def earnings_releases(company: Company, profile: CompanyProfile, since: date, archive=None) -> list[FilingRef]:
     """Earnings documents and candidates. 8-K Item 2.02 exhibits are confirmed earnings releases. Other filings with
     exhibits furnished within 75 days of a quarter end are candidates for the AI to classify: a U.S. filer's 8-K when
     that quarter has no Item 2.02 release (results furnished under another item), and every foreign filer's 6-K (the
@@ -86,7 +87,7 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date) ->
         item_202 = not profile.foreign and "2.02" in str(getattr(filing, "items", "") or "")
         if not (item_202 or in_window):
             continue
-        exhibits = _html_exhibits(filing)
+        exhibits = _archived_exhibits(filing, archive)
         if not exhibits:
             continue
         ref = _release_ref(filing, exhibits, profile)
@@ -114,6 +115,19 @@ def exhibit_html(attachment) -> str | None:
     if not content or len(content) > _MAX_EXHIBIT_BYTES:
         return None
     return content
+
+
+def _archived_exhibits(filing, archive) -> list:
+    """A filing's HTML exhibits from the archive, else from EDGAR and then archived (an empty list too, so a filing
+    with none is not fetched again)."""
+    if archive is None:
+        return _html_exhibits(filing)
+    stored = archive.read_json(filing.accession_no, "exhibits.json")
+    if stored is not None:
+        return exhibits_from_record(stored)
+    exhibits = _html_exhibits(filing)
+    archive.write_json(filing.accession_no, "exhibits.json", exhibits_record(exhibits, _MAX_EXHIBIT_BYTES))
+    return exhibits
 
 
 def _html_exhibits(filing) -> list:

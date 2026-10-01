@@ -22,6 +22,7 @@ from datetime import date, timedelta
 
 from . import ai
 from .ai import AiResponseError, Located, Spec
+from .archive import Archive, xbrl_from_parts, xbrl_parts
 from .control import ControlError
 from .derive import derive_periods
 from .document import Document, clean, parse_document, parse_number
@@ -89,6 +90,8 @@ class SymbolPipeline:
         self.values: dict[tuple, dict] = {}
         self.names: dict = {}
         self._xbrl_cache: dict[str, Future] = {}
+        self._archiving: list[Future] = []
+        self.archive: Archive | None = None
         self._exhibits: dict[str, Future] = {}
         # Downloads and XBRL parsing start ahead of the filing being worked on.
         self._prefetch = ThreadPoolExecutor(max_workers=3)
@@ -133,14 +136,20 @@ class SymbolPipeline:
         self.values = {value_key(value): value for value in state.get("values") or []}
         self.names = (state.get("spec") or {}).get("names") or {}
         self.profile, company = company_profile(self.symbol)
+        self.archive = Archive(self.control, self.symbol, self.profile.cik, self.log)
+        self.archive._listing()  # once, before the download threads start
         reports = sorted(periodic_reports(company, self.since), key=lambda ref: ref.filed)
         for ref in reversed(reports):
             if self.force or self._pending(ref):
-                self._xbrl_cache[ref.accession] = self._prefetch.submit(ref.filing.xbrl)
+                self._xbrl_cache[ref.accession] = self._prefetch.submit(self._load_xbrl, ref)
+            elif not self.archive.has(ref.accession, "xbrl.json"):
+                # Read before the archive existed: stored now, once, without parsing it.
+                self._archiving.append(self._prefetch.submit(self._archive_xbrl, ref))
         self.offset = self._year_offset(reports)
         for ref in reports:
             self._process_report(ref)
-        releases = [ref for ref in sorted(earnings_releases(company, self.profile, self.since), key=lambda ref: ref.filed)
+        releases = [ref for ref in sorted(earnings_releases(company, self.profile, self.since, self.archive),
+                                          key=lambda ref: ref.filed)
                     if self._is_earnings_document(ref)]
         for ref in releases:
             if self.force or self._pending(ref):
@@ -185,6 +194,9 @@ class SymbolPipeline:
             self.log(f"{self.symbol}: only {self.result.release_verified} of {len(live)} release values are verified")
         if self.result.q4_gaps:
             self.log(f"{self.symbol}: no Q4 for {', '.join(self.result.q4_gaps[:10])}")
+        for future in self._archiving:
+            future.exception()  # archiving finishes before the download threads are shut down
+        self.log(f"{self.symbol}: filing archive {self.archive.reads} read, {self.archive.writes} added")
         return self.result
 
     # Periodic reports: official XBRL breakdowns, with rows chosen by the AI where the rules fall short.
@@ -196,8 +208,25 @@ class SymbolPipeline:
 
     def _xbrl(self, ref: FilingRef):
         if ref.accession not in self._xbrl_cache:
-            self._xbrl_cache[ref.accession] = self._prefetch.submit(ref.filing.xbrl)
+            self._xbrl_cache[ref.accession] = self._prefetch.submit(self._load_xbrl, ref)
         return self._xbrl_cache[ref.accession].result()
+
+    def _archive_xbrl(self, ref: FilingRef) -> None:
+        if (parts := xbrl_parts(ref.filing)) is not None:
+            self.archive.write_json(ref.accession, "xbrl.json", parts)
+
+    def _load_xbrl(self, ref: FilingRef):
+        """A filing's XBRL from the archive, else from EDGAR and then archived."""
+        if self.archive is None:
+            return ref.filing.xbrl()
+        stored = self.archive.read_json(ref.accession, "xbrl.json")
+        if stored and stored.get("parts"):
+            return xbrl_from_parts(stored)
+        parts = xbrl_parts(ref.filing)
+        if parts is None:
+            return ref.filing.xbrl()
+        self.archive.write_json(ref.accession, "xbrl.json", parts)
+        return xbrl_from_parts(parts)
 
     def _exhibit(self, exhibit) -> Future:
         if exhibit.url not in self._exhibits:
