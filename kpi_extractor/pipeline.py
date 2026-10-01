@@ -16,6 +16,7 @@ import re
 import string
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
+from itertools import permutations
 from datetime import date, timedelta
 
 from . import ai
@@ -149,6 +150,7 @@ class SymbolPipeline:
         self._recheck_flagged()
         self._anchor_ai_breakdowns()
         self._unify_series()
+        self._fix_mislabelled_quarters()
         self._derive()
         self._harmonize_labels()
         self.result.q4_gaps = self._q4_gaps()
@@ -957,6 +959,78 @@ class SymbolPipeline:
         for start in range(0, len(flagged), 400):
             self._store(values=flagged[start:start + 400])
 
+    def _fix_mislabelled_quarters(self) -> None:
+        """A filer's XBRL can attach figures to the wrong members (AMD's 2024 10-Qs tag Data Center's $2,337M as Client).
+        A later filing's comparatives then contradict them: the same member restated with a value another member of
+        that quarter holds. The quarters of that year are relabelled with the one mapping that every later comparative
+        and the year's own 10-K allow (no member's Q4 below zero); if the evidence allows none or several, they are
+        flagged instead, so swapped names are never served."""
+        rows = [v for v in self.values.values() if v["method"] == "xbrl" and v["validation_status"] == "verified"]
+        by_period: dict[tuple[str, str, str], dict[str, dict]] = {}
+        for v in rows:
+            by_period.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
+        # Later comparatives: (group, quarter end) → {key: restated value}.
+        restated: dict[tuple[str, str], dict[str, float]] = {}
+        for v in rows:
+            prior = (v.get("locator") or {}).get("prior")
+            if prior is not None and v["fiscal_period"] != "FY":
+                end = (date.fromisoformat(v["period_end"][:10]) - timedelta(days=365)).isoformat()
+                restated.setdefault((v["group_key"], end), {})[v["kpi_key"]] = float(prior)
+        changes = []
+        for (group, year), quarters in self._contradicted_years(by_period, restated).items():
+            keys = sorted(quarters[0])
+            annual = by_period.get((group, year, "FY"), {})
+            evidence = [(quarter, {k: x for k, x in _restated_for(restated, group, quarter[keys[0]]["period_end"]).items()
+                                   if k in keys}) for quarter in quarters]
+            fits = []
+            for order in permutations(keys):
+                mapping = dict(zip(keys, order))  # stored key → true key
+                relabelled = [{mapping[k]: float(q[k]["value"]) for k in keys} for q in quarters]
+                if any(any(not _same(relabelled[i][k], x) for k, x in found.items()) for i, (_q, found) in enumerate(evidence)):
+                    continue
+                if set(annual) == set(keys) and any(float(annual[k]["value"]) - sum(r[k] for r in relabelled) < 0 for k in keys):
+                    continue
+                fits.append(mapping)
+            if len(fits) == 1 and any(k != t for k, t in fits[0].items()):
+                for quarter in quarters:
+                    for key, row in quarter.items():
+                        true = fits[0][key]
+                        if true != key:
+                            label = next((q[true]["kpi_label"] for q in quarters if true in q), true)
+                            changes.append({**row, "kpi_key": true, "kpi_label": label,
+                                            "notes": [*(row.get("notes") or []), "member labels corrected from later filings"]})
+            elif not any(all(_same(float(q[k]["value"]), x) for k, x in found.items()) for q, found in evidence):
+                for quarter in quarters:
+                    changes += [{**row, "validation_status": "needs_review",
+                                 "notes": [*(row.get("notes") or []), "member labels contradict later filings"]}
+                                for row in quarter.values()]
+        for start in range(0, len(changes), 400):
+            self._store(values=changes[start:start + 400])
+        if changes:
+            self.log(f"{self.symbol}: {len(changes)} XBRL values relabelled or held from later filings' comparatives")
+
+    @staticmethod
+    def _contradicted_years(by_period: dict, restated: dict) -> dict[tuple[str, str], list[dict]]:
+        """(group, fiscal year) → its Q1–Q3 rows, for years where a later comparative gives a member a value another
+        member of that quarter holds."""
+        years: dict[tuple[str, str], list[dict]] = {}
+        for (group, year, period), quarter in by_period.items():
+            if period == "FY":
+                continue
+            found = _restated_for(restated, group, next(iter(quarter.values()))["period_end"])
+            values = {key: float(row["value"]) for key, row in quarter.items()}
+            if any(key in values and not _same(values[key], x) and any(_same(x, other) for k2, other in values.items() if k2 != key)
+                   for key, x in found.items()):
+                years[(group, year)] = []
+        for (group, year) in list(years):
+            quarters = [by_period.get((group, year, q)) for q in ("Q1", "Q2", "Q3")]
+            quarters = [q for q in quarters if q]
+            if not quarters or len({frozenset(q) for q in quarters}) != 1 or len(quarters[0]) > 6:
+                del years[(group, year)]
+                continue
+            years[(group, year)] = quarters
+        return years
+
     def _q4_gaps(self) -> list[str]:
         periods: dict[tuple[str, str], set[str]] = {}
         for v in self.values.values():
@@ -1207,6 +1281,11 @@ def _annual_columns(read: list[ReadValue]) -> bool:
     """Whether the breakdown was read from a column its header calls a year ("Twelve Months Ended", "Year Ended")."""
     headers = [str(item.locator.get("header") or "") for item in read if item.group.kind == "revenue_breakdown"]
     return bool(headers) and all(_annual_header(header) for header in headers)
+
+
+def _restated_for(restated: dict, group: str, end: str) -> dict[str, float]:
+    """The later comparatives for a quarter, whose restated end can differ by days (52/53-week years)."""
+    return next((values for (key, other), values in restated.items() if key == group and abs(_days(other, end)) <= 12), {})
 
 
 def _keeps_verified(existing: dict, incoming: dict) -> bool:

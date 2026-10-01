@@ -23,18 +23,25 @@ def derive_periods(values: list[dict]) -> list[dict]:
             quarters = [_align(annual, quarter) for quarter in quarters]
         if annual and _method(annual) in ("xbrl", "ai") and (fourth is None or _only_derived(fourth)):
             following = by_group_year.get((group, str(int(year) + 1)), {})
-            nine = _nine_months(annual, periods.get("Q3"), following.get("Q3"))
+            # Every way the year's Q4 can be derived on one basis, most direct first; the first that holds up is used.
+            # Broadcom's 10-K reclassified revenue its Q3 10-Q had counted, so its own nine months leave a negative
+            # Q4, while next year's restated nine months do not.
+            ways = []
+            own = _nine_months(annual, periods.get("Q3"), None)
+            restated_nine = _nine_months(annual, None, following.get("Q3"))
+            if own:
+                ways.append(lambda own=own: _combine_year_to_date(annual, *own))
+            if restated_nine:
+                ways.append(lambda nine=restated_nine: _combine_year_to_date(annual, *nine))
+            if all(quarters) and _same_keys(annual, *quarters):
+                ways.append(lambda: _combine(annual, quarters, "Q4"))
             restated = _restated_year(annual, following.get("FY"), following.get("Q3"))
-            if nine:
-                # Q4 = year − nine months, the nine months on the year's own basis: the year's Q3 10-Q, or when the
-                # 10-K recast the breakdown (Microsoft split out Dynamics), next year's Q3 10-Q restating them.
-                derived.extend(_whole_rows(_combine_year_to_date(annual, *nine)))
-            elif all(quarters) and _same_keys(annual, *quarters):
-                derived.extend(_whole_rows(_combine(annual, quarters, "Q4")))
-            elif restated:
-                # A layout no 10-Q ever used (Microsoft's FY2023 10-K): next year's 10-K and Q3 10-Q restate the year
-                # and its nine months on one later basis, so Q4 is exact on that basis.
-                derived.extend(_whole_rows(_combine_year_to_date(*restated)))
+            if restated:
+                ways.append(lambda restated=restated: _combine_year_to_date(*restated))
+            attempts = [_whole_rows(way()) for way in ways]
+            chosen = next((rows for rows in attempts if rows and all(r["validation_status"] == "verified" for r in rows)),
+                          attempts[0] if attempts else [])
+            derived.extend(chosen)
         if not annual or _only_derived(annual):
             parts = [*quarters, fourth]
             if all(parts) and _same_keys(*parts) and all(_method(part) == "ai" for part in parts):

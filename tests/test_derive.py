@@ -131,3 +131,18 @@ def test_a_layout_no_quarter_used_is_derived_on_next_years_restated_basis():
     derived = {r["kpi_key"]: r["value"] for r in derive_periods(year + following + third)
                if r["fiscal_period"] == "Q4" and r["fiscal_year"] == "2023"}
     assert derived == {"a": 25, "e": 25}
+
+
+def test_a_q4_that_one_source_leaves_negative_is_derived_from_the_next():
+    year = [_value("FY", "products", 44.8, method="xbrl", year="2025"), _value("FY", "services", 19.0, method="xbrl", year="2025")]
+    for row in year:
+        row["locator"] = {"total": 63.8}
+    third = [_value("Q3", "products", 9.3, year="2025"), _value("Q3", "services", 6.7, year="2025")]
+    third[0]["locator"] = {"total": 16.0, "ytd": 25.9, "ytd_total": 45.8}
+    third[1]["locator"] = {"total": 16.0, "ytd": 19.9, "ytd_total": 45.8}  # more than the year: reclassified later
+    later = [_value("Q3", "products", 1, year="2026"), _value("Q3", "services", 1, year="2026")]
+    later[0]["locator"] = {"total": 2, "prior_ytd": 32.0, "prior_ytd_total": 45.8}
+    later[1]["locator"] = {"total": 2, "prior_ytd": 13.8, "prior_ytd_total": 45.8}
+    derived = {r["kpi_key"]: (round(r["value"], 1), r["validation_status"]) for r in derive_periods(year + third + later)
+               if r["fiscal_period"] == "Q4" and r["fiscal_year"] == "2025"}
+    assert derived == {"products": (12.8, "verified"), "services": (5.2, "verified")}

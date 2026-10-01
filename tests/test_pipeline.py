@@ -505,3 +505,26 @@ def test_the_year_ago_column_confirms_a_reading_in_a_new_place():
     assert pipeline._year_ago_confirms(read, document, EXPECTED)
     pipeline = _pipeline(FakeControl({}), [{**base, "kpi_key": "client", "value": 2499.0}, {**base, "kpi_key": "gaming", "value": 999.0}])
     assert not pipeline._year_ago_confirms(read, document, EXPECTED)
+
+
+def test_quarters_a_filer_mislabelled_are_relabelled_from_later_comparatives():
+    def row(year, period, end, key, value, prior=None, label=None):
+        return {"group_key": "segments", "kpi_key": key, "kpi_label": label or key, "fiscal_year": year, "fiscal_period": period,
+                "period_end": end, "method": "xbrl", "validation_status": "verified", "value": value, "source_accession": f"{year}{period}",
+                "group_label": "Revenue by Segment", "group_kind": "revenue_breakdown", "locator": {"prior": prior}}
+    # AMD's 2024 10-Qs: Data Center's figures tagged Client, Client's Gaming, Gaming's Data Center.
+    tagged = {"Q1": ("2024-03-30", 2337, 922, 1368, 846), "Q2": ("2024-06-29", 2834, 648, 1492, 861),
+              "Q3": ("2024-09-28", 3549, 462, 1881, 927)}
+    history = []
+    for period, (end, client, datacenter, gaming, embedded) in tagged.items():
+        history += [row("2024", period, end, "client", client), row("2024", period, end, "datacenter", datacenter),
+                    row("2024", period, end, "gaming", gaming), row("2024", period, end, "embedded", embedded)]
+    history += [row("2024", "FY", "2024-12-28", k, v) for k, v in (("client", 7054), ("datacenter", 12579), ("gaming", 2595), ("embedded", 3557))]
+    # The 2025 10-Qs restate Data Center and Embedded correctly (Client and Gaming are combined by then).
+    later = {"Q1": ("2025-03-29", 2337, 846), "Q2": ("2025-06-28", 2834, 861), "Q3": ("2025-09-27", 3549, 927)}
+    for period, (end, datacenter, embedded) in later.items():
+        history += [row("2025", period, end, "datacenter", 1, prior=datacenter), row("2025", period, end, "embedded", 1, prior=embedded)]
+    pipeline = _pipeline(FakeControl({}), history)
+    pipeline._fix_mislabelled_quarters()
+    q1 = {k: v["value"] for (g, k, y, p), v in pipeline.values.items() if y == "2024" and p == "Q1" and v["validation_status"] == "verified"}
+    assert q1 == {"datacenter": 2337, "client": 1368, "gaming": 922, "embedded": 846}
