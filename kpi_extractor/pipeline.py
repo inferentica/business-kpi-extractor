@@ -1090,6 +1090,25 @@ class SymbolPipeline:
                                 for m in members]
         for start in range(0, len(cleared), 400):
             self._store(values=cleared[start:start + 400])
+        self._release_held_breakdowns()
+
+    def _release_held_breakdowns(self) -> None:
+        """Parts flagged only because another part of their breakdown was, released once that part is cleared: TSMC's
+        FY2024 nodes were held for 3nm's 3.5× ramp, which the year's reconciling table then confirmed."""
+        held = "another part of this breakdown needs review"
+        groups: dict[tuple, list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["group_kind"] != "metric" and v["validation_status"] != "rejected":
+                groups.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"], v.get("source_accession")), []).append(v)
+        released = []
+        for rows in groups.values():
+            waiting = [v for v in rows if v["validation_status"] == "needs_review"]
+            if waiting and all(set(v.get("notes") or []) <= {held, "confirmed by review"} and held in (v.get("notes") or [])
+                               for v in waiting):
+                released += [{**v, "validation_status": "verified",
+                              "notes": [note for note in (v.get("notes") or []) if note != held]} for v in waiting]
+        for start in range(0, len(released), 400):
+            self._store(values=released[start:start + 400])
 
     def _reports_full_year(self, read: list[ReadValue], period_end: date) -> bool:
         """Whether a breakdown in this document adds up to the fiscal year's revenue in XBRL (an annual report the

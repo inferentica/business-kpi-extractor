@@ -535,3 +535,15 @@ def test_a_total_pointing_at_no_kpi_does_not_discard_the_list():
                                             "total_kpi": "total_revenues", "kpis": [
         {"key": "search", "label": "Search", "unit": "currency"}, {"key": "youtube", "label": "YouTube ads", "unit": "currency"}]}]})
     assert spec.groups[0].total_kpi is None and len(spec.groups[0].kpis) == 2
+
+
+def test_parts_held_for_another_part_are_released_once_it_clears():
+    base = {"group_key": "kpi_technology", "group_kind": "revenue_breakdown", "fiscal_year": "2024", "fiscal_period": "FY",
+            "period_end": "2024-12-31", "method": "ai", "source_accession": "annual", "group_label": "x", "kpi_label": "x",
+            "locator": {"total": 100.0, "whole_table": True}}
+    rows = [{**base, "kpi_key": "nm3", "value": 18.0, "validation_status": "verified", "notes": ["the year's breakdown reconciles"]},
+            {**base, "kpi_key": "nm5", "value": 82.0, "validation_status": "needs_review",
+             "notes": ["another part of this breakdown needs review"]}]
+    pipeline = _pipeline(FakeControl({}), rows)
+    pipeline._release_held_breakdowns()
+    assert pipeline.values[("kpi_technology", "nm5", "2024", "FY")]["validation_status"] == "verified"
