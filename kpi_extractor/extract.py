@@ -212,18 +212,20 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         if scale is None:
             raise LocateError("amount scale unknown")
 
-    def read_row(index: int) -> tuple[str, float, str] | None:
-        text = table.cell(index, locator.col)
+    def read_row(index: int, source: Table | None = None, col: int | None = None) -> tuple[str, float, str] | None:
+        source, col = source or table, locator.col if col is None else col
+        text = source.cell(index, col)
         parsed = parse_number(text)
-        if parsed is None or index >= len(table.rows):
+        if parsed is None or index >= len(source.rows):
             return None
-        label = _row_label(table.rows[index], locator.col)
+        label = _row_label(source.rows[index], col)
         if unit == "percent" and not parsed.percent and "%" not in header and "percent" not in header.lower():
             raise LocateError(f"{text!r} in row {index} is not a percentage")
         value = parsed.value if parsed.scale_word or unit == "percent" else parsed.value * scale
         return label, value, text
 
     parts: dict[str, tuple[str, float, int]] = {}
+    continued: dict[str, tuple[str, int, int]] = {}  # rows read past a page break: key → (table, row, column)
     for index in range(locator.first_row, locator.last_row + 1):
         if index == locator.total_row:
             continue
@@ -234,9 +236,16 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         if key not in parts:
             parts[key] = (row[0], row[1], index)
     total_index = locator.total_row
+    total_table, total_col = table, locator.col
     if total_index is None and unit == "currency" and parts:
         total_index = _total_row_by_sum(table, locator, parts, read_row)
-    total_row = read_row(total_index) if total_index is not None else None
+    if total_index is None and unit == "currency" and parts:
+        # The rows read stop short of a total: read on, through the table's continuation after a page break (TSMC's
+        # node table runs 3nm–20nm on one page, 28nm to the total on the next), to the row that is their sum.
+        reached = _read_to_total(document, table, locator, parts, read_row, continued)
+        if reached:
+            total_table, total_index, total_col = reached
+    total_row = read_row(total_index, total_table, total_col) if total_index is not None else None
     total = total_row[1] if total_row else (100.0 if unit == "percent" else None)
     kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total)
     if total and unit == "currency" and total_index is not None and abs(sum(kept.values()) - total) > abs(total) * 0.001:
@@ -250,23 +259,108 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                          KpiSpec(key="x", label="x", unit="currency"), default_currency,
                          context if declared_currency(context) else document.declared_currency()) if unit == "currency" else None
     # What the next quarter's replay needs: the total row's label (None when the table has none) and the scale used.
-    total_label = _row_label(table.rows[total_index], locator.col)[:80] if total_row is not None else None
+    total_label = _row_label(total_table.rows[total_index], total_col)[:80] if total_row is not None else None
+    # A third quarter's report also shows the nine months to date beside the quarter; Q4 is then the year less them.
+    nine = _nine_month_columns(document, table, locator, parts, continued, total_table, total_index) if unit == "currency" else {}
     values = []
     for key, (label, value, index) in parts.items():
         if key not in kept:
             continue
-        record = {"table": locator.table, "row": index, "col": locator.col, "row_label": label[:80],
+        source_table, source_row, source_col = continued.get(key, (locator.table, index, locator.col))
+        record = {"table": source_table, "row": source_row, "col": source_col, "row_label": label[:80],
                   "context": table.context[-80:], "whole_table": True, "total_row_label": total_label,
                   "scale": scale if unit == "currency" else None,
                   "header": column_header(table, locator.first_row, locator.col)}
+        if key in nine and "__total__" in nine:
+            record.update({"ytd": nine[key] * scale, "ytd_total": nine["__total__"] * scale})
         values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit),
                                 value, currency, record))
     if total_row is not None:
-        record = {"table": locator.table, "row": total_index, "col": locator.col, "row_label": "Total", "whole_table": True,
+        record = {"table": total_table.id, "row": total_index, "col": total_col, "row_label": "Total", "whole_table": True,
                   "header": column_header(table, locator.first_row, locator.col)}
         values.append(ReadValue(group, KpiSpec(key=group.total_kpi or "total", label="Total", unit=unit), total_row[1],
                                 currency, record, is_total=True))
     return values
+
+
+def _raw_header(table: Table, first_data_row: int, col: int) -> str:
+    return clean(" ".join(row[col] for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row))).lower()
+
+
+def _first_data_row(table: Table) -> int:
+    """The first row with a label and a figure; a row of years ("Resolution | 2023 | 2022") is still the header."""
+    def figure(cell: str) -> bool:
+        return bool(cell) and parse_number(cell) is not None and not re.fullmatch(r"(19|20)\d{2}", cell.strip())
+    return next((i for i, row in enumerate(table.rows) if row and re.search(r"[A-Za-z]", row[0])
+                 and any(figure(cell) for cell in row[1:])), 1)
+
+
+def _read_to_total(document: Document, table: Table, locator: TableLocator, parts: dict, read_row, continued: dict):
+    """(table, row, column) of the total, reading on from the last row read: below it in this table, then in the next
+    table when it continues this one (same column header, years included). Rows on the way join the parts; nothing is
+    kept unless a row equals the sum of everything above it."""
+    added: dict[str, tuple[str, float, int]] = {}
+    added_from: dict[str, tuple[str, int, int]] = {}
+    running = sum(value for _label, value, _index in parts.values())
+    segments = [(table, locator.col, locator.last_row + 1)]
+    position = document.order.index(table.id) if table.id in document.order else -1
+    following = [document.tables[key] for key in document.order[position + 1:position + 4] if key in document.tables][:1]
+    wanted = _raw_header(table, locator.first_row, locator.col)
+    for nxt in following:
+        start = _first_data_row(nxt)
+        col = next((c for c in range(1, max(len(row) for row in nxt.rows)) if _raw_header(nxt, start, c) == wanted), None)
+        if col is not None:
+            segments.append((nxt, col, start))
+    for source, col, start in segments:
+        for index in range(start, min(len(source.rows), start + 30)):
+            row = read_row(index, source, col)
+            if row is None or not row[0]:
+                continue
+            if running and abs(row[1] - running) <= abs(running) * 0.001:
+                for key, value in added.items():
+                    parts.setdefault(key, value)
+                continued.update(added_from)
+                return source, index, col
+            key = member_key(row[0])
+            if key not in parts and key not in added:
+                added[key] = (row[0], row[1], index)
+                if source is not table:
+                    added_from[key] = (source.id, index, col)
+                running += row[1]
+    return None
+
+
+def _nine_month_columns(document: Document, table: Table, locator: TableLocator, parts: dict, continued: dict,
+                        total_table: Table, total_index: int | None) -> dict[str, float]:
+    """Each row's figure in the same year's nine-months column (raw, before scale), plus "__total__"."""
+    year = re.findall(r"(?:19|20)\d{2}", _raw_header(table, locator.first_row, locator.col))
+
+    def nine_column(source: Table) -> int | None:
+        start = _first_data_row(source)
+        for col in range(1, max(len(row) for row in source.rows)):
+            header = _raw_header(source, start, col)
+            if re.search(r"nine months|9 months", header) and (not year or year[-1] in header):
+                return col
+        return None
+
+    columns = {table.id: nine_column(table)}
+    found: dict[str, float] = {}
+    rows = [(document.tables[continued[key][0]], continued[key][1]) if key in continued else (table, index)
+            for key, (_label, _value, index) in parts.items()]
+    for source, index in rows:
+        col = columns.setdefault(source.id, nine_column(source))
+        if col is None:
+            continue
+        parsed = parse_number(source.cell(index, col))
+        label = _row_label(source.rows[index], col) if index < len(source.rows) else ""
+        if parsed is not None and label:
+            found.setdefault(member_key(label), parsed.value)
+    if total_index is not None:
+        col = columns.setdefault(total_table.id, nine_column(total_table))
+        parsed = parse_number(total_table.cell(total_index, col)) if col is not None else None
+        if parsed is not None:
+            found["__total__"] = parsed.value
+    return found
 
 
 def _block_summing_to(parts: dict, total_index: int, total: float) -> list[str] | None:

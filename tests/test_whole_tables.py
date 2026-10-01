@@ -158,3 +158,39 @@ def test_every_reading_refuses_a_column_headed_for_another_period():
         {"group": "technology", "table": table, "col": 1, "first_row": 2, "last_row": 6, "total_row": 7}]})
     values, problems = read_values(document, SPEC, located, "TWD")
     assert values == [] and any("not a quarter" in problem for problem in problems)
+
+
+def test_a_table_split_by_a_page_break_is_read_to_its_total():
+    html = """<p>(Amounts in Thousands of New Taiwan Dollars)</p><table>
+      <tr><td></td><td>Three Months Ended June 30</td><td>Six Months Ended June 30</td></tr>
+      <tr><td>Resolution</td><td>2023</td><td>2023</td></tr>
+      <tr><td>3-nanometer</td><td>$483,710</td><td>$483,710</td></tr>
+      <tr><td>5-nanometer</td><td>127,824,564</td><td>267,120,041</td></tr></table>
+      <p>(Continued)</p><table>
+      <tr><td></td><td>Three Months Ended June 30</td><td>Six Months Ended June 30</td></tr>
+      <tr><td>Resolution</td><td>2023</td><td>2023</td></tr>
+      <tr><td>28-nanometer</td><td>$47,590,123</td><td>$99,647,165</td></tr>
+      <tr><td>Wafer revenue</td><td>$175,898,397</td><td>$367,250,916</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    first = next(iter(document.tables))
+    located = ai.Located.model_validate({"period_end": "2023-06-30", "tables": [
+        {"group": "technology", "table": first, "col": 1, "first_row": 2, "last_row": 3}]})
+    values, problems = read_values(document, SPEC, located, "TWD")
+    assert problems == []
+    assert {item.kpi.label: item.value for item in values if not item.is_total}["28-nanometer"] == 47_590_123_000
+    assert [item.value for item in values if item.is_total] == [175_898_397_000]
+
+
+def test_a_third_quarter_table_carries_its_nine_months():
+    html = """<p>(Amounts in Thousands of New Taiwan Dollars)</p><table>
+      <tr><td></td><td>Three Months Ended September 30</td><td>Nine Months Ended September 30</td></tr>
+      <tr><td>Resolution</td><td>2023</td><td>2023</td></tr>
+      <tr><td>3-nanometer</td><td>$28,994,752</td><td>$29,478,462</td></tr>
+      <tr><td>5-nanometer</td><td>173,190,000</td><td>440,310,041</td></tr>
+      <tr><td>Wafer revenue</td><td>$202,184,752</td><td>$469,788,503</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    located = ai.Located.model_validate({"period_end": "2023-09-30", "tables": [
+        {"group": "technology", "table": next(iter(document.tables)), "col": 1, "first_row": 2, "last_row": 3}]})
+    values, _ = read_values(document, SPEC, located, "TWD")
+    five = next(item for item in values if item.kpi.label == "5-nanometer")
+    assert five.locator["ytd"] == 440_310_041_000 and five.locator["ytd_total"] == 469_788_503_000
