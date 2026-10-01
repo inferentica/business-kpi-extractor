@@ -61,6 +61,9 @@ class XbrlGroup:
     # The year-ago nine months as this filing restates them: last year's Q4 = last year − these, on one basis.
     prior_year_to_date: dict[str, float] = field(default_factory=dict)
     prior_year_to_date_total: float | None = None
+    # The other complete split when the axis carries two (members as above); the pipeline keeps the one the
+    # company's quarters use.
+    alternative: list[tuple[str, str, float]] = field(default_factory=list)
 
 
 @dataclass
@@ -239,7 +242,8 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         def elements(rows: dict[str, float]) -> dict[str, str]:
             return {member_key(label(member) or labels.get(member) or humanize(member)): member for member in rows}
 
-        leaves = drop_overlaps(remove_subtotals(_finer_partition(members, total), total), total)
+        fine, coarse = _two_partitions(members, total)
+        leaves = drop_overlaps(remove_subtotals(fine, total), total)
         error = (sum(leaves.values()) - total) / total if len(leaves) >= 2 else None
         prior = _by_key(named(_single_axis_members(prior_frame, concept, axis, dimension_columns)))
         ytd = _by_key(named(_single_axis_members(ytd_frame, concept, axis, dimension_columns)))
@@ -252,10 +256,9 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             if dimension_columns else []
         prior_ytd_total = float(prior_ytd_totals.iloc[0]) if len(prior_ytd_totals) else None
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
-            leaf_keys = {k for k, _n, _v in named(leaves)}
             groups.append(XbrlGroup(key, title, order, named(leaves), total, error, currencies.get(concept), concept,
-                                    prior, elements(leaves), {k: v for k, v in ytd.items() if k in leaf_keys}, ytd_total,
-                                    {k: v for k, v in prior_ytd.items() if k in leaf_keys}, prior_ytd_total))
+                                    prior, {**elements(coarse), **elements(leaves)}, ytd, ytd_total, prior_ytd,
+                                    prior_ytd_total, named(coarse) if coarse else []))
             continue
         # Worth an AI review only when it could plausibly be a breakdown: a standard axis, or a custom one whose rows
         # are of the right order of magnitude.
@@ -288,20 +291,21 @@ def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension
     return members
 
 
-def _finer_partition(members: dict[str, float], total: float | None) -> dict[str, float]:
-    """When one axis carries two complete splits of revenue (Microsoft tags Product / Service and other beside its ten
-    product lines), the finer one: two or three rows that make up revenue alone are the coarse split."""
+def _two_partitions(members: dict[str, float], total: float | None) -> tuple[dict[str, float], dict[str, float]]:
+    """(finer, coarser) when one axis carries two complete splits of revenue (Microsoft tags Product / Service and
+    other beside its product lines; Broadcom's 10-K tags countries beside the regions its 10-Qs use), else (members, {})."""
     if not total or len(members) < 4:
-        return members
+        return members, {}
     tolerance = abs(total) * MAX_RECONCILIATION_ERROR
     if abs(sum(members.values()) - 2 * total) > 2 * tolerance:
-        return members
+        return members, {}
     keys = list(members)
-    for size in (2, 3):
+    for size in (2, 3, 4):
         for combo in combinations(keys, size):
-            if abs(sum(members[key] for key in combo) - total) <= tolerance:
-                return {key: value for key, value in members.items() if key not in combo}
-    return members
+            if len(keys) - size >= size and abs(sum(members[key] for key in combo) - total) <= tolerance:
+                coarse = {key: members[key] for key in combo}
+                return {key: value for key, value in members.items() if key not in combo}, coarse
+    return members, {}
 
 
 def drop_overlaps(members: dict[str, float], total: float | None) -> dict[str, float]:

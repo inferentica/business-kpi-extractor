@@ -459,3 +459,16 @@ def test_one_flagged_part_flags_the_whole_breakdown():
     document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
     records = pipeline._release_records(read, SPEC, ref, document, "2026", "Q2", EXPECTED, None)
     assert {record["validation_status"] for record in records} == {"needs_review"}
+
+
+def test_the_split_the_quarters_use_is_kept():
+    from kpi_extractor.xbrl import XbrlGroup
+    base = {"group_key": "geography", "fiscal_year": "2025", "fiscal_period": "Q3", "period_end": "2025-08-03",
+            "method": "xbrl", "validation_status": "verified", "value": 1.0, "source_accession": "q3"}
+    pipeline = _pipeline(FakeControl({}), [{**base, "kpi_key": k} for k in ("americas", "asiapacific", "emea")])
+    group = XbrlGroup("geography", "Revenue by Geography", 2, [("china", "China", 11.0), ("singapore", "Singapore", 10.8),
+                                                               ("unitedstates", "United States", 16.5), ("other", "Other", 25.6)],
+                      63.9, 0.0, "USD", "c", alternative=[("americas", "Americas", 20.0), ("asiapacific", "Asia Pacific", 34.9),
+                                                          ("emea", "EMEA", 9.0)])
+    chosen = pipeline._continuing_split(group, date(2025, 11, 2))
+    assert [key for key, _l, _v in chosen.members] == ["americas", "asiapacific", "emea"]

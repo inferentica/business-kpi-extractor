@@ -14,7 +14,7 @@ import copy
 import re
 import string
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 
 from . import ai
@@ -217,6 +217,7 @@ class SymbolPipeline:
                 if group is not None:
                     groups.append((group, ["rows chosen by review"]))
                     taken.add(group.key)
+            groups = [(self._continuing_split(group, breakdowns.period_end), notes) for group, notes in groups]
             records = []
             for group, extra_notes in groups:
                 named = self.names.get(group.key) or {}
@@ -252,6 +253,20 @@ class SymbolPipeline:
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
+
+    def _continuing_split(self, group, period_end: date):
+        """Of two complete splits on one axis, the one the company's stored periods of the past year use, so the year
+        and its quarters line up (Broadcom's regions, not its 10-K's countries); the finer one when there is none."""
+        if not group.alternative:
+            return group
+        window = (period_end - timedelta(days=370)).isoformat()
+        recent = {v["kpi_key"] for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
+                  and v["validation_status"] == "verified" and window <= v["period_end"] < period_end.isoformat()}
+        current = {key for key, _label, _value in group.members}
+        other = {key for key, _label, _value in group.alternative}
+        if recent and len(other & recent) > len(current & recent):
+            return replace(group, members=group.alternative, alternative=group.members)
+        return group
 
     def _curate(self, candidate: XbrlCandidate):
         """Pro picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""

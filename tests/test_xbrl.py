@@ -114,6 +114,7 @@ def test_rows_sharing_a_key_add_their_nine_months_once():
 
 
 def test_two_complete_splits_on_one_axis_keep_the_finer():
-    from kpi_extractor.xbrl import _finer_partition
+    from kpi_extractor.xbrl import _two_partitions
     members = {"product": 64.0, "service": 268.0, "server": 129.0, "office": 111.0, "gaming": 22.0, "linkedin": 20.0, "other": 50.0}
-    assert set(_finer_partition(members, 332.0)) == {"server", "office", "gaming", "linkedin", "other"}
+    fine, coarse = _two_partitions(members, 332.0)
+    assert set(fine) == {"server", "office", "gaming", "linkedin", "other"} and set(coarse) == {"product", "service"}
