@@ -395,14 +395,15 @@ def locate_data(period_hint: str, spec: Spec, hints: dict[str, str]) -> str:
 
 
 def normalize_spec(spec: Spec) -> Spec:
-    """A list whose every breakdown can be checked: a revenue breakdown needs its total and at least two parts, a mix at
-    least two shares. Anything less can never reconcile (Broadcom's lone "AI Semiconductor" amount was a one-row
-    breakdown, hidden every quarter), so its KPIs become metrics, which are checked one by one."""
+    """A list whose every breakdown can be checked: a revenue breakdown needs at least two parts, a mix two shares.
+    Anything less can never reconcile (Broadcom's lone "AI Semiconductor" amount was a one-row breakdown, hidden every
+    quarter), so its KPIs become metrics, which are checked one by one."""
     groups, loose = [], []
     for group in spec.groups:
         parts = [kpi for kpi in group.kpis if kpi.key != group.total_kpi]
-        if group.kind == "revenue_breakdown" and (group.total_kpi is None or len(parts) < 2):
-            loose += parts if group.total_kpi is None or parts else group.kpis
+        # A breakdown without a named total still reconciles: reading the table whole finds its total row by the sum.
+        if group.kind == "revenue_breakdown" and len(parts) < 2:
+            loose += parts or group.kpis
         elif group.kind == "mix" and len(group.kpis) < 2:
             loose += group.kpis
         else:
