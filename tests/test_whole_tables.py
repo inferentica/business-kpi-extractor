@@ -218,3 +218,14 @@ def test_a_mix_total_row_is_not_a_share_and_q2_headers_are_quarters():
         {"group": "mix", "table": next(iter(document.tables)), "col": 1, "first_row": 1, "last_row": 4}]})
     values, problems = read_values(document, spec, located, None)
     assert problems == [] and sum(item.value for item in values if not item.is_total) == 100
+
+
+def test_a_row_label_carrying_the_business_name_takes_the_listed_key():
+    from kpi_extractor.extract import _listed_kpi
+    group = Spec.model_validate({"groups": [{"key": "customers", "label": "Revenue by Customer Type", "kind": "revenue_breakdown",
+                                             "kpis": [{"key": "domestic", "label": "Employer & Individual - Domestic", "unit": "currency"},
+                                                      {"key": "global", "label": "Employer & Individual - Global", "unit": "currency"},
+                                                      {"key": "other", "label": "Other", "unit": "currency"}]}]}).groups[0]
+    assert _listed_kpi(group, "UnitedHealthcare Employer & Individual - Domestic").key == "domestic"
+    assert _listed_kpi(group, "UnitedHealthcare Employer & Individual - Total") is None
+    assert _listed_kpi(group, "Another") is None  # a short name is never matched by its ending

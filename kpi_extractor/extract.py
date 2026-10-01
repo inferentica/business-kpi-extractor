@@ -178,8 +178,12 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
     """The KPI on the company's list a table row is, so a whole-table reading and a row-by-row reading of one table use
     one key (Flash and Pro then agree, and a breakdown is never stored twice under two names)."""
     wanted = _identity(label)
-    matches = [kpi for kpi in group.kpis if kpi.key != group.total_kpi
-               and wanted in (_identity(kpi.label), _identity(kpi.key))]
+    listed = [kpi for kpi in group.kpis if kpi.key != group.total_kpi]
+    matches = [kpi for kpi in listed if wanted in (_identity(kpi.label), _identity(kpi.key))]
+    if not matches:
+        # A row label that adds the business's name to the listed one ("UnitedHealthcare Employer & Individual -
+        # Domestic" for "Employer & Individual - Domestic"): its ending, when that is specific and names one KPI.
+        matches = [kpi for kpi in listed if len(_identity(kpi.label)) >= 8 and wanted.endswith(_identity(kpi.label))]
     return matches[0] if len(matches) == 1 else None
 
 
