@@ -45,6 +45,12 @@ MAX_YEAR_RATIO = 3.0
 LOCK_WAITS, LOCK_WAIT_SECONDS = 20, 30
 _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
+# Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
+_EQUALS_XBRL = "equals a figure reported in XBRL"
+_ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
+_CONFIRMED_LATER = "confirmed by the next year's release"
+_RESTATED_LATER = "restated in the next year's release"
+_PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER)
 
 
 @dataclass
@@ -166,6 +172,7 @@ class SymbolPipeline:
         self._refile_annuals()
         self._recheck_flagged()
         self._anchor_ai_breakdowns()
+        self._prove_flagged(releases)
         self._unify_series()
         self._fix_mislabelled_quarters()
         self._derive()
@@ -709,23 +716,8 @@ class SymbolPipeline:
 
     @staticmethod
     def _year_ago_cell_matches(item: ReadValue, document: Document, before: float | None) -> bool:
-        table = document.tables.get(str(item.locator.get("table")))
-        if before is None or table is None or item.locator.get("row") is None:
-            return False
-        row, col = int(item.locator["row"]), int(item.locator["col"])
-        current = parse_number(table.cell(row, col))
-        if current is None or not current.value:
-            return False
-        factor = item.value / current.value
-        first = next((i for i, r in enumerate(table.rows) if r and any(parse_number(c) for c in r[1:])
-                      and re.search(r"[A-Za-z]", r[0]) and not all(re.fullmatch(r"(19|20)\d{2}", c.strip()) for c in r[1:] if c)), 1)
-        period = column_header(table, first, col)  # "three months ended @ # #": years blanked, duration kept
-        for other in range(len(table.rows[row])):
-            cell = parse_number(table.cell(row, other)) if other != col else None
-            if cell and abs(cell.value * factor - before) <= abs(before) * 1e-4 and column_header(table, first, other) == period:
-                return True
-        return False
-
+        return before is not None and any(abs(cell - before) <= abs(before) * 1e-4
+                                          for cell in _year_ago_cells(document, item.locator, item.value))
 
     def _explain_jumps(self, read: list[ReadValue], document: Document, spec: Spec) -> None:
         """Values flagged only for a sharp change get a reading by Pro; a real change backed by a quote stands."""
@@ -982,6 +974,8 @@ class SymbolPipeline:
             if (v["method"] == "ai" and v["group_kind"] == "revenue_breakdown" and v["validation_status"] == "verified"
                     and (v.get("locator") or {}).get("total")):
                 groups.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), []).append(v)
+        # Parts each proven on their own stand, whatever their read total row says.
+        groups = {key: rows for key, rows in groups.items() if not all(_proven(v) for v in rows)}
         flagged = []
         segment_of: dict[str, set[str]] = {}
         for (group, _year, period), rows in groups.items():
@@ -1006,6 +1000,86 @@ class SymbolPipeline:
                     flagged.append({**v, "group_label": f"{member} {v['group_label']}"[:80]})
         for start in range(0, len(flagged), 400):
             self._store(values=flagged[start:start + 400])
+
+    def _prove_flagged(self, releases: list[FilingRef]) -> None:
+        """Settles flagged release values by evidence, with no AI and no one reviewing them:
+        - a value equal to a figure the company reported in XBRL for the same period is proven;
+        - a breakdown whose parts add up to such a figure is proven whole;
+        - the next year's release repeats each figure in its year-ago column: the same number proves it, a single other
+          number is the figure as restated and replaces it, and none matching among several rejects it.
+        What nothing settles stays unserved. A later release is fetched for a value only until it has been checked."""
+        flagged = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] == "needs_review"]
+        if not flagged:
+            return
+        official: dict[bool, list[tuple[str, float]]] = {}
+        for v in self.values.values():
+            if (v["method"] in ("xbrl", "derived") and not v["group_key"].startswith(AI_GROUP_PREFIX)
+                    and v["validation_status"] == "verified"):
+                figures = official.setdefault(v["fiscal_period"] == "FY", [])
+                figures.append((v["period_end"], float(v["value"])))
+                if (v.get("locator") or {}).get("total"):
+                    figures.append((v["period_end"], float(v["locator"]["total"])))
+
+        def reported(row: dict, figure: float, tolerance: float) -> bool:
+            return any(abs(_days(end, row["period_end"])) <= 12 and abs(other - figure) <= abs(figure) * tolerance
+                       for end, other in official.get(row["fiscal_period"] == "FY", []))
+
+        def settle(row: dict, note: str, **fields) -> None:
+            settled[value_key(row)] = {**row, "validation_status": "verified", **fields,
+                                       "notes": [*(row.get("notes") or []), note]}
+
+        settled: dict[tuple, dict] = {}
+        for v in flagged:
+            value = float(v["value"])
+            if v["unit"] == "currency" and _significant(value) and reported(v, value, 1e-4):
+                settle(v, _EQUALS_XBRL)
+        groups: dict[tuple, list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["group_kind"] == "revenue_breakdown" and v["validation_status"] != "rejected":
+                groups.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"], v.get("source_accession")), []).append(v)
+        for rows in groups.values():
+            waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
+            if waiting and len(rows) >= 2 and reported(rows[0], sum(float(v["value"]) for v in rows), 1e-5):
+                for v in waiting:
+                    settle(v, _ADDS_TO_XBRL)
+        by_accession = {ref.accession: ref for ref in releases}
+        for v in flagged:
+            if value_key(v) in settled:
+                continue
+            target = (date.fromisoformat(v["period_end"][:10]) + timedelta(days=365)).isoformat()
+            later = next((o for o in self.values.values()
+                          if o["method"] == "ai" and o["validation_status"] == "verified"
+                          and o["group_key"] == v["group_key"] and o["kpi_key"] == v["kpi_key"]
+                          and (o["fiscal_period"] == "FY") == (v["fiscal_period"] == "FY")
+                          and abs(_days(o["period_end"], target)) <= 12 and o.get("source_accession") in by_accession
+                          and (o.get("locator") or {}).get("row") is not None), None)
+            if later is None:
+                continue
+            checked = f"checked against {later['source_accession']}"
+            if checked in (v.get("notes") or []):
+                continue
+            try:
+                document = self._document(by_accession[later["source_accession"]])
+            except Exception:  # noqa: BLE001 - an unreadable release settles nothing
+                continue
+            cells = _year_ago_cells(document, later["locator"], float(later["value"]))
+            value = float(v["value"])
+            if any(abs(cell - value) <= max(abs(value) * 1e-4, 1e-9) for cell in cells):
+                settle(v, _CONFIRMED_LATER)
+            elif len(cells) == 1:
+                settle(v, f"{_RESTATED_LATER} (was {value:g})", value=round(cells[0], 2))
+            elif cells:
+                settled[value_key(v)] = {**v, "validation_status": "rejected",
+                                         "notes": [*(v.get("notes") or []), "contradicted by the next year's release"]}
+            else:
+                settled[value_key(v)] = {**v, "notes": [*(v.get("notes") or []), checked]}
+        changed = list(settled.values())
+        for start in range(0, len(changed), 400):
+            self._store(values=changed[start:start + 400])
+        proven = sum(1 for v in changed if v["validation_status"] == "verified")
+        if proven:
+            self.log(f"{self.symbol}: {proven} flagged values proven by later or official figures")
+        self._release_held_breakdowns()
 
     def _fix_mislabelled_quarters(self) -> None:
         """A filer's XBRL can attach figures to the wrong members (AMD's 2024 10-Qs tag Data Center's $2,337M as Client).
@@ -1273,7 +1347,7 @@ class SymbolPipeline:
         self.control.call("store", symbol=self.symbol, filings=filings or [], values=values)
         for value in values:
             existing = self.values.get(value_key(value))
-            if existing and _keeps_verified(existing, value, self.force):
+            if existing and _keeps_verified(existing, value):
                 continue  # as store_business_kpis does: another filing's unchecked reading never replaces a verified one
             self.values[value_key(value)] = value
         self.result.values += len(values)
@@ -1355,9 +1429,39 @@ def _restated_for(restated: dict, group: str, end: str) -> dict[str, float]:
     return next((values for (key, other), values in restated.items() if key == group and abs(_days(other, end)) <= 12), {})
 
 
-def _keeps_verified(existing: dict, incoming: dict, force: bool = False) -> bool:
-    if "owner decision" in (existing.get("notes") or []):
-        return not force  # decided in Bedrock: stays, unless a forced re-read replaces it (as store_business_kpis does)
+def _year_ago_cells(document: Document, locator: dict, value: float) -> list[float]:
+    """The other cells of a value's row in columns headed for the same length of period ("three months ended"), in the
+    value's own units: the year-ago figure (and the quarter before, where a release shows it)."""
+    table = document.tables.get(str(locator.get("table")))
+    if table is None or locator.get("row") is None or locator.get("col") is None:
+        return []
+    row, col = int(locator["row"]), int(locator["col"])
+    current = parse_number(table.cell(row, col))
+    if current is None or not current.value:
+        return []
+    factor = value / current.value
+    first = next((i for i, r in enumerate(table.rows) if r and any(parse_number(c) for c in r[1:])
+                  and re.search(r"[A-Za-z]", r[0]) and not all(re.fullmatch(r"(19|20)\d{2}", c.strip()) for c in r[1:] if c)), 1)
+    period = column_header(table, first, col)  # "three months ended @ # #": years blanked, duration kept
+    cells = []
+    for other in range(len(table.rows[row])):
+        cell = parse_number(table.cell(row, other)) if other != col else None
+        if cell is not None and column_header(table, first, other) == period:
+            cells.append(cell.value * factor)
+    return cells
+
+
+def _proven(value: dict) -> bool:
+    return any(note.startswith(_PROOFS) for note in value.get("notes") or [])
+
+
+def _significant(value: float) -> bool:
+    """A figure precise enough that equality with another is no coincidence (12,345,000,000, not 60,000,000,000)."""
+    digits = f"{abs(value):.0f}".rstrip("0")
+    return abs(value) >= 1e6 and len(digits) >= 3
+
+
+def _keeps_verified(existing: dict, incoming: dict) -> bool:
     return (existing["validation_status"] == "verified" and incoming["validation_status"] == "needs_review"
             and existing.get("source_accession") != incoming.get("source_accession"))
 

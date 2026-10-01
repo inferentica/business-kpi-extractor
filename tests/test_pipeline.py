@@ -584,3 +584,52 @@ def test_a_breakdown_of_one_segment_is_titled_for_it():
     pipeline = _pipeline(FakeControl({}), xbrl + ai_rows)
     pipeline._anchor_ai_breakdowns()
     assert pipeline.values[("kpi_cg", "client", "2026", "Q2")]["group_label"] == "Client and Gaming Revenue by Product"
+
+
+def _flagged_fixture(html, flagged):
+    """A pipeline holding this year's verified readings of a release table and last year's flagged values."""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    common = {"group_key": "kpi_ops", "group_kind": "metric", "group_label": "Ops", "unit": "count", "method": "ai"}
+    later = [{**common, "kpi_key": key, "kpi_label": key, "fiscal_year": "2026", "fiscal_period": "Q2", "period_end": "2026-06-30",
+              "validation_status": "verified", "source_accession": "later", "value": value,
+              "locator": {"table": table, "row": row, "col": 1}} for key, row, value in (("client", 1, 3062.0), ("gaming", 2, 779.0))]
+    earlier = [{**common, "kpi_key": key, "kpi_label": key, "fiscal_year": "2025", "fiscal_period": "Q2", "period_end": "2025-06-28",
+                "validation_status": "needs_review", "source_accession": "earlier", "value": value, "notes": ["changed 3x in a quarter"]}
+               for key, value in flagged.items()]
+    pipeline = _pipeline(FakeControl({}), later + earlier)
+    pipeline._document = lambda ref: document
+    pipeline._prove_flagged([SimpleNamespace(accession="later")])
+    return {k: v for (g, k, y, p), v in pipeline.values.items() if y == "2025"}
+
+
+def test_the_next_years_release_confirms_or_restates_a_flagged_value():
+    html = """<table><tr><td></td><td>Three Months Ended June 30, 2026</td><td>Three Months Ended June 30, 2025</td></tr>
+      <tr><td>Client</td><td>3,062</td><td>2,499</td></tr><tr><td>Gaming</td><td>779</td><td>1,122</td></tr></table>"""
+    settled = _flagged_fixture(html, {"client": 2499.0, "gaming": 1000.0})
+    assert settled["client"]["validation_status"] == "verified"
+    assert settled["gaming"]["validation_status"] == "verified" and settled["gaming"]["value"] == 1122.0
+
+
+def test_a_flagged_value_no_column_of_the_next_years_release_shows_is_rejected():
+    html = """<table><tr><td></td><td>Three Months Ended June 30, 2026</td><td>Three Months Ended March 31, 2026</td>
+      <td>Three Months Ended June 30, 2025</td></tr>
+      <tr><td>Client</td><td>3,062</td><td>2,900</td><td>2,499</td></tr><tr><td>Gaming</td><td>779</td><td>700</td><td>1,122</td></tr></table>"""
+    settled = _flagged_fixture(html, {"client": 2499.0, "gaming": 1000.0})
+    assert settled["client"]["validation_status"] == "verified"
+    assert settled["gaming"]["validation_status"] == "rejected"
+
+
+def test_a_flagged_value_equal_to_an_official_figure_is_proven_only_when_precise():
+    xbrl = {"group_key": "segments", "group_kind": "revenue_breakdown", "method": "xbrl", "validation_status": "verified",
+            "fiscal_year": "2025", "fiscal_period": "Q2", "period_end": "2025-06-28", "locator": {}}
+    ai_row = {"group_key": "kpi_product", "group_kind": "revenue_breakdown", "method": "ai", "validation_status": "needs_review",
+              "fiscal_year": "2025", "fiscal_period": "Q2", "period_end": "2025-06-28", "unit": "currency",
+              "notes": ["no total revenue to reconcile against"], "source_accession": "r"}
+    pipeline = _pipeline(FakeControl({}), [
+        {**xbrl, "kpi_key": "datacenter", "value": 3_859_000_000.0}, {**xbrl, "kpi_key": "round", "value": 60_000_000_000.0},
+        {**ai_row, "kpi_key": "datacenter", "value": 3_859_000_000.0}, {**ai_row, "group_key": "kpi_other", "kpi_key": "round",
+                                                                         "value": 60_000_000_000.0}])
+    pipeline._prove_flagged([])
+    assert pipeline.values[("kpi_product", "datacenter", "2025", "Q2")]["validation_status"] == "verified"
+    assert pipeline.values[("kpi_other", "round", "2025", "Q2")]["validation_status"] == "needs_review"

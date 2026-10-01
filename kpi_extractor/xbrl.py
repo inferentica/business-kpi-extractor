@@ -256,9 +256,17 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             if dimension_columns else []
         prior_ytd_total = float(prior_ytd_totals.iloc[0]) if len(prior_ytd_totals) else None
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
+            # Products against services (Amazon, Microsoft) is a view of its own beside the product lines, not a
+            # coarser version of them: both are published, so neither depends on the AI listing it.
+            split = coarse and all(_PRODUCT_OR_SERVICE.match(key) for key, _name, _value in named(coarse))
             groups.append(XbrlGroup(key, title, order, named(leaves), total, error, currencies.get(concept), concept,
                                     prior, {**elements(coarse), **elements(leaves)}, ytd, ytd_total, prior_ytd,
-                                    prior_ytd_total, named(coarse) if coarse else []))
+                                    prior_ytd_total, [] if split or not coarse else named(coarse)))
+            if split:
+                groups.append(XbrlGroup(
+                    "product_service", "Revenue by Product and Service", order, named(coarse), total,
+                    (sum(coarse.values()) - total) / total, currencies.get(concept), concept, prior, elements(coarse),
+                    ytd, ytd_total, prior_ytd, prior_ytd_total))
             continue
         # Worth an AI review only when it could plausibly be a breakdown: a standard axis, or a custom one whose rows
         # are of the right order of magnitude.
@@ -289,6 +297,9 @@ def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension
         if len(dimensions) == 1 and axis in dimensions:
             members.setdefault(dimensions[axis], float(fact["numeric_value"]))
     return members
+
+
+_PRODUCT_OR_SERVICE = re.compile(r"^(?:net)?(?:products?|services?(?:andother)?)(?:sales|revenues?)?$")
 
 
 def _two_partitions(members: dict[str, float], total: float | None) -> tuple[dict[str, float], dict[str, float]]:

@@ -108,11 +108,6 @@ def main(argv: list[str] | None = None) -> int:
     plane = ControlPlane(os.environ["BUSINESS_KPI_WORKFLOW_URL"])
     started = plane.call("start", runId=None, triggerType="eval", symbols=symbols, quarters=args.quarters, forceRefresh=True)
     plane.run_id = started["runId"]
-    # Values the owner approved in Bedrock's review are checked too, as further golden values.
-    golden += [{"symbol": row["symbol"], "period_end": row["period_end"], "fiscal_period": row["fiscal_period"],
-                "label": f"^{re.escape(row['kpi_label'])}$", "unit": row["unit"], "value": float(row["value"]),
-                "currency": row.get("currency"), "optional": True, "source": "approved by the owner in Bedrock"}
-               for row in started.get("approved") or [] if row["symbol"] in symbols]
     with company_pool(max(1, min(args.workers, len(symbols)))) as pool:
         outcomes = list(pool.map(evaluate_symbol, [plane] * len(symbols), symbols, [args.quarters] * len(symbols)))
     results = [result for result, _values in outcomes]

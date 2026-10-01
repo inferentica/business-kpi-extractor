@@ -118,3 +118,18 @@ def test_two_complete_splits_on_one_axis_keep_the_finer():
     members = {"product": 64.0, "service": 268.0, "server": 129.0, "office": 111.0, "gaming": 22.0, "linkedin": 20.0, "other": 50.0}
     fine, coarse = _two_partitions(members, 332.0)
     assert set(fine) == {"server", "office", "gaming", "linkedin", "other"} and set(coarse) == {"product", "service"}
+
+
+def test_products_against_services_is_published_beside_the_product_lines():
+    facts = pd.DataFrame([
+        _fact("us-gaap:Revenues", 100.0),
+        _fact("us-gaap:Revenues", 40.0, "us-gaap:ProductMember"),
+        _fact("us-gaap:Revenues", 60.0, "us-gaap:ServiceMember"),
+        _fact("us-gaap:Revenues", 35.0, "x:OnlineStoresMember"),
+        _fact("us-gaap:Revenues", 25.0, "x:AwsMember"),
+        _fact("us-gaap:Revenues", 30.0, "x:AdvertisingMember"),
+        _fact("us-gaap:Revenues", 10.0, "x:OtherMember"),
+    ])
+    groups = {group.key: group for group in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
+    assert {key for key, _label, _value in groups["product_service"].members} == {"product", "service"}
+    assert len(groups["products"].members) == 4 and groups["products"].alternative == []
