@@ -528,3 +528,10 @@ def test_quarters_a_filer_mislabelled_are_relabelled_from_later_comparatives():
     pipeline._fix_mislabelled_quarters()
     q1 = {k: v["value"] for (g, k, y, p), v in pipeline.values.items() if y == "2024" and p == "Q1" and v["validation_status"] == "verified"}
     assert q1 == {"datacenter": 2337, "client": 1368, "gaming": 922, "embedded": 846}
+
+
+def test_a_total_pointing_at_no_kpi_does_not_discard_the_list():
+    spec = Spec.model_validate({"groups": [{"key": "product", "label": "Revenue by Product", "kind": "revenue_breakdown",
+                                            "total_kpi": "total_revenues", "kpis": [
+        {"key": "search", "label": "Search", "unit": "currency"}, {"key": "youtube", "label": "YouTube ads", "unit": "currency"}]}]})
+    assert spec.groups[0].total_kpi is None and len(spec.groups[0].kpis) == 2

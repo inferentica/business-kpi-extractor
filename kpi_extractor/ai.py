@@ -64,7 +64,9 @@ class GroupSpec(BaseModel):
             if any(kpi.unit != "currency" for kpi in self.kpis):
                 raise ValueError(f"{self.key}: revenue breakdowns hold currency amounts")
             if self.total_kpi is not None and self.total_kpi not in keys:
-                raise ValueError(f"{self.key}: total_kpi must be one of its KPIs")
+                # A total pointing at no KPI of its own group is dropped, not fatal: one bad pointer once discarded
+                # Alphabet's whole list. Reading the table whole still finds the total row by its sum.
+                self.total_kpi = None
         elif self.kind == "mix":
             if any(kpi.unit != "percent" for kpi in self.kpis):
                 raise ValueError(f"{self.key}: mixes hold percentages")
