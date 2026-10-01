@@ -1,6 +1,7 @@
 from kpi_extractor import ai
 from kpi_extractor.ai import Spec
 from kpi_extractor.document import parse_document
+from kpi_extractor.ai import KpiSpec
 from kpi_extractor.extract import read_values, validate_groups
 
 REPORT = """
@@ -194,3 +195,12 @@ def test_a_third_quarter_table_carries_its_nine_months():
     values, _ = read_values(document, SPEC, located, "TWD")
     five = next(item for item in values if item.kpi.label == "5-nanometer")
     assert five.locator["ytd"] == 440_310_041_000 and five.locator["ytd_total"] == 469_788_503_000
+
+
+def test_a_node_ramping_from_an_immaterial_base_is_not_a_jump():
+    from kpi_extractor.extract import ReadValue
+    group = SPEC.groups[0]
+    items = [ReadValue(group, group.kpis[0], 29.0, "TWD", {}), ReadValue(group, group.kpis[1], 444.0, "TWD", {}, is_total=True),
+             ReadValue(group, KpiSpec(key="n5", label="5nm", unit="currency"), 415.0, "TWD", {})]
+    validate_groups(items, previous={"technology.n3": 0.5, "technology.n5": 420.0})
+    assert all(item.status == "verified" for item in items)

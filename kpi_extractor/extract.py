@@ -489,10 +489,14 @@ def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None
                 item.status = "needs_review"
                 item.notes.append(reason)
         parts_total = sum(item.value for item in items if not (item.is_total or item.kpi.key == group.total_kpi))
+        previous_total = sum(value for key, value in previous.items() if key.startswith(f"{group_key}."))
         for item in items:
             if group.kind == "revenue_breakdown" and parts_total and abs(item.value) < 0.01 * abs(parts_total):
                 continue  # an immaterial row (TSMC's residual 10nm) swings wildly; the group total still checks it
             before = previous.get(f"{group_key}.{item.kpi.key}")
+            if group.kind == "revenue_breakdown" and before is not None and previous_total \
+                    and abs(before) < 0.01 * abs(previous_total):
+                continue  # growth from an immaterial base is a launch (TSMC's 3nm: NT$0.5B to NT$29B), not an error
             jump = _jump(item, before)
             if jump:
                 item.status = "needs_review"
