@@ -571,15 +571,7 @@ class SymbolPipeline:
             self.result.replayed_reads += 1
             return replayed[0], [], replayed[1]
         text = text() if callable(text) else text
-        flash = self._ask(text, "locate", Located, thinking_first=False, model="flash")
-        flash_read, flash_problems = read_values(document, spec, flash, currency)
-        invalid = [problem for problem in flash_problems if _INVALID_POINTER.search(problem)]
-        if invalid:
-            # One retry with the reader told which pointers failed (e.g. a text block cited as a table).
-            retry_text = text + "\n\nYour previous answer had pointers that do not hold:\n" + "\n".join(
-                f"- {_explain_pointer(problem, document)}" for problem in invalid[:20])
-            flash = self._ask(retry_text, "locate", Located, thinking_first=False, model="flash")
-            flash_read, flash_problems = read_values(document, spec, flash, currency)
+        flash, flash_read, flash_problems = self._locate(text, document, spec, currency, model="flash", thinking_first=False)
         if self._flash_is_enough(flash, flash_read, spec, expected, document) or (
                 not flash.tables and not flash.values and self._kind_reports_nothing(document, expected, version)):
             self.result.flash_only_reads += 1
@@ -587,8 +579,8 @@ class SymbolPipeline:
         self.result.pro_reads += 1
         # The second reader: Pro, or Flash reasoning first when the evaluation compares them (KPI_SECOND_READER).
         flash_second = os.environ.get("KPI_SECOND_READER") == "flash-thinking"
-        pro = self._ask(text, "locate", Located, thinking_first=flash_second, model="flash" if flash_second else "pro")
-        pro_read, pro_problems = read_values(document, spec, pro, currency)
+        pro, pro_read, pro_problems = self._locate(text, document, spec, currency, model="flash" if flash_second else "pro",
+                                                   thinking_first=flash_second)
         by_flash = {f"{item.group.key}.{item.kpi.key}": item for item in flash_read}
         by_pro = {f"{item.group.key}.{item.kpi.key}": item for item in pro_read}
         agreed: list[ReadValue] = []
@@ -615,6 +607,19 @@ class SymbolPipeline:
                 agreed.append(chosen)
         located = flash if flash.period_end else pro
         return agreed, problems, located
+
+    def _locate(self, text: str, document: Document, spec: Spec, currency: str | None, model: str, thinking_first: bool):
+        """One reader's answer read back by code, with one retry when its pointers do not hold (a text block cited as a
+        table, a table id the document does not have), the reader told which and why."""
+        located = self._ask(text, "locate", Located, thinking_first=thinking_first, model=model)
+        read, problems = read_values(document, spec, located, currency)
+        invalid = [problem for problem in problems if _INVALID_POINTER.search(problem)]
+        if invalid:
+            retry_text = text + "\n\nYour previous answer had pointers that do not hold:\n" + "\n".join(
+                f"- {_explain_pointer(problem, document)}" for problem in invalid[:20])
+            located = self._ask(retry_text, "locate", Located, thinking_first=thinking_first, model=model)
+            read, problems = read_values(document, spec, located, currency)
+        return located, read, problems
 
     def _replay(self, document: Document, spec: Spec, expected: date, version: int | None, currency: str | None):
         """Last quarter's reading repeated by code, when the same KPI list read it. KPIs that list has but last quarter
@@ -1521,6 +1526,8 @@ def _explain_pointer(problem: str, document: Document) -> str:
                 f'{{"kpi": ..., "block": "{block}", "quote": "<the label and the numbers, copied exactly>", '
                 f'"value_text": "<the one number for the reported period>"}}; the column headers at the start of the '
                 "block give the order of the periods.")
+    if match:
+        return f"{problem}: the document's tables are {', '.join(list(document.tables)[:40]) or 'none'}"
     return problem
 
 

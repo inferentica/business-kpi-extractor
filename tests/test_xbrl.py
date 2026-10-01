@@ -133,3 +133,16 @@ def test_products_against_services_is_published_beside_the_product_lines():
     groups = {group.key: group for group in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
     assert {key for key, _label, _value in groups["product_service"].members} == {"product", "service"}
     assert len(groups["products"].members) == 4 and groups["products"].alternative == []
+
+
+def test_segments_reported_before_eliminations_add_up_with_them():
+    segment = "dim_us-gaap_StatementBusinessSegmentsAxis"
+    facts = pd.DataFrame([
+        _fact("us-gaap:Revenues", 100.0),
+        _fact("us-gaap:Revenues", 70.0, "x:InsuranceMember", axis=segment, consolidation="us-gaap:OperatingSegmentsMember"),
+        _fact("us-gaap:Revenues", 50.0, "x:ServicesMember", axis=segment, consolidation="us-gaap:OperatingSegmentsMember"),
+        _fact("us-gaap:Revenues", 45.0, "x:TotalServicesMember", axis=segment),  # net of its own internal sales
+        _fact("us-gaap:Revenues", -20.0, None, axis=segment, consolidation="us-gaap:IntersegmentEliminationMember"),
+    ])
+    group = extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups[0]
+    assert {key: value for key, _label, value in group.members} == {"insurance": 70.0, "services": 50.0, "eliminations": -20.0}

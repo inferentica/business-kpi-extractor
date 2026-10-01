@@ -283,7 +283,7 @@ def test_a_text_block_cited_as_a_table_is_retried_with_how_to_quote_it():
     block = next(iter(document.blocks))
     message = _explain_pointer(f"technology.n3: unknown table {block}", document)
     assert f'"block": "{block}"' in message and "not a table" in message
-    assert _explain_pointer("technology.n3: unknown table A_T9", document) == "technology.n3: unknown table A_T9"
+    assert _explain_pointer("technology.n3: unknown table A_T9", document).endswith("the document's tables are none")
 
 
 def test_a_re_read_withdraws_what_the_earlier_reading_of_that_filing_had():

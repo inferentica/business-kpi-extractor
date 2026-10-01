@@ -21,6 +21,10 @@ REVENUE_CONCEPTS = (
 )
 # A fact tagged only as "operating segments" is the consolidated total seen from the segment note, not a breakdown.
 _NEUTRAL_MEMBERS = {("ConsolidationItemsAxis", "OperatingSegmentsMember")}
+# Segments reported before intersegment sales come out (UnitedHealth's Optum sells to UnitedHealthcare) add up to
+# revenue only with the eliminations, tagged on the consolidation axis alone; they are kept as one row.
+_ELIMINATIONS = "us-gaap:IntersegmentEliminationMember"
+_SEGMENT_AXES = {"StatementBusinessSegmentsAxis", "SegmentsAxis"}
 # Default titles; each company's KPI list can rename them in its own terms (e.g. "Revenue by Market Platform").
 _STANDARD_AXES = {
     "StatementBusinessSegmentsAxis": ("segments", "Revenue by Segment", 0),
@@ -187,7 +191,10 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     candidates: dict[str, list[tuple[str, dict[str, float]]]] = {}
     single: dict[tuple[str, str], dict[str, float]] = {}
     paired: dict[tuple[str, frozenset], list[tuple[dict[str, str], float]]] = {}
+    eliminations: dict[str, float] = {}
     for concept, dimensions, value in tagged:
+        if set(dimensions) == {"ConsolidationItemsAxis"}:
+            eliminations[concept] = eliminations.get(concept, 0.0) + value
         if any(axis in _IGNORED_AXES for axis in dimensions):
             continue
         if len(dimensions) == 1:
@@ -210,14 +217,26 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     def total_for(concept: str) -> float | None:
         return totals.get(concept) or next((totals[other] for other in REVENUE_CONCEPTS if other in totals), None)
 
-    def score(candidate: tuple[str, dict[str, float]]):
+    def reconciled(axis: str, concept: str, members: dict[str, float]) -> dict[str, float]:
+        """A segment split with its eliminations as one more row, when only that makes it add up to revenue."""
+        total = total_for(concept)
+        if axis not in _SEGMENT_AXES or not total or not eliminations.get(concept):
+            return members
+        def adds_up(rows: dict[str, float]) -> bool:
+            leaves = drop_overlaps(remove_subtotals(rows, total), total)
+            return abs(sum(leaves.values()) - total) <= abs(total) * MAX_RECONCILIATION_ERROR
+        with_eliminations = {**members, _ELIMINATIONS: eliminations[concept]}
+        return with_eliminations if not adds_up(members) and adds_up(with_eliminations) else members
+
+    def score(candidate: tuple[str, dict[str, float]], axis: str = ""):
         concept, members = candidate
+        members = reconciled(axis, concept, members)
         total = total_for(concept)
         leaves = drop_overlaps(remove_subtotals(members, total), total)
         reconciles = bool(total) and abs(sum(leaves.values()) - total) <= abs(total) * MAX_RECONCILIATION_ERROR
         return (reconciles, len(leaves), concept in totals)
 
-    best_by_axis = {axis: max(options, key=score) for axis, options in candidates.items()}
+    best_by_axis = {axis: max(options, key=lambda option, axis=axis: score(option, axis)) for axis, options in candidates.items()}
 
     groups: list[XbrlGroup] = []
     rejected: list[XbrlCandidate] = []
@@ -235,22 +254,31 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         def named(rows: dict[str, float]) -> list[tuple[str, str, float]]:
             out = []
             for member, value in sorted(rows.items(), key=lambda item: -item[1]):
-                name = label(member) or labels.get(member) or humanize(member)
+                name = "Eliminations" if member == _ELIMINATIONS else label(member) or labels.get(member) or humanize(member)
                 out.append((member_key(name), name, value))
             return out
 
         def elements(rows: dict[str, float]) -> dict[str, str]:
             return {member_key(label(member) or labels.get(member) or humanize(member)): member for member in rows}
 
+        members = reconciled(axis, concept, members)
+        eliminated = _ELIMINATIONS in members
+
+        def frame_members(source: pd.DataFrame) -> dict[str, float]:
+            rows = _single_axis_members(source, concept, axis, dimension_columns)
+            if eliminated and rows and (removed := _eliminations_in(source, concept, dimension_columns)) is not None:
+                rows[_ELIMINATIONS] = removed
+            return rows
+
         fine, coarse = _two_partitions(members, total)
         leaves = drop_overlaps(remove_subtotals(fine, total), total)
         error = (sum(leaves.values()) - total) / total if len(leaves) >= 2 else None
-        prior = _by_key(named(_single_axis_members(prior_frame, concept, axis, dimension_columns)))
-        ytd = _by_key(named(_single_axis_members(ytd_frame, concept, axis, dimension_columns)))
+        prior = _by_key(named(frame_members(prior_frame)))
+        ytd = _by_key(named(frame_members(ytd_frame)))
         ytd_totals = ytd_frame[(ytd_frame["concept"] == concept)
                                & ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] if dimension_columns else []
         ytd_total = float(ytd_totals.iloc[0]) if len(ytd_totals) else None
-        prior_ytd = _by_key(named(_single_axis_members(prior_ytd_frame, concept, axis, dimension_columns)))
+        prior_ytd = _by_key(named(frame_members(prior_ytd_frame)))
         prior_ytd_totals = prior_ytd_frame[(prior_ytd_frame["concept"] == concept)
                                            & prior_ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] \
             if dimension_columns else []
@@ -286,6 +314,17 @@ def _by_key(rows: list[tuple[str, str, float]]) -> dict[str, float]:
     for key, _label, value in rows:
         out[key] = out.get(key, 0.0) + value
     return out
+
+
+def _eliminations_in(frame: pd.DataFrame, concept: str, dimension_columns: list[str]) -> float | None:
+    """The sum of a concept's facts tagged on the consolidation axis alone, other than its operating segments
+    (intersegment eliminations, corporate items); None when the frame has none."""
+    total = None
+    for _, fact in frame[frame["concept"] == concept].iterrows():
+        dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
+        if set(dimensions) == {"ConsolidationItemsAxis"} and local_name(dimensions["ConsolidationItemsAxis"]) != "OperatingSegmentsMember":
+            total = (total or 0.0) + float(fact["numeric_value"])
+    return total
 
 
 def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str]) -> dict[str, float]:

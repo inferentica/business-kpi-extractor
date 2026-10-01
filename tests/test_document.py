@@ -109,3 +109,19 @@ def test_a_table_that_arrives_as_text_is_read_as_a_table():
     margins = parse_document("<p>(Unaudited) 2025 2026 Gross margin 53.7 % 54.0 % Operating margin 34.6 % 37.1 % "
                              "Net margin 29.8 % 31.3 %</p>", "https://www.sec.gov/x.htm")
     assert next(iter(margins.tables.values())).rows[2] == ["Gross margin", "53.7%", "54.0%"]
+
+
+def test_statements_that_arrive_as_dot_leader_text_become_tables():
+    text = ("<p>REVENUES BY BUSINESS (in millions; unaudited) Alpha Beta Total Three Months Ended June 30, 2026 "
+            "Total revenues ........ $86,017 $23,472 $109,489 Restructuring and other (2) ..... — (1) (1) "
+            "Three Months Ended June 30, 2025 Total revenues ........ $86,103 $24,725 $110,828 "
+            "Customer Revenues (in millions; unaudited) Three Months Ended June 30, Six Months Ended June 30, "
+            "2026 2025 2026 2025 Domestic ....... 19,048 18,950 38,254 38,016 Global ....... 944 819 1,856 1,601 "
+            "Total ....... 19,992 19,769 40,110 39,617</p>")
+    document = parse_document(text, "https://www.sec.gov/x.htm")
+    first, second = (document.tables[key] for key in document.tables)
+    assert first.rows[0] == ["Three Months Ended June 30, 2026"]
+    assert first.rows[1] == ["Total revenues", "86,017", "23,472", "109,489"]
+    assert first.rows[3] == ["Three Months Ended June 30, 2025"] and first.declared_scale() == 1e6
+    assert second.rows[1] == ["", "2026", "2025", "2026", "2025"] and second.rows[2][0] == "Domestic"
+    assert "86,017" not in next(iter(document.blocks.values())).text

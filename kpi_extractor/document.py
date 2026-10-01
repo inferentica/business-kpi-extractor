@@ -256,6 +256,7 @@ def parse_document(raw_html: bytes | str, source_url: str, prefix: str = "") -> 
         recent = f"{recent} {stripped}"[-_CONTEXT_CHARS:]
     flush()
     _tables_from_text(document)
+    _tables_from_leaders(document)
     return document
 
 
@@ -366,3 +367,76 @@ def _fold_symbols(cells: list[str]) -> list[str]:
                 cells[target] = f"{cells[target]}{text}"
                 cells[index] = ""
     return cells
+
+
+_LEADER = re.compile(r"\s*\.{3,}\s*")
+_LEADER_CELL = re.compile(r"\s*(?:[>~<]\s*)?(?:\$\s*)?(?:\(?-?\d[\d,]*(?:\.\d+)?\)?(?:\s*%)?|—|–)(?=\s|$)")
+_MONTH = r"(?:January|February|March|April|May|June|July|August|September|October|November|December)"
+_DATE = re.compile(_MONTH + r"\s+\d{1,2},\s+(?:19|20)\d{2}")
+_DATES_RUN = re.compile(r"(?:" + _MONTH + r"\s+\d{1,2},\s+(?:19|20)\d{2}\s*){2,8}")
+
+
+def _tables_from_leaders(document: Document) -> None:
+    """Statements that reach us as text from a PDF (UnitedHealth's releases): each row a label, a dot leader and its
+    figures, in one block per page. The rows become tables beside the block, a new table at each header (a run of dates,
+    or of years under their durations), with a period line such as "Three Months Ended June 30, 2025" kept as a row of
+    its own; the block keeps only its words, so the figures are not shown twice."""
+    for key in list(document.order):
+        block = document.blocks.get(key)
+        if block is None or f"{key}_T" in document.tables or len(_LEADER.findall(block.text)) < 3:
+            continue
+        pieces = _LEADER.split(block.text)
+        tables: list[tuple[str, list[list[str]]]] = []
+        gap, kept = pieces[0], []
+        for piece in pieces[1:]:
+            header, section, label = _split_gap(gap, first=not tables)
+            if header is not None:
+                tables.append(header)
+            elif not tables:
+                break
+            rows = tables[-1][1]
+            if section:
+                rows.append([section])
+            cells, position = [], 0
+            while match := _LEADER_CELL.match(piece, position):
+                cells.append(re.sub(r"[\s>~<$]", "", match.group(0)))
+                position = match.end()
+            if cells:
+                rows.append([clean(label), *cells])
+            gap = piece[position:]
+        kept.append(gap)
+        built = [(context, rows) for context, rows in tables
+                 if sum(1 for row in rows if len(row) > 1 and any(_NUMBER.search(cell) for cell in row[1:])) >= 3]
+        if not built:
+            continue
+        place = document.order.index(key) + 1
+        for index, (context, rows) in enumerate(built):
+            table_key = f"{key}_L{index}"
+            document.tables[table_key] = Table(table_key, context, rows)
+            document.order.insert(place + index, table_key)
+        block.text = clean(f"{built[0][0]} {' '.join(kept)}")
+
+
+def _split_gap(gap: str, first: bool) -> tuple[tuple[str, list[list[str]]] | None, str | None, str]:
+    """The text between one row's figures and the next row's leader: a new table's header (when it holds a run of
+    dates or years, or opens the block), a period line, and the next row's label."""
+    text = clean(gap)
+    run = _DATES_RUN.search(text) or _YEARS_RUN.search(text)
+    if run:
+        before = text[:run.start()]
+        columns = _DATE.findall(run.group(0)) or run.group(1).split()
+        durations = [m.group(0) for m in _DURATION.finditer(before)]
+        per = len(columns) // len(durations) if durations and len(columns) % len(durations) == 0 else 0
+        header = [["", *([durations[i // per] for i in range(len(columns))])]] if per else []
+        return (before[-_CONTEXT_CHARS:], [*header, ["", *columns]]), None, text[run.end():]
+    date = None
+    for date in _DATE.finditer(text):
+        pass
+    if date is None:
+        return ((text[-_CONTEXT_CHARS:], []), None, "") if first else (None, None, text)
+    durations = [m for m in _DURATION.finditer(text, 0, date.start()) if date.start() - m.start() <= 40]
+    start = durations[-1].start() if durations else date.start()
+    section, label = text[start:date.end()], text[date.end():]
+    if first:
+        return (text[:start][-_CONTEXT_CHARS:], []), section, label
+    return None, section, label
