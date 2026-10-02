@@ -823,3 +823,16 @@ def test_a_kpi_list_is_kept_to_the_cap_by_trimming_metrics_first():
     spec = normalize_spec(Spec.model_validate({"groups": [breakdown, metrics]}))
     assert sum(len(g.kpis) for g in spec.groups) == MAX_LISTED_KPIS
     assert len(spec.groups[0].kpis) == 10  # the breakdown, which is checked by its sum, is kept whole
+
+
+def test_the_cap_never_drops_a_breakdown():
+    from kpi_extractor.ai import normalize_spec
+    def breakdown(key, n):
+        return {"key": key, "label": key, "kind": "revenue_breakdown",
+                "kpis": [{"key": f"{key}{i}", "label": f"{key}{i}", "unit": "currency"} for i in range(n)]}
+    metrics = {"key": "operating", "label": "Operating Metrics", "kind": "metric",
+               "kpis": [{"key": f"m{i}", "label": f"M{i}", "unit": "count"} for i in range(8)]}
+    spec = normalize_spec(Spec.model_validate({"groups": [breakdown("nodes", 12), breakdown("platforms", 7), metrics,
+                                                          breakdown("geography", 5)]}))
+    assert [g.key for g in spec.groups] == ["nodes", "platforms", "operating", "geography"]
+    assert len(spec.groups[2].kpis) == 4

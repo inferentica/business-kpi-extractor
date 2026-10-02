@@ -23,6 +23,7 @@ MAX_KPIS_PER_GROUP = 16
 # A focused list: every KPI is read, and possibly disputed, every quarter. The proposal is asked for at most six
 # groups; the code keeps any list to this many KPIs (see normalize_spec).
 MAX_LISTED_KPIS = 24
+MIN_KEPT_METRICS = 4
 
 SYSTEM = """You analyse SEC filings for a financial data pipeline. You never write a number that will be stored: you \
 point to where a value is (a table cell, or an exact quote with the number as written) or you choose among options \
@@ -437,12 +438,11 @@ def normalize_spec(spec: Spec) -> Spec:
     elif sum(len(group.kpis) for group in spec.groups) <= MAX_LISTED_KPIS:
         return spec
     groups = [g for g in groups if g["kpis"]][:MAX_GROUPS]
-    # Over the cap: operating metrics are trimmed first (from the end of the list), then whole trailing groups.
+    # Over the cap, only operating metrics are trimmed (from the end of the list, keeping a few): a breakdown or mix is
+    # checked by its own sum, so it is never dropped (TSMC's geography beside its twelve nodes).
     def count() -> int:
         return sum(len(g["kpis"]) for g in groups)
     for group in [g for g in groups if g["kind"] == "metric"]:
-        while count() > MAX_LISTED_KPIS and len(group["kpis"]) > 1:
+        while count() > MAX_LISTED_KPIS and len(group["kpis"]) > MIN_KEPT_METRICS:
             group["kpis"].pop()
-    while count() > MAX_LISTED_KPIS and len(groups) > 1:
-        groups.pop()
     return Spec.model_validate({"groups": groups, "names": spec.names})
