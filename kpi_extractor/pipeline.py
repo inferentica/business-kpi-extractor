@@ -725,24 +725,29 @@ class SymbolPipeline:
         return confirmed
 
     def _settle_by_checks(self, agreed: list[ReadValue], disputed: dict[str, tuple], expected: date) -> None:
-        """Two readings that found the same KPIs of a group but disagree on numbers: when exactly one of them passes the
-        group's checks (it adds up, nothing jumps against last quarter), that one stands without a Pro review."""
+        """Two readings of a group that disagree: when exactly one of them passes the group's checks (a breakdown or mix
+        adds up with its rows, nothing jumps against last quarter), that one stands without a Pro review. For a single
+        metric one reader found and the other did not, there is nothing to add up against, and Pro reviews it."""
         groups = {key.split(".", 1)[0] for key in disputed}
         for group in groups:
             pairs = {key: pair for key, pair in disputed.items() if key.split(".", 1)[0] == group}
-            if not all(a and b for a, b in pairs.values()):
-                continue  # one reading found a KPI the other did not: that is for the review
+            sample = next(item for pair in pairs.values() for item in pair if item)
+            if not all(a and b for a, b in pairs.values()) and sample.group.kind == "metric":
+                continue  # a metric one reader found and the other did not has nothing to add up against: for review
             base = [item for item in agreed if item.group.key == group]
             passes = []
             for side in (0, 1):
-                trial = copy.deepcopy(base + [pair[side] for pair in pairs.values()])
+                rows = base + [pair[side] for pair in pairs.values() if pair[side]]
+                trial = copy.deepcopy(rows)
                 validate_groups(trial, self._previous(expected))
-                passes.append(all(item.status == "verified" for item in trial))
+                # A breakdown or mix must also be whole: its parts add up to its total (or 100%) only with every row.
+                passes.append(bool(rows) and all(item.status == "verified" for item in trial))
             if passes[0] != passes[1]:
                 winner = 0 if passes[0] else 1
                 for key, pair in pairs.items():
-                    pair[winner].notes.append("settled by the checks")
-                    agreed.append(pair[winner])
+                    if pair[winner]:
+                        pair[winner].notes.append("settled by the checks")
+                        agreed.append(pair[winner])
                     del disputed[key]
 
     def _locate(self, text: str, document: Document, spec: Spec, currency: str | None, model: str, thinking_first: bool):
