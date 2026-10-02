@@ -200,6 +200,9 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     candidates: dict[str, list[tuple[str, dict[str, float]]]] = {}
     single: dict[tuple[str, str], dict[str, float]] = {}
     paired: dict[tuple[str, frozenset], list[tuple[dict[str, str], float]]] = {}
+    # (axis, concept) → the one (axis, member) its facts are also tagged with (Alphabet's products, all "Google
+    # Services"), so the year-ago and to-date figures are read from facts tagged the same way.
+    fixed_for: dict[tuple[str, str], tuple[str, str]] = {}
     eliminations: dict[str, float] = {}
     for concept, dimensions, value in tagged:
         if set(dimensions) == {"ConsolidationItemsAxis"}:
@@ -222,6 +225,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             for dimensions, value in items:
                 members.setdefault(dimensions[other], value)
             candidates.setdefault(other, []).append((concept, members))
+            fixed_for.setdefault((other, concept), (fixed, items[0][0][fixed]))
 
     def total_for(concept: str) -> float | None:
         return totals.get(concept) or next((totals[other] for other in REVENUE_CONCEPTS if other in totals), None)
@@ -311,7 +315,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             members = {**members, _UNALLOCATED: outside}
 
         def frame_members(source: pd.DataFrame) -> dict[str, float]:
-            rows = _single_axis_members(source, concept, axis, dimension_columns)
+            rows = _single_axis_members(source, concept, axis, dimension_columns, fixed_for.get((axis, concept)))
             if eliminated and rows and (removed := _eliminations_in(source, concept, dimension_columns)) is not None:
                 rows[_ELIMINATIONS] = removed
             if outside is not None and rows and (whole := frame_total(source, concept)) is not None:
@@ -419,13 +423,17 @@ def _eliminations_in(frame: pd.DataFrame, concept: str, dimension_columns: list[
     return total
 
 
-def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str]) -> dict[str, float]:
-    """Members of one axis for one concept, from facts tagged with that axis alone."""
+def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str],
+                         fixed: tuple[str, str] | None = None) -> dict[str, float]:
+    """Members of one axis for one concept, from facts tagged with that axis alone, or with it and the one member of
+    another axis its period's facts all carry (fixed)."""
     members: dict[str, float] = {}
     for _, fact in frame[frame["concept"] == concept].iterrows():
         dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
         dimensions = {a: m for a, m in dimensions.items() if (a, local_name(m)) not in _NEUTRAL_MEMBERS}
-        if len(dimensions) == 1 and axis in dimensions:
+        if axis not in dimensions:
+            continue
+        if len(dimensions) == 1 or (fixed and len(dimensions) == 2 and dimensions.get(fixed[0]) == fixed[1]):
             members.setdefault(dimensions[axis], float(fact["numeric_value"]))
     return members
 
