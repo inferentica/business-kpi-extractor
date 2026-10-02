@@ -670,3 +670,19 @@ def test_a_report_read_by_an_older_xbrl_reader_is_read_again():
     assert not pipeline._pending(ref)
     pipeline.filings = {"a": {"status": "processed", "attempts": 1, "notes": []}}
     assert not pipeline._pending(SimpleNamespace(accession="a", role="earnings_release"))
+
+
+def test_a_part_equal_to_xbrl_is_not_proven_in_a_breakdown_that_misses_its_total():
+    xbrl = {"group_key": "segments", "group_kind": "revenue_breakdown", "method": "xbrl", "validation_status": "verified",
+            "fiscal_year": "2025", "fiscal_period": "Q4", "period_end": "2025-12-31", "locator": {}}
+    part = {"group_key": "kpi_segment", "group_kind": "revenue_breakdown", "method": "ai", "fiscal_year": "2025",
+            "fiscal_period": "Q4", "period_end": "2025-12-31", "unit": "currency", "source_accession": "r",
+            "locator": {"total": 113_215_000_000.0}}
+    pipeline = _pipeline(FakeControl({}), [
+        {**xbrl, "kpi_key": "uhc", "value": 87_113_000_000.0}, {**xbrl, "kpi_key": "optumrx", "value": 41_456_000_000.0},
+        {**part, "kpi_key": "uhc", "value": 87_113_000_000.0, "validation_status": "needs_review", "notes": ["parts differ"]},
+        {**part, "kpi_key": "optumrx", "value": 41_456_000_000.0, "validation_status": "verified",
+         "notes": ["equals a figure reported in XBRL"]}])
+    pipeline._prove_flagged([])
+    assert pipeline.values[("kpi_segment", "uhc", "2025", "Q4")]["validation_status"] == "needs_review"
+    assert pipeline.values[("kpi_segment", "optumrx", "2025", "Q4")]["validation_status"] == "needs_review"

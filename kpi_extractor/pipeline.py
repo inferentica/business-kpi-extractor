@@ -1088,8 +1088,6 @@ class SymbolPipeline:
           number is the figure as restated and replaces it, and none matching among several rejects it.
         What nothing settles stays unserved. A later release is fetched for a value only until it has been checked."""
         flagged = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] == "needs_review"]
-        if not flagged:
-            return
         official: dict[bool, list[tuple[str, float]]] = {}
         for v in self.values.values():
             if (v["method"] in ("xbrl", "derived") and not v["group_key"].startswith(AI_GROUP_PREFIX)
@@ -1108,14 +1106,31 @@ class SymbolPipeline:
                                        "notes": [*(row.get("notes") or []), note]}
 
         settled: dict[tuple, dict] = {}
-        for v in flagged:
-            value = float(v["value"])
-            if v["unit"] == "currency" and _significant(value) and reported(v, value, 1e-4):
-                settle(v, _EQUALS_XBRL)
         groups: dict[tuple, list[dict]] = {}
         for v in self.values.values():
             if v["method"] == "ai" and v["group_kind"] == "revenue_breakdown" and v["validation_status"] != "rejected":
                 groups.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"], v.get("source_accession")), []).append(v)
+
+        def whole(row: dict) -> bool:
+            """A breakdown part counts as proven only in a breakdown that adds up to its own total: every visible part
+            can match XBRL while a part the release left out (UnitedHealth's eliminations) still makes it incomplete."""
+            if row["group_kind"] != "revenue_breakdown":
+                return True
+            rows = groups.get((row["group_key"], row["fiscal_year"], row["fiscal_period"], row.get("source_accession")), [])
+            total = float((row.get("locator") or {}).get("total") or 0)
+            return not total or abs(sum(float(o["value"]) for o in rows) - total) <= abs(total) * 0.001
+
+        for v in flagged:
+            value = float(v["value"])
+            if v["unit"] == "currency" and _significant(value) and reported(v, value, 1e-4) and whole(v):
+                settle(v, _EQUALS_XBRL)
+        # Parts proven alone by an earlier version of this rule, in breakdowns that do not add up, go back to review.
+        for rows in groups.values():
+            if not whole(rows[0]):
+                for v in rows:
+                    if v["validation_status"] == "verified" and _EQUALS_XBRL in (v.get("notes") or []):
+                        settled[value_key(v)] = {**v, "validation_status": "needs_review", "notes": [
+                            note for note in v.get("notes") or [] if note != _EQUALS_XBRL]}
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
             if waiting and len(rows) >= 2 and reported(rows[0], sum(float(v["value"]) for v in rows), 1e-5):
