@@ -30,6 +30,7 @@ from .document import Document, clean, parse_document, parse_number
 from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, count_jump, describe,
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
+from .statements import statement_lines
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
 from .xbrl import XbrlCandidate, extract_breakdowns, member_children, official_labels
@@ -49,7 +50,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 13"
+_XBRL_READER = "xbrl reader 14"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -294,6 +295,7 @@ class SymbolPipeline:
                 return
             fiscal_year, fiscal_period = fiscal_label(breakdowns.period_end, self.profile.fiscal_year_end,
                                                       annual=breakdowns.annual, year_offset=self.offset)
+            self._store_statements(ref, xbrl, breakdowns, fiscal_year, fiscal_period)
             groups = [(group, []) for group in breakdowns.groups]
             taken = {group.key for group in breakdowns.groups}
             ai_pending = False
@@ -348,6 +350,21 @@ class SymbolPipeline:
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
+
+    def _store_statements(self, ref: FilingRef, xbrl, breakdowns, fiscal_year: str, fiscal_period: str) -> None:
+        """The filing's three statements as presented; a statement that cannot be read never holds up its KPIs."""
+        try:
+            lines = statement_lines(xbrl, breakdowns.period_end, breakdowns.annual)
+            if not lines:
+                return
+            currency = next((group.currency for group in breakdowns.groups if group.currency), "USD")
+            shared = {"fiscal_year": fiscal_year, "fiscal_period": fiscal_period,
+                      "period_end": breakdowns.period_end.isoformat(), "form": ref.form,
+                      "filed_at": ref.filed.isoformat(), "currency": currency}
+            self.control.call("store_statements", symbol=self.symbol, accession=ref.accession,
+                              lines=[{**line, **shared} for line in lines])
+        except Exception as error:  # noqa: BLE001
+            self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not stored ({type(error).__name__}: {error})"[:300])
 
     def _continuing_split(self, group, period_end: date):
         """Of two complete splits on one axis, the one the company's stored periods of the past year use, so the year

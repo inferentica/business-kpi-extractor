@@ -41,6 +41,8 @@ class EvalControl:
                 state = self.plane.call(operation, **payload)
                 return {"spec": state.get("spec"), "curations": state.get("curations") or [], "filings": [], "values": []}
             return {"spec": None, "filings": [], "values": []}
+        if operation == "store_statements":
+            return {}
         if operation == "store":
             self.values.setdefault(payload["symbol"], []).extend(payload.get("values") or [])
             return {}
