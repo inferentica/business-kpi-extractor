@@ -77,6 +77,8 @@ class XbrlGroup:
     # The other complete split when the axis carries two (members as above); the pipeline keeps the one the
     # company's quarters use.
     alternative: list[tuple[str, str, float]] = field(default_factory=list)
+    # Revenue one year earlier as this filing restates it: what a restated year-ago split must add up to.
+    prior_total: float | None = None
 
 
 @dataclass
@@ -339,6 +341,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         prior_ytd_total = float(prior_ytd_totals.iloc[0]) if len(prior_ytd_totals) else None
         if outside is not None:
             prior_ytd_total = frame_total(prior_ytd_frame, concept)
+        prior_total = frame_total(prior_frame, concept)
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
             # Products against services (Amazon, Microsoft) is a view of its own beside the product lines, not a
             # coarser version of them: both are published, so neither depends on the AI listing it.
@@ -349,12 +352,12 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
                     or row[0] == "eliminations"]
             groups.append(XbrlGroup(key, title, order, rows, total, error, currencies.get(concept), concept,
                                     prior, {**elements(coarse), **elements(leaves)}, ytd, ytd_total, prior_ytd,
-                                    prior_ytd_total, [] if split or not coarse else named(coarse)))
+                                    prior_ytd_total, [] if split or not coarse else named(coarse), prior_total))
             if split:
                 groups.append(XbrlGroup(
                     "product_service", "Revenue by Product and Service", order, named(coarse), total,
                     (sum(coarse.values()) - total) / total, currencies.get(concept), concept, prior, elements(coarse),
-                    ytd, ytd_total, prior_ytd, prior_ytd_total))
+                    ytd, ytd_total, prior_ytd, prior_ytd_total, prior_total=prior_total))
             continue
         # Worth an AI review only when it could plausibly be a breakdown: a standard axis, or a custom one whose rows
         # are of the right order of magnitude.
@@ -400,7 +403,8 @@ def _completed_by_segments(candidate: XbrlCandidate, groups: list[XbrlGroup]) ->
                          segments.currency, candidate.concept, merged(candidate.prior, segments.prior),
                          {**segments.elements, **candidate.elements},
                          merged(candidate.year_to_date, segments.year_to_date), segments.year_to_date_total,
-                         merged(candidate.prior_year_to_date, segments.prior_year_to_date), segments.prior_year_to_date_total)
+                         merged(candidate.prior_year_to_date, segments.prior_year_to_date), segments.prior_year_to_date_total,
+                         prior_total=segments.prior_total)
     return None
 
 

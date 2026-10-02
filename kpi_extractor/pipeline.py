@@ -48,7 +48,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 9"
+_XBRL_READER = "xbrl reader 10"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -321,6 +321,7 @@ class SymbolPipeline:
                         period_end=breakdowns.period_end, locator={
                             "concept": group.concept, "total": group.total, "member": group.elements.get(reported),
                             "prior": group.prior.get(reported),
+                            **({"prior_total": group.prior_total} if group.prior_total else {}),
                             **({"ytd": ytd, "ytd_total": group.year_to_date_total}
                                if ytd is not None and group.year_to_date_total else {}),
                             **({"prior_ytd": prior_ytd, "prior_ytd_total": group.prior_year_to_date_total}
@@ -1054,7 +1055,28 @@ class SymbolPipeline:
             if isinstance(total, (int, float)):
                 revenue.setdefault((v["fiscal_year"], v["fiscal_period"]), (float(total), v["period_end"]))
         changed = []
-        for (group, year, period), annual in rows.items():
+        # A year with quarters but no figure of its own (Nvidia's FY2018 10-K tags no regions for the year) takes the
+        # year as the following 10-K restates it, when that restatement adds up to the revenue it restates.
+        for (group, year, period), following in list(rows.items()):
+            previous = str(int(year) - 1)
+            if period != "FY" or (group, previous, "FY") in rows or not any((group, previous, q) in rows for q in ("Q1", "Q2", "Q3")):
+                continue
+            priors = {key: (row.get("locator") or {}).get("prior") for key, row in following.items()}
+            restated_total = next((float(t) for row in following.values()
+                                   if isinstance(t := (row.get("locator") or {}).get("prior_total"), (int, float))), None)
+            end = next((f["period_end"] for f in self.filings.values() if f.get("document_role") == "periodic_report"
+                        and f.get("fiscal_year") == previous and f.get("fiscal_period") == "FY" and f.get("period_end")), None)
+            if (not all(isinstance(v, (int, float)) for v in priors.values()) or restated_total is None or end is None
+                    or abs(sum(priors.values()) - restated_total) > abs(restated_total) * 0.001):
+                continue
+            year_rows = {key: {**row, "fiscal_year": previous, "period_end": end, "value": float(priors[key]),
+                               "reconciliation_error_pct": (sum(priors.values()) - restated_total) / restated_total,
+                               "locator": {"total": restated_total, "member": (row.get("locator") or {}).get("member"),
+                                           "restated_by": row.get("source_accession")},
+                               "notes": ["as restated in the following year's filing"]} for key, row in following.items()}
+            rows[(group, previous, "FY")] = year_rows
+            changed += year_rows.values()
+        for (group, year, period), annual in list(rows.items()):
             if period != "FY":
                 continue
             for quarter in ("Q1", "Q2", "Q3"):
@@ -1063,10 +1085,20 @@ class SymbolPipeline:
                     continue  # on the year's layout, or finer (Nvidia's 10-Qs list regions its 10-K folds into Other)
                 following = rows.get((group, str(int(year) + 1), quarter)) or {}
                 priors = {key: (row.get("locator") or {}).get("prior") for key, row in following.items()}
+                if not priors or set(priors) != set(annual) or not all(isinstance(v, (int, float)) for v in priors.values()):
+                    continue
+                # The restated rows must add up to revenue: the quarter's own when its report was read, else the
+                # revenue the restating report gives for that quarter.
+                restated_total = next((float(t) for row in following.values()
+                                       if isinstance(t := (row.get("locator") or {}).get("prior_total"), (int, float))), None)
                 reported = revenue.get((year, quarter))
-                if (not priors or set(priors) != set(annual) or reported is None
-                        or not all(isinstance(value, (int, float)) for value in priors.values())
-                        or abs(sum(priors.values()) - reported[0]) > abs(reported[0]) * 0.001):
+                if reported is None and restated_total is not None:
+                    # The quarter's own report was read but kept nothing: its record still knows when the quarter ended.
+                    end = next((f["period_end"] for f in self.filings.values() if f.get("document_role") == "periodic_report"
+                                and f.get("fiscal_year") == year and f.get("fiscal_period") == quarter and f.get("period_end")),
+                               (date.fromisoformat(next(iter(following.values()))["period_end"][:10]) - timedelta(days=364)).isoformat())
+                    reported = (restated_total, end)
+                if reported is None or abs(sum(priors.values()) - reported[0]) > abs(reported[0]) * 0.001:
                     continue
                 note = "as restated in the following year's filing"
                 changed += [{**row, "fiscal_year": year, "fiscal_period": quarter, "period_end": reported[1],
