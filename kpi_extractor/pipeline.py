@@ -108,6 +108,7 @@ class SymbolPipeline:
         # of it only while it waits on the AI or a download (see _waiting).
         self._state = threading.Lock()
         self._local = threading.local()
+        self._rereading: set[str] = set()
         self.archive: Archive | None = None
         self._exhibits: dict[str, Future] = {}
         # Downloads and XBRL parsing start ahead of the filing being worked on.
@@ -590,35 +591,45 @@ class SymbolPipeline:
             self._state.acquire()
 
     def _process_releases(self, refs: list[FilingRef], spec: Spec, version: int) -> list[FilingRef]:
-        """Reads releases: the newest first on its own, so the others have a reading to be compared with, then the rest
-        newest to oldest, several at a time. Every check still runs on each reading; afterwards the quarters just read
-        are checked against each other in date order, as reading them one by one would have."""
+        """Reads releases in four chains, one per fiscal quarter (every Q1 oldest to newest, every Q2, ...), the chains
+        side by side. Each read then has the same quarter a year earlier already read in this run: the reference for
+        where each KPI sits, and the year-ago figure its column must match. Readings stored by an earlier run for a
+        filing this run is still to re-read are never a reference. Afterwards the quarters just read are checked against
+        each other in date order, as reading them one by one would have."""
         before = {key for key, value in self.values.items() if value["method"] == "ai"}
         pending = [ref for ref in refs if self.force or self._pending(ref) or
                    (self.filings.get(ref.accession) or {}).get("spec_version") != version]
         done: set[str] = set()
+        self._rereading = {ref.accession for ref in pending}
 
         def read(ref: FilingRef) -> None:
-            with self._state:
-                self._local.holding = True
-                try:
-                    if self._process_release(ref, spec, version):
-                        done.add(ref.accession)
-                finally:
-                    self._local.holding = False
+            if self._process_release(ref, spec, version):
+                done.add(ref.accession)
+            self._rereading.discard(ref.accession)
 
-        if len(pending) <= 2:
-            for ref in refs:
-                if self._process_release(ref, spec, version):
-                    done.add(ref.accession)
-        else:
-            newest = max(pending, key=lambda ref: ref.period_end or date.min)
-            read(newest)
-            rest = sorted([ref for ref in refs if ref is not newest], key=lambda ref: ref.period_end or date.min, reverse=True)
-            with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
-                list(pool.map(read, rest))
-            self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
-                                    | {key for key in before if self.values[key].get("source_accession") in done})
+        def chain(quarter_refs: list[FilingRef]) -> None:
+            for ref in quarter_refs:
+                with self._state:
+                    self._local.holding = True
+                    try:
+                        read(ref)
+                    finally:
+                        self._local.holding = False
+
+        try:
+            if len(pending) <= 2:
+                for ref in refs:
+                    read(ref)
+            else:
+                chains: dict[int, list[FilingRef]] = {}
+                for ref in sorted(refs, key=lambda ref: ref.period_end or date.min):
+                    chains.setdefault((ref.period_end or date.min).month % 12 // 3, []).append(ref)
+                with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
+                    list(pool.map(chain, chains.values()))
+                self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
+                                        | {key for key in before if self.values[key].get("source_accession") in done})
+        finally:
+            self._rereading = set()
         return [ref for ref in refs if ref.accession in done]
 
     def _check_read_series(self, keys: set[tuple]) -> None:
@@ -1085,9 +1096,12 @@ class SymbolPipeline:
         latest: dict[str, dict] = {}
         later: dict[str, dict] = {}
         cutoff = before.isoformat()
+        rereading = getattr(self, "_rereading", set())
         for value in list(self.values.values()):
             if value["method"] != "ai" or abs(_days(value["period_end"], cutoff)) <= 20:
                 continue
+            if value.get("source_accession") in rereading:
+                continue  # read by an earlier run, possibly with an older list, and about to be read again
             if source is not None and _source_template(value.get("source_url") or "") != source:
                 continue
             key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
