@@ -269,8 +269,7 @@ Track a percentage mix only when the company gives no amounts for it, and only w
 Do not track a breakdown that has the same rows as one listed under "Already covered by XBRL", even under another \
 title.
 
-Keep the list focused: at most 6 groups and about 20 KPIs in all, the ones an investor follows quarter to quarter. Every \
-group must be checkable: a revenue breakdown whose parts add up to a total row shown beside them, a mix whose shares \
+Every group must be checkable: a revenue breakdown whose parts add up to a total row shown beside them, a mix whose shares \
 add up to about 100, or operating metrics reported the same way each quarter. A breakdown's rows are parts of revenue \
 or of one segment's revenue; never income-statement lines such as net interest income, interest expense or \
 noninterest revenue listed together.
