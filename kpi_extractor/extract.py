@@ -63,6 +63,14 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             continue
         group, kpi = kpis[locator.kpi]
         try:
+            if group.kind != "metric" and locator.table is not None and locator.table in document.tables:
+                # A part of a breakdown or mix pointed at a combined line (Total Markets & Securities Services for
+                # Securities Services). A metric is often reported as its own total ("Total assets under management").
+                table = document.tables[locator.table]
+                row_label = _row_label(table.rows[locator.row], locator.col) if locator.row < len(table.rows) else ""
+                if _combined_line(row_label, kpi.label):
+                    raise LocateError(f"{locator.table} r{locator.row} is the combined line {row_label!r}, not "
+                                      f"{kpi.label!r}: point at the row for {kpi.label} itself")
             value, currency, notes = _read(document, locator, kpi, default_currency)
         except LocateError as error:
             problems.append(f"{locator.kpi}: {error}")
@@ -116,10 +124,6 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         parsed = parse_number(text)
         if parsed is None:
             raise LocateError(f"no number in {locator.table} r{locator.row} c{locator.col}")
-        row_label = _row_label(table.rows[locator.row], locator.col) if locator.row < len(table.rows) else ""
-        if _combined_line(row_label, kpi.label):
-            raise LocateError(f"{locator.table} r{locator.row} is the combined line {row_label!r}, not {kpi.label!r}: "
-                              f"point at the row for {kpi.label} itself")
         header = " ".join(" ".join(row) for row in table.rows[:3])
         if kpi.unit == "percent" and not parsed.percent and not re.search(r"%|\bpercent", f"{' '.join(table.rows[locator.row])} {header}", re.I):
             raise LocateError(f"{text!r} is not a percentage")

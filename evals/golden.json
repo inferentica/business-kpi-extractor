@@ -1,439 +1,529 @@
 [
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^\\s*2\\s*-?\\s*n(ano)?m",
-    "unit": "currency",
-    "value": 31934248000,
-    "source": "TSMC 2Q26 consolidated report, revenue by resolution",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^\\s*3\\s*-?\\s*n(ano)?m",
-    "unit": "currency",
-    "value": 320558574000,
-    "source": "TSMC 2Q26 consolidated report, revenue by resolution",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^\\s*5\\s*-?\\s*n(ano)?m",
-    "unit": "currency",
-    "value": 350112503000,
-    "source": "TSMC 2Q26 consolidated report, revenue by resolution",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^\\s*7\\s*-?\\s*n(ano)?m",
-    "unit": "currency",
-    "value": 121857311000,
-    "source": "TSMC 2Q26 consolidated report, revenue by resolution",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "high performance computing|^hpc",
-    "unit": "currency",
-    "value": 830369159000,
-    "source": "TSMC 2Q26 consolidated report, revenue by platform",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "smartphone",
-    "unit": "currency",
-    "value": 283278967000,
-    "source": "TSMC 2Q26 consolidated report, revenue by platform",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "internet of things|\\biot\\b",
-    "unit": "currency",
-    "value": 64054205000,
-    "source": "TSMC 2Q26 consolidated report, revenue by platform",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "automotive",
-    "unit": "currency",
-    "value": 53662812000,
-    "source": "TSMC 2Q26 consolidated report, revenue by platform",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "united states",
-    "unit": "currency",
-    "value": 970894218000,
-    "source": "TSMC 2Q26 consolidated report, revenue by geography",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^taiwan",
-    "unit": "currency",
-    "value": 79315268000,
-    "source": "TSMC 2Q26 consolidated report, revenue by geography",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^china",
-    "unit": "currency",
-    "value": 76730473000,
-    "source": "TSMC 2Q26 consolidated report, revenue by geography",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^\\s*2\\s*-?\\s*n(ano)?m",
-    "unit": "percent",
-    "value": 3,
-    "source": "TSMC 2Q26 earnings release: share of wafer revenue (shares are computed from node amounts; tracked only if the list keeps a mix)",
-    "optional": true
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^\\s*3\\s*-?\\s*n(ano)?m",
-    "unit": "percent",
-    "value": 30,
-    "source": "TSMC 2Q26 earnings release: share of wafer revenue (shares are computed from node amounts; tracked only if the list keeps a mix)",
-    "optional": true
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^\\s*5\\s*-?\\s*n(ano)?m",
-    "unit": "percent",
-    "value": 33,
-    "source": "TSMC 2Q26 earnings release: share of wafer revenue (shares are computed from node amounts; tracked only if the list keeps a mix)",
-    "optional": true
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2026-06-30",
-    "label": "^\\s*7\\s*-?\\s*n(ano)?m",
-    "unit": "percent",
-    "value": 11,
-    "source": "TSMC 2Q26 earnings release: share of wafer revenue (shares are computed from node amounts; tracked only if the list keeps a mix)",
-    "optional": true
-  },
-  {
-    "symbol": "META",
-    "period_end": "2026-06-30",
-    "label": "daily active people|\\bdap\\b",
-    "unit": "count",
-    "value": 3600000000.0,
-    "source": "Meta 2Q26 release: DAP was 3.60 billion"
-  },
-  {
-    "symbol": "META",
-    "period_end": "2026-06-30",
-    "label": "impression",
-    "unit": "percent",
-    "value": 14,
-    "source": "Meta 2Q26 release: ad impressions +14% YoY"
-  },
-  {
-    "symbol": "META",
-    "period_end": "2026-06-30",
-    "label": "price per ad",
-    "unit": "percent",
-    "value": 12,
-    "source": "Meta 2Q26 release: average price per ad +12% YoY"
-  },
-  {
-    "symbol": "META",
-    "period_end": "2026-06-30",
-    "label": "headcount|employees",
-    "unit": "count",
-    "value": 75472,
-    "optional": true,
-    "source": "Meta 2Q26 release: headcount"
-  },
-  {
-    "symbol": "META",
-    "period_end": "2026-06-30",
-    "label": "family of apps",
-    "unit": "currency",
-    "value": 60370000000.0,
-    "source": "Meta 2Q26 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "META",
-    "period_end": "2026-06-30",
-    "label": "reality labs",
-    "unit": "currency",
-    "value": 431000000.0,
-    "source": "Meta 2Q26 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "META",
-    "period_end": "2026-06-30",
-    "label": "us.*canada|united states and canada",
-    "unit": "currency",
-    "value": 23863000000.0,
-    "source": "Meta 2Q26 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "META",
-    "period_end": "2025-12-31",
-    "label": "family of apps",
-    "unit": "currency",
-    "value": 58938000000.0,
-    "fiscal_period": "Q4",
-    "source": "Meta 4Q25 earnings release: Family of Apps revenue $58,938 million (the year less nine months)",
-    "currency": "USD"
-  },
-  {
-    "symbol": "NVDA",
-    "period_end": "2026-07-26",
-    "label": "^compute",
-    "unit": "currency",
-    "value": 88299000000.0,
-    "source": "NVIDIA Q2 FY27 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "NVDA",
-    "period_end": "2026-07-26",
-    "label": "^graphics",
-    "unit": "currency",
-    "value": 7922000000.0,
-    "source": "NVIDIA Q2 FY27 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "NVDA",
-    "period_end": "2026-07-26",
-    "label": "hyperscale",
-    "unit": "currency",
-    "value": 48710000000.0,
-    "source": "NVIDIA Q2 FY27 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "NVDA",
-    "period_end": "2026-07-26",
-    "label": "united states",
-    "unit": "currency",
-    "value": 60074000000.0,
-    "source": "NVIDIA Q2 FY27 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "NVDA",
-    "period_end": "2026-01-25",
-    "label": "^compute",
-    "unit": "currency",
-    "value": 61651000000.0,
-    "fiscal_period": "Q4",
-    "source": "NVIDIA FY26 10-K minus Q1\u2013Q3 10-Qs",
-    "currency": "USD"
-  },
-  {
-    "symbol": "AAPL",
-    "period_end": "2026-06-27",
-    "label": "^iphone",
-    "unit": "currency",
-    "value": 54252000000.0,
-    "source": "Apple Q3 FY26 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "AAPL",
-    "period_end": "2026-06-27",
-    "label": "^services",
-    "unit": "currency",
-    "value": 30739000000.0,
-    "source": "Apple Q3 FY26 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "AAPL",
-    "period_end": "2026-06-27",
-    "label": "^americas",
-    "unit": "currency",
-    "value": 45781000000.0,
-    "source": "Apple Q3 FY26 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "AAPL",
-    "period_end": "2025-09-27",
-    "label": "^iphone",
-    "unit": "currency",
-    "value": 49025000000.0,
-    "fiscal_period": "Q4",
-    "source": "Apple FY25 10-K minus Q1\u2013Q3 10-Qs",
-    "currency": "USD"
-  },
-  {
-    "symbol": "NFLX",
-    "period_end": "2026-06-30",
-    "label": "united states and canada|ucan",
-    "unit": "currency",
-    "value": 5431667000,
-    "source": "Netflix 2Q26 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "NFLX",
-    "period_end": "2026-06-30",
-    "label": "europe|emea",
-    "unit": "currency",
-    "value": 4033515000,
-    "source": "Netflix 2Q26 10-Q XBRL",
-    "currency": "USD"
-  },
-  {
-    "symbol": "TSM",
-    "period_end": "2025-12-31",
-    "label": "high performance computing|^hpc",
-    "unit": "currency",
-    "value": 2192931000000,
-    "fiscal_period": "FY",
-    "source": "TSMC 2025 20-F XBRL: markets of customers",
-    "currency": "TWD"
-  },
-  {
-    "symbol": "MSFT",
-    "period_end": "2026-06-30",
-    "fiscal_period": "Q4",
-    "label": "xbox|gaming",
-    "unit": "currency",
-    "value": 4983000000,
-    "currency": "USD",
-    "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4); the 10-K renamed Gaming to Xbox"
-  },
-  {
-    "symbol": "MSFT",
-    "period_end": "2026-06-30",
-    "fiscal_period": "Q4",
-    "label": "server products",
-    "unit": "currency",
-    "value": 37096000000,
-    "currency": "USD",
-    "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4)"
-  },
-  {
-    "symbol": "MSFT",
-    "period_end": "2026-06-30",
-    "fiscal_period": "Q4",
-    "label": "linkedin",
-    "unit": "currency",
-    "value": 5189000000,
-    "currency": "USD",
-    "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4)"
-  },
-  {
-    "symbol": "AMD",
-    "period_end": "2026-06-27",
-    "label": "^client$",
-    "unit": "currency",
-    "value": 3062000000,
-    "currency": "USD",
-    "source": "AMD 2Q26 release: segment and disaggregated revenue, Client"
-  },
-  {
-    "symbol": "AMD",
-    "period_end": "2026-06-27",
-    "label": "^gaming$",
-    "unit": "currency",
-    "value": 779000000,
-    "currency": "USD",
-    "source": "AMD 2Q26 release: segment and disaggregated revenue, Gaming"
-  },
-  {
-    "symbol": "AVGO",
-    "period_end": "2026-08-02",
-    "label": "ai semiconductor",
-    "unit": "currency",
-    "value": 16700000000,
-    "tolerance": 0.004,
-    "currency": "USD",
-    "source": "Broadcom 3Q26 release: AI semiconductor revenue of $16.7 billion"
-  },
-  {
-    "symbol": "AMZN",
-    "period_end": "2026-06-30",
-    "label": "net product sales|^products?$",
-    "unit": "currency",
-    "value": 77602000000,
-    "currency": "USD",
-    "source": "Amazon 2Q26 release: net product sales"
-  },
-  {
-    "symbol": "AMZN",
-    "period_end": "2026-06-30",
-    "label": "net service sales|^services?$",
-    "unit": "currency",
-    "value": 123004000000,
-    "currency": "USD",
-    "source": "Amazon 2Q26 release: net service sales"
-  },
-  {
-    "symbol": "GOOGL",
-    "period_end": "2026-06-30",
-    "label": "youtube ads",
-    "unit": "currency",
-    "value": 11055000000,
-    "currency": "USD",
-    "source": "Alphabet 2Q26 release: YouTube ads"
-  },
-  {
-    "symbol": "GOOGL",
-    "period_end": "2026-06-30",
-    "label": "google cloud",
-    "unit": "currency",
-    "value": 24768000000,
-    "currency": "USD",
-    "source": "Alphabet 2Q26 release: Google Cloud"
-  },
-  {
-    "symbol": "GOOGL",
-    "period_end": "2026-06-30",
-    "label": "search",
-    "unit": "currency",
-    "value": 63271000000,
-    "currency": "USD",
-    "source": "Alphabet 2Q26 release: Google Search & other"
-  },
-  {
-    "symbol": "ASML",
-    "period_end": "2026-06-28",
-    "label": "net system sales",
-    "unit": "currency",
-    "value": 6564800000,
-    "currency": "EUR",
-    "source": "ASML 2Q26 financial statements: net system sales \u20ac6,564.8 million"
-  },
-  {
-    "symbol": "ASML",
-    "period_end": "2026-06-28",
-    "label": "installed base|service and field option",
-    "unit": "currency",
-    "value": 2761700000,
-    "currency": "EUR",
-    "source": "ASML 2Q26 financial statements: net service and field option sales \u20ac2,761.7 million"
-  }
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^\\s*2\\s*-?\\s*n(ano)?m",
+  "unit": "currency",
+  "value": 31934248000,
+  "source": "TSMC 2Q26 consolidated report, revenue by resolution",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^\\s*3\\s*-?\\s*n(ano)?m",
+  "unit": "currency",
+  "value": 320558574000,
+  "source": "TSMC 2Q26 consolidated report, revenue by resolution",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^\\s*5\\s*-?\\s*n(ano)?m",
+  "unit": "currency",
+  "value": 350112503000,
+  "source": "TSMC 2Q26 consolidated report, revenue by resolution",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^\\s*7\\s*-?\\s*n(ano)?m",
+  "unit": "currency",
+  "value": 121857311000,
+  "source": "TSMC 2Q26 consolidated report, revenue by resolution",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "high performance computing|^hpc",
+  "unit": "currency",
+  "value": 830369159000,
+  "source": "TSMC 2Q26 consolidated report, revenue by platform",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "smartphone",
+  "unit": "currency",
+  "value": 283278967000,
+  "source": "TSMC 2Q26 consolidated report, revenue by platform",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "internet of things|\\biot\\b",
+  "unit": "currency",
+  "value": 64054205000,
+  "source": "TSMC 2Q26 consolidated report, revenue by platform",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "automotive",
+  "unit": "currency",
+  "value": 53662812000,
+  "source": "TSMC 2Q26 consolidated report, revenue by platform",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "united states",
+  "unit": "currency",
+  "value": 970894218000,
+  "source": "TSMC 2Q26 consolidated report, revenue by geography",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^taiwan",
+  "unit": "currency",
+  "value": 79315268000,
+  "source": "TSMC 2Q26 consolidated report, revenue by geography",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^china",
+  "unit": "currency",
+  "value": 76730473000,
+  "source": "TSMC 2Q26 consolidated report, revenue by geography",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^\\s*2\\s*-?\\s*n(ano)?m",
+  "unit": "percent",
+  "value": 3,
+  "source": "TSMC 2Q26 earnings release: share of wafer revenue (shares are computed from node amounts; tracked only if the list keeps a mix)",
+  "optional": true
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^\\s*3\\s*-?\\s*n(ano)?m",
+  "unit": "percent",
+  "value": 30,
+  "source": "TSMC 2Q26 earnings release: share of wafer revenue (shares are computed from node amounts; tracked only if the list keeps a mix)",
+  "optional": true
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^\\s*5\\s*-?\\s*n(ano)?m",
+  "unit": "percent",
+  "value": 33,
+  "source": "TSMC 2Q26 earnings release: share of wafer revenue (shares are computed from node amounts; tracked only if the list keeps a mix)",
+  "optional": true
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2026-06-30",
+  "label": "^\\s*7\\s*-?\\s*n(ano)?m",
+  "unit": "percent",
+  "value": 11,
+  "source": "TSMC 2Q26 earnings release: share of wafer revenue (shares are computed from node amounts; tracked only if the list keeps a mix)",
+  "optional": true
+ },
+ {
+  "symbol": "META",
+  "period_end": "2026-06-30",
+  "label": "daily active people|\\bdap\\b",
+  "unit": "count",
+  "value": 3600000000.0,
+  "source": "Meta 2Q26 release: DAP was 3.60 billion"
+ },
+ {
+  "symbol": "META",
+  "period_end": "2026-06-30",
+  "label": "impression",
+  "unit": "percent",
+  "value": 14,
+  "source": "Meta 2Q26 release: ad impressions +14% YoY"
+ },
+ {
+  "symbol": "META",
+  "period_end": "2026-06-30",
+  "label": "price per ad",
+  "unit": "percent",
+  "value": 12,
+  "source": "Meta 2Q26 release: average price per ad +12% YoY"
+ },
+ {
+  "symbol": "META",
+  "period_end": "2026-06-30",
+  "label": "headcount|employees",
+  "unit": "count",
+  "value": 75472,
+  "optional": true,
+  "source": "Meta 2Q26 release: headcount"
+ },
+ {
+  "symbol": "META",
+  "period_end": "2026-06-30",
+  "label": "family of apps",
+  "unit": "currency",
+  "value": 60370000000.0,
+  "source": "Meta 2Q26 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "META",
+  "period_end": "2026-06-30",
+  "label": "reality labs",
+  "unit": "currency",
+  "value": 431000000.0,
+  "source": "Meta 2Q26 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "META",
+  "period_end": "2026-06-30",
+  "label": "us.*canada|united states and canada",
+  "unit": "currency",
+  "value": 23863000000.0,
+  "source": "Meta 2Q26 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "META",
+  "period_end": "2025-12-31",
+  "label": "family of apps",
+  "unit": "currency",
+  "value": 58938000000.0,
+  "fiscal_period": "Q4",
+  "source": "Meta 4Q25 earnings release: Family of Apps revenue $58,938 million (the year less nine months)",
+  "currency": "USD"
+ },
+ {
+  "symbol": "NVDA",
+  "period_end": "2026-07-26",
+  "label": "^compute",
+  "unit": "currency",
+  "value": 88299000000.0,
+  "source": "NVIDIA Q2 FY27 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "NVDA",
+  "period_end": "2026-07-26",
+  "label": "^graphics",
+  "unit": "currency",
+  "value": 7922000000.0,
+  "source": "NVIDIA Q2 FY27 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "NVDA",
+  "period_end": "2026-07-26",
+  "label": "hyperscale",
+  "unit": "currency",
+  "value": 48710000000.0,
+  "source": "NVIDIA Q2 FY27 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "NVDA",
+  "period_end": "2026-07-26",
+  "label": "united states",
+  "unit": "currency",
+  "value": 60074000000.0,
+  "source": "NVIDIA Q2 FY27 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "NVDA",
+  "period_end": "2026-01-25",
+  "label": "^compute",
+  "unit": "currency",
+  "value": 61651000000.0,
+  "fiscal_period": "Q4",
+  "source": "NVIDIA FY26 10-K minus Q1\u2013Q3 10-Qs",
+  "currency": "USD"
+ },
+ {
+  "symbol": "AAPL",
+  "period_end": "2026-06-27",
+  "label": "^iphone",
+  "unit": "currency",
+  "value": 54252000000.0,
+  "source": "Apple Q3 FY26 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "AAPL",
+  "period_end": "2026-06-27",
+  "label": "^services",
+  "unit": "currency",
+  "value": 30739000000.0,
+  "source": "Apple Q3 FY26 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "AAPL",
+  "period_end": "2026-06-27",
+  "label": "^americas",
+  "unit": "currency",
+  "value": 45781000000.0,
+  "source": "Apple Q3 FY26 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "AAPL",
+  "period_end": "2025-09-27",
+  "label": "^iphone",
+  "unit": "currency",
+  "value": 49025000000.0,
+  "fiscal_period": "Q4",
+  "source": "Apple FY25 10-K minus Q1\u2013Q3 10-Qs",
+  "currency": "USD"
+ },
+ {
+  "symbol": "NFLX",
+  "period_end": "2026-06-30",
+  "label": "united states and canada|ucan",
+  "unit": "currency",
+  "value": 5431667000,
+  "source": "Netflix 2Q26 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "NFLX",
+  "period_end": "2026-06-30",
+  "label": "europe|emea",
+  "unit": "currency",
+  "value": 4033515000,
+  "source": "Netflix 2Q26 10-Q XBRL",
+  "currency": "USD"
+ },
+ {
+  "symbol": "TSM",
+  "period_end": "2025-12-31",
+  "label": "high performance computing|^hpc",
+  "unit": "currency",
+  "value": 2192931000000,
+  "fiscal_period": "FY",
+  "source": "TSMC 2025 20-F XBRL: markets of customers",
+  "currency": "TWD"
+ },
+ {
+  "symbol": "MSFT",
+  "period_end": "2026-06-30",
+  "fiscal_period": "Q4",
+  "label": "xbox|gaming",
+  "unit": "currency",
+  "value": 4983000000,
+  "currency": "USD",
+  "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4); the 10-K renamed Gaming to Xbox"
+ },
+ {
+  "symbol": "MSFT",
+  "period_end": "2026-06-30",
+  "fiscal_period": "Q4",
+  "label": "server products",
+  "unit": "currency",
+  "value": 37096000000,
+  "currency": "USD",
+  "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4)"
+ },
+ {
+  "symbol": "MSFT",
+  "period_end": "2026-06-30",
+  "fiscal_period": "Q4",
+  "label": "linkedin",
+  "unit": "currency",
+  "value": 5189000000,
+  "currency": "USD",
+  "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4)"
+ },
+ {
+  "symbol": "AMD",
+  "period_end": "2026-06-27",
+  "label": "^client$",
+  "unit": "currency",
+  "value": 3062000000,
+  "currency": "USD",
+  "source": "AMD 2Q26 release: segment and disaggregated revenue, Client"
+ },
+ {
+  "symbol": "AMD",
+  "period_end": "2026-06-27",
+  "label": "^gaming$",
+  "unit": "currency",
+  "value": 779000000,
+  "currency": "USD",
+  "source": "AMD 2Q26 release: segment and disaggregated revenue, Gaming"
+ },
+ {
+  "symbol": "AVGO",
+  "period_end": "2026-08-02",
+  "label": "ai semiconductor",
+  "unit": "currency",
+  "value": 16700000000,
+  "tolerance": 0.004,
+  "currency": "USD",
+  "source": "Broadcom 3Q26 release: AI semiconductor revenue of $16.7 billion"
+ },
+ {
+  "symbol": "AMZN",
+  "period_end": "2026-06-30",
+  "label": "net product sales|^products?$",
+  "unit": "currency",
+  "value": 77602000000,
+  "currency": "USD",
+  "source": "Amazon 2Q26 release: net product sales"
+ },
+ {
+  "symbol": "AMZN",
+  "period_end": "2026-06-30",
+  "label": "net service sales|^services?$",
+  "unit": "currency",
+  "value": 123004000000,
+  "currency": "USD",
+  "source": "Amazon 2Q26 release: net service sales"
+ },
+ {
+  "symbol": "GOOGL",
+  "period_end": "2026-06-30",
+  "label": "youtube ads",
+  "unit": "currency",
+  "value": 11055000000,
+  "currency": "USD",
+  "source": "Alphabet 2Q26 release: YouTube ads"
+ },
+ {
+  "symbol": "GOOGL",
+  "period_end": "2026-06-30",
+  "label": "google cloud",
+  "unit": "currency",
+  "value": 24768000000,
+  "currency": "USD",
+  "source": "Alphabet 2Q26 release: Google Cloud"
+ },
+ {
+  "symbol": "GOOGL",
+  "period_end": "2026-06-30",
+  "label": "search",
+  "unit": "currency",
+  "value": 63271000000,
+  "currency": "USD",
+  "source": "Alphabet 2Q26 release: Google Search & other"
+ },
+ {
+  "symbol": "ASML",
+  "period_end": "2026-06-28",
+  "label": "net system sales",
+  "unit": "currency",
+  "value": 6564800000,
+  "currency": "EUR",
+  "source": "ASML 2Q26 financial statements: net system sales \u20ac6,564.8 million"
+ },
+ {
+  "symbol": "ASML",
+  "period_end": "2026-06-28",
+  "label": "installed base|service and field option",
+  "unit": "currency",
+  "value": 2761700000,
+  "currency": "EUR",
+  "source": "ASML 2Q26 financial statements: net service and field option sales \u20ac2,761.7 million"
+ },
+ {
+  "symbol": "UNH",
+  "period_end": "2026-06-30",
+  "label": "^unitedhealthcare$",
+  "unit": "currency",
+  "value": 86017000000,
+  "currency": "USD",
+  "source": "UnitedHealth 2Q26 10-Q segment revenue (XBRL)"
+ },
+ {
+  "symbol": "UNH",
+  "period_end": "2026-06-30",
+  "label": "^optum rx$",
+  "unit": "currency",
+  "value": 38292000000,
+  "currency": "USD",
+  "source": "UnitedHealth 2Q26 10-Q segment revenue (XBRL)"
+ },
+ {
+  "symbol": "UNH",
+  "period_end": "2026-06-30",
+  "label": "^optum eliminations$",
+  "unit": "currency",
+  "value": -1503000000,
+  "currency": "USD",
+  "source": "UnitedHealth 2Q26 10-Q intersegment eliminations (XBRL)"
+ },
+ {
+  "symbol": "UNH",
+  "period_end": "2026-06-30",
+  "label": "^corporate and eliminations$",
+  "unit": "currency",
+  "value": -39648000000,
+  "currency": "USD",
+  "source": "UnitedHealth 2Q26 10-Q corporate and eliminations (XBRL)"
+ },
+ {
+  "symbol": "JPM",
+  "period_end": "2026-06-30",
+  "label": "^corporate$",
+  "unit": "currency",
+  "value": 6046000000,
+  "currency": "USD",
+  "source": "JPMorgan 2Q26 10-Q Corporate, net revenue (XBRL)"
+ },
+ {
+  "symbol": "JPM",
+  "period_end": "2026-06-30",
+  "label": "^reconciling items$",
+  "unit": "currency",
+  "value": -675000000,
+  "currency": "USD",
+  "source": "JPMorgan 2Q26 10-Q reconciling items (XBRL)"
+ },
+ {
+  "symbol": "JPM",
+  "period_end": "2026-06-30",
+  "label": "^commercial & investment bank$",
+  "unit": "currency",
+  "value": 24853000000,
+  "currency": "USD",
+  "source": "JPMorgan 2Q26 10-Q CIB net revenue (XBRL)"
+ },
+ {
+  "symbol": "JPM",
+  "period_end": "2026-06-30",
+  "label": "^securities services$",
+  "unit": "currency",
+  "value": 1657000000,
+  "currency": "USD",
+  "source": "JPMorgan 2Q26 earnings supplement: CIB Securities Services"
+ },
+ {
+  "symbol": "GOOGL",
+  "period_end": "2025-06-30",
+  "label": "subscriptions, platforms,? and devices",
+  "unit": "currency",
+  "value": 11203000000,
+  "currency": "USD",
+  "source": "Alphabet 2Q25 10-Q product revenue (XBRL)"
+ },
+ {
+  "symbol": "GOOGL",
+  "period_end": "2025-06-30",
+  "label": "^unallocated$",
+  "unit": "currency",
+  "value": -112000000,
+  "currency": "USD",
+  "source": "Alphabet 2Q25 10-Q: revenue 96,428M less segments 96,540M (hedging)"
+ }
 ]

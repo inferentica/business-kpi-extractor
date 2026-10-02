@@ -297,3 +297,14 @@ def test_small_counts_jump_by_how_far_they_move_not_by_ratio():
     big = ReadValue(group, group.kpis[0], 45.0, None, {}, [])
     validate_groups([big], {"ops.used": 3.0})
     assert big.status == "needs_review"
+
+
+def test_a_metric_reported_as_its_own_total_is_read():
+    html = """<table><tr><td>(in billions)</td><td>2Q26</td></tr><tr><td>Total assets under management</td><td>$4,312</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric",
+                                             "kpis": [{"key": "aum", "label": "Assets Under Management", "unit": "currency"}]}]})
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "values": [{"kpi": "operating.aum", "table": table, "row": 1, "col": 1}]})
+    read, problems = read_values(document, spec, located, "USD")
+    assert not problems and read[0].value == 4_312e9
