@@ -54,8 +54,59 @@ def _number(raw) -> float | None:
     return None if math.isnan(value) or math.isinf(value) else value
 
 
-def statement_lines(xbrl, period_end: date, annual: bool) -> list[dict]:
-    """Every presented line of the three statements for the filing's own period, in the filing's order."""
+_STRUCTURAL = re.compile(r"\[abstract\]\s*$", re.I)
+
+
+def _label(raw: str) -> str:
+    """The filing's label, in sentence case where the filer wrote it in capitals (TSMC's "NET REVENUE")."""
+    label = re.sub(r"\s+", " ", raw).strip()
+    letters = [char for char in label if char.isalpha()]
+    if len(letters) > 3 and all(char.isupper() for char in letters):
+        label = label[0] + label[1:].lower()
+    return label[:300]
+
+
+class _ReportingCurrency:
+    """A filer may tag a line twice for one period: in its own currency and as a convenience translation (TSMC's 20-F
+    gives the latest year in US dollars as well). Each line takes the figure in the currency the filing reports in."""
+
+    def __init__(self, xbrl):
+        self.currency: str | None = None
+        self.facts: dict[tuple[str, str], list[tuple[str, float, str]]] = {}
+        try:
+            facts = xbrl.facts.to_dataframe()
+        except Exception:  # noqa: BLE001 - without facts the statement's own figures stand
+            return
+        if facts is None or facts.empty or "currency" not in facts:
+            return
+        if "is_dimensioned" in facts:
+            facts = facts[facts["is_dimensioned"] != True]  # noqa: E712 - pandas mask
+        monetary = facts[facts["currency"].notna() & ~facts["unit_ref"].astype(str).str.contains("per", case=False)]
+        if monetary.empty:
+            return
+        self.currency = str(monetary["currency"].value_counts().idxmax())
+        for row in monetary.to_dict("records"):
+            when = row.get("period_end") if isinstance(row.get("period_end"), str) else row.get("period_instant")
+            value = _number(row.get("numeric_value"))
+            if isinstance(when, str) and value is not None:
+                self.facts.setdefault((str(row["concept"]), when[:10]), []).append(
+                    (str(row["currency"]), value, str(row.get("period_key"))))
+
+    def value(self, concept: str, when: str, value: float) -> float:
+        candidates = self.facts.get((concept.replace("_", ":", 1), when))
+        if not candidates or self.currency is None:
+            return value
+        shown = next((fact for fact in candidates if fact[1] == value), None)
+        if shown is None or shown[0] == self.currency:
+            return value
+        own = next((fact for fact in candidates if fact[0] == self.currency and fact[2] == shown[2]), None)
+        return own[1] if own else value
+
+
+def statement_lines(xbrl, period_end: date, annual: bool) -> tuple[list[dict], str | None]:
+    """Every presented line of the three statements for the filing's own period, in the filing's order, and the
+    currency the filing reports in."""
+    currency = _ReportingCurrency(xbrl)
     lines: list[dict] = []
     for statement, method in _STATEMENTS:
         frame = _frame(xbrl, method)
@@ -69,19 +120,25 @@ def statement_lines(xbrl, period_end: date, annual: bool) -> list[dict]:
         if not columns:
             continue
         rows = frame[frame["dimension"] != True] if "dimension" in frame else frame  # noqa: E712 - pandas mask
-        levels = [int(level) for level in rows["level"] if _number(level) is not None] if "level" in rows else []
+        # Taxonomy groupings the filer did not title ("Statement of comprehensive income [abstract]") are not lines.
+        rows = [row for row in rows.to_dict("records")
+                if not (row.get("abstract") and _STRUCTURAL.search(str(row.get("label") or "")))]
+        levels = [int(level) for level in (_number(row.get("level")) for row in rows) if level is not None]
         base = min(levels) if levels else 0
         for duration, column in columns.items():
+            when = _COLUMN.match(str(column)).group(1)
             kept = []
-            for row in rows.to_dict("records"):
+            for row in rows:
                 heading = bool(row.get("abstract"))
                 value = None if heading else _number(row.get(column))
                 if not heading and value is None:
                     continue  # a line this period does not report
+                if value is not None:
+                    value = currency.value(str(row["concept"]), when, value)
                 level = _number(row.get("level"))
                 kept.append({
                     "statement": statement, "duration": duration, "line": len(kept),
-                    "concept": str(row["concept"])[:200], "label": str(row.get("label") or row["concept"]).strip()[:300],
+                    "concept": str(row["concept"])[:200], "label": _label(str(row.get("label") or row["concept"])),
                     "level": max(0, min(20, int(level) - base)) if level is not None else 0,
                     "is_heading": heading, "value": value,
                 })
@@ -90,7 +147,7 @@ def statement_lines(xbrl, period_end: date, annual: bool) -> list[dict]:
             for index, line in enumerate(kept):
                 line["line"] = index
             lines.extend(kept)
-    return lines
+    return lines, currency.currency
 
 
 def _has_lines_below(lines: list[dict], index: int) -> bool:

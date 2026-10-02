@@ -50,7 +50,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 14"
+_XBRL_READER = "xbrl reader 15"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -354,10 +354,10 @@ class SymbolPipeline:
     def _store_statements(self, ref: FilingRef, xbrl, breakdowns, fiscal_year: str, fiscal_period: str) -> None:
         """The filing's three statements as presented; a statement that cannot be read never holds up its KPIs."""
         try:
-            lines = statement_lines(xbrl, breakdowns.period_end, breakdowns.annual)
+            lines, currency = statement_lines(xbrl, breakdowns.period_end, breakdowns.annual)
             if not lines:
                 return
-            currency = next((group.currency for group in breakdowns.groups if group.currency), "USD")
+            currency = currency or next((group.currency for group in breakdowns.groups if group.currency), "USD")
             shared = {"fiscal_year": fiscal_year, "fiscal_period": fiscal_period,
                       "period_end": breakdowns.period_end.isoformat(), "form": ref.form,
                       "filed_at": ref.filed.isoformat(), "currency": currency}
