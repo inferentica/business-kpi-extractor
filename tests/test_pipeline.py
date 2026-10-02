@@ -709,3 +709,20 @@ def test_a_renamed_release_line_joins_its_series_by_the_year_ago_cell():
     pipeline._unify_release_series([SimpleNamespace(accession="new")])
     renamed = {(y, p) for (g, k, y, p), v in pipeline.values.items() if k == "subscriptions" and v["validation_status"] == "verified"}
     assert renamed == {("2022", "Q4"), ("2023", "Q3"), ("2023", "Q4")}
+
+
+def test_a_quarter_on_an_older_layout_takes_the_following_years_restatement():
+    def row(key, year, period, end, value, prior=None, total=None, accession="a"):
+        return {"group_key": "products", "group_kind": "revenue_breakdown", "group_label": "Revenue by Product", "kpi_key": key,
+                "kpi_label": key, "fiscal_year": year, "fiscal_period": period, "period_end": end, "method": "xbrl",
+                "validation_status": "verified", "value": value, "source_accession": accession,
+                "locator": {"total": total, **({"prior": prior} if prior is not None else {})}}
+    values = [row("search", "2019", "FY", "2019-12-31", 98.0, total=120.0), row("youtube", "2019", "FY", "2019-12-31", 22.0, total=120.0),
+              row("properties", "2019", "Q2", "2019-06-30", 30.0, total=30.0),  # Search and YouTube together
+              row("search", "2020", "Q2", "2020-06-30", 26.0, prior=24.5, total=32.0, accession="b"),
+              row("youtube", "2020", "Q2", "2020-06-30", 6.0, prior=5.5, total=32.0, accession="b")]
+    pipeline = _pipeline(FakeControl({}), values)
+    pipeline._adopt_restated_quarters()
+    q2 = {k: v["value"] for (g, k, y, p), v in pipeline.values.items() if y == "2019" and p == "Q2" and v["validation_status"] == "verified"}
+    assert q2 == {"search": 24.5, "youtube": 5.5}
+    assert pipeline.values[("products", "properties", "2019", "Q2")]["validation_status"] == "rejected"

@@ -194,6 +194,7 @@ class SymbolPipeline:
         self._join_custom_axes()
         self._unify_series()
         self._unify_release_series(releases)
+        self._adopt_restated_quarters()
         self._fix_mislabelled_quarters()
         self._derive()
         self._harmonize_labels()
@@ -1037,6 +1038,49 @@ class SymbolPipeline:
             self._store(values=rekeyed[start:start + 400])
         if rekeyed:
             self.log(f"{self.symbol}: {len(rekeyed) // 2} XBRL values joined to their series")
+
+    def _adopt_restated_quarters(self) -> None:
+        """A year's quarter that is missing or laid out unlike the year's own 10-K (Alphabet's 2019 10-Qs grouped Search
+        and YouTube as "Google properties" and left "Google other" untagged in Q1) is taken from the following year's
+        10-Q for the same quarter, which restates it on the year's layout: only when that restated quarter has exactly
+        the year's rows and adds up to the quarter's reported revenue. The year's Q4 then follows on one layout."""
+        rows: dict[tuple[str, str, str], dict[str, dict]] = {}
+        revenue: dict[tuple[str, str], tuple[float, str]] = {}
+        for v in self.values.values():
+            if v["method"] != "xbrl" or v["validation_status"] != "verified" or v["group_key"].startswith(AI_GROUP_PREFIX):
+                continue
+            rows.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
+            total = (v.get("locator") or {}).get("total")
+            if isinstance(total, (int, float)):
+                revenue.setdefault((v["fiscal_year"], v["fiscal_period"]), (float(total), v["period_end"]))
+        changed = []
+        for (group, year, period), annual in rows.items():
+            if period != "FY":
+                continue
+            for quarter in ("Q1", "Q2", "Q3"):
+                current = rows.get((group, year, quarter)) or {}
+                if set(current) == set(annual):
+                    continue  # already on the year's layout
+                following = rows.get((group, str(int(year) + 1), quarter)) or {}
+                priors = {key: (row.get("locator") or {}).get("prior") for key, row in following.items()}
+                reported = revenue.get((year, quarter))
+                if (not priors or set(priors) != set(annual) or reported is None
+                        or not all(isinstance(value, (int, float)) for value in priors.values())
+                        or abs(sum(priors.values()) - reported[0]) > abs(reported[0]) * 0.001):
+                    continue
+                note = "as restated in the following year's filing"
+                changed += [{**row, "fiscal_year": year, "fiscal_period": quarter, "period_end": reported[1],
+                             "value": float(priors[key]), "reconciliation_error_pct": (sum(priors.values()) - reported[0]) / reported[0],
+                             "locator": {"total": reported[0], "member": (row.get("locator") or {}).get("member"),
+                                         "restated_by": row.get("source_accession")},
+                             "notes": [note]} for key, row in following.items()]
+                changed += [{**row, "validation_status": "rejected", "notes": ["replaced by the following year's restated layout"]}
+                            for key, row in current.items() if key not in priors]
+        for start in range(0, len(changed), 400):
+            self._store(values=changed[start:start + 400])
+        adopted = sum(1 for v in changed if v["validation_status"] == "verified")
+        if adopted:
+            self.log(f"{self.symbol}: {adopted} quarterly values taken from the following year's restated layout")
 
     def _unify_release_series(self, releases: list[FilingRef]) -> None:
         """A line a release renamed (Alphabet's "Google other" became "Google subscriptions, platforms, and devices" in
