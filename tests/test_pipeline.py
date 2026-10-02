@@ -742,3 +742,10 @@ def test_a_quarter_finer_than_its_year_keeps_its_own_rows():
     pipeline = _pipeline(FakeControl({}), values)
     pipeline._adopt_restated_quarters()
     assert pipeline.values[("geography", "singapore", "2026", "Q1")]["validation_status"] == "verified"
+
+
+def test_an_overlong_kpi_key_is_repaired_instead_of_discarding_the_list():
+    from kpi_extractor.ai import KpiSpec
+    assert KpiSpec(key="global_corporate_banking_global_investment_banking", label="x", unit="currency").key == \
+        "global_corporate_banking_global_investment_banki"
+    assert KpiSpec(key="3nm Share", label="x", unit="percent").key == "k_3nm_share"

@@ -27,9 +27,14 @@ given to you, and code reads and checks every value. Reply with a single JSON ob
 
 
 def _check_key(value: str) -> str:
-    if not _KEY.match(value):
+    # A key the AI made too long or wrote loosely ("global_corporate_banking_global_investment_banking") is repaired
+    # rather than costing the whole list: lower case, underscores, at most 48 characters, starting with a letter.
+    repaired = re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", str(value).lower())).strip("_")[:48].rstrip("_")
+    if repaired and not repaired[0].isalpha():
+        repaired = f"k_{repaired}"[:48].rstrip("_")
+    if not _KEY.match(repaired):
         raise ValueError(f"invalid key {value!r}")
-    return value
+    return repaired
 
 
 class KpiSpec(BaseModel):
