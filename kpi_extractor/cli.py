@@ -94,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
                             if result.release_values >= 5 and result.release_verified < 0.5 * result.release_values},
             "failedCompanies": [result.symbol for result in results if result.errors and not result.filings],
             "skippedCompanies": [result.symbol for result in results if result.skipped],
+            "trimmedKpis": {result.symbol: result.trimmed_kpis for result in results if result.trimmed_kpis},
             "errors": {result.symbol: result.errors[:5] for result in results if result.errors},
         }
         print(f"Summary: {summary}")

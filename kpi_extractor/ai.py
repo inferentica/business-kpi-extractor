@@ -79,7 +79,10 @@ class GroupSpec(BaseModel):
         elif self.kind == "mix":
             if any(kpi.unit != "percent" for kpi in self.kpis):
                 raise ValueError(f"{self.key}: mixes hold percentages")
-            self.total_kpi = None
+            # A mix's "Total 100%" row is its check, not a share: keep it as the total when it is one of its KPIs.
+            if self.total_kpi not in keys:
+                self.total_kpi = next((kpi.key for kpi in self.kpis
+                                       if re.match(r"total\b", kpi.key) or re.match(r"total\b", kpi.label, re.I)), None)
         else:
             self.total_kpi = None
         return self
@@ -420,7 +423,7 @@ def normalize_spec(spec: Spec) -> Spec:
         # A breakdown without a named total still reconciles: reading the table whole finds its total row by the sum.
         if group.kind == "revenue_breakdown" and len(parts) < 2:
             loose += parts or group.kpis
-        elif group.kind == "mix" and len(group.kpis) < 2:
+        elif group.kind == "mix" and len(parts) < 2:
             loose += group.kpis
         else:
             groups.append(group.model_dump())

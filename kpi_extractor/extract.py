@@ -14,6 +14,8 @@ BREAKDOWN_TOLERANCE = 0.01
 PERIOD_TOLERANCE_DAYS = 12
 MAX_RATIO_JUMP = 3.0
 MAX_MIX_JUMP = 30.0
+SMALL_COUNT = 50
+SMALL_COUNT_MOVE = 25
 _CURRENCY_MARKERS = (("NT$", "TWD"), ("US$", "USD"), ("HK$", "HKD"), ("C$", "CAD"), ("A$", "AUD"), ("RMB", "CNY"),
                      ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("$", "USD"))
 
@@ -526,10 +528,15 @@ def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None
         group = items[0].group
         reason = None
         if group.kind == "mix":
+            # A mix's own "Total 100%" row (its named total) is its check, not one of its shares.
+            shares = [item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]
+            stated = next((item.value for item in items if item.is_total or item.kpi.key == group.total_kpi), None)
             if any(not 0 <= item.value <= 100 for item in items):
                 reason = "share outside 0-100%"
+            elif stated is not None and abs(stated - 100) > MIX_TOLERANCE:
+                reason = f"the mix's total row reads {stated:.1f}%"
             else:
-                total = sum(item.value for item in items)
+                total = sum(item.value for item in shares)
                 if abs(total - 100) > MIX_TOLERANCE:
                     reason = f"shares add up to {total:.1f}%"
         elif group.kind == "revenue_breakdown":
@@ -569,7 +576,20 @@ def _jump(item: ReadValue, before: float | None) -> str | None:
         return f"moved {item.value - before:+.1f} points in a quarter" if abs(item.value - before) > MAX_MIX_JUMP else None
     if item.kpi.unit == "percent" or before <= 0 or item.value <= 0:
         return None
-    ratio = item.value / before
+    small = count_jump(item.kpi.unit, before, item.value)
+    return (small or None) if small is not None else _ratio_jump(before, item.value)
+
+
+def count_jump(unit: str, before: float, now: float) -> str | None:
+    """Small counts move by a few at a time (ASML's used systems sold, 3 one quarter and 10 the next): below SMALL_COUNT
+    a jump is an absolute move, not a ratio. Returns "" when the small-count rule applies and finds no jump."""
+    if unit != "count" or max(abs(before), abs(now)) >= SMALL_COUNT:
+        return None
+    return f"moved {now - before:+g} in a quarter" if abs(now - before) > SMALL_COUNT_MOVE else ""
+
+
+def _ratio_jump(before: float, now: float) -> str | None:
+    ratio = now / before
     return f"changed {ratio:.1f}x in a quarter" if ratio > MAX_RATIO_JUMP or ratio < 1 / MAX_RATIO_JUMP else None
 
 

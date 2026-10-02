@@ -836,3 +836,49 @@ def test_the_cap_never_drops_a_breakdown():
                                                           breakdown("geography", 5)]}))
     assert [g.key for g in spec.groups] == ["nodes", "platforms", "operating", "geography"]
     assert len(spec.groups[2].kpis) == 4
+
+
+def test_a_jump_alone_never_settles_a_dispute():
+    from kpi_extractor.extract import ReadValue
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Ops", "kind": "metric",
+                                            "kpis": [{"key": "users", "label": "Users", "unit": "count"}]}]})
+    group, kpi = spec.groups[0], spec.groups[0].kpis[0]
+    pipeline = _pipeline(FakeControl({}), [{"group_key": "kpi_ops", "kpi_key": "users", "fiscal_year": "2026", "fiscal_period": "Q1",
+                                            "period_end": "2026-03-31", "method": "ai", "validation_status": "verified", "value": 100.0}])
+    disputed = {"ops.users": (ReadValue(group, kpi, 450.0, None, {}, []), ReadValue(group, kpi, 100.0, None, {}, []))}
+    agreed: list = []
+    pipeline._settle_by_checks(agreed, disputed, date(2026, 6, 30))
+    assert agreed == [] and "ops.users" in disputed  # the real move goes to the review, not to last quarter's figure
+
+
+def test_a_breakdown_reading_that_repeats_an_earlier_period_loses():
+    from kpi_extractor.extract import ReadValue
+    spec = Spec.model_validate({"groups": [{"key": "seg", "label": "Revenue by Segment", "kind": "revenue_breakdown", "total_kpi": "total",
+                                            "kpis": [{"key": "a", "label": "A", "unit": "currency"}, {"key": "b", "label": "B", "unit": "currency"},
+                                                     {"key": "total", "label": "Total", "unit": "currency"}]}]})
+    group = spec.groups[0]
+    a, b, total = group.kpis
+    earlier = [{"group_key": "kpi_seg", "kpi_key": "a", "fiscal_year": "2026", "fiscal_period": "Q1", "period_end": "2026-03-31",
+                "method": "ai", "validation_status": "verified", "value": 60.0}]
+    pipeline = _pipeline(FakeControl({}), earlier)
+    agreed = [ReadValue(group, b, 40.0, None, {}, []), ReadValue(group, total, 100.0, None, {}, [], is_total=True)]
+    disputed = {"seg.a": (ReadValue(group, a, 60.0, None, {}, []), ReadValue(group, a, 55.0, None, {}, []))}
+    pipeline._settle_by_checks(agreed, disputed, date(2026, 6, 30))
+    # One adds up only by repeating last quarter's 60, the other does not add up: neither is sound, Pro reviews.
+    assert "seg.a" in disputed and agreed[-1].kpi.key != "a"
+
+
+def test_a_breakdown_read_from_part_of_its_table_is_flagged():
+    from kpi_extractor.extract import ReadValue
+    spec = Spec.model_validate({"groups": [{"key": "tech", "label": "Revenue by Technology", "kind": "revenue_breakdown", "total_kpi": "total",
+                                            "kpis": [{"key": k, "label": k, "unit": "currency"} for k in ("n2", "n3", "n5", "n7", "total")]}]})
+    group = spec.groups[0]
+    reference = [{"group_key": "kpi_tech", "kpi_key": k, "fiscal_year": "2026", "fiscal_period": "Q1", "period_end": "2026-03-31",
+                  "method": "ai", "validation_status": "verified", "value": v, "source_url": "https://www.sec.gov/x.htm",
+                  "locator": {"total": 100.0}} for k, v in (("n2", 10.0), ("n3", 30.0), ("n5", 35.0), ("n7", 25.0))]
+    pipeline = _pipeline(FakeControl({}), reference)
+    kpis = {k.key: k for k in group.kpis}
+    read = [ReadValue(group, kpis["n2"], 12.0, None, {}, []), ReadValue(group, kpis["n3"], 30.0, None, {}, []),
+            ReadValue(group, kpis["total"], 42.0, None, {}, [], is_total=True)]  # "advanced technologies" taken for the total
+    pipeline._flag_partial_tables(read, EXPECTED, parse_document("<p>x</p>", "https://www.sec.gov/x.htm"))
+    assert all(item.status == "needs_review" for item in read)

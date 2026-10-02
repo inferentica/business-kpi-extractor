@@ -24,8 +24,9 @@ GOLDEN = Path("evals/golden.json")  # relative to the repository root, where the
 class EvalControl:
     """The control plane for AI calls and run bookkeeping; storage and company state stay local."""
 
-    def __init__(self, plane: ControlPlane):
+    def __init__(self, plane: ControlPlane, stored_lists: bool = False):
         self.plane = plane
+        self.stored_lists = stored_lists
         self.values: dict[str, list[dict]] = {}
 
     @property
@@ -34,6 +35,11 @@ class EvalControl:
 
     def call(self, operation: str, **payload) -> dict:
         if operation == "symbol_state":
+            if self.stored_lists:
+                # Production's KPI list and saved row choices, with every filing read fresh: the readers are scored
+                # without paying for (or varying with) a newly written list.
+                state = self.plane.call(operation, **payload)
+                return {"spec": state.get("spec"), "curations": state.get("curations") or [], "filings": [], "values": []}
             return {"spec": None, "filings": [], "values": []}
         if operation == "store":
             self.values.setdefault(payload["symbol"], []).extend(payload.get("values") or [])
@@ -46,9 +52,11 @@ class EvalControl:
 
 def evaluate_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolResult, list[dict]]:
     """One company in its own process; what it would have stored comes back with its result."""
-    control = EvalControl(plane)
+    stored = os.environ.get("KPI_EVAL_LISTS", "fresh") == "stored"
+    control = EvalControl(plane, stored_lists=stored)
     try:
-        result = SymbolPipeline(control, symbol, quarters, True, log=lambda line: print(line, flush=True)).run()
+        # With stored lists nothing is forced: the state is empty, so every filing is read, and the list is kept.
+        result = SymbolPipeline(control, symbol, quarters, not stored, log=lambda line: print(line, flush=True)).run()
     except Exception as error:  # noqa: BLE001
         result = SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
     return result, control.values.get(symbol, [])

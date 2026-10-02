@@ -17,7 +17,15 @@ on:
         options:
           - pro
           - flash-thinking
-  # Weekly, and whenever the prompts or the reader change.
+      lists:
+        description: KPI lists - stored (production's, cheaper and stable) or fresh (written anew, as for a new company)
+        required: true
+        default: stored
+        type: choice
+        options:
+          - stored
+          - fresh
+  # Weekly with fresh lists, and with stored lists whenever the prompts or the reader change.
   schedule:
     - cron: "17 3 * * 1"
   push:
@@ -51,6 +59,7 @@ jobs:
         env:
           QUARTERS: ${{ inputs.quarters || '6' }}
           KPI_SECOND_READER: ${{ inputs.second_reader || 'pro' }}
+          KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}
         run: python -m kpi_extractor.evaluate --quarters "$QUARTERS"
       - uses: actions/upload-artifact@v6
         if: always()

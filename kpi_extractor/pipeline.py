@@ -27,7 +27,7 @@ from .archive import Archive, filing_folder, xbrl_from_parts, xbrl_parts
 from .control import ControlError
 from .derive import balancing, derive_periods
 from .document import Document, clean, parse_document, parse_number
-from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, describe,
+from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, count_jump, describe,
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
 from .replay import replay
@@ -80,6 +80,8 @@ class SymbolResult:
     # Values read from earnings documents that are not rejected, and how many of them are verified (shown to users).
     release_values: int = 0
     release_verified: int = 0
+    # KPIs the list cap took off (operating metrics only), so a lost metric is never silent.
+    trimmed_kpis: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
@@ -109,6 +111,7 @@ class SymbolPipeline:
         self._state = threading.Lock()
         self._local = threading.local()
         self._dead: set[str] | None = None  # groups not read this run (see _readable)
+        self._newest_release: date | None = None
         self.archive: Archive | None = None
         self._exhibits: dict[str, Future] = {}
         # Downloads and XBRL parsing start ahead of the filing being worked on.
@@ -169,6 +172,7 @@ class SymbolPipeline:
         for ref in reports:
             self._process_report(ref)
         releases = [ref for ref in sorted(listing.result(), key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
+        self._newest_release = max((ref.period_end for ref in releases if ref.period_end), default=None)
         for ref in releases:
             if self.force or self._pending(ref):
                 for exhibit in ref.exhibits[:6]:
@@ -177,7 +181,9 @@ class SymbolPipeline:
         if spec is not None:
             processed = self._process_releases(releases, spec, version)
             latest_end = releases[-1].period_end if releases else None
-            if not proposed and any(ref.period_end == latest_end for ref in processed):
+            # An evaluation on stored lists scores the readers, so it keeps the list as stored (no audit call).
+            audit = os.environ.get("KPI_EVAL_LISTS") != "stored"
+            if audit and not proposed and any(ref.period_end == latest_end for ref in processed):
                 previous_spec = spec
                 updated = self._maintain(spec, version, [ref for ref in releases if ref.period_end == latest_end])
                 if updated is not None:
@@ -398,7 +404,7 @@ class SymbolPipeline:
     def _spec(self, row: dict | None, releases: list[FilingRef]) -> tuple[Spec | None, int, bool]:
         if row and not self.force:
             stored = Spec.model_validate({"groups": row["groups"], "names": row.get("names") or {}})
-            spec, version = ai.normalize_spec(stored), int(row["version"])
+            spec, version = self._capped(stored), int(row["version"])
             if spec.model_dump() != stored.model_dump():
                 # A stored list that breaks the rules is repaired once; its filings are then read with the new version.
                 version += 1
@@ -431,7 +437,7 @@ class SymbolPipeline:
             return None, 0, False
         if current is not None:
             spec = keep_current_groups(spec, current)
-        spec = ai.normalize_spec(spec)
+        spec = self._capped(spec)
         # Names may only rename breakdowns and members that exist.
         names = {
             key: {"label": name.label, "members": {m: l for m, l in name.members.items() if m in breakdowns[key]["members"]}}
@@ -442,6 +448,18 @@ class SymbolPipeline:
         self.names = names
         self.log(f"{self.symbol}: KPI list v{version} with {sum(len(g.kpis) for g in spec.groups)} KPIs")
         return spec, version, True
+
+    def _capped(self, spec: Spec) -> Spec:
+        """normalize_spec, with any KPI the cap took off recorded for the run summary."""
+        normalized = ai.normalize_spec(spec)
+        kept = {(g.key, k.key) for g in normalized.groups for k in g.kpis}
+        trimmed = [f"{g.key}.{k.key}" for g in spec.groups for k in g.kpis
+                   if (g.key, k.key) not in kept and not any(k.key == other.key for other in
+                                                              next((n.kpis for n in normalized.groups if n.kind == "metric"), []))]
+        if trimmed:
+            self.result.trimmed_kpis = sorted(set(self.result.trimmed_kpis) | set(trimmed))
+            self.log(f"{self.symbol}: KPI cap left out {', '.join(trimmed[:10])}")
+        return normalized
 
     def _maintain(self, spec: Spec, version: int, latest_quarter: list[FilingRef]) -> tuple[Spec, int] | None:
         """Pro audits the newest quarter against the list: KPIs the documents report that the list lacks, and KPIs the
@@ -462,7 +480,7 @@ class SymbolPipeline:
             return None
         if updated is None:
             return None
-        updated = ai.normalize_spec(updated)  # the audit's additions are kept to the cap like any list
+        updated = self._capped(updated)  # the audit's additions are kept to the cap like any list
         if updated.model_dump() == spec.model_dump():
             return None
         self._store_spec(updated, self.names, version + 1, latest_quarter[-1].accession)
@@ -524,7 +542,8 @@ class SymbolPipeline:
         if not spec.groups:
             self._store_filing(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
             return True
-        spec = self._readable(spec)
+        if ref.period_end != self._newest_release:
+            spec = self._readable(spec)  # the newest quarter always reads every group: a fixed bug lets it verify
         try:
             expected = ref.period_end
             fiscal_year, fiscal_period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)
@@ -554,6 +573,7 @@ class SymbolPipeline:
                 fiscal_year, fiscal_period = fiscal_label(period_end, self.profile.fiscal_year_end, annual=True,
                                                           year_offset=self.offset)
             validate_groups(read, self._previous(period_end, annual=located.annual))
+            self._flag_partial_tables(read, period_end, document)
             self._explain_jumps(read, document, spec)
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
             verified = sum(1 for record in records if record["validation_status"] == "verified")
@@ -569,7 +589,9 @@ class SymbolPipeline:
     def _readable(self, spec: Spec) -> Spec:
         """The list without groups that have never verified in at least eight quarters read (JPMorgan's income-statement
         lines listed as a breakdown): reading them again would only flag them again, at a Pro read each quarter. Decided
-        once per run (see _process_releases), before re-reading a filing could withdraw their history."""
+        once per run (see _process_releases), before re-reading a filing could withdraw their history. Used for older
+        quarters only: the newest is read whole every run, so a group that failed for an extractor bug verifies again
+        once the bug is fixed, and is read in full from then on."""
         dead = self._dead if self._dead is not None else self._never_verified()
         if not dead or all(group.key in dead for group in spec.groups):
             return spec
@@ -617,10 +639,12 @@ class SymbolPipeline:
             for ref in quarter_refs:
                 with self._state:
                     self._local.holding = True
+                    self._local.chained = True  # history lookups see this chain's own earlier quarters only
                     try:
                         read(ref)
                     finally:
                         self._local.holding = False
+                        self._local.chained = False
 
         if len(pending) <= 2:
             for ref in refs:
@@ -628,14 +652,14 @@ class SymbolPipeline:
         else:
             chains: dict[int, list[FilingRef]] = {}
             for ref in sorted(refs, key=lambda ref: ref.period_end or date.min):
-                chains.setdefault((ref.period_end or date.min).month % 12 // 3, []).append(ref)
+                chains.setdefault(_chain_of(ref.period_end or date.min), []).append(ref)
             with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
                 list(pool.map(chain, chains.values()))
             self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
-                                    | {key for key in before if self.values[key].get("source_accession") in done})
+                                    | {key for key in before if self.values[key].get("source_accession") in done}, refs)
         return [ref for ref in refs if ref.accession in done]
 
-    def _check_read_series(self, keys: set[tuple]) -> None:
+    def _check_read_series(self, keys: set[tuple], refs: list[FilingRef] = ()) -> None:
         """The jump checks of quarters read side by side, run again in date order: each value against the quarter before
         it (a share against its last share, an amount against three times or a third of its last), and an amount equal
         to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole."""
@@ -650,13 +674,18 @@ class SymbolPipeline:
                 if value_key(current) not in keys or _days(previous["period_end"], current["period_end"]) > 120:
                     continue
                 before, now = float(previous["value"]), float(current["value"])
+                small = count_jump(current["unit"], before, now)
                 if current["unit"] == "percent":
                     jump = abs(now - before) > MAX_MIX_JUMP and f"moved {now - before:+.1f} points in a quarter"
+                elif small is not None:
+                    jump = small or None
                 else:
                     jump = before and now / before > 0 and not 1 / MAX_RATIO_JUMP <= now / before <= MAX_RATIO_JUMP \
                         and f"changed {now / before:.1f}x in a quarter"
                 if jump and not self._immaterial(current):
                     flagged[value_key(current)] = jump
+                elif current["unit"] == "currency" and _significant(now) and _same(now, before):
+                    flagged[value_key(current)] = "the same figure as the quarter before: check the column"
             by_end = {v["period_end"][:7]: v for v in rows}
             for current in rows:
                 year_ago = by_end.get(f"{int(current['period_end'][:4]) - 1}{current['period_end'][4:7]}")
@@ -672,6 +701,38 @@ class SymbolPipeline:
                 changed.append({**value, "validation_status": "needs_review", "notes": [*(value.get("notes") or []), note]})
         for start in range(0, len(changed), 400):
             self._store(values=changed[start:start + 400])
+        self._explain_stored({key for key, note in flagged.items() if _is_jump(note)}, refs)
+
+    def _explain_stored(self, keys: set[tuple], refs: list[FilingRef]) -> None:
+        """Jumps the date-order check found, given the reading-time treatment: Pro is asked whether each is a real
+        change, and one backed by a quote found in the document stands (its breakdown's other parts are released by
+        _release_held_breakdowns). One Pro call per release with such a jump."""
+        by_accession = {ref.accession: ref for ref in refs}
+        jumps: dict[str, list[dict]] = {}
+        for key in keys:
+            value = self.values.get(key)
+            if value and value.get("source_accession") in by_accession:
+                jumps.setdefault(value["source_accession"], []).append(value)
+        cleared = []
+        for accession, rows in jumps.items():
+            try:
+                document = self._document(by_accession[accession])
+                lines = "\n".join(
+                    f"- {v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']} ({v['group_label']} / {v['kpi_label']}): "
+                    f"now {float(v['value']):g}; {'; '.join(n for n in v.get('notes') or [] if _is_jump(n))}" for v in rows)
+                answer = self._ask(ai.prompt(self.company, self._prompt_document(document, None), ai.EXPLAIN_TASK, lines),
+                                   "explain", ai.Explanations, thinking_first=True, model="pro")
+            except Exception:  # noqa: BLE001 - unexplained, they stay flagged
+                continue
+            haystack = _document_text(document)
+            for v in rows:
+                verdict = answer.items.get(f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}")
+                quote = clean(verdict.quote or "") if verdict else ""
+                if verdict and verdict.legitimate and len(quote) >= 20 and quote in haystack:
+                    cleared.append({**v, "validation_status": "verified",
+                                    "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"]})
+        for start in range(0, len(cleared), 400):
+            self._store(values=cleared[start:start + 400])
 
     def _immaterial(self, value: dict) -> bool:
         """A breakdown row under 1% of its total, whose swings say nothing (as validate_groups treats it)."""
@@ -846,25 +907,31 @@ class SymbolPipeline:
         return confirmed
 
     def _settle_by_checks(self, agreed: list[ReadValue], disputed: dict[str, tuple], expected: date) -> None:
-        """Two readings of a group that disagree: when exactly one of them passes the group's checks (a breakdown or mix
-        adds up with its rows, nothing jumps against last quarter), that one stands without a Pro review. For a single
-        metric one reader found and the other did not, there is nothing to add up against, and Pro reviews it."""
-        groups = {key.split(".", 1)[0] for key in disputed}
-        for group in groups:
+        """Two readings of a group that disagree, settled without a Pro review only on structural evidence: one adds up
+        (a breakdown to its total, a mix to 100%) and holds no number repeated from an earlier period, while the other
+        does not add up or repeats an earlier period's number. A jump alone never decides: last quarter's figure read
+        from another column passes the jump check precisely because it did not move, so a jump goes to the review and
+        the explanation step as before. A single metric one reader found and the other did not goes to the review."""
+        earlier = self._earlier_values(expected)
+        for group in {key.split(".", 1)[0] for key in disputed}:
             pairs = {key: pair for key, pair in disputed.items() if key.split(".", 1)[0] == group}
             sample = next(item for pair in pairs.values() for item in pair if item)
-            if not all(a and b for a, b in pairs.values()) and sample.group.kind == "metric":
-                continue  # a metric one reader found and the other did not has nothing to add up against: for review
+            if sample.group.kind == "metric":
+                continue  # nothing to add up against
             base = [item for item in agreed if item.group.key == group]
-            passes = []
+            sound, broken = [], []
             for side in (0, 1):
                 rows = base + [pair[side] for pair in pairs.values() if pair[side]]
                 trial = copy.deepcopy(rows)
-                validate_groups(trial, self._previous(expected))
-                # A breakdown or mix must also be whole: its parts add up to its total (or 100%) only with every row.
-                passes.append(bool(rows) and all(item.status == "verified" for item in trial))
-            if passes[0] != passes[1]:
-                winner = 0 if passes[0] else 1
+                validate_groups(trial, {})  # sums and totals only: no previous quarter, so no jump can decide
+                adds_up = bool(rows) and all(item.status == "verified" for item in trial)
+                repeats = any(item.kpi.unit in ("currency", "count") and any(
+                    _same(item.value, value) for value in earlier.get(f"{group}.{item.kpi.key}", []))
+                    for pair in pairs.values() if (item := pair[side]))
+                sound.append(adds_up and not repeats)
+                broken.append(not adds_up or repeats)
+            if sound[0] and broken[1] or sound[1] and broken[0]:
+                winner = 0 if sound[0] else 1
                 for key, pair in pairs.items():
                     if pair[winner]:
                         pair[winner].notes.append("settled by the checks")
@@ -995,6 +1062,26 @@ class SymbolPipeline:
         return before is not None and any(abs(cell - before) <= abs(before) * 1e-4
                                           for cell in _year_ago_cells(document, item.locator, item.value))
 
+    def _flag_partial_tables(self, read: list[ReadValue], expected: date, document: Document) -> None:
+        """A breakdown read with fewer rows than in the reference quarter and a total under half of that quarter's is
+        most likely part of its table, with a subtotal taken for the total (TSMC's 2nm and 3nm under "advanced
+        technologies"): its parts add up, so only the comparison shows it. Flagged whole."""
+        history = self._ai_history(expected, _source_template(document.source_url))
+        for group in {item.group.key for item in read if item.group.kind == "revenue_breakdown"}:
+            items = [item for item in read if item.group.key == group]
+            total = next((item.value for item in items if item.is_total or item.kpi.key == item.group.total_kpi), None)
+            parts = [item for item in items if not (item.is_total or item.kpi.key == item.group.total_kpi)]
+            reference = [value for key, value in history.items() if key.split(".", 1)[0] == group]
+            if not reference or total is None:
+                continue
+            newest = max(value["period_end"] for value in reference)
+            before = [value for value in reference if value["period_end"] == newest]
+            before_total = next((float(v["locator"]["total"]) for v in before if (v.get("locator") or {}).get("total")), None)
+            if before_total and len(parts) < len(before) and total < 0.5 * before_total:
+                for item in items:
+                    item.status = "needs_review"
+                    item.notes.append("fewer rows and under half the total of the quarter compared: likely part of the table")
+
     def _explain_jumps(self, read: list[ReadValue], document: Document, spec: Spec) -> None:
         """Values flagged only for a sharp change get a reading by Pro; a real change backed by a quote stands."""
         flagged = [item for item in read if item.status == "needs_review"
@@ -1103,9 +1190,12 @@ class SymbolPipeline:
         latest: dict[str, dict] = {}
         later: dict[str, dict] = {}
         cutoff = before.isoformat()
+        chained = getattr(self._local, "chained", False)
         for value in list(self.values.values()):
             if value["method"] != "ai" or abs(_days(value["period_end"], cutoff)) <= 20:
                 continue
+            if chained and (value["period_end"] > cutoff or not _same_chain(value["period_end"], before)):
+                continue  # in a chain: only its own earlier quarters, which are always read first
             if source is not None and _source_template(value.get("source_url") or "") != source:
                 continue
             key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
@@ -1141,7 +1231,12 @@ class SymbolPipeline:
         return False
 
     def _quarter_total_before(self, group_key: str, period_end: str) -> float | None:
-        """The reported total of the group's latest quarter within 120 days before period_end."""
+        """The reported total of the group's latest quarter within 120 days before period_end. In a reading chain, where
+        that quarter may not be read yet, the quarter's own revenue in XBRL (an annual total is about four times it)."""
+        if getattr(self._local, "chained", False):
+            return next((float(v["locator"]["total"]) for v in list(self.values.values())
+                         if v["method"] == "xbrl" and v["fiscal_period"] != "FY" and (v.get("locator") or {}).get("total")
+                         and abs(_days(v["period_end"], period_end)) <= 12), None)
         candidates = [v for v in self.values.values()
                       if v["group_key"] == group_key and v["fiscal_period"] in ("Q1", "Q2", "Q3", "Q4")
                       and v["validation_status"] != "rejected" and (v.get("locator") or {}).get("total")
@@ -1739,7 +1834,10 @@ class SymbolPipeline:
 
     def _earlier_values(self, before: date) -> dict[str, list[float]]:
         earlier: dict[str, list[float]] = {}
-        for value in self.values.values():
+        chained = getattr(self._local, "chained", False)
+        for value in list(self.values.values()):
+            if chained and not _same_chain(value["period_end"], before):
+                continue  # the other chains' quarters are compared after reading, in date order
             if value["method"] == "ai" and value["period_end"] < (before - timedelta(days=20)).isoformat():
                 key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
                 earlier.setdefault(key, []).append(float(value["value"]))
@@ -1748,6 +1846,8 @@ class SymbolPipeline:
     def _previous(self, before: date, annual: bool = False) -> dict[str, float]:
         """The latest verified value of each AI KPI in the period before, for jump checks: the quarter before a
         quarter, the year before a year (a year is never compared with a quarter)."""
+        if getattr(self._local, "chained", False) and not annual:
+            return {}  # quarters read in chains are compared with the quarter before after reading (_check_read_series)
         window_start = (before - timedelta(days=400 if annual else 120)).isoformat()
         latest: dict[str, dict] = {}
         for value in self.values.values():
@@ -1940,6 +2040,15 @@ def _year_ago_cells(document: Document, locator: dict, value: float) -> list[flo
 
 
 _NO_XBRL = {"version": 1, "parts": {}}
+
+
+def _chain_of(day: date) -> int:
+    """Which reading chain a quarter belongs to: quarters ending in the same months of the year share one."""
+    return day.month % 12 // 3
+
+
+def _same_chain(period_end: str, day: date) -> bool:
+    return _chain_of(date.fromisoformat(period_end[:10])) == _chain_of(day)
 
 
 def _folder(ref: FilingRef) -> str:

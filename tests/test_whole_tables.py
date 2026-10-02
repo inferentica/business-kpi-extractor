@@ -272,3 +272,28 @@ def test_a_total_row_is_never_a_part_even_with_a_negative_part_inside_it():
     values = {item.kpi.label: item.value for item in read if not item.is_total}
     assert values["Securities Services"] == 1_064e6 and "Total Markets & Securities Services" not in values
     assert abs(sum(values.values()) - 11_534e6) < 1
+
+
+def test_a_mixs_named_total_row_is_its_check_not_a_share():
+    from kpi_extractor.extract import ReadValue
+    spec = Spec.model_validate({"groups": [{"key": "tech", "label": "Revenue by Technology", "kind": "mix", "total_kpi": "total", "kpis": [
+        {"key": "n3", "label": "3nm", "unit": "percent"}, {"key": "n5", "label": "5nm", "unit": "percent"},
+        {"key": "total", "label": "Total", "unit": "percent"}]}]})
+    group = spec.groups[0]
+    items = [ReadValue(group, group.kpis[0], 30.0, None, {}, []), ReadValue(group, group.kpis[1], 70.0, None, {}, []),
+             ReadValue(group, group.kpis[2], 100.0, None, {}, [])]
+    validate_groups(items, {})
+    assert all(item.status == "verified" for item in items)
+
+
+def test_small_counts_jump_by_how_far_they_move_not_by_ratio():
+    from kpi_extractor.extract import ReadValue
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Ops", "kind": "metric",
+                                            "kpis": [{"key": "used", "label": "Used systems sold", "unit": "count"}]}]})
+    group = spec.groups[0]
+    item = ReadValue(group, group.kpis[0], 10.0, None, {}, [])
+    validate_groups([item], {"ops.used": 3.0})
+    assert item.status == "verified"  # 3 to 10 is a small count moving by 7
+    big = ReadValue(group, group.kpis[0], 45.0, None, {}, [])
+    validate_groups([big], {"ops.used": 3.0})
+    assert big.status == "needs_review"
