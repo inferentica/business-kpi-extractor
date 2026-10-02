@@ -25,6 +25,10 @@ _NEUTRAL_MEMBERS = {("ConsolidationItemsAxis", "OperatingSegmentsMember")}
 # revenue only with the eliminations, tagged on the consolidation axis alone; they are kept as one row.
 _ELIMINATIONS = "us-gaap:IntersegmentEliminationMember"
 _SEGMENT_AXES = {"StatementBusinessSegmentsAxis", "SegmentsAxis"}
+# Revenue the company reports outside every split (Alphabet's hedging gains and losses): found when two splits agree on
+# a sum just short of revenue, and kept as one row so the split adds up to revenue exactly.
+_UNALLOCATED = "unallocated"
+MAX_UNALLOCATED = 0.02
 # Default titles; each company's KPI list can rename them in its own terms (e.g. "Revenue by Market Platform").
 _STANDARD_AXES = {
     "StatementBusinessSegmentsAxis": ("segments", "Revenue by Segment", 0),
@@ -242,6 +246,37 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
 
     best_by_axis = {axis: max(options, key=lambda option, axis=axis: score(option, axis)) for axis, options in candidates.items()}
 
+    def leaf_sum(axis: str, concept: str, members: dict[str, float]) -> float:
+        total = total_for(concept)
+        return sum(drop_overlaps(remove_subtotals(reconciled(axis, concept, members), total), total).values())
+
+    sums_by_concept: dict[str, list[float]] = {}
+    for axis, (concept, members) in best_by_axis.items():
+        if len(members) >= 2 and total_for(concept):
+            sums_by_concept.setdefault(concept, []).append(leaf_sum(axis, concept, members))
+
+    def unallocated(axis: str, concept: str, members: dict[str, float]) -> float | None:
+        """Revenue outside the split, when the split falls short and another split of the same figure agrees."""
+        total = total_for(concept)
+        if concept in totals or not total:
+            return None  # a concept with its own total is reconciled to it, gap or not
+        own = leaf_sum(axis, concept, members)
+        gap = total - own
+        if abs(gap) <= abs(total) * MAX_RECONCILIATION_ERROR or abs(gap) > abs(total) * MAX_UNALLOCATED:
+            return None
+        agreeing = [other for other in sums_by_concept.get(concept, []) if abs(other - own) <= abs(own) * 1e-5]
+        return gap if len(agreeing) >= 2 else None  # itself and at least one other split
+
+    def frame_total(source: pd.DataFrame, concept: str) -> float | None:
+        if not dimension_columns:
+            return None
+        plain = source[source[dimension_columns].isna().all(axis=1)]
+        for name in (concept, *REVENUE_CONCEPTS):
+            values = plain[plain["concept"] == name]["numeric_value"]
+            if len(values):
+                return float(values.iloc[0])
+        return None
+
     groups: list[XbrlGroup] = []
     rejected: list[XbrlCandidate] = []
     for axis, (concept, members) in best_by_axis.items():
@@ -260,20 +295,27 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             for member, value in sorted(rows.items(), key=lambda item: -item[1]):
                 if value == 0 and member != _ELIMINATIONS:
                     continue  # a row of nothing (Broadcom's 2019 "Intercompany revenue") is not a part of revenue
-                name = "Eliminations" if member == _ELIMINATIONS else label(member) or labels.get(member) or humanize(member)
+                name = {_ELIMINATIONS: "Eliminations", _UNALLOCATED: "Unallocated"}.get(member) \
+                    or label(member) or labels.get(member) or humanize(member)
                 out.append((member_key(name), name, value))
             return out
 
         def elements(rows: dict[str, float]) -> dict[str, str]:
             return {member_key(label(member) or labels.get(member) or humanize(member)): member for member in rows}
 
+        outside = unallocated(axis, concept, members)
         members = reconciled(axis, concept, members)
         eliminated = _ELIMINATIONS in members
+        if outside is not None:
+            leaf_members = set(drop_overlaps(remove_subtotals(members, total), total))
+            members = {**members, _UNALLOCATED: outside}
 
         def frame_members(source: pd.DataFrame) -> dict[str, float]:
             rows = _single_axis_members(source, concept, axis, dimension_columns)
             if eliminated and rows and (removed := _eliminations_in(source, concept, dimension_columns)) is not None:
                 rows[_ELIMINATIONS] = removed
+            if outside is not None and rows and (whole := frame_total(source, concept)) is not None:
+                rows[_UNALLOCATED] = whole - sum(value for member, value in rows.items() if member in leaf_members)
             return rows
 
         fine, coarse = _two_partitions(members, total)
@@ -284,11 +326,15 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         ytd_totals = ytd_frame[(ytd_frame["concept"] == concept)
                                & ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] if dimension_columns else []
         ytd_total = float(ytd_totals.iloc[0]) if len(ytd_totals) else None
+        if outside is not None:
+            ytd_total = frame_total(ytd_frame, concept)
         prior_ytd = _by_key(named(frame_members(prior_ytd_frame)))
         prior_ytd_totals = prior_ytd_frame[(prior_ytd_frame["concept"] == concept)
                                            & prior_ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] \
             if dimension_columns else []
         prior_ytd_total = float(prior_ytd_totals.iloc[0]) if len(prior_ytd_totals) else None
+        if outside is not None:
+            prior_ytd_total = frame_total(prior_ytd_frame, concept)
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
             # Products against services (Amazon, Microsoft) is a view of its own beside the product lines, not a
             # coarser version of them: both are published, so neither depends on the AI listing it.

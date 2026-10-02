@@ -146,3 +146,19 @@ def test_segments_reported_before_eliminations_add_up_with_them():
     ])
     group = extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups[0]
     assert {key: value for key, _label, value in group.members} == {"insurance": 70.0, "services": 50.0, "eliminations": -20.0}
+
+
+def test_revenue_outside_every_split_is_kept_as_one_row_when_two_splits_agree():
+    contract = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+    segment, region = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_StatementGeographicalAxis"
+    facts = pd.DataFrame([
+        _fact("us-gaap:Revenues", 99.0),  # hedging losses of 1 are in revenue but in no split
+        _fact(contract, 70.0, "x:ServicesMember", axis=segment), _fact(contract, 30.0, "x:CloudMember", axis=segment),
+        _fact(contract, 60.0, "country:US", axis=region), _fact(contract, 40.0, "x:EmeaMember", axis=region),
+    ])
+    groups = {g.key: g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
+    assert {k: v for k, _n, v in groups["segments"].members} == {"services": 70.0, "cloud": 30.0, "unallocated": -1.0}
+    assert groups["geography"].reconciliation_error == 0
+    lone = pd.DataFrame([_fact("us-gaap:Revenues", 99.0), _fact(contract, 70.0, "x:ServicesMember", axis=segment),
+                         _fact(contract, 30.0, "x:CloudMember", axis=segment)])
+    assert extract_breakdowns(lone, {"document_period_end_date": "2026-06-30"}, "10-Q").groups == []  # nothing agrees
