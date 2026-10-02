@@ -38,7 +38,11 @@ _STANDARD_AXES = {
 # Axes that slice revenue by something other than the business (legal entity, scenario, ranges, eliminations).
 _IGNORED_AXES = {"ConsolidationItemsAxis", "LegalEntityAxis", "RangeAxis", "StatementScenarioAxis", "RestatementAxis",
                  "RetrospectiveAdjustmentsAxis", "ReclassificationOutOfAccumulatedOtherComprehensiveIncomeAxis",
-                 "SubsegmentsConsolidationItemsAxis", "IncomeStatementLocationAxis", "StatementEquityComponentsAxis"}
+                 "SubsegmentsConsolidationItemsAxis", "IncomeStatementLocationAxis", "StatementEquityComponentsAxis",
+                 # An accounting change's restatement (Broadcom's 2019 Topic 606 columns) and a debt guarantee's
+                 # parent-and-subsidiary columns split revenue by bookkeeping, not by business.
+                 "AdjustmentsForNewAccountingPronouncementsAxis", "CumulativeEffectPeriodOfAdoptionAxis",
+                 "ConsolidatedEntitiesAxis"}
 # XBRL amounts are exact to the reporting unit, so a true breakdown adds up to within rounding; a partial one (e.g.
 # advertising + other revenue, which leaves out a segment) misses by more.
 MAX_RECONCILIATION_ERROR = 0.001
@@ -254,6 +258,8 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         def named(rows: dict[str, float]) -> list[tuple[str, str, float]]:
             out = []
             for member, value in sorted(rows.items(), key=lambda item: -item[1]):
+                if value == 0 and member != _ELIMINATIONS:
+                    continue  # a row of nothing (Broadcom's 2019 "Intercompany revenue") is not a part of revenue
                 name = "Eliminations" if member == _ELIMINATIONS else label(member) or labels.get(member) or humanize(member)
                 out.append((member_key(name), name, value))
             return out

@@ -641,3 +641,32 @@ def test_reports_reach_ten_years_while_releases_keep_the_runs_window():
     assert pipeline.since.year == 2021 and pipeline.reports_since.year == 2016
     assert SymbolPipeline(FakeControl({}), "NVDA", quarters=6, force=False, today=date(2026, 10, 2),
                           log=lambda *_: None).reports_since == date(2026, 10, 2) - __import__("datetime").timedelta(days=92 * 6 + 120)
+
+
+def test_an_early_custom_axis_joins_the_standard_group_it_became():
+    def row(group, key, year, period, end, value):
+        return {"group_key": group, "kpi_key": key, "kpi_label": key, "fiscal_year": year, "fiscal_period": period,
+                "period_end": end, "method": "xbrl", "validation_status": "verified", "value": value,
+                "group_label": "Revenue by Product" if group == "products" else "Revenue by Major Market",
+                "group_kind": "revenue_breakdown", "group_order": 1, "locator": {}}
+    old = [row("x_revenuebymajormarket", key, "2018", "Q1", "2017-04-30", value)
+           for key, value in (("gaming", 1027.0), ("datacenter", 409.0), ("automotive", 140.0))]
+    new = [row("products", key, "2019", "Q1", "2018-04-29", value)
+           for key, value in (("gaming", 1723.0), ("datacenter", 701.0), ("automotive", 145.0), ("oemandip", 387.0))]
+    pipeline = _pipeline(FakeControl({}), old + new)
+    pipeline._join_custom_axes()
+    joined = {k for (g, k, y, p), v in pipeline.values.items() if g == "products" and y == "2018" and v["validation_status"] == "verified"}
+    assert joined == {"gaming", "datacenter", "automotive"}
+    assert all(v["validation_status"] == "rejected" for (g, *_), v in pipeline.values.items() if g == "x_revenuebymajormarket")
+
+
+def test_a_report_read_by_an_older_xbrl_reader_is_read_again():
+    from kpi_extractor.pipeline import _XBRL_READER
+    pipeline = _pipeline(FakeControl({}))
+    ref = SimpleNamespace(accession="a", role="periodic_report")
+    pipeline.filings = {"a": {"status": "processed", "attempts": 1, "notes": []}}
+    assert pipeline._pending(ref)
+    pipeline.filings = {"a": {"status": "processed", "attempts": 1, "notes": [_XBRL_READER]}}
+    assert not pipeline._pending(ref)
+    pipeline.filings = {"a": {"status": "processed", "attempts": 1, "notes": []}}
+    assert not pipeline._pending(SimpleNamespace(accession="a", role="earnings_release"))

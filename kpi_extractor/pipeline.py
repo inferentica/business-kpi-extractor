@@ -46,6 +46,9 @@ MAX_YEAR_RATIO = 3.0
 LOCK_WAITS, LOCK_WAIT_SECONDS = 20, 30
 _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
+# Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
+# so a fix to the XBRL reader reaches the whole history.
+_XBRL_READER = "xbrl reader 2"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -186,6 +189,7 @@ class SymbolPipeline:
         self._recheck_flagged()
         self._anchor_ai_breakdowns()
         self._prove_flagged(releases)
+        self._join_custom_axes()
         self._unify_series()
         self._fix_mislabelled_quarters()
         self._derive()
@@ -208,7 +212,8 @@ class SymbolPipeline:
     def _pending(self, ref: FilingRef) -> bool:
         """Whether a filing still has to be read (a spec change can still re-read a finished release)."""
         previous = self.filings.get(ref.accession)
-        return not previous or (previous["status"] not in _DONE and previous.get("attempts", 0) < _MAX_ATTEMPTS)
+        return not previous or (previous["status"] not in _DONE and previous.get("attempts", 0) < _MAX_ATTEMPTS) or (
+            ref.role == "periodic_report" and _XBRL_READER not in (previous.get("notes") or []))
 
     def _xbrl(self, ref: FilingRef):
         if ref.accession not in self._xbrl_cache:
@@ -258,8 +263,7 @@ class SymbolPipeline:
         return 0
 
     def _process_report(self, ref: FilingRef) -> None:
-        previous = self.filings.get(ref.accession)
-        if not self.force and previous and (previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS):
+        if not self.force and not self._pending(ref):
             return
         try:
             xbrl = self._xbrl(ref)
@@ -320,7 +324,8 @@ class SymbolPipeline:
                         },
                     ))
             status = "failed" if ai_pending else "processed" if records else "skipped"
-            notes = [_AI_PENDING] if ai_pending else [] if records else ["no revenue breakdown reconciles to reported revenue"]
+            notes = [_XBRL_READER, *([_AI_PENDING] if ai_pending else [] if records
+                                     else ["no revenue breakdown reconciles to reported revenue"])]
             self._store_filing(ref, status, records=records, period_end=breakdowns.period_end,
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
@@ -931,6 +936,39 @@ class SymbolPipeline:
                 continue
             moved.append({**v, "kpi_key": kpi.key, "kpi_label": kpi.label})
             moved.append({**v, "validation_status": "rejected", "notes": [f"continued as {kpi.key}"]})
+        for start in range(0, len(moved), 400):
+            self._store(values=moved[start:start + 400])
+
+    def _join_custom_axes(self) -> None:
+        """A company's own early axis continued by a standard one (Nvidia's 2016–18 "Revenue by Major Market" became its
+        Revenue by Product): its periods join the standard group when most of its rows are rows of that group and every
+        period the two share holds the same figures. No AI involved."""
+        groups: dict[str, list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "xbrl" and v["validation_status"] != "rejected":
+                groups.setdefault(v["group_key"], []).append(v)
+        standard = {key: rows for key, rows in groups.items() if not key.startswith(("x_", AI_GROUP_PREFIX))}
+        moved = []
+        for key, rows in groups.items():
+            if not key.startswith("x_"):
+                continue
+            own = {v["kpi_key"] for v in rows}
+            shared, target = max(((len(own & {v["kpi_key"] for v in other}), name) for name, other in standard.items()),
+                                 default=(0, None))
+            if target is None or shared < 2 or shared * 2 < len(own):
+                continue
+            theirs = {(v["fiscal_year"], v["fiscal_period"], v["kpi_key"]): float(v["value"]) for v in standard[target]}
+            both = {(v["fiscal_year"], v["fiscal_period"]) for v in standard[target]}
+            if any((v["fiscal_year"], v["fiscal_period"]) in both
+                   and not _same(theirs.get((v["fiscal_year"], v["fiscal_period"], v["kpi_key"]), float("nan")), float(v["value"]))
+                   for v in rows):
+                continue  # a shared period read differently: two views after all
+            latest = max(standard[target], key=lambda v: v["period_end"])
+            for v in rows:
+                if (v["fiscal_year"], v["fiscal_period"]) not in both:
+                    moved.append({**v, "group_key": target, "group_label": latest["group_label"],
+                                  "group_order": latest["group_order"]})
+                moved.append({**v, "validation_status": "rejected", "notes": [f"continued as {target}"]})
         for start in range(0, len(moved), 400):
             self._store(values=moved[start:start + 400])
 
