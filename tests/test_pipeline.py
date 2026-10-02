@@ -835,7 +835,7 @@ def test_the_cap_never_drops_a_breakdown():
     spec = normalize_spec(Spec.model_validate({"groups": [breakdown("nodes", 12), breakdown("platforms", 7), metrics,
                                                           breakdown("geography", 5)]}))
     assert [g.key for g in spec.groups] == ["nodes", "platforms", "operating", "geography"]
-    assert len(spec.groups[2].kpis) == 4
+    assert len(spec.groups[2].kpis) == 8  # fewer than the kept minimum: none trimmed
 
 
 def test_a_jump_alone_never_settles_a_dispute():

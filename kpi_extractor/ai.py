@@ -23,7 +23,7 @@ MAX_KPIS_PER_GROUP = 16
 # A focused list: every KPI is read, and possibly disputed, every quarter. The proposal is asked for at most six
 # groups; the code keeps any list to this many KPIs (see normalize_spec).
 MAX_LISTED_KPIS = 24
-MIN_KEPT_METRICS = 4
+MIN_KEPT_METRICS = 10
 
 SYSTEM = """You analyse SEC filings for a financial data pipeline. You never write a number that will be stored: you \
 point to where a value is (a table cell, or an exact quote with the number as written) or you choose among options \

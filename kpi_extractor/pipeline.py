@@ -713,8 +713,8 @@ class SymbolPipeline:
             value = self.values.get(key)
             if value and value.get("source_accession") in by_accession:
                 jumps.setdefault(value["source_accession"], []).append(value)
-        cleared = []
-        for accession, rows in jumps.items():
+        def explain(item: tuple[str, list[dict]]):
+            accession, rows = item
             try:
                 document = self._document(by_accession[accession])
                 lines = "\n".join(
@@ -722,7 +722,15 @@ class SymbolPipeline:
                     f"now {float(v['value']):g}; {'; '.join(n for n in v.get('notes') or [] if _is_jump(n))}" for v in rows)
                 answer = self._ask(ai.prompt(self.company, self._prompt_document(document, None), ai.EXPLAIN_TASK, lines),
                                    "explain", ai.Explanations, thinking_first=True, model="pro")
+                return rows, document, answer
             except Exception:  # noqa: BLE001 - unexplained, they stay flagged
+                return rows, None, None
+
+        cleared = []
+        with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:  # one Pro call per release, side by side
+            answers = list(pool.map(explain, jumps.items()))
+        for rows, document, answer in answers:
+            if answer is None:
                 continue
             haystack = _document_text(document)
             for v in rows:
@@ -1653,6 +1661,16 @@ class SymbolPipeline:
                                          "notes": [*(v.get("notes") or []), "contradicted by the next year's release"]}
             else:
                 settled[value_key(v)] = {**v, "notes": [*(v.get("notes") or []), checked]}
+        # A breakdown or mix is proven whole or not at all: a part confirmed on its own, beside parts still flagged, stays
+        # flagged with them (its confirmation note kept for when the rest is settled).
+        for key, row in list(settled.items()):
+            if row["validation_status"] != "verified" or row["group_kind"] == "metric":
+                continue
+            siblings = [v for v in self.values.values() if v["group_key"] == row["group_key"]
+                        and v["fiscal_year"] == row["fiscal_year"] and v["fiscal_period"] == row["fiscal_period"]
+                        and v["method"] == "ai" and v["validation_status"] != "rejected"]
+            if any((settled.get(value_key(v)) or v)["validation_status"] != "verified" for v in siblings):
+                settled[key] = {**row, "validation_status": "needs_review"}
         changed = list(settled.values())
         for start in range(0, len(changed), 400):
             self._store(values=changed[start:start + 400])
