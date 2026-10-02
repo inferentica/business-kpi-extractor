@@ -520,9 +520,9 @@ class SymbolPipeline:
             document = self._document(ref)
             period_hint = f"quarter ended about {expected} (fiscal {fiscal_period} {fiscal_year})"
 
-            def text() -> str:  # built only when the AI reads, so a replayed quarter costs no selection call
+            def text(subset: Spec | None = None) -> str:  # built only when the AI reads: a replayed quarter costs none
                 return ai.prompt(self.company, self._prompt_document(document, spec), ai.LOCATE_TASK,
-                                 ai.locate_data(period_hint, spec, self._hints(expected)))
+                                 ai.locate_data(period_hint, subset or spec, self._hints(expected)))
 
             read, problems, located = self._read(text, document, spec, expected, version)
             how = _READ_BY_REPLAY if self._replayed else _READ_BY_AI
@@ -616,20 +616,32 @@ class SymbolPipeline:
             self._replayed = True
             self.result.replayed_reads += 1
             return replayed[0], [], replayed[1]
-        text = text() if callable(text) else text
-        flash, flash_read, flash_problems = self._locate(text, document, spec, currency, model="flash", thinking_first=False)
+        build = text if callable(text) else (lambda subset=None: text)
+        full_text = build()
+        flash, flash_read, flash_problems = self._locate(full_text, document, spec, currency, model="flash", thinking_first=False)
         if self._flash_is_enough(flash, flash_read, spec, expected, document) or (
                 not flash.tables and not flash.values and self._kind_reports_nothing(document, expected, version)):
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
+        # Groups Flash's reading confirms on their own stand; Pro reads only the rest of the list.
+        confirmed = self._confirmed_groups(flash, flash_read, spec, expected, document)
+        open_groups = [group for group in spec.groups if group.key not in confirmed]
+        kept = [item for item in flash_read if item.group.key in confirmed]
+        if not open_groups:
+            self.result.flash_only_reads += 1
+            return flash_read, [f"flash {problem}" for problem in flash_problems], flash
+        subset = spec if not confirmed else Spec.model_validate({"groups": [g.model_dump() for g in open_groups],
+                                                                 "names": {}})
         self.result.pro_reads += 1
         # The second reader: Pro, or Flash reasoning first when the evaluation compares them (KPI_SECOND_READER).
         flash_second = os.environ.get("KPI_SECOND_READER") == "flash-thinking"
-        pro, pro_read, pro_problems = self._locate(text, document, spec, currency, model="flash" if flash_second else "pro",
+        pro, pro_read, pro_problems = self._locate(full_text if subset is spec else build(subset), document, subset,
+                                                   currency, model="flash" if flash_second else "pro",
                                                    thinking_first=flash_second)
-        by_flash = {f"{item.group.key}.{item.kpi.key}": item for item in flash_read}
+        open_keys = {group.key for group in open_groups}
+        by_flash = {f"{item.group.key}.{item.kpi.key}": item for item in flash_read if item.group.key in open_keys}
         by_pro = {f"{item.group.key}.{item.kpi.key}": item for item in pro_read}
-        agreed: list[ReadValue] = []
+        agreed: list[ReadValue] = list(kept)
         disputed: dict[str, tuple[ReadValue | None, ReadValue | None]] = {}
         for key in [*by_flash, *[key for key in by_pro if key not in by_flash]]:
             a, b = by_flash.get(key), by_pro.get(key)
@@ -638,11 +650,15 @@ class SymbolPipeline:
             else:
                 disputed[key] = (a, b)
         problems = [f"flash {problem}" for problem in flash_problems] + [f"pro {problem}" for problem in pro_problems]
+        self._settle_by_checks(agreed, disputed, expected)
         if disputed:
             lines = [f"- {key}: A = {describe(document, a) if a else 'not reported'}; "
                      f"B = {describe(document, b) if b else 'not reported'}" for key, (a, b) in disputed.items()]
-            review = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.REVIEW_TASK,
-                                         "Disputed KPIs:\n" + "\n".join(lines)),
+            # Pro reviews only the tables and passages the two readings point to, with the opening for the period.
+            pointed = {str(item.locator.get("table") or item.locator.get("block")) for pair in disputed.values()
+                       for item in pair if item}
+            review = self._ask(ai.prompt(self.company, document.render_ids(pointed, MAX_DOCUMENT_CHARS, opening=3),
+                                         ai.REVIEW_TASK, "Disputed KPIs:\n" + "\n".join(lines)),
                                "review", ai.Review, thinking_first=True, model="pro")
             for key, (a, b) in disputed.items():
                 chosen = {"A": a, "B": b}.get(review.choices.get(key, "none"))
@@ -653,6 +669,61 @@ class SymbolPipeline:
                 agreed.append(chosen)
         located = flash if flash.period_end else pro
         return agreed, problems, located
+
+    def _confirmed_groups(self, located: Located, read: list[ReadValue], spec: Spec, expected: date,
+                          document: Document) -> set[str]:
+        """Groups a single reading settles on its own: the reading's period holds, the group passes every check, no value
+        repeats an earlier period's number, nothing found last quarter is missing, and each value is where it was last
+        quarter or matches the year-ago figure in its own row. None when the reading's period itself is in doubt."""
+        if check_period(located, expected) or located.annual or self._reports_full_year(read, expected):
+            return set()
+        earlier = self._earlier_values(expected)
+        last = self._last_locators(expected, _source_template(document.source_url))
+        target = (expected - timedelta(days=365)).isoformat()
+        stored = {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
+                  for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
+                  and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
+        confirmed = set()
+        for group in spec.groups:
+            items = [item for item in read if item.group.key == group.key]
+            parts = [item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]
+            if not parts:
+                continue
+            keys = {f"{item.group.key}.{item.kpi.key}" for item in items}
+            if any(key.split(".", 1)[0] == group.key and key not in keys for key in last):
+                continue  # something this group had last quarter is missing now
+            if any(item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in
+                   earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
+                continue
+            trial = copy.deepcopy(items)
+            validate_groups(trial, self._previous(expected))
+            if not all(item.status == "verified" for item in trial):
+                continue
+            if all(self._same_place_as_last(item, expected, document)
+                   or self._year_ago_cell_matches(item, document, stored.get(f"{group.key}.{item.kpi.key}")) for item in parts):
+                confirmed.add(group.key)
+        return confirmed
+
+    def _settle_by_checks(self, agreed: list[ReadValue], disputed: dict[str, tuple], expected: date) -> None:
+        """Two readings that found the same KPIs of a group but disagree on numbers: when exactly one of them passes the
+        group's checks (it adds up, nothing jumps against last quarter), that one stands without a Pro review."""
+        groups = {key.split(".", 1)[0] for key in disputed}
+        for group in groups:
+            pairs = {key: pair for key, pair in disputed.items() if key.split(".", 1)[0] == group}
+            if not all(a and b for a, b in pairs.values()):
+                continue  # one reading found a KPI the other did not: that is for the review
+            base = [item for item in agreed if item.group.key == group]
+            passes = []
+            for side in (0, 1):
+                trial = copy.deepcopy(base + [pair[side] for pair in pairs.values()])
+                validate_groups(trial, self._previous(expected))
+                passes.append(all(item.status == "verified" for item in trial))
+            if passes[0] != passes[1]:
+                winner = 0 if passes[0] else 1
+                for key, pair in pairs.items():
+                    pair[winner].notes.append("settled by the checks")
+                    agreed.append(pair[winner])
+                    del disputed[key]
 
     def _locate(self, text: str, document: Document, spec: Spec, currency: str | None, model: str, thinking_first: bool):
         """One reader's answer read back by code, with one retry when its pointers do not hold (a text block cited as a
@@ -813,6 +884,8 @@ class SymbolPipeline:
             return self._prompt_documents[key]
         if document.fits(MAX_DOCUMENT_CHARS):
             text = document.render()
+        elif spec is not None and (found := self._sections_with_every_kpi(document, spec)):
+            text = document.render_ids(found, MAX_DOCUMENT_CHARS)  # code found every KPI: no selection call
         else:
             wanted = ai.kpi_lines(spec) if spec else "(no list yet: revenue breakdowns and operating metrics)"
             try:
@@ -824,6 +897,28 @@ class SymbolPipeline:
             text = document.render_ids(ids, MAX_DOCUMENT_CHARS) if ids else document.render_for_prompt(MAX_DOCUMENT_CHARS)
         self._prompt_documents[key] = text
         return text
+
+    def _sections_with_every_kpi(self, document: Document, spec: Spec) -> set[str] | None:
+        """The tables and passages naming each listed KPI (by its label, or the row label it had last quarter), when
+        every KPI is found and together they fit; None sends the choice to Flash."""
+        hints = {key: (value.get("locator") or {}).get("row_label") for key, value in self._ai_history(date.max).items()}
+        found: set[str] = set()
+        for group in spec.groups:
+            for kpi in group.kpis:
+                if kpi.key == group.total_kpi:
+                    continue
+                names = {_identity_text(kpi.label)} | ({_identity_text(hints[f"{group.key}.{kpi.key}"])}
+                                                       if hints.get(f"{group.key}.{kpi.key}") else set())
+                names.discard("")
+                hits = {key for key, table in document.tables.items()
+                        if any(_identity_text(row[0]) in names for row in table.rows if row)}
+                hits |= {key for key, block in document.blocks.items()
+                         if any(name and name in _identity_text(block.text) for name in names if len(name) >= 8)}
+                if not hits:
+                    return None
+                found |= hits
+        rendered = sum(len((document.tables.get(key) or document.blocks[key]).render()) for key in found)
+        return found if rendered <= MAX_DOCUMENT_CHARS * 0.9 else None
 
     def _document(self, *refs: FilingRef) -> Document:
         """The exhibits of one or more filings as one document; each exhibit's ids carry their own letter prefix."""
@@ -1700,6 +1795,10 @@ def _period_headed(document: Document, locator: dict) -> bool:
 
 
 _PERIOD_HEADER = re.compile(r"months?|weeks?|quarter|year|\bq[1-4]\b|\bfy\b|@", re.I)
+
+
+def _identity_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (text or "").lower())
 
 
 def _proven(value: dict) -> bool:

@@ -84,7 +84,7 @@ def test_flash_alone_when_everything_is_where_it_was_last_quarter():
     assert pipeline.result.flash_only_reads == 1
 
 
-def test_a_reading_in_a_new_place_brings_in_pro_and_a_review():
+def test_a_reading_in_a_new_place_brings_in_pro_and_the_checks_settle_it():
     document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
     control = FakeControl({
         ("locate", "flash"): _answer(document, "3-nanometer accounted for 20%", "20%"),
@@ -95,8 +95,9 @@ def test_a_reading_in_a_new_place_brings_in_pro_and_a_review():
     history[0]["locator"] = {"block": "P9", "quote": "Leading-edge 3-nanometer share: 29%", "value_text": "29%"}
     read, _, _ = _pipeline(control, history)._read("prompt", document, SPEC, EXPECTED)
     values = {item.kpi.key: item for item in read}
-    assert values["n3"].value == 30 and "confirmed by review" in values["n3"].notes
-    assert ("review", "pro") in control.calls
+    # Flash's 20% (the year-ago share) leaves the mix at 90%; Pro's 30% makes it whole: no review needed.
+    assert values["n3"].value == 30 and "settled by the checks" in values["n3"].notes
+    assert ("review", "pro") not in control.calls
 
 
 def test_review_rejecting_both_readings_drops_the_kpi():
@@ -749,3 +750,32 @@ def test_an_overlong_kpi_key_is_repaired_instead_of_discarding_the_list():
     assert KpiSpec(key="global_corporate_banking_global_investment_banking", label="x", unit="currency").key == \
         "global_corporate_banking_global_investment_banki"
     assert KpiSpec(key="3nm Share", label="x", unit="percent").key == "k_3nm_share"
+
+
+def test_a_group_confirmed_on_its_own_stands_and_pro_reads_only_the_rest():
+    html = RELEASE + "<p>Employees at quarter end: 76,000.</p>"
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    spec = Spec.model_validate({"groups": [SPEC.groups[0].model_dump(), {"key": "ops", "label": "Operating", "kind": "metric",
+                                "kpis": [{"key": "headcount", "label": "Employees", "unit": "count"}]}]})
+    block = next(key for key, item in document.blocks.items() if "Employees" in item.text)
+    headcount = {"kpi": "ops.headcount", "block": block, "quote": "Employees at quarter end: 76,000", "value_text": "76,000"}
+    flash = {**_answer(document), "values": _answer(document)["values"] + [headcount]}
+    control = FakeControl({("locate", "flash"): flash,
+                           ("locate", "pro"): {"period_end": "2026-06-30", "values": [headcount]}})
+    history = _history(document, _answer(document))  # the mix was found here last quarter; headcount is new
+    read, _, _ = _pipeline(control, history)._read(lambda subset=None: "prompt", document, spec, EXPECTED)
+    assert {item.kpi.key for item in read} == {"n3", "n5", "other", "headcount"}
+    assert ("locate", "pro") in control.calls and ("review", "pro") not in control.calls
+
+
+def test_code_finds_the_sections_naming_every_kpi():
+    html = """<table><tr><td>Data Center</td><td>4,100</td></tr><tr><td>Gaming</td><td>2,900</td></tr></table>
+      <table><tr><td>Total assets</td><td>99,000</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    spec = Spec.model_validate({"groups": [{"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown", "kpis": [
+        {"key": "datacenter", "label": "Data Center", "unit": "currency"}, {"key": "gaming", "label": "Gaming", "unit": "currency"}]}]})
+    pipeline = _pipeline(FakeControl({}))
+    assert pipeline._sections_with_every_kpi(document, spec) == {next(iter(document.tables))}
+    missing = Spec.model_validate({"groups": [{"key": "ops", "label": "Ops", "kind": "metric", "kpis": [
+        {"key": "dap", "label": "Daily Active People", "unit": "count"}]}]})
+    assert pipeline._sections_with_every_kpi(document, missing) is None
