@@ -606,9 +606,11 @@ def _flagged_fixture(html, flagged):
 def test_the_next_years_release_confirms_or_restates_a_flagged_value():
     html = """<table><tr><td></td><td>Three Months Ended June 30, 2026</td><td>Three Months Ended June 30, 2025</td></tr>
       <tr><td>Client</td><td>3,062</td><td>2,499</td></tr><tr><td>Gaming</td><td>779</td><td>1,122</td></tr></table>"""
-    settled = _flagged_fixture(html, {"client": 2499.0, "gaming": 1000.0})
+    settled = _flagged_fixture(html, {"client": 2499.0, "gaming": 1100.0})
     assert settled["client"]["validation_status"] == "verified"
     assert settled["gaming"]["validation_status"] == "verified" and settled["gaming"]["value"] == 1122.0
+    # A figure far from the flagged one is another column (a year beside a quarter), not a restatement.
+    assert _flagged_fixture(html, {"client": 2499.0, "gaming": 500.0})["gaming"]["validation_status"] == "needs_review"
 
 
 def test_a_flagged_value_no_column_of_the_next_years_release_shows_is_rejected():

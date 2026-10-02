@@ -55,6 +55,8 @@ _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
 _CONFIRMED_LATER = "confirmed by the next year's release"
 _RESTATED_LATER = "restated in the next year's release"
 _PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER)
+# Restatements move a figure a little (a reclassification); a jump beyond this is a different column, not a restatement.
+MAX_RESTATEMENT = 0.10
 
 
 @dataclass
@@ -1124,6 +1126,16 @@ class SymbolPipeline:
             value = float(v["value"])
             if v["unit"] == "currency" and _significant(value) and reported(v, value, 1e-4) and whole(v):
                 settle(v, _EQUALS_XBRL)
+        # A restatement far from the figure it replaced was a column of another length (a year for a quarter): the
+        # figure is restored and goes back to review.
+        for v in self.values.values():
+            if v["method"] != "ai" or v["validation_status"] != "verified":
+                continue
+            note = next((n for n in v.get("notes") or [] if n.startswith(_RESTATED_LATER)), None)
+            match = re.search(r"\(was ([-\d.e+]+)\)", note or "")
+            if match and abs(float(v["value"]) - float(match.group(1))) > abs(float(match.group(1))) * MAX_RESTATEMENT:
+                settled[value_key(v)] = {**v, "value": float(match.group(1)), "validation_status": "needs_review",
+                                         "notes": [n for n in v.get("notes") or [] if n != note]}
         # Parts proven alone by an earlier version of this rule, in breakdowns that do not add up, go back to review.
         for rows in groups.values():
             if not whole(rows[0]):
@@ -1158,11 +1170,12 @@ class SymbolPipeline:
                 continue
             cells = _year_ago_cells(document, later["locator"], float(later["value"]))
             value = float(v["value"])
+            named = _period_headed(document, later["locator"])
             if any(abs(cell - value) <= max(abs(value) * 1e-4, 1e-9) for cell in cells):
                 settle(v, _CONFIRMED_LATER)
-            elif len(cells) == 1:
+            elif named and len(cells) == 1 and abs(cells[0] - value) <= abs(value) * MAX_RESTATEMENT:
                 settle(v, f"{_RESTATED_LATER} (was {value:g})", value=round(cells[0], 2))
-            elif cells:
+            elif named and len(cells) > 1:
                 settled[value_key(v)] = {**v, "validation_status": "rejected",
                                          "notes": [*(v.get("notes") or []), "contradicted by the next year's release"]}
             else:
@@ -1550,6 +1563,20 @@ _NO_XBRL = {"version": 1, "parts": {}}
 
 def _folder(ref: FilingRef) -> str:
     return filing_folder(ref.filed, ref.form, ref.accession)
+
+
+def _period_headed(document: Document, locator: dict) -> bool:
+    """Whether a value's column is headed by words naming its period ("three months ended", "Q4"), so the row's
+    other cells under the same words are the same length of period."""
+    table = document.tables.get(str(locator.get("table")))
+    if table is None or locator.get("col") is None:
+        return False
+    first = next((i for i, r in enumerate(table.rows) if r and any(parse_number(c) for c in r[1:])
+                  and re.search(r"[A-Za-z]", r[0])), 1)
+    return bool(_PERIOD_HEADER.search(column_header(table, first, int(locator["col"]))))
+
+
+_PERIOD_HEADER = re.compile(r"months?|weeks?|quarter|year|\bq[1-4]\b|\bfy\b|@", re.I)
 
 
 def _proven(value: dict) -> bool:
