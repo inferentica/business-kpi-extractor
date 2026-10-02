@@ -108,6 +108,7 @@ class SymbolPipeline:
         # of it only while it waits on the AI or a download (see _waiting).
         self._state = threading.Lock()
         self._local = threading.local()
+        self._dead: set[str] | None = None  # groups not read this run (see _readable)
         self.archive: Archive | None = None
         self._exhibits: dict[str, Future] = {}
         # Downloads and XBRL parsing start ahead of the filing being worked on.
@@ -567,7 +568,15 @@ class SymbolPipeline:
 
     def _readable(self, spec: Spec) -> Spec:
         """The list without groups that have never verified in at least eight quarters read (JPMorgan's income-statement
-        lines listed as a breakdown): reading them again would only flag them again, at a Pro read each quarter."""
+        lines listed as a breakdown): reading them again would only flag them again, at a Pro read each quarter. Decided
+        once per run (see _process_releases), before re-reading a filing could withdraw their history."""
+        dead = self._dead if self._dead is not None else self._never_verified()
+        if not dead or all(group.key in dead for group in spec.groups):
+            return spec
+        return Spec.model_validate({"groups": [g.model_dump() for g in spec.groups if g.key not in dead],
+                                    "names": spec.names})
+
+    def _never_verified(self) -> set[str]:
         periods: dict[str, set[tuple[str, str]]] = {}
         verified: set[str] = set()
         for v in self.values.values():
@@ -576,11 +585,7 @@ class SymbolPipeline:
                 periods.setdefault(group, set()).add((v["fiscal_year"], v["fiscal_period"]))
                 if v["validation_status"] == "verified":
                     verified.add(group)
-        dead = {group for group, seen in periods.items() if len(seen) >= DEAD_GROUP_QUARTERS and group not in verified}
-        if not dead or all(group.key in dead for group in spec.groups):
-            return spec
-        return Spec.model_validate({"groups": [g.model_dump() for g in spec.groups if g.key not in dead],
-                                    "names": spec.names})
+        return {group for group, seen in periods.items() if len(seen) >= DEAD_GROUP_QUARTERS and group not in verified}
 
     def _waiting(self, wait):
         """Lets other readers work while this one waits on the AI or a download, when it holds the state lock."""
@@ -599,6 +604,7 @@ class SymbolPipeline:
         filing this run is still to re-read are never a reference. Afterwards the quarters just read are checked against
         each other in date order, as reading them one by one would have."""
         before = {key for key, value in self.values.items() if value["method"] == "ai"}
+        self._dead = self._never_verified()
         pending = [ref for ref in refs if self.force or self._pending(ref) or
                    (self.filings.get(ref.accession) or {}).get("spec_version") != version]
         done: set[str] = set()
@@ -1802,6 +1808,8 @@ class SymbolPipeline:
                 for value in self.values.values()
                 if value["method"] == method and value.get("source_accession") == ref.accession
                 and value["validation_status"] != "rejected" and value_key(value) not in fresh
+                # A group not read this run keeps its rows (flagged, and so not served): they are why it is not read.
+                and value["group_key"].removeprefix(AI_GROUP_PREFIX) not in (self._dead or set())
             ]
         filing = {
             "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(), "document_role": ref.role,
