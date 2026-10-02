@@ -263,7 +263,8 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             return None
         own = leaf_sum(axis, concept, members)
         gap = total - own
-        if abs(gap) <= abs(total) * MAX_RECONCILIATION_ERROR or abs(gap) > abs(total) * MAX_UNALLOCATED:
+        # Recorded whatever its size, so every period of the series carries it and its quarters add up to its year.
+        if abs(gap) <= abs(total) * 1e-9 or abs(gap) > abs(total) * MAX_UNALLOCATED:
             return None
         agreeing = [other for other in sums_by_concept.get(concept, []) if abs(other - own) <= abs(own) * 1e-5]
         return gap if len(agreeing) >= 2 else None  # itself and at least one other split

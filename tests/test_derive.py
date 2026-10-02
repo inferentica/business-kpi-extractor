@@ -146,3 +146,17 @@ def test_a_q4_that_one_source_leaves_negative_is_derived_from_the_next():
     derived = {r["kpi_key"]: (round(r["value"], 1), r["validation_status"]) for r in derive_periods(year + third + later)
                if r["fiscal_period"] == "Q4" and r["fiscal_year"] == "2025"}
     assert derived == {"products": (12.8, "verified"), "services": (5.2, "verified")}
+
+
+def test_a_quarter_without_the_years_unallocated_row_counts_it_as_zero():
+    from kpi_extractor.derive import derive_periods
+    def row(period, key, value, end="2019-12-31", locator=None):
+        return {"group_key": "segments", "group_kind": "revenue_breakdown", "kpi_key": key, "kpi_label": key, "fiscal_year": "2019",
+                "fiscal_period": period, "period_end": end, "value": value, "method": "xbrl", "validation_status": "verified",
+                "locator": locator or {}, "notes": []}
+    values = [row("FY", "google", 160.0, locator={"total": 161.0}), row("FY", "otherbets", 0.6, locator={"total": 161.0}),
+              row("FY", "unallocated", 0.4, locator={"total": 161.0})]
+    for period, end in (("Q1", "2019-03-31"), ("Q2", "2019-06-30"), ("Q3", "2019-09-30")):
+        values += [row(period, "google", 36.0, end, {"total": 36.15}), row(period, "otherbets", 0.15, end, {"total": 36.15})]
+    q4 = {r["kpi_key"]: round(r["value"], 2) for r in derive_periods(values) if r["fiscal_period"] == "Q4"}
+    assert q4 == {"google": 52.0, "otherbets": 0.15, "unallocated": 0.4}

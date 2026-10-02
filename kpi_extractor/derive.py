@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 QUARTERS = ("Q1", "Q2", "Q3")
+# Rows that balance a split to revenue (intersegment eliminations, revenue outside every split). A period without one had
+# nothing to balance: the row is zero there, not a business that is missing.
+BALANCING = ("eliminations", "unallocated")
 
 
 def derive_periods(values: list[dict]) -> list[dict]:
@@ -89,6 +92,11 @@ def _align(annual: dict, quarter: dict) -> dict:
     - rows the year folds into "Other" (Nvidia's 10-K shows four regions, its 10-Qs six) are added to the quarter's
       "Other";
     - an immaterial row the year does not list (TSMC's 10nm, under 1% of the quarter) is left out."""
+    missing = [key for key in BALANCING if key in annual and key not in quarter]
+    if missing and quarter:
+        template = next(iter(quarter.values()))
+        quarter = {**quarter, **{key: {**template, "kpi_key": key, "kpi_label": annual[key]["kpi_label"], "value": 0.0}
+                                 for key in missing}}
     extra = [key for key in quarter if key not in annual]
     if not extra:
         return quarter
@@ -118,6 +126,9 @@ def _nine_months(annual: dict, third: dict | None, next_third: dict | None) -> t
         values = {key: value for key, value in values.items() if isinstance(value, (int, float))}
         totals = [(row.get("locator") or {}).get(total_field) for row in rows.values()]
         total = next((t for t in totals if isinstance(t, (int, float))), None)
+        missing = [key for key in BALANCING if key in annual and key not in values]
+        if total is not None and len(missing) == 1 and set(values) | set(missing) == set(annual):
+            values = {**values, missing[0]: float(total) - sum(values.values())}  # what the other rows leave over
         if total is not None and set(values) == set(annual):
             return values, float(total), rows
     return None
@@ -149,7 +160,8 @@ def _combine_year_to_date(annual: dict, nine: dict, nine_total: float, sources: 
     rows = []
     for key, year in annual.items():
         value = year["value"] - nine[key]
-        verified = year["validation_status"] == "verified" and sources[key]["validation_status"] == "verified"
+        source = sources.get(key) or next(iter(sources.values()))  # a balancing row the nine months left implicit
+        verified = year["validation_status"] == "verified" and source["validation_status"] == "verified"
         notes = [] if verified else ["derived from values that need review"]
         if value < 0 <= year["value"]:
             verified, notes = False, [*notes, "derived Q4 is negative"]

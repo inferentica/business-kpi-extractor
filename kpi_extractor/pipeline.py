@@ -48,7 +48,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 5"
+_XBRL_READER = "xbrl reader 6"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -1598,7 +1598,8 @@ def _year_ago_cells(document: Document, locator: dict, value: float) -> list[flo
     period = column_header(table, first, col)  # "three months ended @ # #": years blanked, duration kept
     cells = []
     for other in range(len(table.rows[row])):
-        cell = parse_number(table.cell(row, other)) if other != col else None
+        text = table.cell(row, other) or ""
+        cell = parse_number(text) if other != col and not re.search(r"[A-Za-z]", text) else None  # not the label's "(1)"
         if cell is not None and column_header(table, first, other) == period:
             cells.append(cell.value * factor)
     return cells

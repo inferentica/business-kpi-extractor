@@ -424,7 +424,14 @@ def _currency(text: str | None, kpi: KpiSpec, default_currency: str | None, cont
 def column_header(table: Table, first_data_row: int, col: int) -> str:
     """The words heading a column ("Three Months Ended @ #") with dates and numbers blanked, so a quarter's column and a
     six-month or prior-year column never pass for one another when a reading is replayed."""
-    cells = [row[col] for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row) and re.search(r"[A-Za-z]", row[col])]
+    def heading(row: list[str]) -> str:
+        # A header spanning several columns sits on the first of them ("Quarter Ended December 31," over 2022 and 2023):
+        # an empty header cell takes the nearest one to its left, never the row-label column.
+        for index in range(min(col, len(row) - 1), 0, -1):
+            if row[index].strip():
+                return row[index]
+        return ""
+    cells = [cell for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row) and re.search(r"[A-Za-z]", cell := heading(row))]
     text = clean(" ".join(cells)).lower()
     text = re.sub(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
                   r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b", "@", text)
