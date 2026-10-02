@@ -714,19 +714,33 @@ class SymbolPipeline:
         return records
 
     def _read(self, text, document: Document, spec: Spec, expected: date, version: int | None = None):
-        """Code first: last quarter's rows and sentences read again, standing only on the checks a Flash reading must
-        pass. Then Flash. Its reading stands alone only when every KPI was found where it was found last quarter, no
-        value repeats an earlier period's number (the tell of a prior-year column) and every check passes; otherwise
-        Pro reads the document independently, values stand where the two agree, and Pro reviews the rest."""
+        """Code first: each group read the way it was last quarter (or in the nearest quarter read), standing only on
+        the checks a Flash reading must pass; this holds across KPI-list versions, so a list change sends only new or
+        changed groups to the AI. The rest goes to Flash. A group Flash's reading confirms stands alone; Pro reads the
+        others independently, values stand where the two agree or where the checks settle them, and Pro reviews the
+        rest."""
         currency = self._default_currency()
         self._local.replayed = False
-        replayed = self._replay(document, spec, expected, version, currency)
-        if replayed is not None:
+        replayed, replay_located, done = self._replay_groups(document, spec, expected, currency)
+        if done and all(group.key in done for group in spec.groups):
             self._local.replayed = True
             self.result.replayed_reads += 1
-            return replayed[0], [], replayed[1]
-        build = text if callable(text) else (lambda subset=None: text)
-        full_text = build()
+            return replayed, [], replay_located
+        open_spec = spec if not done else Spec.model_validate(
+            {"groups": [g.model_dump() for g in spec.groups if g.key not in done], "names": {}})
+        read, problems, located = self._read_ai(text, document, open_spec, expected, version, currency, partial=bool(done))
+        return replayed + read, problems, located
+
+    def _read_ai(self, text, document: Document, spec: Spec, expected: date, version: int | None, currency: str | None,
+                 partial: bool = False):
+        def build(subset: Spec | None = None) -> str:
+            if not callable(text):
+                return text
+            try:
+                return text(subset) if subset is not None else text()
+            except TypeError:
+                return text()  # a prompt that does not take a part of the list
+        full_text = build(spec if partial else None)
         flash, flash_read, flash_problems = self._locate(full_text, document, spec, currency, model="flash", thinking_first=False)
         if self._flash_is_enough(flash, flash_read, spec, expected, document) or (
                 not flash.tables and not flash.values and self._kind_reports_nothing(document, expected, version)):
@@ -852,35 +866,43 @@ class SymbolPipeline:
             read, problems = read_values(document, spec, located, currency)
         return located, read, problems
 
-    def _replay(self, document: Document, spec: Spec, expected: date, version: int | None, currency: str | None):
-        """Last quarter's reading repeated by code, when the same KPI list read it. KPIs that list has but last quarter
-        did not report are looked for by the AI at least every other quarter, so a newly reported KPI is not missed."""
-        if version is None:
-            return None
+    def _replay_groups(self, document: Document, spec: Spec, expected: date, currency: str | None):
+        """Each group read again by code from where it was found in the nearest quarter of the same kind of document,
+        kept only when it passes every check a Flash-only reading must (its period, its sums, no jumps, nothing found
+        before missing, every value where it was). A KPI the list has but the nearest reading did not find is looked
+        for by the AI unless that reading's AI read noted it as not reported. Returns the kept groups' values."""
         source = _source_template(document.source_url)
         last = self._last_locators(expected, source)
         if not last:
-            return None
+            return [], None, set()
         accession = next((value.get("source_accession") for key, value in self._ai_history(expected, source).items()
                           if key in last), None)
-        filing = self.filings.get(accession or "") or {}
-        if filing.get("spec_version") != version:
-            return None
-        whole = {key.split(".", 1)[0] for key, locator in last.items() if locator.get("whole_table")}
-        missing = {f"{group.key}.{kpi.key}" for group in spec.groups if group.key not in whole for kpi in group.kpis
-                   if kpi.key != group.total_kpi} - last.keys()
-        if missing:
-            notes = filing.get("notes") or []
-            reported = next((note for note in notes if note.startswith(_NOT_REPORTED)), _NOT_REPORTED)
-            if _READ_BY_AI not in notes or not missing <= set(reported.removeprefix(_NOT_REPORTED).split(", ")):
-                return None
-        located = replay(document, last, expected)
-        if located is None:
-            return None
-        read, problems = read_values(document, spec, located, currency)
-        if problems or not self._flash_is_enough(located, read, spec, expected, document) or self._far_above_quarters(read, expected):
-            return None
-        return read, located
+        notes = (self.filings.get(accession or "") or {}).get("notes") or []
+        reported = next((note for note in notes if note.startswith(_NOT_REPORTED)), _NOT_REPORTED)
+        not_reported = set(reported.removeprefix(_NOT_REPORTED).split(", ")) if _READ_BY_AI in notes else set()
+        items: list[ReadValue] = []
+        kept_located, done = None, set()
+        for group in spec.groups:
+            mine = {key: locator for key, locator in last.items() if key.split(".", 1)[0] == group.key}
+            if not mine:
+                continue
+            whole = any(locator.get("whole_table") for locator in mine.values())
+            listed = {f"{group.key}.{kpi.key}" for kpi in group.kpis if kpi.key != group.total_kpi}
+            if not whole and (listed - mine.keys()) - not_reported:
+                continue  # a KPI the list has and nobody has looked for in this kind of document yet
+            located = replay(document, mine, expected)
+            if located is None:
+                continue
+            read, problems = read_values(document, spec, located, currency)
+            read = [item for item in read if item.group.key == group.key]
+            if problems or not read or self._far_above_quarters(read, expected):
+                continue
+            if group.key not in self._confirmed_groups(located, read, spec, expected, document):
+                continue
+            items += read
+            done.add(group.key)
+            kept_located = kept_located or located
+        return items, kept_located, done
 
     def _kind_reports_nothing(self, document: Document, expected: date, version: int | None) -> bool:
         """Whether both models already read this kind of document for this KPI list and found nothing in it (TSMC's

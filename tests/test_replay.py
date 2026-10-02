@@ -102,7 +102,7 @@ def test_a_replayed_quarter_needs_no_ai_call():
     assert {item.kpi.key: item.value for item in read if not item.is_total}["r2nanometer"] == 11_000
 
 
-def test_replay_is_refused_when_a_number_repeats_last_year_or_the_list_changed():
+def test_replay_is_refused_when_a_number_repeats_but_holds_across_a_new_list_version():
     first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
     flash = {"period_end": "2026-06-30", "values": []}
     answers = {("locate", "flash"): flash, ("locate", "pro"): flash}
@@ -113,8 +113,9 @@ def test_replay_is_refused_when_a_number_repeats_last_year_or_the_list_changed()
     assert ("locate", "flash") in control.calls
     control = NoAi(answers)
     second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
-    _pipeline(control, history)._read(lambda: "prompt", second, SPEC, Q2, version=2)  # a new KPI list: the AI reads
-    assert ("locate", "flash") in control.calls
+    read, _, _ = _pipeline(control, history)._read(lambda: "prompt", second, SPEC, Q2, version=2)
+    # A new KPI list version with this group unchanged: the group is still read by code, with no AI.
+    assert control.calls == [] and len(read) > 0
 
 
 def test_kpis_missing_last_quarter_are_looked_for_by_the_ai_every_other_quarter():

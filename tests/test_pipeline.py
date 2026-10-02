@@ -812,3 +812,14 @@ def test_quarters_read_side_by_side_are_checked_against_each_other_in_date_order
     pipeline._check_read_series({("kpi_ops", "users", "2026", "Q2")})
     assert pipeline.values[("kpi_ops", "users", "2026", "Q2")]["validation_status"] == "needs_review"
     assert pipeline.values[("kpi_ops", "users", "2026", "Q3")]["validation_status"] == "verified"  # not read now
+
+
+def test_a_kpi_list_is_kept_to_the_cap_by_trimming_metrics_first():
+    from kpi_extractor.ai import MAX_LISTED_KPIS, normalize_spec
+    breakdown = {"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown",
+                 "kpis": [{"key": f"s{i}", "label": f"S{i}", "unit": "currency"} for i in range(10)]}
+    metrics = {"key": "operating", "label": "Operating Metrics", "kind": "metric",
+               "kpis": [{"key": f"m{i}", "label": f"M{i}", "unit": "count"} for i in range(16)]}
+    spec = normalize_spec(Spec.model_validate({"groups": [breakdown, metrics]}))
+    assert sum(len(g.kpis) for g in spec.groups) == MAX_LISTED_KPIS
+    assert len(spec.groups[0].kpis) == 10  # the breakdown, which is checked by its sum, is kept whole

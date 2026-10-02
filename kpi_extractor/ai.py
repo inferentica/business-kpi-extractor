@@ -20,6 +20,9 @@ _KEY = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
 
 MAX_GROUPS = 8
 MAX_KPIS_PER_GROUP = 16
+# A focused list: every KPI is read, and possibly disputed, every quarter. The proposal is asked for at most six
+# groups; the code keeps any list to this many KPIs (see normalize_spec).
+MAX_LISTED_KPIS = 24
 
 SYSTEM = """You analyse SEC filings for a financial data pipeline. You never write a number that will be stored: you \
 point to where a value is (a table cell, or an exact quote with the number as written) or you choose among options \
@@ -265,6 +268,12 @@ Track a percentage mix only when the company gives no amounts for it, and only w
 Do not track a breakdown that has the same rows as one listed under "Already covered by XBRL", even under another \
 title.
 
+Keep the list focused: at most 6 groups and about 20 KPIs in all, the ones an investor follows quarter to quarter. Every \
+group must be checkable: a revenue breakdown whose parts add up to a total row shown beside them, a mix whose shares \
+add up to about 100, or operating metrics reported the same way each quarter. A breakdown's rows are parts of revenue \
+or of one segment's revenue; never income-statement lines such as net interest income, interest expense or \
+noninterest revenue listed together.
+
 Rules:
 - kind "revenue_breakdown": currency amounts that together make up revenue. Include the table's total row as a KPI and \
 name it in "total_kpi", with at least two parts beside it; a single amount (e.g. AI revenue) is a metric, not a \
@@ -415,15 +424,25 @@ def normalize_spec(spec: Spec) -> Spec:
             loose += group.kpis
         else:
             groups.append(group.model_dump())
-    if not loose:
+    if loose:
+        metrics = next((group for group in groups if group["kind"] == "metric"), None)
+        if metrics is None:
+            metrics = {"key": "operating", "label": "Operating Metrics", "kind": "metric", "total_kpi": None, "kpis": []}
+            groups.append(metrics)
+        taken = {kpi["key"] for kpi in metrics["kpis"]}
+        for kpi in loose:
+            if kpi.key not in taken and len(metrics["kpis"]) < MAX_KPIS_PER_GROUP:
+                metrics["kpis"].append(kpi.model_dump())
+                taken.add(kpi.key)
+    elif sum(len(group.kpis) for group in spec.groups) <= MAX_LISTED_KPIS:
         return spec
-    metrics = next((group for group in groups if group["kind"] == "metric"), None)
-    if metrics is None:
-        metrics = {"key": "operating", "label": "Operating Metrics", "kind": "metric", "total_kpi": None, "kpis": []}
-        groups.append(metrics)
-    taken = {kpi["key"] for kpi in metrics["kpis"]}
-    for kpi in loose:
-        if kpi.key not in taken and len(metrics["kpis"]) < MAX_KPIS_PER_GROUP:
-            metrics["kpis"].append(kpi.model_dump())
-            taken.add(kpi.key)
-    return Spec.model_validate({"groups": [g for g in groups if g["kpis"]][:MAX_GROUPS], "names": spec.names})
+    groups = [g for g in groups if g["kpis"]][:MAX_GROUPS]
+    # Over the cap: operating metrics are trimmed first (from the end of the list), then whole trailing groups.
+    def count() -> int:
+        return sum(len(g["kpis"]) for g in groups)
+    for group in [g for g in groups if g["kind"] == "metric"]:
+        while count() > MAX_LISTED_KPIS and len(group["kpis"]) > 1:
+            group["kpis"].pop()
+    while count() > MAX_LISTED_KPIS and len(groups) > 1:
+        groups.pop()
+    return Spec.model_validate({"groups": groups, "names": spec.names})
