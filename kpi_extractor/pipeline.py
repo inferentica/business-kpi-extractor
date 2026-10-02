@@ -1140,12 +1140,12 @@ class SymbolPipeline:
         for rows in groups.values():
             if not whole(rows[0]):
                 for v in rows:
-                    if v["validation_status"] == "verified" and _EQUALS_XBRL in (v.get("notes") or []):
+                    if v["validation_status"] == "verified" and {_EQUALS_XBRL, _ADDS_TO_XBRL} & set(v.get("notes") or []):
                         settled[value_key(v)] = {**v, "validation_status": "needs_review", "notes": [
-                            note for note in v.get("notes") or [] if note != _EQUALS_XBRL]}
+                            note for note in v.get("notes") or [] if note not in (_EQUALS_XBRL, _ADDS_TO_XBRL)]}
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
-            if waiting and len(rows) >= 2 and reported(rows[0], sum(float(v["value"]) for v in rows), 1e-5):
+            if waiting and len(rows) >= 2 and whole(rows[0]) and reported(rows[0], sum(float(v["value"]) for v in rows), 1e-5):
                 for v in waiting:
                     settle(v, _ADDS_TO_XBRL)
         by_accession = {ref.accession: ref for ref in releases}
