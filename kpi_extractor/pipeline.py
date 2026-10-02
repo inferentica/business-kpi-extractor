@@ -79,11 +79,14 @@ def value_key(value: dict) -> tuple[str, str, str, str]:
 
 class SymbolPipeline:
     def __init__(self, control, symbol: str, quarters: int, force: bool, today: date | None = None, log=print,
-                 wait_for_lock: bool = False):
+                 wait_for_lock: bool = False, report_quarters: int | None = None):
         self.control = control
         self.symbol = symbol
         self.force = force
+        # Earnings releases cost AI to read, so they keep the run's window; 10-Qs and 10-Ks are read by code from XBRL
+        # and may reach further back (report_quarters).
         self.since = (today or date.today()) - timedelta(days=92 * quarters + 120)
+        self.reports_since = (today or date.today()) - timedelta(days=92 * max(quarters, report_quarters or 0) + 120)
         self.log = log
         self.result = SymbolResult(symbol)
         self.filings: dict[str, dict] = {}
@@ -139,7 +142,7 @@ class SymbolPipeline:
         self.archive = Archive(self.control, self.symbol, self.profile.cik, self.log)
         self.archive._listing()  # once, before the download threads start
         self.archive.label(self.symbol, self.profile.name)
-        reports = sorted(periodic_reports(company, self.since), key=lambda ref: ref.filed)
+        reports = sorted(periodic_reports(company, self.reports_since), key=lambda ref: ref.filed)
         for ref in reversed(reports):
             if self.force or self._pending(ref):
                 self._xbrl_cache[ref.accession] = self._prefetch.submit(self._load_xbrl, ref)
@@ -213,8 +216,8 @@ class SymbolPipeline:
         return self._xbrl_cache[ref.accession].result()
 
     def _archive_xbrl(self, ref: FilingRef) -> None:
-        if (parts := xbrl_parts(ref.filing)) is not None:
-            self.archive.write_json(_folder(ref), "xbrl.json", parts)
+        # A filing without an XBRL instance is marked, so it is not downloaded again on every run.
+        self.archive.write_json(_folder(ref), "xbrl.json", xbrl_parts(ref.filing) or _NO_XBRL)
 
     def _load_xbrl(self, ref: FilingRef):
         """A filing's XBRL from the archive, else from EDGAR and then archived."""
@@ -223,8 +226,11 @@ class SymbolPipeline:
         stored = self.archive.read_json(_folder(ref), "xbrl.json")
         if stored and stored.get("parts"):
             return xbrl_from_parts(stored)
+        if stored is not None:
+            return ref.filing.xbrl()  # marked as having no instance to archive: EDGAR's own reading, as before
         parts = xbrl_parts(ref.filing)
         if parts is None:
+            self.archive.write_json(_folder(ref), "xbrl.json", _NO_XBRL)
             return ref.filing.xbrl()
         self.archive.write_json(_folder(ref), "xbrl.json", parts)
         return xbrl_from_parts(parts)
@@ -1484,6 +1490,9 @@ def _year_ago_cells(document: Document, locator: dict, value: float) -> list[flo
         if cell is not None and column_header(table, first, other) == period:
             cells.append(cell.value * factor)
     return cells
+
+
+_NO_XBRL = {"version": 1, "parts": {}}
 
 
 def _folder(ref: FilingRef) -> str:

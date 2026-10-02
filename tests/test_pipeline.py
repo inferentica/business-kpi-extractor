@@ -633,3 +633,11 @@ def test_a_flagged_value_equal_to_an_official_figure_is_proven_only_when_precise
     pipeline._prove_flagged([])
     assert pipeline.values[("kpi_product", "datacenter", "2025", "Q2")]["validation_status"] == "verified"
     assert pipeline.values[("kpi_other", "round", "2025", "Q2")]["validation_status"] == "needs_review"
+
+
+def test_reports_reach_ten_years_while_releases_keep_the_runs_window():
+    pipeline = SymbolPipeline(FakeControl({}), "NVDA", quarters=20, force=False, today=date(2026, 10, 2),
+                              log=lambda *_: None, report_quarters=40)
+    assert pipeline.since.year == 2021 and pipeline.reports_since.year == 2016
+    assert SymbolPipeline(FakeControl({}), "NVDA", quarters=6, force=False, today=date(2026, 10, 2),
+                          log=lambda *_: None).reports_since == date(2026, 10, 2) - __import__("datetime").timedelta(days=92 * 6 + 120)

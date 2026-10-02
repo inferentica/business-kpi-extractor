@@ -39,10 +39,14 @@ def normalize_symbols(raw: str | list[str]) -> list[str]:
     return symbols
 
 
+# About ten years of 10-Q and 10-K segments: read from XBRL by code, so the longer window costs downloads, not AI.
+REPORT_QUARTERS = 40
+
+
 def process_symbol(control, symbol: str, quarters: int, force: bool, wait_for_lock: bool = False) -> SymbolResult:
     try:
         return SymbolPipeline(control, symbol, quarters, force, log=lambda line: print(line, flush=True),
-                              wait_for_lock=wait_for_lock).run()
+                              wait_for_lock=wait_for_lock, report_quarters=REPORT_QUARTERS).run()
     except Exception as error:  # noqa: BLE001 - one company must not stop the run
         traceback.print_exc()
         return SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
