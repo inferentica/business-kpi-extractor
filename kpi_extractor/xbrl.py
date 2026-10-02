@@ -354,6 +354,8 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             if local_name(member) not in _CONSOLIDATION_NAMES and member not in eliminations.get(concept, {}):
                 return None
             own = label(member)
+            if own and "reconciling" in own.lower():
+                return "Reconciling items"  # one series whether a year's filing says "Segment Reconciling Items" or not
             if own and len(own) <= 40 and not own.lower().startswith("segment reporting"):
                 return own
             return _CONSOLIDATION_NAMES.get(local_name(member)) or own
