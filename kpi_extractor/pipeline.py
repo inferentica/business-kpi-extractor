@@ -22,7 +22,7 @@ from datetime import date, timedelta
 
 from . import ai
 from .ai import AiResponseError, Located, Spec
-from .archive import Archive, xbrl_from_parts, xbrl_parts
+from .archive import Archive, filing_folder, xbrl_from_parts, xbrl_parts
 from .control import ControlError
 from .derive import derive_periods
 from .document import Document, clean, parse_document, parse_number
@@ -138,11 +138,12 @@ class SymbolPipeline:
         self.profile, company = company_profile(self.symbol)
         self.archive = Archive(self.control, self.symbol, self.profile.cik, self.log)
         self.archive._listing()  # once, before the download threads start
+        self.archive.label(self.symbol, self.profile.name)
         reports = sorted(periodic_reports(company, self.since), key=lambda ref: ref.filed)
         for ref in reversed(reports):
             if self.force or self._pending(ref):
                 self._xbrl_cache[ref.accession] = self._prefetch.submit(self._load_xbrl, ref)
-            elif not self.archive.has(ref.accession, "xbrl.json"):
+            elif not self.archive.has(_folder(ref), "xbrl.json"):
                 # Read before the archive existed: stored now, once, without parsing it.
                 self._archiving.append(self._prefetch.submit(self._archive_xbrl, ref))
         self.offset = self._year_offset(reports)
@@ -213,19 +214,19 @@ class SymbolPipeline:
 
     def _archive_xbrl(self, ref: FilingRef) -> None:
         if (parts := xbrl_parts(ref.filing)) is not None:
-            self.archive.write_json(ref.accession, "xbrl.json", parts)
+            self.archive.write_json(_folder(ref), "xbrl.json", parts)
 
     def _load_xbrl(self, ref: FilingRef):
         """A filing's XBRL from the archive, else from EDGAR and then archived."""
         if self.archive is None:
             return ref.filing.xbrl()
-        stored = self.archive.read_json(ref.accession, "xbrl.json")
+        stored = self.archive.read_json(_folder(ref), "xbrl.json")
         if stored and stored.get("parts"):
             return xbrl_from_parts(stored)
         parts = xbrl_parts(ref.filing)
         if parts is None:
             return ref.filing.xbrl()
-        self.archive.write_json(ref.accession, "xbrl.json", parts)
+        self.archive.write_json(_folder(ref), "xbrl.json", parts)
         return xbrl_from_parts(parts)
 
     def _exhibit(self, exhibit) -> Future:
@@ -1483,6 +1484,10 @@ def _year_ago_cells(document: Document, locator: dict, value: float) -> list[flo
         if cell is not None and column_header(table, first, other) == period:
             cells.append(cell.value * factor)
     return cells
+
+
+def _folder(ref: FilingRef) -> str:
+    return filing_folder(ref.filed, ref.form, ref.accession)
 
 
 def _proven(value: dict) -> bool:

@@ -1,7 +1,8 @@
 """The SEC filing archive in R2: each filing's XBRL and earnings exhibits as downloaded, so a later read (a re-read
 after a fix, a new KPI looked for in old releases, statements built from history) never goes back to EDGAR.
 
-The runner holds no keys. The control plane lists a company's archived files with links to read them, and hands out a
+Layout: filings/<cik>/company.json names the company; filings/<cik>/<filed>_<form>_<accession>/ holds a filing's
+xbrl.json.gz or exhibits.json.gz. The runner holds no keys. The control plane lists a company's archived files with links to read them, and hands out a
 link per file to write it. Anything that fails here falls back to EDGAR: the archive only ever saves downloads.
 """
 from __future__ import annotations
@@ -26,8 +27,8 @@ class Archive:
         self._refused = False  # the archive turned a write down: the rest of the run reads from EDGAR only
         self.reads = self.writes = 0
 
-    def key(self, accession: str, name: str) -> str:
-        return f"sec/{self.cik}/{accession}/{name}.gz"
+    def key(self, folder: str, name: str) -> str:
+        return f"filings/{self.cik}/{folder}/{name}.gz"
 
     def _listing(self) -> dict[str, str]:
         with self._lock:
@@ -39,12 +40,12 @@ class Archive:
                     self._links, self._refused = {}, True
             return self._links
 
-    def has(self, accession: str, name: str) -> bool:
-        key = self.key(accession, name)
+    def has(self, folder: str, name: str) -> bool:
+        key = self.key(folder, name)
         return key in self._written or key in self._listing()
 
-    def read_json(self, accession: str, name: str) -> dict | None:
-        link = self._listing().get(self.key(accession, name))
+    def read_json(self, folder: str, name: str) -> dict | None:
+        link = self._listing().get(self.key(folder, name))
         if not link:
             return None
         try:
@@ -55,12 +56,29 @@ class Archive:
         self.reads += 1
         return data
 
-    def write_json(self, accession: str, name: str, data: dict) -> None:
-        key = self.key(accession, name)
+    def write_json(self, folder: str, name: str, data: dict) -> None:
+        self._put(self.key(folder, name), gzip.compress(json.dumps(data).encode(), compresslevel=6), "application/gzip")
+
+    def label(self, symbol: str, name: str) -> None:
+        """filings/<cik>/company.json: who the folder is (its tickers and name), for anyone browsing the bucket. The
+        folder keeps the CIK, which never changes; a new ticker for the same company is added to the label."""
+        key = f"filings/{self.cik}/company.json"
+        current: dict = {}
+        if link := self._listing().get(key):
+            try:
+                with urllib.request.urlopen(link, timeout=30) as response:
+                    current = json.loads(response.read())
+            except Exception:  # noqa: BLE001 - rewritten below
+                current = {}
+        tickers = list(dict.fromkeys([*(current.get("tickers") or []), symbol]))
+        label = {"cik": self.cik, "name": name, "tickers": tickers}
+        if current != label:
+            self._put(key, json.dumps(label, indent=1).encode(), "application/json")
+
+    def _put(self, key: str, body: bytes, content_type: str) -> None:
         self._listing()  # an archive that cannot be listed is not written to either
         if key in self._written or self._refused:
             return
-        body = gzip.compress(json.dumps(data).encode(), compresslevel=6)
         try:
             uploads = self.control.call("archive_put", symbol=self.symbol, cik=self.cik,
                                         files=[{"key": key, "size": len(body)}]).get("uploads") or {}
@@ -68,7 +86,7 @@ class Archive:
             if not link:
                 return
             request = urllib.request.Request(link, data=body, method="PUT", headers={
-                "Content-Type": "application/gzip", "Content-Length": str(len(body))})
+                "Content-Type": content_type, "Content-Length": str(len(body))})
             with urllib.request.urlopen(request, timeout=120):
                 pass
         except Exception as error:  # noqa: BLE001 - not archived this time; the next run tries again
@@ -77,6 +95,11 @@ class Archive:
             return
         self._written.add(key)
         self.writes += 1
+
+
+def filing_folder(filed, form: str, accession: str) -> str:
+    """A filing's folder, readable and in date order: "2026-08-27_10-Q_0001045810-26-000123"."""
+    return f"{str(filed)[:10]}_{form.replace('/', '-')}_{accession}"
 
 
 def xbrl_parts(filing) -> dict | None:

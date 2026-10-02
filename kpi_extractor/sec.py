@@ -8,7 +8,7 @@ from datetime import date, timedelta
 
 from edgar import Company, set_identity
 
-from .archive import exhibits_from_record, exhibits_record
+from .archive import exhibits_from_record, exhibits_record, filing_folder
 from .fiscal import nominal_quarter_end_before
 
 PERIODIC_FORMS = ("10-Q", "10-K", "20-F", "40-F")
@@ -122,11 +122,12 @@ def _archived_exhibits(filing, archive) -> list:
     with none is not fetched again)."""
     if archive is None:
         return _html_exhibits(filing)
-    stored = archive.read_json(filing.accession_no, "exhibits.json")
+    folder = filing_folder(filing.filing_date, filing.form, filing.accession_no)
+    stored = archive.read_json(folder, "exhibits.json")
     if stored is not None:
         return exhibits_from_record(stored)
     exhibits = _html_exhibits(filing)
-    archive.write_json(filing.accession_no, "exhibits.json", exhibits_record(exhibits, _MAX_EXHIBIT_BYTES))
+    archive.write_json(folder, "exhibits.json", exhibits_record(exhibits, _MAX_EXHIBIT_BYTES))
     return exhibits
 
 
