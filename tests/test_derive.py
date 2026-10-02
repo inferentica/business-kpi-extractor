@@ -160,3 +160,13 @@ def test_a_quarter_without_the_years_unallocated_row_counts_it_as_zero():
         values += [row(period, "google", 36.0, end, {"total": 36.15}), row(period, "otherbets", 0.15, end, {"total": 36.15})]
     q4 = {r["kpi_key"]: round(r["value"], 2) for r in derive_periods(values) if r["fiscal_period"] == "Q4"}
     assert q4 == {"google": 52.0, "otherbets": 0.15, "unallocated": 0.4}
+
+
+def test_a_balancing_row_may_be_negative_in_a_derived_quarter():
+    from kpi_extractor.derive import _combine_year_to_date
+    year = {key: {"kpi_key": key, "value": value, "validation_status": "verified", "locator": {"total": 182527.0}, "notes": []}
+            for key, value in (("googleservices", 168635.0), ("googlecloud", 13059.0), ("otherbets", 657.0), ("unallocated", 176.0))}
+    nine = {"googleservices": 115762.0, "googlecloud": 9228.0, "otherbets": 461.0, "unallocated": 178.0}
+    rows = _combine_year_to_date(year, nine, 125629.0, year)
+    assert all(row["validation_status"] == "verified" for row in rows)
+    assert {row["kpi_key"]: row["value"] for row in rows}["unallocated"] == -2.0
