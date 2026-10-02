@@ -229,3 +229,19 @@ def test_a_row_label_carrying_the_business_name_takes_the_listed_key():
     assert _listed_kpi(group, "UnitedHealthcare Employer & Individual - Domestic").key == "domestic"
     assert _listed_kpi(group, "UnitedHealthcare Employer & Individual - Total") is None
     assert _listed_kpi(group, "Another") is None  # a short name is never matched by its ending
+
+
+def test_a_combined_line_never_takes_the_listed_key_of_its_last_part():
+    from kpi_extractor.extract import _listed_kpi
+    group = Spec.model_validate({"groups": [{"key": "cib", "label": "CIB Revenue by Business", "kind": "revenue_breakdown",
+                                             "kpis": [{"key": "securities", "label": "Securities Services", "unit": "currency"},
+                                                      {"key": "markets", "label": "Fixed Income Markets", "unit": "currency"}]}]}).groups[0]
+    assert _listed_kpi(group, "Markets & Securities Services") is None
+    assert _listed_kpi(group, "JPM Securities Services").key == "securities"
+
+
+def test_footnote_markers_run_into_a_label_are_dropped():
+    from kpi_extractor.extract import _row_label
+    assert _row_label(["Banking & Wealth Management14", "1"], 1) == "Banking & Wealth Management"
+    assert _row_label(["Google subscriptions, platforms, and devices(1)", "1"], 1) == "Google subscriptions, platforms, and devices"
+    assert _row_label(["Q4", "1"], 1) == "Q4"

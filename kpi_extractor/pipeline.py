@@ -24,7 +24,7 @@ from . import ai
 from .ai import AiResponseError, Located, Spec
 from .archive import Archive, filing_folder, xbrl_from_parts, xbrl_parts
 from .control import ControlError
-from .derive import BALANCING, derive_periods
+from .derive import balancing, derive_periods
 from .document import Document, clean, parse_document, parse_number
 from .extract import (ReadValue, _listed_kpi, check_period, column_header, describe, locator_hint, read_values,
                       validate_groups)
@@ -48,7 +48,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 11"
+_XBRL_READER = "xbrl reader 12"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -1081,7 +1081,7 @@ class SymbolPipeline:
                 continue
             for quarter in ("Q1", "Q2", "Q3"):
                 current = rows.get((group, year, quarter)) or {}
-                if current and not set(annual) - set(current) - set(BALANCING):
+                if current and not {key for key in set(annual) - set(current) if not balancing(key)}:
                     continue  # on the year's layout, or finer (Nvidia's 10-Qs list regions its 10-K folds into Other)
                 following = rows.get((group, str(int(year) + 1), quarter)) or {}
                 priors = {key: (row.get("locator") or {}).get("prior") for key, row in following.items()}

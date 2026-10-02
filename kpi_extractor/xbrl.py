@@ -23,7 +23,11 @@ REVENUE_CONCEPTS = (
 _NEUTRAL_MEMBERS = {("ConsolidationItemsAxis", "OperatingSegmentsMember")}
 # Segments reported before intersegment sales come out (UnitedHealth's Optum sells to UnitedHealthcare) add up to
 # revenue only with the eliminations, tagged on the consolidation axis alone; they are kept as one row.
-_ELIMINATIONS = "us-gaap:IntersegmentEliminationMember"
+# Each item on the consolidation axis is its own row under the filing's name (JPMorgan's "Corporate", UnitedHealth's
+# "Optum Eliminations"); these names stand in for the taxonomy's own long labels.
+_CONSOLIDATION_NAMES = {"IntersegmentEliminationMember": "Eliminations", "CorporateNonSegmentMember": "Corporate",
+                        "MaterialReconcilingItemsMember": "Reconciling items",
+                        "SegmentReconcilingItemsMember": "Reconciling items"}
 _SEGMENT_AXES = {"StatementBusinessSegmentsAxis", "SegmentsAxis"}
 # Revenue the company reports outside every split (Alphabet's hedging gains and losses, inside its contract-revenue total
 # in some years and outside it in others): found when two splits agree on a sum just short of revenue, and kept as one
@@ -250,10 +254,11 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     # (axis, concept) → the one (axis, member) its facts are also tagged with (Alphabet's products, all "Google
     # Services"), so the year-ago and to-date figures are read from facts tagged the same way.
     fixed_for: dict[tuple[str, str], tuple[str, str]] = {}
-    eliminations: dict[str, float] = {}
+    eliminations: dict[str, dict[str, float]] = {}
     for concept, dimensions, value in tagged:
-        if set(dimensions) == {"ConsolidationItemsAxis"}:
-            eliminations[concept] = eliminations.get(concept, 0.0) + value
+        if set(dimensions) == {"ConsolidationItemsAxis"} and value:
+            items = eliminations.setdefault(concept, {})
+            items[dimensions["ConsolidationItemsAxis"]] = items.get(dimensions["ConsolidationItemsAxis"], 0.0) + value
         if any(axis in _IGNORED_AXES for axis in dimensions):
             continue
         if len(dimensions) == 1:
@@ -286,7 +291,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         def adds_up(rows: dict[str, float]) -> bool:
             leaves = drop_overlaps(remove_subtotals(rows, total), total)
             return abs(sum(leaves.values()) - total) <= abs(total) * MAX_RECONCILIATION_ERROR
-        with_eliminations = {**members, _ELIMINATIONS: eliminations[concept]}
+        with_eliminations = {**members, **eliminations[concept]}
         return with_eliminations if not adds_up(members) and adds_up(with_eliminations) else members
 
     def score(candidate: tuple[str, dict[str, float]], axis: str = ""):
@@ -344,28 +349,39 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         axis_label = label(axis_qnames.get(axis, axis)) or humanize(axis)
         key, title, order = standard or (f"x_{_snake(axis)}", f"Revenue by {_title(axis_label)}", 10)
 
+        def consolidation_name(member: str) -> str | None:
+            """The filing's own name for a consolidation item, unless it only has the taxonomy's long one."""
+            if local_name(member) not in _CONSOLIDATION_NAMES and member not in eliminations.get(concept, {}):
+                return None
+            own = label(member)
+            if own and len(own) <= 40 and not own.lower().startswith("segment reporting"):
+                return own
+            return _CONSOLIDATION_NAMES.get(local_name(member)) or own
+
         def named(rows: dict[str, float]) -> list[tuple[str, str, float]]:
             out = []
             for member, value in sorted(rows.items(), key=lambda item: -item[1]):
-                name = {_ELIMINATIONS: "Eliminations", _UNALLOCATED: "Unallocated"}.get(member) \
+                name = "Unallocated" if member == _UNALLOCATED else consolidation_name(member) \
                     or label(member) or labels.get(member) or humanize(member)
                 out.append((member_key(name), name, value))
             return out
 
         def elements(rows: dict[str, float]) -> dict[str, str]:
-            return {member_key(label(member) or labels.get(member) or humanize(member)): member for member in rows}
+            return {member_key(consolidation_name(member) or label(member) or labels.get(member) or humanize(member)): member
+                    for member in rows}
 
         outside = unallocated(axis, concept, members)
         members = reconciled(axis, concept, members)
-        eliminated = _ELIMINATIONS in members
+        consolidation = [member for member in members if member in eliminations.get(concept, {})]
         if outside is not None:
             leaf_members = set(drop_overlaps(remove_subtotals(members, total), total))
             members = {**members, _UNALLOCATED: outside}
 
         def frame_members(source: pd.DataFrame) -> dict[str, float]:
             rows = _single_axis_members(source, concept, axis, dimension_columns, fixed_for.get((axis, concept)))
-            if eliminated and rows and (removed := _eliminations_in(source, concept, dimension_columns)) is not None:
-                rows[_ELIMINATIONS] = removed
+            if consolidation and rows:
+                items = _consolidation_items(source, concept, dimension_columns)
+                rows.update({member: items[member] for member in consolidation if member in items})
             if outside is not None and rows and (whole := frame_total(source, concept)) is not None:
                 rows[_UNALLOCATED] = whole - sum(value for member, value in rows.items() if member in leaf_members)
             return rows
@@ -394,8 +410,8 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             split = coarse and all(_PRODUCT_OR_SERVICE.match(key) for key, _name, _value in named(coarse))
             # A row of nothing all year (Broadcom's 2019 "Intercompany revenue") is not a part of revenue; a business
             # at zero this quarter but not to date (Nvidia's licensing after its Q1) stays, so its year adds up.
-            rows = [row for row in named(leaves) if row[2] != 0 or ytd.get(row[0]) or prior.get(row[0])
-                    or row[0] == "eliminations"]
+            kept = {key for key, _name, _value in named({member: 1.0 for member in consolidation})}
+            rows = [row for row in named(leaves) if row[2] != 0 or ytd.get(row[0]) or prior.get(row[0]) or row[0] in kept]
             groups.append(XbrlGroup(key, title, order, rows, total, error, currencies.get(concept), concept,
                                     prior, {**elements(coarse), **elements(leaves)}, ytd, ytd_total, prior_ytd,
                                     prior_ytd_total, [] if split or not coarse else named(coarse), prior_total))
@@ -462,15 +478,16 @@ def _by_key(rows: list[tuple[str, str, float]]) -> dict[str, float]:
     return out
 
 
-def _eliminations_in(frame: pd.DataFrame, concept: str, dimension_columns: list[str]) -> float | None:
-    """The sum of a concept's facts tagged on the consolidation axis alone, other than its operating segments
-    (intersegment eliminations, corporate items); None when the frame has none."""
-    total = None
+def _consolidation_items(frame: pd.DataFrame, concept: str, dimension_columns: list[str]) -> dict[str, float]:
+    """A concept's facts tagged on the consolidation axis alone, other than its operating segments, by member
+    (intersegment eliminations, corporate items, reconciling items)."""
+    items: dict[str, float] = {}
     for _, fact in frame[frame["concept"] == concept].iterrows():
         dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
         if set(dimensions) == {"ConsolidationItemsAxis"} and local_name(dimensions["ConsolidationItemsAxis"]) != "OperatingSegmentsMember":
-            total = (total or 0.0) + float(fact["numeric_value"])
-    return total
+            member = dimensions["ConsolidationItemsAxis"]
+            items[member] = items.get(member, 0.0) + float(fact["numeric_value"])
+    return items
 
 
 def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str],

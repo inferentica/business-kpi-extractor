@@ -183,8 +183,20 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
     if not matches:
         # A row label that adds the business's name to the listed one ("UnitedHealthcare Employer & Individual -
         # Domestic" for "Employer & Individual - Domestic"): its ending, when that is specific and names one KPI.
-        matches = [kpi for kpi in listed if len(_identity(kpi.label)) >= 8 and wanted.endswith(_identity(kpi.label))]
+        # Not after a joining word: "Markets & Securities Services" is a combined line, not Securities Services.
+        matches = [kpi for kpi in listed if len(_identity(kpi.label)) >= 8 and wanted.endswith(_identity(kpi.label))
+                   and not re.search(r"(?:&|\band|\+|,|/)\s*$", label[:len(label) - len(_tail(label, kpi.label))], re.I)]
     return matches[0] if len(matches) == 1 else None
+
+
+def _tail(label: str, listed: str) -> str:
+    """The end of a row label that spells the listed name, with the same letters and digits ("Employer & Individual -
+    Domestic" at the end of "UnitedHealthcare Employer & Individual - Domestic")."""
+    wanted = _identity(listed)
+    for start in range(len(label)):
+        if _identity(label[start:]) == wanted:
+            return label[start:]
+    return ""
 
 
 def row_key(label: str) -> str:
@@ -452,9 +464,14 @@ def _locator_record(document: Document, locator: Locator) -> dict:
 
 
 def _row_label(row: list[str], col: int) -> str:
-    """A row's label: the first cell with words to the left of the value (not a "$ -" filler in another column)."""
-    return next((cell for cell in row[:col] if re.search(r"[A-Za-z]", cell)),
-                next((cell for cell in row if re.search(r"[A-Za-z]", cell) and not re.search(r"\d", cell)), ""))
+    """A row's label: the first cell with words to the left of the value (not a "$ -" filler in another column), without
+    a footnote marker run into it ("Banking & Wealth Management14", "devices(1)")."""
+    label = next((cell for cell in row[:col] if re.search(r"[A-Za-z]", cell)),
+                 next((cell for cell in row if re.search(r"[A-Za-z]", cell) and not re.search(r"\d", cell)), ""))
+    return _FOOTNOTE.sub("", label).strip()
+
+
+_FOOTNOTE = re.compile(r"(?:(?<=[a-z]{3})\d{1,2}|\s*\(\d{1,2}\)|\s*\([a-z]\))$")
 
 
 def locator_hint(locator: dict | None) -> str | None:
