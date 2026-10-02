@@ -25,8 +25,9 @@ _NEUTRAL_MEMBERS = {("ConsolidationItemsAxis", "OperatingSegmentsMember")}
 # revenue only with the eliminations, tagged on the consolidation axis alone; they are kept as one row.
 _ELIMINATIONS = "us-gaap:IntersegmentEliminationMember"
 _SEGMENT_AXES = {"StatementBusinessSegmentsAxis", "SegmentsAxis"}
-# Revenue the company reports outside every split (Alphabet's hedging gains and losses): found when two splits agree on
-# a sum just short of revenue, and kept as one row so the split adds up to revenue exactly.
+# Revenue the company reports outside every split (Alphabet's hedging gains and losses, inside its contract-revenue total
+# in some years and outside it in others): found when two splits agree on a sum just short of revenue, and kept as one
+# row so the split adds up to revenue exactly.
 _UNALLOCATED = "unallocated"
 MAX_UNALLOCATED = 0.02
 # Default titles; each company's KPI list can rename them in its own terms (e.g. "Revenue by Market Platform").
@@ -258,8 +259,8 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     def unallocated(axis: str, concept: str, members: dict[str, float]) -> float | None:
         """Revenue outside the split, when the split falls short and another split of the same figure agrees."""
         total = total_for(concept)
-        if concept in totals or not total:
-            return None  # a concept with its own total is reconciled to it, gap or not
+        if not total:
+            return None
         own = leaf_sum(axis, concept, members)
         gap = total - own
         if abs(gap) <= abs(total) * MAX_RECONCILIATION_ERROR or abs(gap) > abs(total) * MAX_UNALLOCATED:

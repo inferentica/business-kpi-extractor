@@ -688,3 +688,24 @@ def test_a_part_equal_to_xbrl_is_not_proven_in_a_breakdown_that_misses_its_total
     pipeline._prove_flagged([])
     assert pipeline.values[("kpi_segment", "uhc", "2025", "Q4")]["validation_status"] == "needs_review"
     assert pipeline.values[("kpi_segment", "optumrx", "2025", "Q4")]["validation_status"] == "needs_review"
+
+
+def test_a_renamed_release_line_joins_its_series_by_the_year_ago_cell():
+    html = """<table><tr><td></td><td>Three Months Ended December 31, 2023</td><td>Three Months Ended December 31, 2022</td></tr>
+      <tr><td>Google subscriptions, platforms, and devices</td><td>10,794</td><td>8,796</td></tr>
+      <tr><td>Google Cloud</td><td>9,192</td><td>7,315</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    def row(key, year, period, end, value, accession="old", locator=None):
+        return {"group_key": "kpi_product", "group_kind": "revenue_breakdown", "group_label": "Revenue by Product",
+                "kpi_key": key, "kpi_label": key, "fiscal_year": year, "fiscal_period": period, "period_end": end,
+                "method": "ai", "validation_status": "verified", "value": value, "source_accession": accession,
+                "locator": locator or {}, "unit": "currency"}
+    rows = [row("googleother", "2022", "Q4", "2022-12-31", 8_796.0), row("googleother", "2023", "Q3", "2023-09-30", 8_005.0),
+            row("cloud", "2022", "Q4", "2022-12-31", 7_315.0), row("cloud", "2023", "Q4", "2023-12-31", 9_192.0, "new"),
+            row("subscriptions", "2023", "Q4", "2023-12-31", 10_794.0, "new", {"table": table, "row": 1, "col": 1})]
+    pipeline = _pipeline(FakeControl({}), rows)
+    pipeline._document = lambda ref: document
+    pipeline._unify_release_series([SimpleNamespace(accession="new")])
+    renamed = {(y, p) for (g, k, y, p), v in pipeline.values.items() if k == "subscriptions" and v["validation_status"] == "verified"}
+    assert renamed == {("2022", "Q4"), ("2023", "Q3"), ("2023", "Q4")}

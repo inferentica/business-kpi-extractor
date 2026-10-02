@@ -48,7 +48,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 4"
+_XBRL_READER = "xbrl reader 5"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -193,6 +193,7 @@ class SymbolPipeline:
         self._prove_flagged(releases)
         self._join_custom_axes()
         self._unify_series()
+        self._unify_release_series(releases)
         self._fix_mislabelled_quarters()
         self._derive()
         self._harmonize_labels()
@@ -1036,6 +1037,51 @@ class SymbolPipeline:
             self._store(values=rekeyed[start:start + 400])
         if rekeyed:
             self.log(f"{self.symbol}: {len(rekeyed) // 2} XBRL values joined to their series")
+
+    def _unify_release_series(self, releases: list[FilingRef]) -> None:
+        """A line a release renamed (Alphabet's "Google other" became "Google subscriptions, platforms, and devices" in
+        Q4 2023) is one series under its new name: the release's year-ago cell in the new line's row equals what the old
+        line reported a year earlier. Without it a year's quarters carry two names and the year cannot be added up. The
+        release comes from the filing archive; no AI involved."""
+        by_accession = {ref.accession: ref for ref in releases}
+        groups: dict[str, list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["validation_status"] == "verified" and v["group_kind"] != "metric":
+                groups.setdefault(v["group_key"], []).append(v)
+        moved = []
+        for group, rows in groups.items():
+            quarters = [v for v in rows if v["fiscal_period"] != "FY"]
+            if not quarters:
+                continue
+            first = {key: min(v["period_end"] for v in quarters if v["kpi_key"] == key) for key in {v["kpi_key"] for v in quarters}}
+            last = {key: max(v["period_end"] for v in quarters if v["kpi_key"] == key) for key in first}
+            start, end = min(first.values()), max(last.values())
+            ended = [key for key in first if last[key] < end]
+            for key in [key for key in first if first[key] > start] if ended else []:
+                opening = next(v for v in quarters if v["kpi_key"] == key and v["period_end"] == first[key])
+                ref = by_accession.get(opening.get("source_accession") or "")
+                if ref is None or (opening.get("locator") or {}).get("row") is None:
+                    continue
+                target = (date.fromisoformat(opening["period_end"][:10]) - timedelta(days=365)).isoformat()
+                before = {old: float(v["value"]) for v in quarters for old in ended
+                          if v["kpi_key"] == old and abs(_days(v["period_end"], target)) <= 12}
+                try:
+                    cells = _year_ago_cells(self._document(ref), opening["locator"], float(opening["value"]))
+                except Exception:  # noqa: BLE001 - an unreadable release links nothing
+                    continue
+                matches = [old for old, value in before.items() if any(abs(cell - value) <= abs(value) * 1e-4 for cell in cells)]
+                if len(matches) != 1 or any(v["kpi_key"] == key for v in rows for o in rows
+                                            if o["kpi_key"] == matches[0] and o["fiscal_year"] == v["fiscal_year"]
+                                            and o["fiscal_period"] == v["fiscal_period"]):
+                    continue  # no single predecessor, or the two lines share a period: different businesses
+                for v in rows:
+                    if v["kpi_key"] == matches[0]:
+                        moved.append({**v, "kpi_key": key, "kpi_label": opening["kpi_label"]})
+                        moved.append({**v, "validation_status": "rejected", "notes": [f"continued as {key}"]})
+        for start_at in range(0, len(moved), 400):
+            self._store(values=moved[start_at:start_at + 400])
+        if moved:
+            self.log(f"{self.symbol}: {len(moved) // 2} release values joined to their renamed series")
 
     def _anchor_ai_breakdowns(self) -> None:
         """An AI breakdown's total must be a figure the company reported in XBRL for the same period: its revenue, or a
