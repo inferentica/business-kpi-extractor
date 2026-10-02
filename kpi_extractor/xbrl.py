@@ -359,9 +359,45 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             rejected.append(XbrlCandidate(key, title, order, concept, total, currencies.get(concept),
                                           {k: (n, v) for k, n, v in named(members)}, prior, elements(members),
                                           ytd, ytd_total, prior_ytd, prior_ytd_total))
+    for candidate in list(rejected):
+        completed = _completed_by_segments(candidate, groups)
+        if completed is not None:
+            groups.append(completed)
+            rejected.remove(candidate)
     groups.sort(key=lambda group: (group.order, group.key))
     total_revenue = next((totals[concept] for concept in REVENUE_CONCEPTS if concept in totals), None)
     return XbrlBreakdowns(period_end, annual, _fiscal_year(entity), groups, total_revenue, rejected)
+
+
+def _completed_by_segments(candidate: XbrlCandidate, groups: list[XbrlGroup]) -> XbrlGroup | None:
+    """A split tagged inside one segment only (Alphabet's Search, YouTube, Network and subscriptions add up to Google
+    Services, while Cloud and Other Bets appear only as segments), completed by the company's other segments and its
+    balancing rows, when its lines add up exactly to that segment and the whole then adds up to revenue."""
+    segments = next((group for group in groups if group.key == "segments"), None)
+    if segments is None or candidate.key == "segments" or any(group.key == candidate.key for group in groups):
+        return None
+    rows = {key: value for key, (_label, value) in candidate.members.items()}
+    for key, label, part in segments.members:
+        if not part:
+            continue
+        leaves = drop_overlaps(remove_subtotals(rows, part), part)
+        if len(leaves) < 2 or abs(sum(leaves.values()) - part) > abs(part) * 1e-5:
+            continue
+        others = [(k, n, v) for k, n, v in segments.members if k != key]
+        if any(k in leaves for k, _n, _v in others):
+            return None  # a line and a segment under one name: not one split
+        members = [(k, candidate.members[k][0], v) for k, v in sorted(leaves.items(), key=lambda item: -item[1])] + others
+        error = (sum(v for _k, _n, v in members) - segments.total) / segments.total if segments.total else None
+        if error is None or abs(error) > MAX_RECONCILIATION_ERROR:
+            return None
+        def merged(lines: dict[str, float], rest: dict[str, float]) -> dict[str, float]:
+            return {**{k: v for k, v in lines.items() if k in leaves}, **{k: v for k, v in rest.items() if k != key}}
+        return XbrlGroup(candidate.key, candidate.label, candidate.order, members, segments.total, error,
+                         segments.currency, candidate.concept, merged(candidate.prior, segments.prior),
+                         {**segments.elements, **candidate.elements},
+                         merged(candidate.year_to_date, segments.year_to_date), segments.year_to_date_total,
+                         merged(candidate.prior_year_to_date, segments.prior_year_to_date), segments.prior_year_to_date_total)
+    return None
 
 
 def _by_key(rows: list[tuple[str, str, float]]) -> dict[str, float]:

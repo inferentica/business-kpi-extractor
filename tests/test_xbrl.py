@@ -177,3 +177,20 @@ def test_a_zero_row_stays_when_the_business_had_revenue_this_year_and_goes_when_
         return {key for key, _label, _value in group.members}
     assert "other" in keys(43.0)  # licensing that ended after Q1: zero now, but part of the year
     assert "other" not in keys(0.0)  # never anything: not a part of revenue
+
+
+def test_a_split_tagged_inside_one_segment_is_completed_by_the_other_segments():
+    contract = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+    segment = "dim_us-gaap_StatementBusinessSegmentsAxis"
+    def line(value, product):
+        row = _fact(contract, value, product)
+        row[segment] = "x:ServicesMember"
+        return row
+    facts = pd.DataFrame([
+        _fact("us-gaap:Revenues", 100.0),
+        _fact(contract, 80.0, "x:ServicesMember", axis=segment), _fact(contract, 20.0, "x:CloudMember", axis=segment),
+        line(50.0, "x:SearchMember"), line(20.0, "x:YouTubeMember"), line(10.0, "x:NetworkMember"),
+    ])
+    groups = {g.key: g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
+    assert {k: v for k, _n, v in groups["products"].members} == {"search": 50.0, "youtube": 20.0, "network": 10.0, "cloud": 20.0}
+    assert groups["products"].reconciliation_error == 0
