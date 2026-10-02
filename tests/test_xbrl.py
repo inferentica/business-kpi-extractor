@@ -194,3 +194,15 @@ def test_a_split_tagged_inside_one_segment_is_completed_by_the_other_segments():
     groups = {g.key: g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
     assert {k: v for k, _n, v in groups["products"].members} == {"search": 50.0, "youtube": 20.0, "network": 10.0, "cloud": 20.0}
     assert groups["products"].reconciliation_error == 0
+
+
+def test_a_declared_parent_is_a_subtotal_even_when_it_is_not_its_childrens_sum():
+    from kpi_extractor.xbrl import drop_declared_parents
+    children = {"unh:TotalOptumMember": {"unh:OptumHealthMember", "unh:OptumInsightMember", "unh:OptumRxMember"}}
+    members = {"unh:UnitedhealthcareMember": 86.0, "unh:OptumHealthMember": 23.5, "unh:OptumInsightMember": 5.4,
+               "unh:OptumRxMember": 38.3, "unh:TotalOptumMember": 65.7}  # net of Optum's internal sales
+    assert "unh:TotalOptumMember" not in drop_declared_parents(members, 112.0, children)
+    # Parents that together split revenue (products against services) are a coarser split, not subtotals.
+    split = {"x:ProductMember": 40.0, "x:ServiceMember": 60.0, "x:AMember": 30.0, "x:BMember": 10.0, "x:CMember": 60.0}
+    tree = {"x:ProductMember": {"x:AMember", "x:BMember"}, "x:ServiceMember": {"x:CMember", "x:AMember"}}
+    assert drop_declared_parents(split, 100.0, tree) == split

@@ -31,7 +31,7 @@ from .extract import (ReadValue, _listed_kpi, check_period, column_header, descr
 from .fiscal import fiscal_label, learn_year_offset
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
-from .xbrl import XbrlCandidate, extract_breakdowns, official_labels
+from .xbrl import XbrlCandidate, extract_breakdowns, member_children, official_labels
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
 MAX_DOCUMENT_CHARS = 120_000
@@ -48,7 +48,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 10"
+_XBRL_READER = "xbrl reader 11"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -275,7 +275,7 @@ class SymbolPipeline:
                 self._store_filing(ref, "skipped", notes=["no XBRL"])
                 return
             breakdowns = extract_breakdowns(xbrl.facts.to_dataframe(), xbrl.entity_info or {}, ref.form,
-                                            official_labels(getattr(xbrl, "element_catalog", None)))
+                                            official_labels(getattr(xbrl, "element_catalog", None)), member_children(xbrl))
             if breakdowns is None:
                 self._store_filing(ref, "skipped", notes=["no document period"])
                 return

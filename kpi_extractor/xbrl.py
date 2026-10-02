@@ -158,8 +158,53 @@ def official_labels(element_catalog: dict | None) -> Callable[[str], str | None]
     return label
 
 
+def member_children(xbrl) -> dict[str, set[str]]:
+    """Each member's declared children (unh:TotalOptumMember → Optum Health, Optum Insight, Optum Rx), from the filing's
+    presentation trees and its definition domains: what the company says a member is made of."""
+    children: dict[str, set[str]] = {}
+
+    def qname(element_id: str) -> str:
+        return element_id.replace("_", ":", 1)
+
+    for tree in (getattr(getattr(xbrl, "parser", None), "presentation_trees", None) or {}).values():
+        for node_id, node in tree.all_nodes.items():
+            kids = [child for child in node.children if child.endswith("Member")]
+            if node_id.endswith("Member") and kids:
+                children.setdefault(qname(node_id), set()).update(qname(child) for child in kids)
+    for domains in (getattr(xbrl, "domains_by_role", None) or {}).values():
+        for element_id, domain in domains.items():
+            kids = [member for member in domain.members if member.endswith("Member")]
+            if element_id.endswith("Member") and kids:
+                children.setdefault(qname(element_id), set()).update(qname(member) for member in kids)
+    return children
+
+
+def _descendants(member: str, children: dict[str, set[str]]) -> set[str]:
+    found, stack = set(), list(children.get(member, ()))
+    while stack:
+        child = stack.pop()
+        if child not in found:
+            found.add(child)
+            stack.extend(children.get(child, ()))
+    return found
+
+
+def drop_declared_parents(members: dict[str, float], total: float | None, children: dict[str, set[str]]) -> dict[str, float]:
+    """Members the filing declares as parents of at least two members also present (UnitedHealth's "Total Optum" over
+    its three Optum segments, net of their internal sales so not their sum) are subtotals, not parts. Parents that
+    together make a complete split of revenue (Product and Service beside the product lines) are a coarser split and
+    stay, for the two-split logic to keep apart."""
+    parents = {member for member in members if len(_descendants(member, children) & set(members)) >= 2}
+    if not parents:
+        return members
+    if total and len(parents) >= 2 and abs(sum(members[p] for p in parents) - total) <= abs(total) * MAX_RECONCILIATION_ERROR:
+        return members
+    return {member: value for member, value in members.items() if member not in parents}
+
+
 def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
-                       label: Callable[[str], str | None] = lambda _qname: None) -> XbrlBreakdowns | None:
+                       label: Callable[[str], str | None] = lambda _qname: None,
+                       children: dict[str, set[str]] | None = None) -> XbrlBreakdowns | None:
     period_end = _as_date(entity.get("document_period_end_date"))
     if period_end is None:
         return None
@@ -235,6 +280,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     def reconciled(axis: str, concept: str, members: dict[str, float]) -> dict[str, float]:
         """A segment split with its eliminations as one more row, when only that makes it add up to revenue."""
         total = total_for(concept)
+        members = drop_declared_parents(members, total, children or {})
         if axis not in _SEGMENT_AXES or not total or not eliminations.get(concept):
             return members
         def adds_up(rows: dict[str, float]) -> bool:
