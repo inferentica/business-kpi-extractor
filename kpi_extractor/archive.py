@@ -23,6 +23,7 @@ class Archive:
         self._lock = threading.Lock()
         self._links: dict[str, str] | None = None
         self._written: set[str] = set()
+        self._refused = False  # the archive turned a write down: the rest of the run reads from EDGAR only
         self.reads = self.writes = 0
 
     def key(self, accession: str, name: str) -> str:
@@ -34,8 +35,8 @@ class Archive:
                 try:
                     self._links = dict(self.control.call("archive_list", symbol=self.symbol, cik=self.cik).get("files") or {})
                 except ControlError as error:
-                    self.log(f"{self.symbol}: filing archive unavailable ({error}); reading from EDGAR")
-                    self._links = {}
+                    self.log(f"{self.symbol}: filing archive unavailable ({str(error)[:200]}); reading from EDGAR")
+                    self._links, self._refused = {}, True
             return self._links
 
     def has(self, accession: str, name: str) -> bool:
@@ -56,7 +57,8 @@ class Archive:
 
     def write_json(self, accession: str, name: str, data: dict) -> None:
         key = self.key(accession, name)
-        if key in self._written:
+        self._listing()  # an archive that cannot be listed is not written to either
+        if key in self._written or self._refused:
             return
         body = gzip.compress(json.dumps(data).encode(), compresslevel=6)
         try:
@@ -70,7 +72,8 @@ class Archive:
             with urllib.request.urlopen(request, timeout=120):
                 pass
         except Exception as error:  # noqa: BLE001 - not archived this time; the next run tries again
-            self.log(f"{self.symbol}: could not archive {key}: {str(error)[:200]}")
+            self._refused = True
+            self.log(f"{self.symbol}: could not archive {key}: {str(error)[:200]}; not archiving the rest of this run")
             return
         self._written.add(key)
         self.writes += 1
