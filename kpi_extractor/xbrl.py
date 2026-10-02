@@ -293,8 +293,6 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         def named(rows: dict[str, float]) -> list[tuple[str, str, float]]:
             out = []
             for member, value in sorted(rows.items(), key=lambda item: -item[1]):
-                if value == 0 and member != _ELIMINATIONS:
-                    continue  # a row of nothing (Broadcom's 2019 "Intercompany revenue") is not a part of revenue
                 name = {_ELIMINATIONS: "Eliminations", _UNALLOCATED: "Unallocated"}.get(member) \
                     or label(member) or labels.get(member) or humanize(member)
                 out.append((member_key(name), name, value))
@@ -339,7 +337,11 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             # Products against services (Amazon, Microsoft) is a view of its own beside the product lines, not a
             # coarser version of them: both are published, so neither depends on the AI listing it.
             split = coarse and all(_PRODUCT_OR_SERVICE.match(key) for key, _name, _value in named(coarse))
-            groups.append(XbrlGroup(key, title, order, named(leaves), total, error, currencies.get(concept), concept,
+            # A row of nothing all year (Broadcom's 2019 "Intercompany revenue") is not a part of revenue; a business
+            # at zero this quarter but not to date (Nvidia's licensing after its Q1) stays, so its year adds up.
+            rows = [row for row in named(leaves) if row[2] != 0 or ytd.get(row[0]) or prior.get(row[0])
+                    or row[0] == "eliminations"]
+            groups.append(XbrlGroup(key, title, order, rows, total, error, currencies.get(concept), concept,
                                     prior, {**elements(coarse), **elements(leaves)}, ytd, ytd_total, prior_ytd,
                                     prior_ytd_total, [] if split or not coarse else named(coarse)))
             if split:

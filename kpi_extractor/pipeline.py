@@ -48,7 +48,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 3"
+_XBRL_READER = "xbrl reader 4"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"

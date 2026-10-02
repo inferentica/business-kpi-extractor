@@ -162,3 +162,18 @@ def test_revenue_outside_every_split_is_kept_as_one_row_when_two_splits_agree():
     lone = pd.DataFrame([_fact("us-gaap:Revenues", 99.0), _fact(contract, 70.0, "x:ServicesMember", axis=segment),
                          _fact(contract, 30.0, "x:CloudMember", axis=segment)])
     assert extract_breakdowns(lone, {"document_period_end_date": "2026-06-30"}, "10-Q").groups == []  # nothing agrees
+
+
+def test_a_zero_row_stays_when_the_business_had_revenue_this_year_and_goes_when_it_never_does():
+    def keys(other_to_date):
+        quarter = dict(start="2026-07-01", end="2026-09-30")
+        to_date = dict(start="2026-01-01", end="2026-09-30")
+        rows = [_fact("us-gaap:Revenues", 100.0, **quarter), _fact("us-gaap:Revenues", 60.0, "x:GpuMember", **quarter),
+                _fact("us-gaap:Revenues", 40.0, "x:TegraMember", **quarter), _fact("us-gaap:Revenues", 0.0, "x:OtherMember", **quarter),
+                _fact("us-gaap:Revenues", 280.0, **to_date), _fact("us-gaap:Revenues", 160.0, "x:GpuMember", **to_date),
+                _fact("us-gaap:Revenues", 120.0 - other_to_date, "x:TegraMember", **to_date),
+                _fact("us-gaap:Revenues", other_to_date, "x:OtherMember", **to_date)]
+        group = extract_breakdowns(pd.DataFrame(rows), {"document_period_end_date": "2026-09-30"}, "10-Q").groups[0]
+        return {key for key, _label, _value in group.members}
+    assert "other" in keys(43.0)  # licensing that ended after Q1: zero now, but part of the year
+    assert "other" not in keys(0.0)  # never anything: not a part of revenue
