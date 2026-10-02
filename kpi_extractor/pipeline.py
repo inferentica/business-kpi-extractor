@@ -24,7 +24,7 @@ from . import ai
 from .ai import AiResponseError, Located, Spec
 from .archive import Archive, filing_folder, xbrl_from_parts, xbrl_parts
 from .control import ControlError
-from .derive import derive_periods
+from .derive import BALANCING, derive_periods
 from .document import Document, clean, parse_document, parse_number
 from .extract import (ReadValue, _listed_kpi, check_period, column_header, describe, locator_hint, read_values,
                       validate_groups)
@@ -48,7 +48,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 8"
+_XBRL_READER = "xbrl reader 9"
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -1040,7 +1040,7 @@ class SymbolPipeline:
             self.log(f"{self.symbol}: {len(rekeyed) // 2} XBRL values joined to their series")
 
     def _adopt_restated_quarters(self) -> None:
-        """A year's quarter that is missing or laid out unlike the year's own 10-K (Alphabet's 2019 10-Qs grouped Search
+        """A year's quarter that is missing or lacks a row of the year's own 10-K (Alphabet's 2019 10-Qs grouped Search
         and YouTube as "Google properties" and left "Google other" untagged in Q1) is taken from the following year's
         10-Q for the same quarter, which restates it on the year's layout: only when that restated quarter has exactly
         the year's rows and adds up to the quarter's reported revenue. The year's Q4 then follows on one layout."""
@@ -1059,8 +1059,8 @@ class SymbolPipeline:
                 continue
             for quarter in ("Q1", "Q2", "Q3"):
                 current = rows.get((group, year, quarter)) or {}
-                if set(current) == set(annual):
-                    continue  # already on the year's layout
+                if current and not set(annual) - set(current) - set(BALANCING):
+                    continue  # on the year's layout, or finer (Nvidia's 10-Qs list regions its 10-K folds into Other)
                 following = rows.get((group, str(int(year) + 1), quarter)) or {}
                 priors = {key: (row.get("locator") or {}).get("prior") for key, row in following.items()}
                 reported = revenue.get((year, quarter))

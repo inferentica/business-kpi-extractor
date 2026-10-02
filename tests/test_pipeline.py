@@ -726,3 +726,19 @@ def test_a_quarter_on_an_older_layout_takes_the_following_years_restatement():
     q2 = {k: v["value"] for (g, k, y, p), v in pipeline.values.items() if y == "2019" and p == "Q2" and v["validation_status"] == "verified"}
     assert q2 == {"search": 24.5, "youtube": 5.5}
     assert pipeline.values[("products", "properties", "2019", "Q2")]["validation_status"] == "rejected"
+
+
+def test_a_quarter_finer_than_its_year_keeps_its_own_rows():
+    def row(key, year, period, end, value, prior=None, total=None, accession="a"):
+        return {"group_key": "geography", "group_kind": "revenue_breakdown", "group_label": "Revenue by Geography", "kpi_key": key,
+                "kpi_label": key, "fiscal_year": year, "fiscal_period": period, "period_end": end, "method": "xbrl",
+                "validation_status": "verified", "value": value, "source_accession": accession,
+                "locator": {"total": total, **({"prior": prior} if prior is not None else {})}}
+    values = [row("us", "2026", "FY", "2026-01-25", 60.0, total=100.0), row("other", "2026", "FY", "2026-01-25", 40.0, total=100.0),
+              row("us", "2026", "Q1", "2025-04-27", 15.0, total=25.0), row("singapore", "2026", "Q1", "2025-04-27", 4.0, total=25.0),
+              row("other", "2026", "Q1", "2025-04-27", 6.0, total=25.0),
+              row("us", "2027", "Q1", "2026-04-26", 20.0, prior=15.0, total=30.0, accession="b"),
+              row("other", "2027", "Q1", "2026-04-26", 10.0, prior=10.0, total=30.0, accession="b")]
+    pipeline = _pipeline(FakeControl({}), values)
+    pipeline._adopt_restated_quarters()
+    assert pipeline.values[("geography", "singapore", "2026", "Q1")]["validation_status"] == "verified"
