@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -15,6 +16,7 @@ PERIODIC_FORMS = ("10-Q", "10-K", "20-F", "40-F")
 _EARNINGS_WINDOW = (timedelta(days=5), timedelta(days=75))
 # Quarterly financial reports furnished on 6-K run to ~10 MB of HTML; only their revenue sections reach the AI.
 _MAX_EXHIBIT_BYTES = 20_000_000
+_LISTING_READERS = 6
 
 
 def configure_identity() -> None:
@@ -79,15 +81,19 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date, ar
     filings = sorted(company.get_filings(form=form, filing_date=f"{since.isoformat()}:"), key=lambda item: item.filing_date)
     confirmed_quarters = set()
     refs: list[FilingRef] = []
+    candidates = []
     for filing in filings:
         if filing.form != form:
             continue
         quarter_end = nominal_quarter_end_before(filing.filing_date, profile.fiscal_year_end)
         in_window = _EARNINGS_WINDOW[0] <= filing.filing_date - quarter_end <= _EARNINGS_WINDOW[1]
         item_202 = not profile.foreign and "2.02" in str(getattr(filing, "items", "") or "")
-        if not (item_202 or in_window):
-            continue
-        exhibits = _archived_exhibits(filing, archive)
+        if item_202 or in_window:
+            candidates.append((filing, item_202))
+    # Each candidate's exhibits come from the archive (or SEC), a few at a time rather than one after another.
+    with ThreadPoolExecutor(max_workers=_LISTING_READERS) as pool:
+        found = list(pool.map(lambda candidate: _archived_exhibits(candidate[0], archive), candidates))
+    for (filing, item_202), exhibits in zip(candidates, found):
         if not exhibits:
             continue
         ref = _release_ref(filing, exhibits, profile)

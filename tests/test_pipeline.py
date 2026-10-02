@@ -789,3 +789,26 @@ def test_a_group_that_never_verifies_is_not_read_again():
             for q in range(8)]
     assert [g.key for g in _pipeline(FakeControl({}), rows)._readable(spec).groups] == ["technology"]
     assert [g.key for g in _pipeline(FakeControl({}), rows[:7])._readable(spec).groups] == ["technology", "lines"]
+
+
+def test_an_older_quarter_read_after_newer_ones_is_compared_with_the_nearest_reading():
+    def row(end, value):
+        return {"group_key": "kpi_ops", "kpi_key": "users", "fiscal_year": end[:4], "fiscal_period": "Q2", "period_end": end,
+                "method": "ai", "validation_status": "verified", "value": value, "source_url": "https://www.sec.gov/x.htm",
+                "locator": {"row_label": "Users"}}
+    pipeline = _pipeline(FakeControl({}), [row("2026-06-30", 10.0), row("2025-12-31", 9.0)])
+    history = pipeline._ai_history(date(2025, 9, 30), "x.htm")
+    assert history["ops.users"]["period_end"] == "2025-12-31"  # nothing before: the nearest later quarter
+    assert pipeline._ai_history(date(2026, 3, 31), "x.htm")["ops.users"]["period_end"] == "2025-12-31"
+
+
+def test_quarters_read_side_by_side_are_checked_against_each_other_in_date_order():
+    def row(end, value, period):
+        return {"group_key": "kpi_ops", "group_kind": "metric", "kpi_key": "users", "unit": "count", "fiscal_year": end[:4],
+                "fiscal_period": period, "period_end": end, "method": "ai", "validation_status": "verified", "value": value,
+                "notes": []}
+    values = [row("2026-03-31", 100.0, "Q1"), row("2026-06-30", 900.0, "Q2"), row("2026-09-30", 105.0, "Q3")]
+    pipeline = _pipeline(FakeControl({}), values)
+    pipeline._check_read_series({("kpi_ops", "users", "2026", "Q2")})
+    assert pipeline.values[("kpi_ops", "users", "2026", "Q2")]["validation_status"] == "needs_review"
+    assert pipeline.values[("kpi_ops", "users", "2026", "Q3")]["validation_status"] == "verified"  # not read now

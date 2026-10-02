@@ -15,6 +15,7 @@ import os
 import re
 import time
 import string
+import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from itertools import permutations
@@ -26,8 +27,8 @@ from .archive import Archive, filing_folder, xbrl_from_parts, xbrl_parts
 from .control import ControlError
 from .derive import balancing, derive_periods
 from .document import Document, clean, parse_document, parse_number
-from .extract import (ReadValue, _listed_kpi, check_period, column_header, describe, locator_hint, read_values,
-                      validate_groups)
+from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, describe,
+                      locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
@@ -57,6 +58,8 @@ _RESTATED_LATER = "restated in the next year's release"
 _PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER)
 # Restatements move a figure a little (a reclassification); a jump beyond this is a different column, not a restatement.
 MAX_RESTATEMENT = 0.10
+# Releases a company's run reads at once, after its newest (see _process_releases).
+RELEASE_READERS = 4
 # A group read this many quarters without one verified period is not read again (see _readable).
 DEAD_GROUP_QUARTERS = 8
 
@@ -101,6 +104,10 @@ class SymbolPipeline:
         self.names: dict = {}
         self._xbrl_cache: dict[str, Future] = {}
         self._archiving: list[Future] = []
+        # Releases are read several at a time: state changes one reader at a time under this lock, and a reader lets go
+        # of it only while it waits on the AI or a download (see _waiting).
+        self._state = threading.Lock()
+        self._local = threading.local()
         self.archive: Archive | None = None
         self._exhibits: dict[str, Future] = {}
         # Downloads and XBRL parsing start ahead of the filing being worked on.
@@ -108,8 +115,7 @@ class SymbolPipeline:
         self._documents: dict[str, Document] = {}
         self._prompt_documents: dict[str, str] = {}
         self._curations: dict[tuple, list[str]] = {}
-        self._replayed = False
-        # A Refresh waits for a run already working on the company instead of being skipped.
+                # A Refresh waits for a run already working on the company instead of being skipped.
         self.wait_for_lock = wait_for_lock
 
     @property
@@ -156,19 +162,19 @@ class SymbolPipeline:
             elif not self.archive.has(_folder(ref), "xbrl.json"):
                 # Read before the archive existed: stored now, once, without parsing it.
                 self._archiving.append(self._prefetch.submit(self._archive_xbrl, ref))
+        # The earnings releases are listed while the reports are read: the listing waits only on SEC and the archive.
+        listing = self._prefetch.submit(earnings_releases, company, self.profile, self.since, self.archive)
         self.offset = self._year_offset(reports)
         for ref in reports:
             self._process_report(ref)
-        releases = [ref for ref in sorted(earnings_releases(company, self.profile, self.since, self.archive),
-                                          key=lambda ref: ref.filed)
-                    if self._is_earnings_document(ref)]
+        releases = [ref for ref in sorted(listing.result(), key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
         for ref in releases:
             if self.force or self._pending(ref):
                 for exhibit in ref.exhibits[:6]:
                     self._exhibit(exhibit)
         spec, version, proposed = self._spec(state.get("spec"), releases)
         if spec is not None:
-            processed = [ref for ref in releases if self._process_release(ref, spec, version)]
+            processed = self._process_releases(releases, spec, version)
             latest_end = releases[-1].period_end if releases else None
             if not proposed and any(ref.period_end == latest_end for ref in processed):
                 previous_spec = spec
@@ -180,13 +186,11 @@ class SymbolPipeline:
                         # simply move to the new list version (a full re-read took TSMC 38 of 63 minutes).
                         cutoff = latest_end - timedelta(days=370)
                         for ref in releases:
-                            if ref.period_end >= cutoff:
-                                self._process_release(ref, spec, version)
-                            else:
+                            if ref.period_end < cutoff:
                                 self._carry_to_version(ref, version)
+                        self._process_releases([ref for ref in releases if ref.period_end >= cutoff], spec, version)
                     else:
-                        for ref in releases:
-                            self._process_release(ref, spec, version)
+                        self._process_releases(releases, spec, version)
         if spec is not None:
             self._adopt_listed_keys(spec)
         self._refile_annuals()
@@ -528,7 +532,7 @@ class SymbolPipeline:
                                  ai.locate_data(period_hint, subset or spec, self._hints(expected)))
 
             read, problems, located = self._read(text, document, spec, expected, version)
-            how = _READ_BY_REPLAY if self._replayed else _READ_BY_AI
+            how = _READ_BY_REPLAY if getattr(self._local, "replayed", False) else _READ_BY_AI
             period_problem = check_period(located, expected)
             period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
             # A document counts as annual only on evidence: its breakdown adds up to the XBRL full year, or its
@@ -574,6 +578,91 @@ class SymbolPipeline:
             return spec
         return Spec.model_validate({"groups": [g.model_dump() for g in spec.groups if g.key not in dead],
                                     "names": spec.names})
+
+    def _waiting(self, wait):
+        """Lets other readers work while this one waits on the AI or a download, when it holds the state lock."""
+        if not getattr(self._local, "holding", False):
+            return wait()
+        self._state.release()
+        try:
+            return wait()
+        finally:
+            self._state.acquire()
+
+    def _process_releases(self, refs: list[FilingRef], spec: Spec, version: int) -> list[FilingRef]:
+        """Reads releases: the newest first on its own, so the others have a reading to be compared with, then the rest
+        newest to oldest, several at a time. Every check still runs on each reading; afterwards the quarters just read
+        are checked against each other in date order, as reading them one by one would have."""
+        before = {key for key, value in self.values.items() if value["method"] == "ai"}
+        pending = [ref for ref in refs if self.force or self._pending(ref) or
+                   (self.filings.get(ref.accession) or {}).get("spec_version") != version]
+        done: set[str] = set()
+
+        def read(ref: FilingRef) -> None:
+            with self._state:
+                self._local.holding = True
+                try:
+                    if self._process_release(ref, spec, version):
+                        done.add(ref.accession)
+                finally:
+                    self._local.holding = False
+
+        if len(pending) <= 2:
+            for ref in refs:
+                if self._process_release(ref, spec, version):
+                    done.add(ref.accession)
+        else:
+            newest = max(pending, key=lambda ref: ref.period_end or date.min)
+            read(newest)
+            rest = sorted([ref for ref in refs if ref is not newest], key=lambda ref: ref.period_end or date.min, reverse=True)
+            with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
+                list(pool.map(read, rest))
+            self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
+                                    | {key for key in before if self.values[key].get("source_accession") in done})
+        return [ref for ref in refs if ref.accession in done]
+
+    def _check_read_series(self, keys: set[tuple]) -> None:
+        """The jump checks of quarters read side by side, run again in date order: each value against the quarter before
+        it (a share against its last share, an amount against three times or a third of its last), and an amount equal
+        to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole."""
+        series: dict[tuple[str, str], list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["validation_status"] == "verified" and v["fiscal_period"] != "FY":
+                series.setdefault((v["group_key"], v["kpi_key"]), []).append(v)
+        flagged: dict[tuple, str] = {}
+        for rows in series.values():
+            rows.sort(key=lambda v: v["period_end"])
+            for previous, current in zip(rows, rows[1:]):
+                if value_key(current) not in keys or _days(previous["period_end"], current["period_end"]) > 120:
+                    continue
+                before, now = float(previous["value"]), float(current["value"])
+                if current["unit"] == "percent":
+                    jump = abs(now - before) > MAX_MIX_JUMP and f"moved {now - before:+.1f} points in a quarter"
+                else:
+                    jump = before and now / before > 0 and not 1 / MAX_RATIO_JUMP <= now / before <= MAX_RATIO_JUMP \
+                        and f"changed {now / before:.1f}x in a quarter"
+                if jump and not self._immaterial(current):
+                    flagged[value_key(current)] = jump
+            by_end = {v["period_end"][:7]: v for v in rows}
+            for current in rows:
+                year_ago = by_end.get(f"{int(current['period_end'][:4]) - 1}{current['period_end'][4:7]}")
+                if (value_key(current) in keys and year_ago and current["unit"] == "currency"
+                        and _significant(float(current["value"])) and _same(float(current["value"]), float(year_ago["value"]))):
+                    flagged[value_key(current)] = "the same figure as a year earlier: check the column"
+        groups = {(k[0], k[2], k[3]) for k in flagged if self.values[k]["group_kind"] != "metric"}
+        changed = []
+        for key, value in self.values.items():
+            group_period = (key[0], key[2], key[3])
+            if key in flagged or (group_period in groups and value["method"] == "ai" and value["validation_status"] == "verified"):
+                note = flagged.get(key, "another part of this breakdown needs review")
+                changed.append({**value, "validation_status": "needs_review", "notes": [*(value.get("notes") or []), note]})
+        for start in range(0, len(changed), 400):
+            self._store(values=changed[start:start + 400])
+
+    def _immaterial(self, value: dict) -> bool:
+        """A breakdown row under 1% of its total, whose swings say nothing (as validate_groups treats it)."""
+        total = (value.get("locator") or {}).get("total")
+        return value["group_kind"] == "revenue_breakdown" and bool(total) and abs(float(value["value"])) < 0.01 * abs(float(total))
 
     def _carry_to_version(self, ref: FilingRef, version: int) -> None:
         filing = self.filings.get(ref.accession)
@@ -630,10 +719,10 @@ class SymbolPipeline:
         value repeats an earlier period's number (the tell of a prior-year column) and every check passes; otherwise
         Pro reads the document independently, values stand where the two agree, and Pro reviews the rest."""
         currency = self._default_currency()
-        self._replayed = False
+        self._local.replayed = False
         replayed = self._replay(document, spec, expected, version, currency)
         if replayed is not None:
-            self._replayed = True
+            self._local.replayed = True
             self.result.replayed_reads += 1
             return replayed[0], [], replayed[1]
         build = text if callable(text) else (lambda subset=None: text)
@@ -892,7 +981,7 @@ class SymbolPipeline:
     def _ask(self, text: str, purpose: str, schema, thinking_first: bool, model: str = "flash"):
         last_error = None
         for thinking in (thinking_first, True):
-            answer = self.control.ai(self.symbol, purpose, ai.SYSTEM, text, thinking, model)
+            answer = self._waiting(lambda: self.control.ai(self.symbol, purpose, ai.SYSTEM, text, thinking, model))
             self.result.ai_calls += 1
             if not answer:
                 raise AiResponseError("AI is unavailable")
@@ -952,7 +1041,7 @@ class SymbolPipeline:
             combined: Document | None = None
             exhibits = [exhibit for ref in refs for exhibit in ref.exhibits[:6]][:26]
             for index, exhibit in enumerate(exhibits):
-                raw = self._exhibit(exhibit).result()
+                raw = self._waiting(self._exhibit(exhibit).result)
                 if raw is None:
                     continue
                 part = parse_document(raw, exhibit.url, prefix=f"{string.ascii_uppercase[index]}_")
@@ -968,17 +1057,24 @@ class SymbolPipeline:
     # History used by the checks and hints.
 
     def _ai_history(self, before: date, source: str | None = None) -> dict[str, dict]:
-        """The latest AI value of each KPI before a date (optionally only from one kind of document)."""
+        """The latest AI value of each KPI before a date (optionally only from one kind of document); when none is
+        before it (an older quarter read after newer ones), the nearest reading after it, which plays the same part:
+        where each KPI was found in the nearest quarter."""
         latest: dict[str, dict] = {}
-        for value in self.values.values():
-            if value["method"] != "ai" or value["period_end"] >= before.isoformat():
+        later: dict[str, dict] = {}
+        cutoff = before.isoformat()
+        for value in list(self.values.values()):
+            if value["method"] != "ai" or abs(_days(value["period_end"], cutoff)) <= 20:
                 continue
             if source is not None and _source_template(value.get("source_url") or "") != source:
                 continue
             key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
-            if value["period_end"] > latest.get(key, {}).get("period_end", ""):
-                latest[key] = value
-        return latest
+            if value["period_end"] < cutoff:
+                if value["period_end"] > latest.get(key, {}).get("period_end", ""):
+                    latest[key] = value
+            elif value["period_end"] < later.get(key, {}).get("period_end", "9999"):
+                later[key] = value
+        return latest or later
 
     def _hints(self, before: date) -> dict[str, str]:
         return {key: hint for key, value in self._ai_history(before).items() if (hint := locator_hint(value.get("locator")))}
