@@ -193,6 +193,9 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
     return matches[0] if len(matches) == 1 else None
 
 
+_TOTAL_LABEL = re.compile(r"\s*total\b", re.I)
+
+
 def _combined_line(row_label: str, kpi_label: str) -> bool:
     """A row that ends with a KPI's name but adds a total or a joined part ("Total Markets & Securities Services" for
     Securities Services): a subtotal that contains the KPI, not the KPI."""
@@ -256,16 +259,24 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
 
     parts: dict[str, tuple[str, float, int]] = {}
     continued: dict[str, tuple[str, int, int]] = {}  # rows read past a page break: key → (table, row, column)
+    labelled_totals: list[int] = []
     for index in range(locator.first_row, locator.last_row + 1):
         if index == locator.total_row:
             continue
         row = read_row(index)
         if row is None or not row[0]:
             continue
+        if _TOTAL_LABEL.match(row[0]):
+            # "Total Markets & Securities Services" is a subtotal by its own name, whatever the signs of its parts
+            # (JPMorgan's includes a negative "Credit Adjustments & Other", which a sum check of positive rows misses).
+            labelled_totals.append(index)
+            continue
         key = member_key(row[0])
         if key not in parts:
             parts[key] = (row[0], row[1], index)
     total_index = locator.total_row
+    if total_index is None and labelled_totals and labelled_totals[-1] == locator.last_row:
+        total_index = labelled_totals[-1]  # the table's closing "Total" row is its total
     total_table, total_col = table, locator.col
     if unit == "percent" and total_index is None:
         # A mix's own "Total 100%" row is its total, not a share (it would make the shares add up to 200%).

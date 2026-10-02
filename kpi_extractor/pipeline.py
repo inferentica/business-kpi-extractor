@@ -57,6 +57,8 @@ _RESTATED_LATER = "restated in the next year's release"
 _PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER)
 # Restatements move a figure a little (a reclassification); a jump beyond this is a different column, not a restatement.
 MAX_RESTATEMENT = 0.10
+# A group read this many quarters without one verified period is not read again (see _readable).
+DEAD_GROUP_QUARTERS = 8
 
 
 @dataclass
@@ -514,6 +516,7 @@ class SymbolPipeline:
         if not spec.groups:
             self._store_filing(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
             return True
+        spec = self._readable(spec)
         try:
             expected = ref.period_end
             fiscal_year, fiscal_period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)
@@ -554,6 +557,23 @@ class SymbolPipeline:
         except Exception as error:  # noqa: BLE001
             self._fail_filing(ref, error, spec_version=version)
         return True
+
+    def _readable(self, spec: Spec) -> Spec:
+        """The list without groups that have never verified in at least eight quarters read (JPMorgan's income-statement
+        lines listed as a breakdown): reading them again would only flag them again, at a Pro read each quarter."""
+        periods: dict[str, set[tuple[str, str]]] = {}
+        verified: set[str] = set()
+        for v in self.values.values():
+            if v["method"] == "ai" and v["validation_status"] != "rejected" and v["fiscal_period"] != "FY":
+                group = v["group_key"].removeprefix(AI_GROUP_PREFIX)
+                periods.setdefault(group, set()).add((v["fiscal_year"], v["fiscal_period"]))
+                if v["validation_status"] == "verified":
+                    verified.add(group)
+        dead = {group for group, seen in periods.items() if len(seen) >= DEAD_GROUP_QUARTERS and group not in verified}
+        if not dead or all(group.key in dead for group in spec.groups):
+            return spec
+        return Spec.model_validate({"groups": [g.model_dump() for g in spec.groups if g.key not in dead],
+                                    "names": spec.names})
 
     def _carry_to_version(self, ref: FilingRef, version: int) -> None:
         filing = self.filings.get(ref.accession)

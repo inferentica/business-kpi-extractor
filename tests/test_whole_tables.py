@@ -253,3 +253,22 @@ def test_a_pointer_at_a_combined_line_is_rejected():
     assert _combined_line("Markets & Securities Services", "Securities Services")
     assert not _combined_line("Securities Services", "Securities Services")
     assert not _combined_line("UnitedHealthcare Employer & Individual - Domestic", "Employer & Individual - Domestic")
+
+
+def test_a_total_row_is_never_a_part_even_with_a_negative_part_inside_it():
+    html = """<table><tr><td>(in millions)</td><td>4Q21</td></tr>
+      <tr><td>Investment Banking</td><td>3,206</td></tr><tr><td>Payments</td><td>1,801</td></tr><tr><td>Lending</td><td>263</td></tr>
+      <tr><td>Total Banking</td><td>5,270</td></tr><tr><td>Fixed Income Markets</td><td>3,334</td></tr>
+      <tr><td>Equity Markets</td><td>1,954</td></tr><tr><td>Securities Services</td><td>1,064</td></tr>
+      <tr><td>Credit Adjustments &amp; Other</td><td>(88)</td></tr><tr><td>Total Markets &amp; Securities Services</td><td>6,264</td></tr>
+      <tr><td>TOTAL NET REVENUE</td><td>11,534</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "cib", "label": "CIB Revenue by Business", "kind": "revenue_breakdown",
+                                             "kpis": [{"key": "securities", "label": "Securities Services", "unit": "currency"}]}]})
+    located = ai.Located.model_validate({"period_end": "2021-12-31", "tables": [
+        {"group": "cib", "table": table, "col": 1, "first_row": 1, "last_row": 9, "total_row": 10}]})
+    read, problems = read_values(document, spec, located, "USD")
+    values = {item.kpi.label: item.value for item in read if not item.is_total}
+    assert values["Securities Services"] == 1_064e6 and "Total Markets & Securities Services" not in values
+    assert abs(sum(values.values()) - 11_534e6) < 1

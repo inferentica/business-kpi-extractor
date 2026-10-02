@@ -779,3 +779,13 @@ def test_code_finds_the_sections_naming_every_kpi():
     missing = Spec.model_validate({"groups": [{"key": "ops", "label": "Ops", "kind": "metric", "kpis": [
         {"key": "dap", "label": "Daily Active People", "unit": "count"}]}]})
     assert pipeline._sections_with_every_kpi(document, missing) is None
+
+
+def test_a_group_that_never_verifies_is_not_read_again():
+    spec = Spec.model_validate({"groups": [SPEC.groups[0].model_dump(), {"key": "lines", "label": "Revenue lines", "kind": "metric",
+                                "kpis": [{"key": "nii", "label": "Net interest income", "unit": "currency"}]}]})
+    rows = [{"group_key": "kpi_lines", "kpi_key": "nii", "fiscal_year": str(2020 + q // 4), "fiscal_period": f"Q{q % 4 + 1}",
+             "period_end": f"{2020 + q // 4}-0{q % 4 * 3 + 3}-28", "method": "ai", "validation_status": "needs_review", "value": 1.0}
+            for q in range(8)]
+    assert [g.key for g in _pipeline(FakeControl({}), rows)._readable(spec).groups] == ["technology"]
+    assert [g.key for g in _pipeline(FakeControl({}), rows[:7])._readable(spec).groups] == ["technology", "lines"]
