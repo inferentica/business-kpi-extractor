@@ -1759,7 +1759,7 @@ def _source_template(url: str) -> str:
     return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
 
 
-_INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in")
+_INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in|combined line")
 
 
 def _explain_pointer(problem: str, document: Document) -> str:

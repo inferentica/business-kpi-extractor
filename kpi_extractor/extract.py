@@ -114,6 +114,10 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         parsed = parse_number(text)
         if parsed is None:
             raise LocateError(f"no number in {locator.table} r{locator.row} c{locator.col}")
+        row_label = _row_label(table.rows[locator.row], locator.col) if locator.row < len(table.rows) else ""
+        if _combined_line(row_label, kpi.label):
+            raise LocateError(f"{locator.table} r{locator.row} is the combined line {row_label!r}, not {kpi.label!r}: "
+                              f"point at the row for {kpi.label} itself")
         header = " ".join(" ".join(row) for row in table.rows[:3])
         if kpi.unit == "percent" and not parsed.percent and not re.search(r"%|\bpercent", f"{' '.join(table.rows[locator.row])} {header}", re.I):
             raise LocateError(f"{text!r} is not a percentage")
@@ -187,6 +191,16 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
         matches = [kpi for kpi in listed if len(_identity(kpi.label)) >= 8 and wanted.endswith(_identity(kpi.label))
                    and not re.search(r"(?:&|\band|\+|,|/)\s*$", label[:len(label) - len(_tail(label, kpi.label))], re.I)]
     return matches[0] if len(matches) == 1 else None
+
+
+def _combined_line(row_label: str, kpi_label: str) -> bool:
+    """A row that ends with a KPI's name but adds a total or a joined part ("Total Markets & Securities Services" for
+    Securities Services): a subtotal that contains the KPI, not the KPI."""
+    tail = _tail(row_label, kpi_label)
+    if not tail or _identity(row_label) == _identity(kpi_label):
+        return False
+    prefix = row_label[:len(row_label) - len(tail)]
+    return bool(re.search(r"(?:&|\band|\+|,|/)\s*$", prefix, re.I) or re.match(r"\s*total\b", row_label, re.I))
 
 
 def _tail(label: str, listed: str) -> str:

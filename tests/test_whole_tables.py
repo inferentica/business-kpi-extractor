@@ -245,3 +245,11 @@ def test_footnote_markers_run_into_a_label_are_dropped():
     assert _row_label(["Banking & Wealth Management14", "1"], 1) == "Banking & Wealth Management"
     assert _row_label(["Google subscriptions, platforms, and devices(1)", "1"], 1) == "Google subscriptions, platforms, and devices"
     assert _row_label(["Q4", "1"], 1) == "Q4"
+
+
+def test_a_pointer_at_a_combined_line_is_rejected():
+    from kpi_extractor.extract import _combined_line
+    assert _combined_line("Total Markets & Securities Services", "Securities Services")
+    assert _combined_line("Markets & Securities Services", "Securities Services")
+    assert not _combined_line("Securities Services", "Securities Services")
+    assert not _combined_line("UnitedHealthcare Employer & Individual - Domestic", "Employer & Individual - Domestic")
