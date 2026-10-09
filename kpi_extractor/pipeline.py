@@ -51,6 +51,12 @@ _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
 _XBRL_READER = "xbrl reader 15"
+# Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
+# when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
+# with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
+# stamping began are never re-read by it, so a bump cannot re-read every company's history.
+_RELEASE_READER = "release reader 1"
+_RELEASE_READER_PREFIX = "release reader "
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -554,7 +560,7 @@ class SymbolPipeline:
     def _process_release(self, ref: FilingRef, spec: Spec, version: int) -> bool:
         previous = self.filings.get(ref.accession)
         if not self.force and previous and previous.get("spec_version") == version and (
-                previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS):
+                previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS) and not release_reread_due(previous):
             return False
         if not spec.groups:
             self._store_filing(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
@@ -596,7 +602,7 @@ class SymbolPipeline:
             verified = sum(1 for record in records if record["validation_status"] == "verified")
             status = "processed" if verified else "needs_review" if records else "skipped"
             unreported = _unreported(spec, read)
-            notes = [how, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []), *problems[:20]]
+            notes = [how, _RELEASE_READER, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []), *problems[:20]]
             self._store_filing(ref, status, records=records, spec_version=version, period_end=period_end,
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001
@@ -2163,6 +2169,16 @@ def _same_place(now: dict, before: dict) -> bool:
 def _source_template(url: str) -> str:
     """A document's kind from its file name with the dates and numbers taken out ("a2q26e_withguidance.htm")."""
     return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
+
+
+def release_reread_due(previous: dict | None) -> bool:
+    """Whether a finished release should be read again: an older reader (its stamp names another version) left a
+    tracked group unread. A complete release, or one read before stamping began, is left alone."""
+    if not previous or previous.get("status") != "processed":
+        return False
+    notes = previous.get("notes") or []
+    stamp = next((note for note in notes if note.startswith(_RELEASE_READER_PREFIX)), None)
+    return stamp is not None and stamp != _RELEASE_READER and any(note.startswith(_NOT_REPORTED) for note in notes)
 
 
 _INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in|combined line")

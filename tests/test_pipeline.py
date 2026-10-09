@@ -882,3 +882,16 @@ def test_a_breakdown_read_from_part_of_its_table_is_flagged():
             ReadValue(group, kpis["total"], 42.0, None, {}, [], is_total=True)]  # "advanced technologies" taken for the total
     pipeline._flag_partial_tables(read, EXPECTED, parse_document("<p>x</p>", "https://www.sec.gov/x.htm"))
     assert all(item.status == "needs_review" for item in read)
+
+
+def test_a_release_an_older_reader_left_incomplete_is_read_again():
+    from kpi_extractor.pipeline import _NOT_REPORTED, _RELEASE_READER, release_reread_due
+
+    incomplete = {"status": "processed", "notes": ["read by AI", "release reader 0", f"{_NOT_REPORTED}revenue_by_product.net_system_sales"]}
+    assert release_reread_due(incomplete) is True
+    # Read by the current reader, complete, never stamped (read before stamping began) or not finished: left alone.
+    assert release_reread_due({**incomplete, "notes": ["read by AI", _RELEASE_READER, incomplete["notes"][2]]}) is False
+    assert release_reread_due({**incomplete, "notes": ["read by AI", "release reader 0"]}) is False
+    assert release_reread_due({**incomplete, "notes": ["read by AI", incomplete["notes"][2]]}) is False
+    assert release_reread_due({**incomplete, "status": "skipped"}) is False
+    assert release_reread_due(None) is False
