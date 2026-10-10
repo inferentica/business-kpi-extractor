@@ -1,0 +1,280 @@
+"""Quarterly statements read from an earnings release, for filers whose only XBRL is annual (a foreign filer's 20-F):
+the income statement, balance sheet and cash flows as the release's own summary tables present them, no AI.
+
+A statement is read only from a grid whose header names its period ends ("Jun 29, Sep 28, … 2025 2025 …") and whose
+columns are quarters (or balance-sheet dates), and it is kept only when its own arithmetic holds: assets equal
+liabilities and equity, opening cash plus the change equals closing cash."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from datetime import date
+
+from .document import Document, Table, clean
+
+_MONTHS = {name: index + 1 for index, name in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"])}
+_MONTH_DAY = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?"
+_MONTH_DAY_CELL = re.compile(rf"^\s*({_MONTH_DAY})\s*$")
+_YEAR_CELL = re.compile(r"^\s*((?:19|20)\d{2})\s*$")
+_DURATION = re.compile(r"\b(three|six|nine|twelve)\s+months\s+ended\b", re.I)
+# A text header: its month-day run, an optional "(unaudited, in millions €)" and as many years.
+_TEXT_HEADER = re.compile(
+    rf"(?P<durations>(?:(?:three|six|nine|twelve)\s+months\s+ended,?\s+)*)(?P<days>(?:{_MONTH_DAY}\s+){{2,8}})"
+    r"(?P<note>\([^)]{0,120}\)\s+)?(?P<years>(?:(?:19|20)\d{2}\s+){1,7}(?:19|20)\d{2})\b", re.I)
+_CELL = r"(?:\(?-?[\d,]+(?:\.\d+)?\)?\s?%?|—|–)"
+_SCALE = re.compile(r"\bin\s+(thousands|millions|billions)\b", re.I)
+_SCALES = {"thousands": 1e3, "millions": 1e6, "billions": 1e9}
+_CURRENCIES = ((re.compile(r"€|\beuros?\b|\bEUR\b", re.I), "EUR"), (re.compile(r"NT\$|new taiwan dollars?", re.I), "TWD"),
+               (re.compile(r"US\$|\bUSD\b|U\.S\. dollars?", re.I), "USD"))
+# Section titles that reach us glued to the first line under them when a statement arrives as text.
+_HEADING = re.compile(
+    r"^(assets|liabilities and (?:shareholders|stockholders)[’']? ?equity|"
+    r"cash flows? from (?:operating|investing|financing) activities|[^:]{6,140}:)\s+(?=\S)", re.I)
+_PER_SHARE = re.compile(r"\bper\s+(?:\w+\s+)?share\b", re.I)
+_SHARE_COUNT = re.compile(r"number of (?:\w+\s+)?shares", re.I)
+
+# Lines every reader of a statement looks for, under the names Bedrock's statement table already marks as totals.
+_KNOWN = (
+    (re.compile(r"^total net (sales|revenues?)$|^net (sales|revenues?)$|^(total )?revenues?$", re.I), "Revenues"),
+    (re.compile(r"^gross profit$", re.I), "GrossProfit"),
+    (re.compile(r"^(income|profit) from operations$|^operating (income|profit)$", re.I), "OperatingIncomeLoss"),
+    (re.compile(r"^net income$", re.I), "NetIncomeLoss"),
+    (re.compile(r"^total assets$", re.I), "Assets"),
+    (re.compile(r"^total liabilities$", re.I), "Liabilities"),
+    (re.compile(r"^total (shareholders|stockholders)[’']? ?equity$", re.I), "StockholdersEquity"),
+    (re.compile(r"^total liabilities and (shareholders|stockholders)[’']? ?equity$", re.I), "LiabilitiesAndStockholdersEquity"),
+    (re.compile(r"^net cash provided by \(used in\) operating activities$", re.I), "NetCashProvidedByUsedInOperatingActivities"),
+    (re.compile(r"^net cash provided by \(used in\) investing activities$", re.I), "NetCashProvidedByUsedInInvestingActivities"),
+    (re.compile(r"^net cash provided by \(used in\) financing activities$", re.I), "NetCashProvidedByUsedInFinancingActivities"),
+)
+_OPENING_CASH = re.compile(r"cash and cash equivalents at (?:the )?beginning", re.I)
+_CLOSING_CASH = re.compile(r"cash and cash equivalents at (?:the )?end", re.I)
+_CASH_CHANGE = re.compile(r"net (?:increase|decrease)[^a-z]*(?:\(decrease\)|\(increase\))? ?in cash", re.I)
+_TOLERANCE = 0.25  # in the statement's own unit: figures are printed to one decimal
+
+
+@dataclass
+class Grid:
+    """One table of a statement: its period ends, whether its columns are quarters, and its rows in order (a row with
+    no cells is a heading)."""
+    period_ends: list[date]
+    quarterly: bool | None  # None: no duration stated (a balance sheet)
+    scale: float
+    currency: str | None
+    rows: list[tuple[str, list[str] | None]] = field(default_factory=list)
+
+
+@dataclass
+class ReleaseStatement:
+    statement: str  # income | balance | cash_flow
+    period_end: date
+    duration: str  # quarter | instant
+    currency: str | None
+    lines: list[dict]
+
+
+def _period_end(month_day: str, year: str) -> date | None:
+    match = re.match(r"\s*([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})", month_day)
+    month = _MONTHS.get(match.group(1).lower()) if match else None
+    try:
+        return date(int(year), month, int(match.group(2))) if month else None
+    except ValueError:
+        return None
+
+
+def _currency(text: str) -> str | None:
+    found = {code for pattern, code in _CURRENCIES if pattern.search(text)}
+    return found.pop() if len(found) == 1 else None
+
+
+def _scale(text: str) -> float | None:
+    found = {_SCALES[match.group(1).lower()] for match in _SCALE.finditer(text)}
+    return found.pop() if len(found) == 1 else None
+
+
+def _grid_from_table(table: Table) -> Grid | None:
+    """An HTML table whose header has a row of month-days over a row of years, optionally under one duration."""
+    for index in range(min(4, len(table.rows) - 1)):
+        days, years = table.rows[index], table.rows[index + 1]
+        columns = [col for col in range(1, min(len(days), len(years)))
+                   if _MONTH_DAY_CELL.match(days[col] or "") and _YEAR_CELL.match(years[col] or "")]
+        if len(columns) < 2:
+            continue
+        ends = [_period_end(days[col], years[col].strip()) for col in columns]
+        if any(end is None for end in ends):
+            return None
+        header = " ".join(" ".join(row) for row in table.rows[:index + 2])
+        durations = {match.group(1).lower() for match in _DURATION.finditer(header)}
+        if len(durations) > 1:
+            return None  # quarters beside a year to date: the summary table gives each quarter on its own
+        scale = _scale(f"{table.context[-200:]} {header}")
+        if scale is None:
+            return None
+        grid = Grid(ends, (durations == {"three"}) if durations else None, scale, _currency(f"{table.context[-200:]} {header}"))
+        for row in table.rows[index + 2:]:
+            label = clean(row[0] if row else "")
+            if not label:
+                # A section title set in the figures' columns ("Weighted average number of ordinary shares …:").
+                words = [clean(cell) for cell in row[1:] if clean(cell)]
+                if len(words) == 1 and _number(words[0]) is None:
+                    grid.rows.append((words[0].rstrip(":"), None))
+                continue
+            cells = [clean(row[col]) if col < len(row) else "" for col in columns]
+            grid.rows.append((label, cells if any(cells) else None))
+        return grid
+    return None
+
+
+def _grid_from_text(text: str) -> Grid | None:
+    """A statement that reaches us as running text (ASML's are slide images with hidden text): the header gives the
+    period ends; every "label cell cell …" run after it is a row. The header may repeat on a second page, or follow
+    the rows it heads, so it is taken out wherever it stands and the rows are read from the rest."""
+    header = _TEXT_HEADER.search(text)
+    if not header:
+        return None
+    days = re.findall(_MONTH_DAY, header.group("days"))
+    years = header.group("years").split()
+    if len(days) != len(years):
+        return None
+    ends = [_period_end(day, year) for day, year in zip(days, years)]
+    if any(end is None for end in ends):
+        return None
+    durations = {match.group(1).lower() for match in _DURATION.finditer(header.group("durations") or "")}
+    if len(durations) > 1:
+        return None
+    scale = _scale(text)
+    if scale is None:
+        return None
+    grid = Grid(ends, (durations == {"three"}) if durations else None, scale, _currency(text))
+    body = _TEXT_HEADER.sub(" ", text)
+    row = re.compile(rf"\s*(?P<label>[A-Za-z][^\d—–]{{1,220}}?)\s+(?P<cells>(?:{_CELL}\s+){{{len(ends) - 1}}}{_CELL})(?=\s|$)")
+    position = 0
+    while True:
+        match = row.search(body, position)
+        if not match:
+            break
+        label = clean(match.group("label"))
+        while True:  # section titles glued in front of the first line under them
+            heading = _HEADING.match(label)
+            if not heading:
+                break
+            grid.rows.append((clean(heading.group(1)).rstrip(":"), None))
+            label = label[heading.end():]
+        grid.rows.append((label, re.findall(_CELL, match.group("cells"))))
+        position = match.end()
+    return grid if len(grid.rows) >= 5 else None
+
+
+def _kind(grid: Grid) -> str | None:
+    labels = [label.lower() for label, cells in grid.rows if cells is not None]
+    if any(label == "total assets" for label in labels):
+        return "balance"
+    if any(re.search(r"net cash .*operating activities", label) for label in labels):
+        return "cash_flow"
+    if any(pattern.search(label) for label in labels for pattern, name in _KNOWN if name == "Revenues") and any(
+            label.startswith("net income") for label in labels):
+        return "income"
+    return None
+
+
+def _number(cell: str) -> float | None:
+    text = cell.replace(",", "").replace("%", "").strip()
+    if text in ("—", "–", "-"):
+        return 0.0
+    match = re.fullmatch(r"(\()?(-?\d+(?:\.\d+)?)\)?", text)
+    if not match:
+        return None
+    value = float(match.group(2))
+    return -value if match.group(1) else value
+
+
+def _concept(label: str, context: str) -> str:
+    if _SHARE_COUNT.search(f"{context} {label}"):
+        # A share count under "…shares used in computing per share amounts" is a count, never a per-share figure.
+        words = re.findall(r"[A-Za-z0-9]+", label)
+        return "release_WeightedAverageNumberOfShares" + "".join(word[:1].upper() + word[1:].lower() for word in words)[:80]
+    name = next((known for pattern, known in _KNOWN if pattern.search(label)), None)
+    if name is None:
+        words = re.findall(r"[A-Za-z0-9]+", f"{context} {label}" if context else label)
+        name = "".join(word[:1].upper() + word[1:].lower() for word in words)[:150] or "Line"
+    per_share = bool(_PER_SHARE.search(f"{context} {label}")) and not _SHARE_COUNT.search(f"{context} {label}")
+    return f"release_{'PerShare' if per_share and 'PerShare' not in name else ''}{name}"
+
+
+def _lines(grid: Grid, column: int) -> list[dict]:
+    """One period's lines in order. A bare "Basic"/"Diluted" takes the heading above it into its name; amounts take
+    the table's scale, per-share figures none."""
+    lines: list[dict] = []
+    heading = ""
+    for label, cells in grid.rows:
+        if cells is None:
+            heading = label
+            lines.append({"line": len(lines), "concept": _concept(label, "")[:200], "label": label, "level": 0,
+                          "is_heading": True, "value": None})
+            continue
+        value = _number(cells[column]) if column < len(cells) else None
+        if value is None:
+            continue
+        context = heading if len(label.split()) <= 2 and _PER_SHARE.search(heading) or _SHARE_COUNT.search(heading) and len(label.split()) <= 2 else ""
+        named = f"{context} {label}" if context else label
+        per_share = bool(_PER_SHARE.search(named)) and not _SHARE_COUNT.search(named)
+        lines.append({"line": len(lines), "concept": _concept(label, context)[:200], "label": label, "level": 1 if heading else 0,
+                      "is_heading": False, "value": value if per_share else round(value * grid.scale, 2)})
+    # A heading with nothing under it says nothing.
+    kept = [line for index, line in enumerate(lines)
+            if not line["is_heading"] or (index + 1 < len(lines) and not lines[index + 1]["is_heading"])]
+    for index, line in enumerate(kept):
+        line["line"] = index
+    return kept
+
+
+def _value(lines: list[dict], pattern: re.Pattern) -> float | None:
+    return next((line["value"] for line in lines if not line["is_heading"] and pattern.search(line["label"])), None)
+
+
+def _holds(kind: str, lines: list[dict], scale: float) -> bool:
+    """The statement's own arithmetic: read wrongly (a shifted column, a dropped row) it would not add up."""
+    gap = _TOLERANCE * scale
+    if kind == "balance":
+        assets = _value(lines, re.compile(r"^total assets$", re.I))
+        both = _value(lines, re.compile(r"^total liabilities and (shareholders|stockholders)", re.I))
+        return assets is not None and both is not None and abs(assets - both) <= gap
+    if kind == "cash_flow":
+        opening, closing, change = (_value(lines, pattern) for pattern in (_OPENING_CASH, _CLOSING_CASH, _CASH_CHANGE))
+        return None not in (opening, closing, change) and abs(opening + change - closing) <= gap
+    revenue = next((line["value"] for line in lines if line["concept"] == "release_Revenues"), None)
+    gross = next((line["value"] for line in lines if line["concept"] == "release_GrossProfit"), None)
+    cost = _value(lines, re.compile(r"^(total )?cost of (sales|revenues?)$", re.I))
+    if revenue is None or _value(lines, re.compile(r"^net income$", re.I)) is None:
+        return False
+    return gross is None or cost is None or abs(revenue - abs(cost) - gross) <= gap
+
+
+def release_statements(document: Document) -> list[ReleaseStatement]:
+    """Every quarter's statements a release presents, the widest table first (a five-quarter summary before the
+    current-against-last-year table), each period once per statement."""
+    grids: list[tuple[str, Grid]] = []
+    for key in document.order:
+        table, block = document.tables.get(key), document.blocks.get(key)
+        # A table rebuilt from a text block is read from the block itself, which keeps its dates and nil dashes.
+        grid = _grid_from_text(block.text) if block is not None else (
+            _grid_from_table(table) if table is not None and f"{key}"[:-2] not in document.blocks else None)
+        kind = _kind(grid) if grid else None
+        if kind is None:
+            continue
+        if kind != "balance" and grid.quarterly is not True:
+            continue  # only a quarter's own flows; a year to date is not a quarter
+        grids.append((kind, grid))
+    statements: dict[tuple[str, date], ReleaseStatement] = {}
+    for kind, grid in sorted(grids, key=lambda item: -len(item[1].period_ends)):
+        for column, period_end in enumerate(grid.period_ends):
+            if (kind, period_end) in statements:
+                continue
+            lines = _lines(grid, column)
+            if len([line for line in lines if not line["is_heading"]]) < 6 or not _holds(kind, lines, grid.scale):
+                continue
+            statements[(kind, period_end)] = ReleaseStatement(
+                kind, period_end, "instant" if kind == "balance" else "quarter", grid.currency, lines)
+    return sorted(statements.values(), key=lambda item: (item.period_end, item.statement))

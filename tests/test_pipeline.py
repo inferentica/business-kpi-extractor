@@ -895,3 +895,46 @@ def test_a_release_an_older_reader_left_incomplete_is_read_again():
     assert release_reread_due({**incomplete, "notes": ["read by AI", incomplete["notes"][2]]}) is False
     assert release_reread_due({**incomplete, "status": "skipped"}) is False
     assert release_reread_due(None) is False
+
+
+def test_release_statements_go_to_the_newest_release_presenting_each_quarter():
+    from datetime import date as day
+
+    from kpi_extractor.document import Document, TextBlock
+    from kpi_extractor.sec import FilingRef
+    from tests.test_release_statements import BALANCE
+
+    class Recorder(FakeControl):
+        def call(self, operation, **payload):
+            self.calls.append((operation, payload))
+            return {}
+
+    def release(accession: str, filed: day, period_end: day, text: str) -> tuple[FilingRef, Document]:
+        document = Document("https://www.sec.gov/x.htm")
+        document.blocks["P0"] = TextBlock("P0", text)
+        document.order.append("P0")
+        return FilingRef(accession, "6-K", filed, "earnings_release", "https://www.sec.gov/x.htm", period_end), document
+
+    # The newer release presents Jun 2025 to Jun 2026; the older one's five quarters end a quarter earlier.
+    older_text = (BALANCE.replace("Jun 29, Sep 28, Dec 31, Mar 29, Jun 28,", "Mar 30, Jun 29, Sep 28, Dec 31, Mar 29,")
+                  .replace("2025 2025 2025 2026 2026", "2025 2025 2025 2025 2026"))
+    newer, newer_document = release("new", day(2026, 7, 15), day(2026, 6, 28), BALANCE)
+    older, older_document = release("old", day(2026, 4, 15), day(2026, 3, 29), older_text)
+    control = Recorder({})
+    pipeline = _pipeline(control)
+    pipeline.offset = 0
+    pipeline._statement_owners = {}
+    pipeline._document = lambda ref: newer_document if ref.accession == "new" else older_document
+    annual = FilingRef("annual", "20-F", day(2026, 2, 25), "periodic_report", "https://www.sec.gov/y.htm")
+    pipeline._store_release_statements([annual], [older, newer])
+    stored = {payload["accession"]: sorted({line["period_end"] for line in payload["lines"]})
+              for operation, payload in control.calls if operation == "store_statements"}
+    # Balance sheets carry no income statement, so the older release is opened too; it keeps only the quarter the
+    # newer one does not present.
+    assert stored == {"new": ["2025-06-29", "2025-09-28", "2025-12-31", "2026-03-29", "2026-06-28"], "old": ["2025-03-30"]}
+    # A filer with 10-Qs has its quarters in XBRL: its releases are never read for statements.
+    control.calls.clear()
+    quarterly = FilingRef("q", "10-Q", day(2026, 5, 1), "periodic_report", "https://www.sec.gov/z.htm")
+    pipeline._statement_owners = {}
+    pipeline._store_release_statements([annual, quarterly], [older, newer])
+    assert control.calls == []

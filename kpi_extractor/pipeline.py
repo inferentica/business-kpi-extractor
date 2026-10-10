@@ -30,6 +30,7 @@ from .document import Document, clean, parse_document, parse_number
 from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, count_jump, describe,
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
+from .release_statements import release_statements
 from .statements import statement_lines
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
@@ -162,6 +163,11 @@ class SymbolPipeline:
         self.filings = {filing["accession"]: filing for filing in state.get("filings") or []}
         self.values = {value_key(value): value for value in state.get("values") or []}
         self.names = (state.get("spec") or {}).get("names") or {}
+        # Which filing gave each stored statement period: a quarter read from releases belongs to the newest release
+        # that presents it.
+        self._statement_owners = {
+            (row["statement"], row["fiscal_year"], row["fiscal_period"], row["duration"]): row
+            for row in state.get("statements") or []}
         self.profile, company = company_profile(self.symbol)
         self.archive = Archive(self.control, self.symbol, self.profile.cik, self.log)
         self.archive._listing()  # once, before the download threads start
@@ -180,6 +186,7 @@ class SymbolPipeline:
             self._process_report(ref)
         releases = [ref for ref in sorted(listing.result(), key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
         self._newest_release = max((ref.period_end for ref in releases if ref.period_end), default=None)
+        self._store_release_statements(reports, releases)
         for ref in releases:
             if self.force or self._pending(ref):
                 for exhibit in ref.exhibits[:6]:
@@ -371,6 +378,41 @@ class SymbolPipeline:
                               lines=[{**line, **shared} for line in lines])
         except Exception as error:  # noqa: BLE001
             self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not stored ({type(error).__name__}: {error})"[:300])
+
+    def _store_release_statements(self, reports: list[FilingRef], releases: list[FilingRef]) -> None:
+        """Quarterly statements for a filer whose only XBRL is annual (a 20-F filer such as ASML): read from its
+        earnings releases' own tables, no AI. Each quarter is in several releases (a five-quarter summary), so it is
+        kept from the newest release that presents it; a release whose own quarter a newer one already gave is not
+        even opened. A release that cannot be read never holds up the KPIs."""
+        if not reports or any(ref.form.upper().startswith("10-Q") for ref in reports):
+            return
+        owners = self._statement_owners
+        for ref in sorted(releases, key=lambda item: item.filed, reverse=True):
+            if ref.period_end is None:
+                continue
+            try:
+                own = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
+                owner = owners.get(("income", *own, "quarter"))
+                if owner and (owner["accession"] == ref.accession or str(owner.get("filed_at") or "")[:10] >= ref.filed.isoformat()):
+                    continue
+                lines: list[dict] = []
+                for statement in release_statements(self._document(ref)):
+                    fiscal_year, fiscal_period = fiscal_label(statement.period_end, self.profile.fiscal_year_end,
+                                                              year_offset=self.offset)
+                    key = (statement.statement, fiscal_year, fiscal_period, statement.duration)
+                    held = owners.get(key)
+                    if held and held["accession"] != ref.accession and str(held.get("filed_at") or "")[:10] > ref.filed.isoformat():
+                        continue  # a newer release already gave this quarter
+                    shared = {"statement": statement.statement, "duration": statement.duration, "fiscal_year": fiscal_year,
+                              "fiscal_period": fiscal_period, "period_end": statement.period_end.isoformat(),
+                              "form": ref.form, "filed_at": ref.filed.isoformat(), "currency": statement.currency or "USD"}
+                    lines.extend({**line, **shared} for line in statement.lines)
+                    owners[key] = {"accession": ref.accession, "filed_at": ref.filed.isoformat()}
+                if lines:
+                    self.control.call("store_statements", symbol=self.symbol, accession=ref.accession, lines=lines)
+                    self.log(f"{self.symbol}: {ref.form} {ref.filed} statements stored ({len(lines)} lines)")
+            except Exception as error:  # noqa: BLE001
+                self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
 
     def _continuing_split(self, group, period_end: date):
         """Of two complete splits on one axis, the one the company's stored periods of the past year use, so the year
