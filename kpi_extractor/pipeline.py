@@ -47,6 +47,8 @@ CHART_METHOD = "chart"
 # A breakdown slide gives this many things a quarter (three pies and the units sold); a quarter with fewer is looked
 # at again.
 CHART_GROUPS = 4
+# The bar chart of units is read again at these enlargements; a count is trusted when readings agree.
+UNIT_SCALES = (3, 4)
 _SYSTEMS_SOLD = re.compile(r"lithography systems sold", re.I)
 AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
@@ -466,8 +468,8 @@ class SymbolPipeline:
                         words = ocr_words(image)
                         # The bars' small figures are read again from an enlarged cut of the slide.
                         region = unit_region(words)
-                        detail = ocr_words(image, region) if region else None
-                        for chart in [*read_breakdowns(words), *read_units(words, detail)]:
+                        details = [ocr_words(image, region, scale) for scale in UNIT_SCALES] if region else []
+                        for chart in [*read_breakdowns(words), *read_units(words, *details)]:
                             quarter = (chart.fiscal_year, chart.fiscal_period)
                             if quarter not in period_ends:
                                 continue
@@ -548,9 +550,13 @@ class SymbolPipeline:
             total = float(stated)
         units = dict(chart.units)
         notes = ["read from the slide's chart"]
+        if total is None and set(units) - chart.confirmed:
+            return []  # nothing to check the bars against: every count must be one two readings agree on
         if chart.missing:
             rest = None if total is None else total - sum(units.values())
-            if rest is None or rest < 0:
+            # A fill takes whatever is left of the total, so it would hide a misread digit among the bars that were
+            # read: each of those must be a count two readings of the picture agree on.
+            if rest is None or rest < 0 or set(units) - chart.confirmed:
                 return []
             units[chart.missing] = int(rest)
             notes = [f"{chart.missing}: the quarter's {total:g} units less the other technologies"]

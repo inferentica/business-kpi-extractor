@@ -169,3 +169,23 @@ def test_each_quarter_takes_the_reading_that_gave_it_more():
     units = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units(whole, closer)}
     assert units[("Q2", "2026")].missing is None and units[("Q2", "2026")].units["ArF Dry"] == 8
     assert units[("Q1", "2026")].missing is None and units[("Q1", "2026")].units["ArF Dry"] == 5
+
+
+def test_a_count_is_confirmed_when_readings_agree_and_unread_when_they_do_not():
+    whole = [Word(*word) for word in SLIDE]
+    # A closer reading takes Q2's EUV count, 16, for 10; a third agrees with the first.
+    misread = [Word(*[*word[:4], "10" if (word[4] == "16" and word[1] < 400) else word[4]]) for word in SLIDE]
+    units = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units(whole, misread, whole)}
+    assert units[("Q2", "2026")].units["EUV"] == 16 and "EUV" in units[("Q2", "2026")].confirmed
+    # Two readings that disagree leave the bar unread, never a guess between them.
+    split = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units(whole, misread)}
+    assert split[("Q2", "2026")].missing == "EUV" and "EUV" not in split[("Q2", "2026")].units
+    # A single reading confirms nothing.
+    assert read_units(whole)[0].confirmed == frozenset()
+
+
+def test_a_region_label_cut_into_the_bar_chart_is_not_a_bar():
+    # The enlarged cut begins inside the region pie: its "Korea" must not be taken for a technology under a bar.
+    stray = Word(1042, 300, 1080, 318, "Korea")
+    units = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units([Word(*word) for word in SLIDE] + [stray])}
+    assert units[("Q2", "2026")].units == {"EUV": 16, "ArFi": 23, "ArF Dry": 8, "KrF": 35, "I-line": 9}

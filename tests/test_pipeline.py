@@ -975,7 +975,7 @@ def test_chart_slides_become_revenue_breakdowns_and_unit_metrics_checked_against
     fetched: list[str] = []
     original = (module._fetch_image, module.ocr_words)
     module._fetch_image = lambda link: fetched.append(link) or b""
-    module.ocr_words = lambda _image, _region=None: [Word(*word) for word in SLIDE]
+    module.ocr_words = lambda _image, *_region: [Word(*word) for word in SLIDE]
     try:
         pipeline._store_chart_breakdowns([q1, q2])
         values = [value for operation, payload in control.calls if operation == "store" for value in payload["values"]]
@@ -1019,9 +1019,15 @@ def test_units_that_do_not_add_up_to_the_quarter_are_left_out_and_one_unread_bar
     ref = FilingRef("q3", "6-K", day(2025, 10, 15), "earnings_release", "https://www.sec.gov/x.htm", day(2025, 9, 28))
     read = {"EUV": 9, "ArFi": 38, "KrF": 11, "I-line": 10}
     # The picture gave no count for the sliver of a bar: it is the quarter's 72 units less the other four.
-    filled = pipeline._unit_records(ChartUnits("2025", "Q3", read, "ArF Dry"), ref, day(2025, 9, 28), "https://www.sec.gov/s.jpg")
+    link = "https://www.sec.gov/s.jpg"
+    pipeline._document = lambda _ref: (_ for _ in ()).throw(ValueError("no statements exhibit"))
+    filled = pipeline._unit_records(ChartUnits("2025", "Q3", read, "ArF Dry", frozenset(read)), ref, day(2025, 9, 28), link)
     assert {record["kpi_label"]: record["value"] for record in filled}["ArF Dry units sold"] == 4
     assert "72 units less the other technologies" in next(r for r in filled if r["kpi_label"] == "ArF Dry units sold")["notes"][0]
     # Every bar read, but a count misread: the bars no longer add up to the reported units.
-    wrong = pipeline._unit_records(ChartUnits("2025", "Q3", {**read, "ArF Dry": 9}), ref, day(2025, 9, 28), "https://www.sec.gov/s.jpg")
+    wrong = pipeline._unit_records(ChartUnits("2025", "Q3", {**read, "ArF Dry": 9}), ref, day(2025, 9, 28), link)
     assert wrong == []
+    # A fill would take whatever the total leaves, hiding a misread among the bars that were read (an 8 taken for a
+    # 0): so it is made only when two readings agree on each of them.
+    once = pipeline._unit_records(ChartUnits("2025", "Q3", read, "ArF Dry", frozenset({"ArFi", "KrF", "I-line"})), ref, day(2025, 9, 28), link)
+    assert once == []

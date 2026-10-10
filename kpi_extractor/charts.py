@@ -26,6 +26,8 @@ _NAMES = {
     "restofasia": "Rest of Asia", "emea": "EMEA", "europe": "Europe", "singapore": "Singapore",
     "restofworld": "Rest of World",
 }
+# What the bars of units are named for: the lithography technologies, never a region or an end-use from the pies.
+_UNIT_NAMES = {"EUV", "ArFi", "ArF Dry", "KrF", "I-line"}
 _TITLES = {
     "technology": "technology", "enduse": "end-use", "regionshiptolocation": "region", "region": "region",
 }
@@ -67,6 +69,11 @@ class ChartUnits:
     # A technology whose count the picture did not give up (a one-digit figure over a sliver of a bar): the caller
     # may fill it from the quarter's reported total, or leave the chart out.
     missing: str | None = None
+    # Technologies whose count two readings of the picture agree on. A count read once may be a misread digit (an 8
+    # taken for a 0), which a fill from the total would then hide.
+    confirmed: frozenset[str] = frozenset()
+    # Every technology under the bars, read or not (one reading's view, before readings are weighed).
+    names: tuple[str, ...] = ()
 
 
 def breakdown_slides(raw_html: str) -> list[tuple[str, str]]:
@@ -97,21 +104,49 @@ def read_breakdowns(words: list[Word]) -> list[ChartBreakdown]:
     return [chart for chart in _read(words) if isinstance(chart, ChartBreakdown)]
 
 
-def read_units(words: list[Word], detail: list[Word] | None = None) -> list[ChartUnits]:
-    """The slide's bar charts of units sold: each bar's count stands over it and its technology under it. `detail`
-    is a closer reading of the bar chart alone (see `unit_region`), which older slides need: their counts are small
-    and grey, and a reading of the whole slide loses some."""
-    # Neither reading is always the better one, so each quarter takes whichever gave it more: every bar, else all
-    # but one.
-    best: dict[tuple[str, str], ChartUnits] = {}
-    for reading in ([detail, None] if detail is not None else [None]):
-        for chart in _read(words, reading):
+def read_units(words: list[Word], *details: list[Word] | None) -> list[ChartUnits]:
+    """The slide's bar charts of units sold: each bar's count stands over it and its technology under it. `details`
+    are closer readings of the bar chart alone (see `unit_region`), which older slides need: their counts are small
+    and grey, and a reading of the whole slide loses some.
+
+    No single reading is trusted. Each bar takes the count most readings give it; where readings disagree with no
+    majority the bar counts as unread. `confirmed` names the bars at least two readings agree on."""
+    readings = [None, *[detail for detail in details if detail is not None]]
+    seen: dict[tuple[str, str], list[dict[str, int]]] = {}
+    labels: dict[tuple[str, str], list[str]] = {}
+    for reading in readings:
+        for chart in _read(words, reading, partial=True):
             if not isinstance(chart, ChartUnits):
                 continue
             quarter = (chart.fiscal_year, chart.fiscal_period)
-            if quarter not in best or (best[quarter].missing and not chart.missing):
-                best[quarter] = chart
-    return list(best.values())
+            seen.setdefault(quarter, []).append(chart.units)
+            for name in chart.names:
+                if name not in labels.setdefault(quarter, []):
+                    labels[quarter].append(name)
+    charts: list[ChartUnits] = []
+    for quarter, reads in seen.items():
+        names = labels[quarter]
+        if not names:
+            continue
+        units: dict[str, int] = {}
+        confirmed: set[str] = set()
+        for name in names:
+            counts = [read[name] for read in reads if name in read]
+            if not counts:
+                continue
+            top = max(set(counts), key=counts.count)
+            agreeing = counts.count(top)
+            if agreeing * 2 <= len(counts) and len(set(counts)) > 1:
+                continue  # readings disagree with no majority: unread
+            units[name] = top
+            if agreeing >= 2:
+                confirmed.add(name)
+        unread = [name for name in names if name not in units]
+        if len(unread) > 1 or len(names) < 3:
+            continue
+        ordered = {name: units[name] for name in names if name in units}
+        charts.append(ChartUnits(quarter[0], quarter[1], ordered, unread[0] if unread else None, frozenset(confirmed)))
+    return charts
 
 
 def _unit_header(words: list[Word]) -> Word | None:
@@ -125,7 +160,7 @@ def unit_region(words: list[Word]) -> tuple[int, int] | None:
     return None if header is None else (max(0, int(header.x0 - 70)), int(header.y1 + 4))
 
 
-def _read(words: list[Word], detail: list[Word] | None = None) -> list[ChartBreakdown | ChartUnits]:
+def _read(words: list[Word], detail: list[Word] | None = None, partial: bool = False) -> list[ChartBreakdown | ChartUnits]:
     # The picture's lettering can lose its spaces ("Net systemsalesbreakdown"), so no word boundary is asked for.
     title = next((word for word in sorted(words, key=lambda item: item.y0) if "breakdown" in word.text.lower()), None)
     quarters = sorted((word for word in words if _QUARTER.match(word.text.replace(" ", ""))), key=lambda item: item.cy)
@@ -170,16 +205,25 @@ def _read(words: list[Word], detail: list[Word] | None = None) -> list[ChartBrea
                   if left <= word.cx < right and word.cy > unit_header.y1 + 30]
         column = [part for word in column for part in _split_names(word)]
         baselines: list[float] = []
-        for word in sorted((word for word in column if _squash(word.text) in _NAMES), key=lambda item: item.cy):
+        for word in sorted((word for word in column if _NAMES.get(_squash(word.text)) in _UNIT_NAMES), key=lambda item: item.cy):
             if not baselines or word.cy - baselines[-1] > 40:
                 baselines.append(word.cy)
         if len(baselines) == len(quarters):
             for row, (quarter, baseline) in enumerate(zip(quarters, baselines)):
                 above = baselines[row - 1] + 12 if row else unit_header.y1 + 30
-                units, missing = _units([word for word in column if above <= word.cy <= baseline + 12])
+                cell = [word for word in column if above <= word.cy <= baseline + 12]
                 period = _QUARTER.match(quarter.text.replace(" ", ""))
+                year = period.group(2) if len(period.group(2)) == 4 else f"20{period.group(2)}"
+                if partial:
+                    # Every bar this reading gave, however few: the readings are weighed against each other later.
+                    units, names = _unit_counts(cell)
+                    if names:
+                        charts.append(ChartUnits(year, f"Q{period.group(1)}", units,
+                                                 next((name for name in names if name not in units), None),
+                                                 names=tuple(names)))
+                    continue
+                units, missing = _units(cell)
                 if units:
-                    year = period.group(2) if len(period.group(2)) == 4 else f"20{period.group(2)}"
                     charts.append(ChartUnits(year, f"Q{period.group(1)}", units, missing))
     return charts
 
@@ -221,29 +265,36 @@ def _split_names(word: Word) -> list[Word]:
             for match in names]
 
 
-def _units(cell: list[Word]) -> tuple[dict[str, int], str | None]:
+def _unit_counts(cell: list[Word]) -> tuple[dict[str, int], list[str]]:
     """Bars read bottom-up: the technologies stand on one line under the bars, and each bar's count is the number
-    nearest above its own label. At most one label may be left without a count (named as missing)."""
-    labels = [word for word in cell if _squash(word.text) in _NAMES]
+    nearest above its own label. Returns the counts read and every technology on the line."""
+    labels = [word for word in cell if _NAMES.get(_squash(word.text)) in _UNIT_NAMES]
     if len(labels) < 3:
-        return {}, None
+        return {}, []
     baseline = max(word.cy for word in labels)
     labels = sorted((word for word in labels if abs(word.cy - baseline) <= 10), key=lambda item: item.cx)
     numbers = [word for word in cell if re.fullmatch(r"\d{1,4}", word.text.strip()) and word.cy < baseline - 10]
     units: dict[str, int] = {}
-    missing: list[str] = []
     taken: set[int] = set()
     for label in labels:
         width = max(30.0, label.x1 - label.x0)
         over = [number for number in numbers if id(number) not in taken and abs(number.cx - label.cx) <= 0.6 * width]
         if not over:
-            missing.append(_name(label.text))
             continue
         count = max(over, key=lambda item: item.cy)  # the lowest number over the label is the bar's own
         taken.add(id(count))
         units[_name(label.text)] = int(count.text.strip())
-    if len(missing) > 1 or len(taken) != len(numbers):
-        return {}, None  # more than one bar unread, or a number that belongs to no bar
+    if len(taken) != len(numbers):
+        return {}, []  # a number that belongs to no bar: this reading is not to be trusted
+    return units, [_name(label.text) for label in labels]
+
+
+def _units(cell: list[Word]) -> tuple[dict[str, int], str | None]:
+    """One reading's bars; at most one technology may be left without a count (named as missing)."""
+    units, names = _unit_counts(cell)
+    missing = [name for name in names if name not in units]
+    if not names or len(missing) > 1:
+        return {}, None
     return units, (missing[0] if missing else None)
 
 
