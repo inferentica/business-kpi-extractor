@@ -438,3 +438,56 @@ def release_statements(document: Document) -> list[ReleaseStatement]:
             statements[(kind, period_end)] = ReleaseStatement(
                 kind, period_end, "instant" if kind == "balance" else "quarter", grid.currency, lines)
     return sorted(statements.values(), key=lambda item: (item.period_end, item.statement))
+
+
+_UNITS_ROW = re.compile(r"sales of lithography systems \(in units\)", re.I)
+
+
+def reported_units(document: Document) -> dict[date, int]:
+    """Units sold a quarter, from the row of that name in a release's ratios table ("Sales of lithography systems
+    (in units)"), which lists the last five quarters: the figure a chart of units by technology must add up to."""
+    found: dict[date, int] = {}
+    widest = 0
+    for key in document.order:
+        table, block = document.tables.get(key), document.blocks.get(key)
+        ends: list[date | None] = []
+        cells: list[str] = []
+        quarterly = False
+        if table is not None and f"{key}"[:-2] not in document.blocks:
+            for index in range(min(4, len(table.rows) - 1)):
+                days, years = table.rows[index], table.rows[index + 1]
+                columns = [col for col in range(1, min(len(days), len(years)))
+                           if _MONTH_DAY_CELL.match(days[col] or "") and _YEAR_CELL.match(years[col] or "")]
+                if len(columns) < 2:
+                    continue
+                header = " ".join(" ".join(row) for row in table.rows[:index + 2])
+                quarterly = {match.group(1).lower() for match in _DURATION.finditer(header)} == {"three"}
+                row = next((row for row in table.rows[index + 2:] if row and _UNITS_ROW.search(row[0] or "")), None)
+                if row is not None:
+                    ends = [_period_end(days[col], years[col].strip()) for col in columns]
+                    cells = [clean(row[col]) if col < len(row) else "" for col in columns]
+                break
+        elif block is not None:
+            header = _TEXT_HEADER.search(block.text)
+            row = re.search(_UNITS_ROW.pattern + r"((?:\s+\d[\d,]*)+)", block.text, re.I)
+            if header and row:
+                days = re.findall(_MONTH_DAY, header.group("days"))
+                years = header.group("years").split()
+                quarterly = {match.group(1).lower() for match in _DURATION.finditer(header.group("durations") or "")} == {"three"}
+                cells = row.group(1).split()
+                # A footnote mark stands between the label and the figures ("… (in units) 1 76 72 102 79 91").
+                if len(cells) == len(days) + 1 and len(cells[0]) == 1:
+                    cells = cells[1:]
+                ends = [_period_end(day, year) for day, year in zip(days, years)] if len(days) == len(years) else []
+        if not ends or len(ends) != len(cells) or len(ends) <= widest or any(end is None for end in ends):
+            continue
+        # A "Quarterly Summary" may not head its columns "Three months ended": dates a quarter apart say the same.
+        steps = [(later - earlier).days for earlier, later in zip(ends, ends[1:])]
+        if not quarterly and not (len(ends) >= 3 and all(80 <= step <= 100 for step in steps)):
+            continue
+        values = [_number(cell) for cell in cells]
+        if any(value is None for value in values):
+            continue
+        widest = len(ends)
+        found = {end: int(value) for end, value in zip(ends, values)}
+    return found

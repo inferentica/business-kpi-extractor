@@ -33,7 +33,7 @@ from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, chec
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
 from .charts import ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_units, unit_region
-from .release_statements import release_statements
+from .release_statements import release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
@@ -538,6 +538,14 @@ class SymbolPipeline:
                     and value["validation_status"] == "verified" and value["method"] != CHART_METHOD
                     and _SYSTEMS_SOLD.search(value["kpi_label"])]
         total = sum(reported) if len(reported) == 2 else None  # new and used
+        # The release's own table of units a quarter is the better witness: it is read by rule, not by the AI.
+        try:
+            stated = next((units for end, units in reported_units(self._document(ref)).items()
+                           if abs((end - period_end).days) <= 3), None)
+        except Exception:  # noqa: BLE001 - a document that cannot be read leaves the other witness
+            stated = None
+        if stated is not None:
+            total = float(stated)
         units = dict(chart.units)
         notes = ["read from the slide's chart"]
         if chart.missing:

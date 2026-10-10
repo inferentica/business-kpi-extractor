@@ -258,3 +258,27 @@ def test_a_line_between_cost_and_gross_profit_adjusts_the_check_and_a_misread_st
     quarters = [item for item in release_statements(report("860,273,378")) if item.statement == "income" and item.duration == "quarter"]
     assert len(quarters) == 1 and _line(quarters[0], "Gross profit")["value"] == 860_273_378_000
     assert not [item for item in release_statements(report("860,999,999")) if item.statement == "income" and item.duration == "quarter"]
+
+
+def test_reported_units_come_from_the_quarterly_ratios_row_in_either_layout():
+    from kpi_extractor.release_statements import reported_units
+
+    text = ("Three months ended Jun 29, Sep 28, Dec 31, Mar 29, Jun 28, (Unaudited) 2025 2025 2025 2026 2026 Gross margin "
+            "53.7 % 51.6 % 52.2 % 53.0 % 54.0 % Sales of lithography systems (in units) 1 76 72 102 79 91 Net bookings 2 5,541 "
+            "5,399 13,158 3,936 5,541")
+    assert reported_units(_text_document(text)) == {date(2025, 6, 29): 76, date(2025, 9, 28): 72, date(2025, 12, 31): 102,
+                                                    date(2026, 3, 29): 79, date(2026, 6, 28): 91}
+    # A current-against-last-year table mixes a quarter with a year to date: not a quarter's units.
+    mixed = ("Three months ended Six months ended Jun 29, Jun 28, Jun 29, Jun 28, (Unaudited) 2025 2026 2025 2026 "
+             "Sales of lithography systems (in units) 1 76 91 153 170")
+    assert reported_units(_text_document(mixed)) == {}
+    # An older "Quarterly Summary" table does not say "Three months ended": its dates, a quarter apart, do.
+    document = Document("https://example.test/release.htm")
+    document.tables["T5"] = Table("T5", "ASML - Quarterly Summary Ratios and Other Data", [
+        ["", "Dec 31,", "Mar 29,", "Jun 28,", "Sep 27,", "Dec 31,"],
+        ["(unaudited, in millions €, except otherwise indicated)", "2019", "2020", "2020", "2020", "2020"],
+        ["Gross profit as a percentage of net sales", "48.1%", "45.1%", "48.2%", "47.5%", "52.0%"],
+        ["Sales of lithography systems (in units) 1", "76", "57", "61", "60", "80"],
+    ])
+    document.order.append("T5")
+    assert reported_units(document)[date(2020, 12, 31)] == 80 and reported_units(document)[date(2020, 9, 27)] == 60
