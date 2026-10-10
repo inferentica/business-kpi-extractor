@@ -938,3 +938,46 @@ def test_release_statements_go_to_the_newest_release_presenting_each_quarter():
     pipeline._statement_owners = {}
     pipeline._store_release_statements([annual, quarterly], [older, newer])
     assert control.calls == []
+
+
+def test_chart_breakdowns_are_stored_for_quarters_the_releases_cover_and_only_once():
+    from datetime import date as day
+
+    from kpi_extractor import pipeline as module
+    from kpi_extractor.charts import Word
+    from kpi_extractor.sec import FilingRef
+    from test_charts import SLIDE
+
+    class Recorder(FakeControl):
+        def call(self, operation, **payload):
+            self.calls.append((operation, payload))
+            return {}
+
+    exhibit = SimpleNamespace(url="https://www.sec.gov/Archives/edgar/data/1/2/deck.htm")
+    html = ('<IMG src="deck008.jpg" title="slide8"> <DIV><FONT size="1">Page 8 Net system sales breakdown (quarterly)</FONT></DIV>')
+    q2 = FilingRef("q2", "6-K", day(2026, 7, 15), "earnings_release", exhibit.url, day(2026, 6, 28), exhibits=[exhibit])
+    q1 = FilingRef("q1", "6-K", day(2026, 4, 15), "earnings_release", exhibit.url, day(2026, 3, 29), exhibits=[])
+    control = Recorder({})
+    pipeline = _pipeline(control)
+    pipeline.offset = 0
+    pipeline._exhibit = lambda _exhibit: SimpleNamespace(result=lambda: html)
+    fetched: list[str] = []
+    original = (module._fetch_image, module.ocr_words)
+    module._fetch_image = lambda link: fetched.append(link) or b""
+    module.ocr_words = lambda _image: [Word(*word) for word in SLIDE]
+    try:
+        pipeline._store_chart_breakdowns([q1, q2])
+        values = [value for operation, payload in control.calls if operation == "store" for value in payload["values"]]
+        # The Q2 slide gives its own quarter and, since the Q1 release had no slide, the quarter before.
+        assert {(value["fiscal_period"], value["period_end"]) for value in values} == {("Q2", "2026-06-28"), ("Q1", "2026-03-29")}
+        euv = next(value for value in values if value["kpi_label"] == "EUV" and value["fiscal_period"] == "Q2")
+        assert (euv["group_key"], euv["group_label"], euv["group_kind"], euv["unit"], euv["value"], euv["method"], euv["kpi_order"]) == (
+            "kpi_net_system_sales_by_technology", "Net system sales by technology", "mix", "percent", 57.0, "chart", 0)
+        assert euv["validation_status"] == "verified" and euv["source_accession"] == "q2"
+        assert fetched == ["https://www.sec.gov/Archives/edgar/data/1/2/deck008.jpg"]
+        # Stored quarters are not read again.
+        control.calls.clear()
+        pipeline._store_chart_breakdowns([q1, q2])
+        assert control.calls == [] and len(fetched) == 1
+    finally:
+        module._fetch_image, module.ocr_words = original

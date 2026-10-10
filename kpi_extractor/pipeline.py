@@ -16,6 +16,8 @@ import re
 import time
 import string
 import threading
+import urllib.parse
+import urllib.request
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from itertools import permutations
@@ -30,15 +32,18 @@ from .document import Document, clean, parse_document, parse_number
 from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, count_jump, describe,
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
+from .charts import breakdown_slides, ocr_words, read_breakdowns
 from .release_statements import release_statements
 from .statements import statement_lines
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
-from .xbrl import XbrlCandidate, extract_breakdowns, member_children, official_labels
+from .xbrl import XbrlCandidate, extract_breakdowns, member_children, member_key, official_labels
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
 MAX_DOCUMENT_CHARS = 120_000
 AI_GROUP_PREFIX = "kpi_"
+# Values read from a slide's chart: their own method, so a re-read of the release's text never withdraws them.
+CHART_METHOD = "chart"
 AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
 _MAX_ATTEMPTS = 3
@@ -187,6 +192,7 @@ class SymbolPipeline:
         releases = [ref for ref in sorted(listing.result(), key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
         self._newest_release = max((ref.period_end for ref in releases if ref.period_end), default=None)
         self._store_release_statements(reports, releases)
+        self._store_chart_breakdowns(releases)
         for ref in releases:
             if self.force or self._pending(ref):
                 for exhibit in ref.exhibits[:6]:
@@ -413,6 +419,54 @@ class SymbolPipeline:
                     self.log(f"{self.symbol}: {ref.form} {ref.filed} statements stored ({len(lines)} lines)")
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+
+    def _store_chart_breakdowns(self, releases: list[FilingRef]) -> None:
+        """Breakdowns a release shows only as charts (ASML's net system sales by technology, end-use and region are
+        pies on a slide): read from the slide's picture by a local OCR model, no AI service. A slide shows its quarter
+        and the one before, so a quarter is taken from its own release and, failing that, from the next one's. Only a
+        pie whose shares add up to a whole is stored; a slide that cannot be read never holds up the KPIs."""
+        period_ends = {fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset): ref.period_end
+                       for ref in releases if ref.period_end}
+        have = {(value["fiscal_year"], value["fiscal_period"]) for value in self.values.values()
+                if value["method"] == CHART_METHOD and value["validation_status"] == "verified"}
+        for ref in sorted(releases, key=lambda item: item.filed):
+            if ref.period_end is None:
+                continue
+            try:
+                own = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
+                if own in have:
+                    continue
+                records: list[dict] = []
+                for exhibit in ref.exhibits[:6]:
+                    raw = self._waiting(self._exhibit(exhibit).result)
+                    for source, _title in breakdown_slides(raw or ""):
+                        link = urllib.parse.urljoin(exhibit.url, source)
+                        for chart in read_breakdowns(ocr_words(_fetch_image(link))):
+                            quarter = (chart.fiscal_year, chart.fiscal_period)
+                            if quarter in have or quarter not in period_ends:
+                                continue
+                            records.extend(self._chart_records(chart, ref, period_ends[quarter], link))
+                if records:
+                    self._store(values=records)
+                    have |= {(record["fiscal_year"], record["fiscal_period"]) for record in records}
+                    self.log(f"{self.symbol}: {ref.form} {ref.filed} chart breakdowns stored ({len(records)} shares)")
+            except Exception as error:  # noqa: BLE001
+                self.log(f"{self.symbol}: charts of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+
+    def _chart_records(self, chart, ref: FilingRef, period_end: date, link: str) -> list[dict]:
+        axis_order = {"technology": 0, "end-use": 1, "region": 2}
+        subject_key = re.sub(r"[^a-z0-9]+", "_", chart.subject.lower()).strip("_")
+        axis_key = re.sub(r"[^a-z0-9]+", "_", chart.axis.lower()).strip("_")
+        total = sum(chart.shares.values())
+        ranked = sorted(chart.shares.items(), key=lambda item: -item[1])
+        return [self._record(
+            group_key=f"{AI_GROUP_PREFIX}{subject_key}_by_{axis_key}", group_label=f"{chart.subject} by {chart.axis}",
+            group_kind="mix", group_order=60 + axis_order.get(chart.axis, 9), kpi_key=member_key(name)[:48] or "member",
+            kpi_label=name, kpi_order=order, unit="percent", value=share, currency=None, method=CHART_METHOD,
+            validation_status="verified", reconciliation_error_pct=round(total - 100, 2),
+            notes=["read from the slide's chart"], ref=ref, source_url=link, fiscal_year=chart.fiscal_year,
+            fiscal_period=chart.fiscal_period, period_end=period_end, locator={"image": link, "total": total},
+        ) for order, (name, share) in enumerate(ranked)]
 
     def _continuing_split(self, group, period_end: date):
         """Of two complete splits on one axis, the one the company's stored periods of the past year use, so the year
@@ -2211,6 +2265,12 @@ def _same_place(now: dict, before: dict) -> bool:
 def _source_template(url: str) -> str:
     """A document's kind from its file name with the dates and numbers taken out ("a2q26e_withguidance.htm")."""
     return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
+
+
+def _fetch_image(link: str) -> bytes:
+    request = urllib.request.Request(link, headers={"User-Agent": os.environ.get("SEC_USER_AGENT", "TradeTracker admin@inferentica.com")})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return response.read()
 
 
 def release_reread_due(previous: dict | None) -> bool:
