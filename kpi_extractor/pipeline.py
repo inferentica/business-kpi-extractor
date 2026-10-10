@@ -44,6 +44,8 @@ MAX_DOCUMENT_CHARS = 120_000
 AI_GROUP_PREFIX = "kpi_"
 # Values read from a slide's chart: their own method, so a re-read of the release's text never withdraws them.
 CHART_METHOD = "chart"
+# A breakdown slide shows this many pies a quarter (technology, end-use, region); a quarter with fewer is looked at again.
+CHART_AXES = 3
 AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
 _MAX_ATTEMPTS = 3
@@ -427,15 +429,23 @@ class SymbolPipeline:
         pie whose shares add up to a whole is stored; a slide that cannot be read never holds up the KPIs."""
         period_ends = {fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset): ref.period_end
                        for ref in releases if ref.period_end}
-        have = {(value["fiscal_year"], value["fiscal_period"]) for value in self.values.values()
+        # Stored pies, by breakdown and quarter: a pie one slide could not give is still taken from the next slide.
+        have = {(value["group_key"], value["fiscal_year"], value["fiscal_period"]) for value in self.values.values()
                 if value["method"] == CHART_METHOD and value["validation_status"] == "verified"}
+        groups = {key[0] for key in have}
+        ordered = sorted(period_ends, key=period_ends.get)
+
+        def complete(quarter: tuple[str, str]) -> bool:
+            return len(groups) >= CHART_AXES and all((group, *quarter) in have for group in groups)
+
         for ref in sorted(releases, key=lambda item: item.filed):
             if ref.period_end is None:
                 continue
             try:
                 own = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
-                if own in have:
-                    continue
+                before = ordered[ordered.index(own) - 1] if own in ordered and ordered.index(own) else None
+                if complete(own) and (before is None or complete(before)):
+                    continue  # this slide's two quarters are already stored whole
                 records: list[dict] = []
                 for exhibit in ref.exhibits[:6]:
                     raw = self._waiting(self._exhibit(exhibit).result)
@@ -443,12 +453,14 @@ class SymbolPipeline:
                         link = urllib.parse.urljoin(exhibit.url, source)
                         for chart in read_breakdowns(ocr_words(_fetch_image(link))):
                             quarter = (chart.fiscal_year, chart.fiscal_period)
-                            if quarter in have or quarter not in period_ends:
+                            rows = self._chart_records(chart, ref, period_ends[quarter], link) if quarter in period_ends else []
+                            if not rows or (rows[0]["group_key"], *quarter) in have:
                                 continue
-                            records.extend(self._chart_records(chart, ref, period_ends[quarter], link))
+                            records.extend(rows)
                 if records:
                     self._store(values=records)
-                    have |= {(record["fiscal_year"], record["fiscal_period"]) for record in records}
+                    have |= {(record["group_key"], record["fiscal_year"], record["fiscal_period"]) for record in records}
+                    groups |= {record["group_key"] for record in records}
                     self.log(f"{self.symbol}: {ref.form} {ref.filed} chart breakdowns stored ({len(records)} shares)")
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: charts of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
