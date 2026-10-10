@@ -12,7 +12,8 @@ from html import unescape
 
 _SLIDE = re.compile(r"<img[^>]+src=\"([^\"]+\.(?:jpe?g|png))\"[^>]*>\s*<div[^>]*>\s*<font[^>]*>(.*?)</font>", re.I | re.S)
 _BREAKDOWN = re.compile(r"\bbreakdown\b", re.I)
-_QUARTER = re.compile(r"^Q([1-4])\s?((?:19|20)\d{2})$")
+# "Q2 2026" on newer slides, "Q1'26" on older ones.
+_QUARTER = re.compile(r"^Q([1-4])[’'`]?((?:19|20)?\d{2})$")
 _SHARE = re.compile(r"^(?P<label>.*?)\s?(?P<share>\d{1,3})\s?%$")
 # Shares are printed as whole percentages: six of them can be off by a point each way in total.
 _WHOLE = (97.5, 102.5)
@@ -82,7 +83,8 @@ def _name(label: str) -> str:
 def read_breakdowns(words: list[Word]) -> list[ChartBreakdown]:
     """The pies of a breakdown slide. Columns come from the chart titles, rows from the quarter labels at the left;
     a share is a "Label NN%" (the label may sit on the line above, or wrap onto two)."""
-    title = next((word for word in sorted(words, key=lambda item: item.y0) if _BREAKDOWN.search(word.text)), None)
+    # The picture's lettering can lose its spaces ("Net systemsalesbreakdown"), so no word boundary is asked for.
+    title = next((word for word in sorted(words, key=lambda item: item.y0) if "breakdown" in word.text.lower()), None)
     quarters = sorted((word for word in words if _QUARTER.match(word.text.replace(" ", ""))), key=lambda item: item.cy)
     if title is None or not quarters:
         return []
@@ -112,7 +114,8 @@ def read_breakdowns(words: list[Word]) -> list[ChartBreakdown]:
             cell = [word for word in words if left <= word.cx < right and top <= word.cy < bottom and word is not header]
             shares = _shares(cell)
             if len(shares) >= 2 and _WHOLE[0] <= sum(shares.values()) <= _WHOLE[1]:
-                charts.append(ChartBreakdown(subject, _TITLES[_squash(header.text)], period.group(2), f"Q{period.group(1)}", shares))
+                year = period.group(2) if len(period.group(2)) == 4 else f"20{period.group(2)}"
+                charts.append(ChartBreakdown(subject, _TITLES[_squash(header.text)], year, f"Q{period.group(1)}", shares))
     return charts
 
 

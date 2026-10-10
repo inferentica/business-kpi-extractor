@@ -116,3 +116,11 @@ def test_only_breakdown_slides_are_picked_from_a_presentation():
         '<IMG src="deck008.jpg" title="slide8"> <DIV><FONT size="1">Page 8 Net system sales breakdown (quarterly) Q2 2026 '
         'Net system sales &#8364;6.6 billion</FONT></DIV>')
     assert breakdown_slides(html) == [("deck008.jpg", "Page 8 Net system sales breakdown (quarterly) Q2 2026 Net system sales €6.6 billion")]
+
+
+def test_older_slides_label_quarters_with_two_digit_years_and_squash_the_title():
+    older = {"Q22026": "Q2'26", "Q12026": "Q1'26", "Net system sales breakdown (quarterly)": "Net systemsalesbreakdown"}
+    charts = _charts([[*word[:4], older.get(word[4], word[4])] for word in SLIDE])
+    assert charts[("technology", "Q2", "2026")].shares["EUV"] == 57
+    assert charts[("region", "Q1", "2026")].shares["Rest of Asia"] == 1
+    assert len(charts) == 6
