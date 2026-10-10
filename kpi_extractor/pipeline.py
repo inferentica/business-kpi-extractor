@@ -32,7 +32,7 @@ from .document import Document, clean, parse_document, parse_number
 from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, count_jump, describe,
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
-from .charts import breakdown_slides, ocr_words, read_breakdowns
+from .charts import ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_units
 from .release_statements import release_statements
 from .statements import statement_lines
 from .replay import replay
@@ -44,8 +44,10 @@ MAX_DOCUMENT_CHARS = 120_000
 AI_GROUP_PREFIX = "kpi_"
 # Values read from a slide's chart: their own method, so a re-read of the release's text never withdraws them.
 CHART_METHOD = "chart"
-# A breakdown slide shows this many pies a quarter (technology, end-use, region); a quarter with fewer is looked at again.
-CHART_AXES = 3
+# A breakdown slide gives this many things a quarter (three pies and the units sold); a quarter with fewer is looked
+# at again.
+CHART_GROUPS = 4
+_SYSTEMS_SOLD = re.compile(r"lithography systems sold", re.I)
 AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
 _MAX_ATTEMPTS = 3
@@ -423,20 +425,25 @@ class SymbolPipeline:
                 self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
 
     def _store_chart_breakdowns(self, releases: list[FilingRef]) -> None:
-        """Breakdowns a release shows only as charts (ASML's net system sales by technology, end-use and region are
-        pies on a slide): read from the slide's picture by a local OCR model, no AI service. A slide shows its quarter
-        and the one before, so a quarter is taken from its own release and, failing that, from the next one's. Only a
-        pie whose shares add up to a whole is stored; a slide that cannot be read never holds up the KPIs."""
+        """What a release shows only as charts (ASML's slide: net system sales by technology, end-use and region as
+        pies, and units sold by technology as bars), read from the slide's picture by a local OCR model, no AI service.
+
+        A pie is a split of the amount it names, so it is stored as a revenue breakdown: each share of that quarter's
+        net system sales, which the release's statements give. Units are stored as operating metrics and must add up
+        to the quarter's reported units. A slide shows its quarter and the one before, so what one slide could not
+        give is taken from the next. A slide that cannot be read never holds up the KPIs."""
         period_ends = {fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset): ref.period_end
                        for ref in releases if ref.period_end}
-        # Stored pies, by breakdown and quarter: a pie one slide could not give is still taken from the next slide.
-        have = {(value["group_key"], value["fiscal_year"], value["fiscal_period"]) for value in self.values.values()
-                if value["method"] == CHART_METHOD and value["validation_status"] == "verified"}
+        chart_values = [value for value in self.values.values()
+                        if value["method"] == CHART_METHOD and value["validation_status"] == "verified"]
+        # Shares once stored as bare percentages are read again as amounts.
+        have = {(value["group_key"], value["fiscal_year"], value["fiscal_period"]) for value in chart_values
+                if value["unit"] != "percent"}
         groups = {key[0] for key in have}
         ordered = sorted(period_ends, key=period_ends.get)
 
         def complete(quarter: tuple[str, str]) -> bool:
-            return len(groups) >= CHART_AXES and all((group, *quarter) in have for group in groups)
+            return len(groups) >= CHART_GROUPS and all((group, *quarter) in have for group in groups)
 
         for ref in sorted(releases, key=lambda item: item.filed):
             if ref.period_end is None:
@@ -451,34 +458,98 @@ class SymbolPipeline:
                     raw = self._waiting(self._exhibit(exhibit).result)
                     for source, _title in breakdown_slides(raw or ""):
                         link = urllib.parse.urljoin(exhibit.url, source)
-                        for chart in read_breakdowns(ocr_words(_fetch_image(link))):
+                        words = ocr_words(_fetch_image(link))
+                        for chart in [*read_breakdowns(words), *read_units(words)]:
                             quarter = (chart.fiscal_year, chart.fiscal_period)
-                            rows = self._chart_records(chart, ref, period_ends[quarter], link) if quarter in period_ends else []
+                            if quarter not in period_ends:
+                                continue
+                            rows = (self._unit_records(chart, ref, period_ends[quarter], link) if isinstance(chart, ChartUnits)
+                                    else self._chart_records(chart, ref, period_ends[quarter], link))
                             if not rows or (rows[0]["group_key"], *quarter) in have:
                                 continue
                             records.extend(rows)
+                            have.add((rows[0]["group_key"], *quarter))
+                            groups.add(rows[0]["group_key"])
                 if records:
                     self._store(values=records)
-                    have |= {(record["group_key"], record["fiscal_year"], record["fiscal_period"]) for record in records}
-                    groups |= {record["group_key"] for record in records}
-                    self.log(f"{self.symbol}: {ref.form} {ref.filed} chart breakdowns stored ({len(records)} shares)")
+                    self.log(f"{self.symbol}: {ref.form} {ref.filed} chart figures stored ({len(records)} values)")
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: charts of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+        # A share left as a bare percentage (its quarter's amount is not known) is not a revenue breakdown: withdrawn.
+        stale = [{**value, "validation_status": "rejected", "notes": ["a share without its amount; read again as a revenue breakdown"]}
+                 for value in self.values.values()
+                 if value["method"] == CHART_METHOD and value["unit"] == "percent" and value["validation_status"] != "rejected"]
+        for start in range(0, len(stale), 400):
+            self._store(values=stale[start:start + 400])
+
+    def _quarter_amount(self, subject: str, quarter: tuple[str, str], ref: FilingRef, period_end: date) -> tuple[float, str | None] | None:
+        """The amount a pie splits ("Net system sales") for a quarter: the verified value read for it, else the line of
+        that name in the release's own statements."""
+        name = member_key(subject)
+        for value in self.values.values():
+            if ((value["fiscal_year"], value["fiscal_period"]) == quarter and value["unit"] == "currency"
+                    and value["validation_status"] == "verified" and value["method"] != CHART_METHOD
+                    and member_key(value["kpi_label"]) == name):
+                return float(value["value"]), value.get("currency")
+        for statement in release_statements(self._document(ref)):
+            if statement.statement == "income" and abs((statement.period_end - period_end).days) <= 3:
+                for line in statement.lines:
+                    if not line["is_heading"] and member_key(line["label"]) == name and line["value"]:
+                        return float(line["value"]), statement.currency
+        return None
 
     def _chart_records(self, chart, ref: FilingRef, period_end: date, link: str) -> list[dict]:
+        base = self._quarter_amount(chart.subject, (chart.fiscal_year, chart.fiscal_period), ref, period_end)
+        if base is None:
+            return []
+        amount, currency = base
         axis_order = {"technology": 0, "end-use": 1, "region": 2}
         subject_key = re.sub(r"[^a-z0-9]+", "_", chart.subject.lower()).strip("_")
         axis_key = re.sub(r"[^a-z0-9]+", "_", chart.axis.lower()).strip("_")
         total = sum(chart.shares.values())
         ranked = sorted(chart.shares.items(), key=lambda item: -item[1])
+        # The slide prints whole percentages, which need not add up to exactly 100: each share is taken of their sum,
+        # so the parts add up to the quarter's amount.
         return [self._record(
             group_key=f"{AI_GROUP_PREFIX}{subject_key}_by_{axis_key}", group_label=f"{chart.subject} by {chart.axis}",
-            group_kind="mix", group_order=60 + axis_order.get(chart.axis, 9), kpi_key=member_key(name)[:48] or "member",
-            kpi_label=name, kpi_order=order, unit="percent", value=share, currency=None, method=CHART_METHOD,
+            group_kind="revenue_breakdown", group_order=60 + axis_order.get(chart.axis, 9),
+            kpi_key=member_key(name)[:48] or "member", kpi_label=name, kpi_order=order, unit="currency",
+            value=round(amount * share / total, 2), currency=currency or "USD", method=CHART_METHOD,
             validation_status="verified", reconciliation_error_pct=round(total - 100, 2),
-            notes=["read from the slide's chart"], ref=ref, source_url=link, fiscal_year=chart.fiscal_year,
-            fiscal_period=chart.fiscal_period, period_end=period_end, locator={"image": link, "total": total},
+            notes=[f"the slide's rounded share ({share:g}%) of {chart.subject.lower()}"], ref=ref, source_url=link,
+            fiscal_year=chart.fiscal_year, fiscal_period=chart.fiscal_period, period_end=period_end,
+            locator={"image": link, "share": share, "total": amount},
         ) for order, (name, share) in enumerate(ranked)]
+
+    def _unit_records(self, chart, ref: FilingRef, period_end: date, link: str) -> list[dict]:
+        """Units sold by technology. They must add up to the quarter's reported units (new and used systems) where
+        those are known; a single count the picture did not give up is that total less the others."""
+        quarter = (chart.fiscal_year, chart.fiscal_period)
+        reported = [float(value["value"]) for value in self.values.values()
+                    if (value["fiscal_year"], value["fiscal_period"]) == quarter and value["unit"] == "count"
+                    and value["validation_status"] == "verified" and value["method"] != CHART_METHOD
+                    and _SYSTEMS_SOLD.search(value["kpi_label"])]
+        total = sum(reported) if len(reported) == 2 else None  # new and used
+        units = dict(chart.units)
+        notes = ["read from the slide's chart"]
+        if chart.missing:
+            rest = None if total is None else total - sum(units.values())
+            if rest is None or rest < 0:
+                return []
+            units[chart.missing] = int(rest)
+            notes = [f"{chart.missing}: the quarter's {total:g} units less the other technologies"]
+        elif total is not None and sum(units.values()) != total:
+            return []
+        order = {"EUV": 0, "ArFi": 1, "ArF Dry": 2, "KrF": 3, "I-line": 4}
+        return [self._record(
+            group_key=f"{AI_GROUP_PREFIX}lithography_units_sold", group_label="Lithography units sold", group_kind="metric",
+            group_order=70, kpi_key=f"{member_key(name)[:40]}units", kpi_label=f"{name} units sold",
+            kpi_order=order.get(name, 9), unit="count", value=float(count), currency=None, method=CHART_METHOD,
+            validation_status="verified", reconciliation_error_pct=None,
+            notes=notes if name == chart.missing or not chart.missing else ["read from the slide's chart"],
+            ref=ref, source_url=link, fiscal_year=chart.fiscal_year, fiscal_period=chart.fiscal_period,
+            period_end=period_end, locator={"image": link, **({"total": total} if total is not None else {})},
+        ) for name, count in units.items()]
 
     def _continuing_split(self, group, period_end: date):
         """Of two complete splits on one axis, the one the company's stored periods of the past year use, so the year

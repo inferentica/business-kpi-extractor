@@ -940,7 +940,7 @@ def test_release_statements_go_to_the_newest_release_presenting_each_quarter():
     assert control.calls == []
 
 
-def test_chart_breakdowns_are_stored_for_quarters_the_releases_cover_and_only_once():
+def test_chart_slides_become_revenue_breakdowns_and_unit_metrics_checked_against_the_quarter():
     from datetime import date as day
 
     from kpi_extractor import pipeline as module
@@ -953,12 +953,23 @@ def test_chart_breakdowns_are_stored_for_quarters_the_releases_cover_and_only_on
             self.calls.append((operation, payload))
             return {}
 
+    def stored(kpi_label, fiscal_period, period_end, value, unit="currency", group="kpi_revenue_by_product"):
+        return {"group_key": group, "kpi_key": kpi_label.lower().replace(" ", "_"), "kpi_label": kpi_label, "fiscal_year": "2026",
+                "fiscal_period": fiscal_period, "period_end": period_end, "unit": unit, "value": value, "currency": "EUR",
+                "method": "ai", "validation_status": "verified", "group_label": "x", "source_url": "https://www.sec.gov/x.htm"}
+
     exhibit = SimpleNamespace(url="https://www.sec.gov/Archives/edgar/data/1/2/deck.htm")
     html = ('<IMG src="deck008.jpg" title="slide8"> <DIV><FONT size="1">Page 8 Net system sales breakdown (quarterly)</FONT></DIV>')
     q2 = FilingRef("q2", "6-K", day(2026, 7, 15), "earnings_release", exhibit.url, day(2026, 6, 28), exhibits=[exhibit])
     q1 = FilingRef("q1", "6-K", day(2026, 4, 15), "earnings_release", exhibit.url, day(2026, 3, 29), exhibits=[])
     control = Recorder({})
-    pipeline = _pipeline(control)
+    pipeline = _pipeline(control, [
+        stored("Net system sales", "Q2", "2026-06-28", 6_564_800_000),
+        stored("Net system sales", "Q1", "2026-03-29", 6_279_400_000),
+        # Q2's reported units (new and used) are 91, as the bars add up to; Q1's are not known.
+        stored("New Lithography Systems Sold", "Q2", "2026-06-28", 85, unit="count", group="kpi_operating"),
+        stored("Used Lithography Systems Sold", "Q2", "2026-06-28", 6, unit="count", group="kpi_operating"),
+    ])
     pipeline.offset = 0
     pipeline._exhibit = lambda _exhibit: SimpleNamespace(result=lambda: html)
     fetched: list[str] = []
@@ -971,9 +982,19 @@ def test_chart_breakdowns_are_stored_for_quarters_the_releases_cover_and_only_on
         # The Q2 slide gives its own quarter and, since the Q1 release had no slide, the quarter before.
         assert {(value["fiscal_period"], value["period_end"]) for value in values} == {("Q2", "2026-06-28"), ("Q1", "2026-03-29")}
         euv = next(value for value in values if value["kpi_label"] == "EUV" and value["fiscal_period"] == "Q2")
-        assert (euv["group_key"], euv["group_label"], euv["group_kind"], euv["unit"], euv["value"], euv["method"], euv["kpi_order"]) == (
-            "kpi_net_system_sales_by_technology", "Net system sales by technology", "mix", "percent", 57.0, "chart", 0)
-        assert euv["validation_status"] == "verified" and euv["source_accession"] == "q2"
+        # A pie is a revenue breakdown: 57% of the quarter's net system sales, in its currency.
+        assert (euv["group_key"], euv["group_label"], euv["group_kind"], euv["unit"], euv["currency"], euv["method"], euv["kpi_order"]) == (
+            "kpi_net_system_sales_by_technology", "Net system sales by technology", "revenue_breakdown", "currency", "EUR", "chart", 0)
+        assert euv["value"] == round(6_564_800_000 * 0.57, 2) and euv["locator"]["share"] == 57
+        technology = [value for value in values if value["group_key"] == euv["group_key"] and value["fiscal_period"] == "Q2"]
+        assert abs(sum(value["value"] for value in technology) - 6_564_800_000) < 1
+        korea = next(value for value in values if value["kpi_label"] == "South Korea" and value["fiscal_period"] == "Q1")
+        assert korea["group_label"] == "Net system sales by region" and korea["value"] == round(6_279_400_000 * 0.45, 2)
+        # Units by technology are operating metrics.
+        units = {value["kpi_label"]: value["value"] for value in values
+                 if value["group_key"] == "kpi_lithography_units_sold" and value["fiscal_period"] == "Q2"}
+        assert units == {"EUV units sold": 16, "ArFi units sold": 23, "ArF Dry units sold": 8, "KrF units sold": 35, "I-line units sold": 9}
+        assert {value["group_kind"] for value in values if value["group_key"] == "kpi_lithography_units_sold"} == {"metric"}
         assert fetched == ["https://www.sec.gov/Archives/edgar/data/1/2/deck008.jpg"]
         # Stored quarters are not read again.
         control.calls.clear()
@@ -981,3 +1002,26 @@ def test_chart_breakdowns_are_stored_for_quarters_the_releases_cover_and_only_on
         assert control.calls == [] and len(fetched) == 1
     finally:
         module._fetch_image, module.ocr_words = original
+
+
+def test_units_that_do_not_add_up_to_the_quarter_are_left_out_and_one_unread_bar_is_filled():
+    from datetime import date as day
+
+    from kpi_extractor.charts import ChartUnits
+    from kpi_extractor.sec import FilingRef
+
+    def reported(label, value):
+        return {"group_key": "kpi_operating", "kpi_key": label.lower().replace(" ", "_"), "kpi_label": label, "fiscal_year": "2025",
+                "fiscal_period": "Q3", "period_end": "2025-09-28", "unit": "count", "value": value, "method": "ai",
+                "validation_status": "verified", "group_label": "Operating Metrics"}
+
+    pipeline = _pipeline(FakeControl({}), [reported("New Lithography Systems Sold", 66), reported("Used Lithography Systems Sold", 6)])
+    ref = FilingRef("q3", "6-K", day(2025, 10, 15), "earnings_release", "https://www.sec.gov/x.htm", day(2025, 9, 28))
+    read = {"EUV": 9, "ArFi": 38, "KrF": 11, "I-line": 10}
+    # The picture gave no count for the sliver of a bar: it is the quarter's 72 units less the other four.
+    filled = pipeline._unit_records(ChartUnits("2025", "Q3", read, "ArF Dry"), ref, day(2025, 9, 28), "https://www.sec.gov/s.jpg")
+    assert {record["kpi_label"]: record["value"] for record in filled}["ArF Dry units sold"] == 4
+    assert "72 units less the other technologies" in next(r for r in filled if r["kpi_label"] == "ArF Dry units sold")["notes"][0]
+    # Every bar read, but a count misread: the bars no longer add up to the reported units.
+    wrong = pipeline._unit_records(ChartUnits("2025", "Q3", {**read, "ArF Dry": 9}), ref, day(2025, 9, 28), "https://www.sec.gov/s.jpg")
+    assert wrong == []

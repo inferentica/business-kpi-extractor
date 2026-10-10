@@ -1,5 +1,5 @@
 """ASML's "Net system sales breakdown" slide: pies whose labels and shares exist only in the picture."""
-from kpi_extractor.charts import Word, breakdown_slides, read_breakdowns
+from kpi_extractor.charts import Word, breakdown_slides, read_breakdowns, read_units
 
 # The words a local OCR model reads on ASML's Q2 2026 slide 8, with their boxes [x0, y0, x1, y1, text].
 SLIDE = [
@@ -124,3 +124,24 @@ def test_older_slides_label_quarters_with_two_digit_years_and_squash_the_title()
     assert charts[("technology", "Q2", "2026")].shares["EUV"] == 57
     assert charts[("region", "Q1", "2026")].shares["Rest of Asia"] == 1
     assert len(charts) == 6
+
+
+def test_the_bars_of_units_sold_are_read_for_each_quarter():
+    units = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units([Word(*word) for word in SLIDE])}
+    assert units[("Q2", "2026")].units == {"EUV": 16, "ArFi": 23, "ArF Dry": 8, "KrF": 35, "I-line": 9}
+    assert units[("Q1", "2026")].units == {"EUV": 16, "ArFi": 17, "ArF Dry": 5, "KrF": 30, "I-line": 11}
+    assert units[("Q2", "2026")].missing is None
+
+
+def test_a_bar_whose_count_the_picture_did_not_give_up_is_named_and_two_such_bars_drop_the_chart():
+    # Q2's "8" over the ArF Dry bar goes unread.
+    one = [word for word in SLIDE if not (word[4] == "8" and word[1] < 400)]
+    units = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units([Word(*word) for word in one])}
+    assert units[("Q2", "2026")].missing == "ArF Dry" and "ArF Dry" not in units[("Q2", "2026")].units
+    two = [word for word in one if not (word[4] == "9" and word[1] < 400)]
+    assert ("Q2", "2026") not in {(chart.fiscal_period, chart.fiscal_year) for chart in read_units([Word(*word) for word in two])}
+
+
+def test_an_older_slide_calls_south_korea_korea():
+    words = [[*word[:4], "Korea" if word[4] == "SouthKorea" else word[4]] for word in SLIDE]
+    assert "South Korea" in _charts(words)[("region", "Q2", "2026")].shares
