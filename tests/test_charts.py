@@ -145,3 +145,27 @@ def test_a_bar_whose_count_the_picture_did_not_give_up_is_named_and_two_such_bar
 def test_an_older_slide_calls_south_korea_korea():
     words = [[*word[:4], "Korea" if word[4] == "SouthKorea" else word[4]] for word in SLIDE]
     assert "South Korea" in _charts(words)[("region", "Q2", "2026")].shares
+
+
+def test_an_older_slide_sets_the_units_heading_lower_and_runs_bar_names_together():
+    # The heading drops below the pie titles, and "ArFi" and "ArFdry" under two narrow bars read as one word.
+    words = []
+    for word in SLIDE:
+        if word[4] == "Salesinlithography":
+            word = [word[0], word[1] + 40, word[2], word[3] + 40, word[4]]
+        if word[4] == "units" and word[1] < 250:
+            word = [word[0], word[1] + 40, word[2], word[3] + 40, word[4]]
+        words.append(word)
+    upper = [word for word in words if word[4] in ("ArFi", "ArFdry") and 370 < word[1] < 400]
+    merged = [min(word[0] for word in upper), upper[0][1], max(word[2] for word in upper), upper[0][3], "ArFi ArFdry"]
+    words = [word for word in words if word not in upper] + [merged]
+    units = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units([Word(*word) for word in words])}
+    assert units[("Q2", "2026")].units == {"EUV": 16, "ArFi": 23, "ArF Dry": 8, "KrF": 35, "I-line": 9}
+
+
+def test_each_quarter_takes_the_reading_that_gave_it_more():
+    whole = [Word(*word) for word in SLIDE if not (word[4] == "8" and word[1] < 400)]  # Q2's ArF Dry count unread
+    closer = [Word(*word) for word in SLIDE if not (word[4] == "5" and word[1] > 400)]  # Q1's ArF Dry count unread
+    units = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units(whole, closer)}
+    assert units[("Q2", "2026")].missing is None and units[("Q2", "2026")].units["ArF Dry"] == 8
+    assert units[("Q1", "2026")].missing is None and units[("Q1", "2026")].units["ArF Dry"] == 5

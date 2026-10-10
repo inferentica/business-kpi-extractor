@@ -32,7 +32,7 @@ from .document import Document, clean, parse_document, parse_number
 from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, count_jump, describe,
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
-from .charts import ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_units
+from .charts import ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_units, unit_region
 from .release_statements import release_statements
 from .statements import statement_lines
 from .replay import replay
@@ -462,8 +462,12 @@ class SymbolPipeline:
                     raw = self._waiting(self._exhibit(exhibit).result)
                     for source, _title in breakdown_slides(raw or ""):
                         link = urllib.parse.urljoin(exhibit.url, source)
-                        words = ocr_words(_fetch_image(link))
-                        for chart in [*read_breakdowns(words), *read_units(words)]:
+                        image = _fetch_image(link)
+                        words = ocr_words(image)
+                        # The bars' small figures are read again from an enlarged cut of the slide.
+                        region = unit_region(words)
+                        detail = ocr_words(image, region) if region else None
+                        for chart in [*read_breakdowns(words), *read_units(words, detail)]:
                             quarter = (chart.fiscal_year, chart.fiscal_period)
                             if quarter not in period_ends:
                                 continue

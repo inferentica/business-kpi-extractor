@@ -97,12 +97,35 @@ def read_breakdowns(words: list[Word]) -> list[ChartBreakdown]:
     return [chart for chart in _read(words) if isinstance(chart, ChartBreakdown)]
 
 
-def read_units(words: list[Word]) -> list[ChartUnits]:
-    """The slide's bar charts of units sold: each bar's count stands over it and its technology under it."""
-    return [chart for chart in _read(words) if isinstance(chart, ChartUnits)]
+def read_units(words: list[Word], detail: list[Word] | None = None) -> list[ChartUnits]:
+    """The slide's bar charts of units sold: each bar's count stands over it and its technology under it. `detail`
+    is a closer reading of the bar chart alone (see `unit_region`), which older slides need: their counts are small
+    and grey, and a reading of the whole slide loses some."""
+    # Neither reading is always the better one, so each quarter takes whichever gave it more: every bar, else all
+    # but one.
+    best: dict[tuple[str, str], ChartUnits] = {}
+    for reading in ([detail, None] if detail is not None else [None]):
+        for chart in _read(words, reading):
+            if not isinstance(chart, ChartUnits):
+                continue
+            quarter = (chart.fiscal_year, chart.fiscal_period)
+            if quarter not in best or (best[quarter].missing and not chart.missing):
+                best[quarter] = chart
+    return list(best.values())
 
 
-def _read(words: list[Word]) -> list[ChartBreakdown | ChartUnits]:
+def _unit_header(words: list[Word]) -> Word | None:
+    # The bar chart's heading stands level with the pie titles on newer slides and lower on older ones.
+    return next((word for word in words if _squash(word.text).startswith("salesinlithography")), None)
+
+
+def unit_region(words: list[Word]) -> tuple[int, int] | None:
+    """Where the bar chart of units stands on the slide: the (left, top) of the part to read again, enlarged."""
+    header = _unit_header(words)
+    return None if header is None else (max(0, int(header.x0 - 70)), int(header.y1 + 4))
+
+
+def _read(words: list[Word], detail: list[Word] | None = None) -> list[ChartBreakdown | ChartUnits]:
     # The picture's lettering can lose its spaces ("Net systemsalesbreakdown"), so no word boundary is asked for.
     title = next((word for word in sorted(words, key=lambda item: item.y0) if "breakdown" in word.text.lower()), None)
     quarters = sorted((word for word in words if _QUARTER.match(word.text.replace(" ", ""))), key=lambda item: item.cy)
@@ -125,7 +148,7 @@ def _read(words: list[Word]) -> list[ChartBreakdown | ChartUnits]:
               for index, header in enumerate(headers)}
     row_edges = [(upper.cy + lower.cy) / 2 for upper, lower in zip(quarters, quarters[1:])]
     charts: list[ChartBreakdown | ChartUnits] = []
-    unit_header = next((header for header in headers if _squash(header.text).startswith("salesinlithography")), None)
+    unit_header = _unit_header(words)
     for row, quarter in enumerate(quarters):
         top = titles[0].y1 if row == 0 else row_edges[row - 1]
         bottom = row_edges[row] if row < len(row_edges) else float("inf")
@@ -141,8 +164,11 @@ def _read(words: list[Word]) -> list[ChartBreakdown | ChartUnits]:
     if unit_header is not None:
         # Bars stand lower than the pies beside them, so their rows are told by the lines of technology names under
         # them, top to bottom, one line per quarter.
-        left, right = bounds[id(unit_header)]
-        column = [word for word in words if left <= word.cx < right and word.cy > unit_header.y1 + 30]
+        # The bars stand under their heading, a little wider than it; the region pie's labels to the left are not bars.
+        left, right = unit_header.x0 - 70, unit_header.x1 + 70
+        column = [word for word in (detail if detail is not None else words)
+                  if left <= word.cx < right and word.cy > unit_header.y1 + 30]
+        column = [part for word in column for part in _split_names(word)]
         baselines: list[float] = []
         for word in sorted((word for word in column if _squash(word.text) in _NAMES), key=lambda item: item.cy):
             if not baselines or word.cy - baselines[-1] > 40:
@@ -181,6 +207,20 @@ def _shares(cell: list[Word]) -> dict[str, float]:
     return shares
 
 
+_UNIT_NAME = re.compile(r"arf\s?dry|arfi|euv|krf|[i1]-?line", re.I)
+
+
+def _split_names(word: Word) -> list[Word]:
+    """Technology names that run together under narrow bars ("ArFi ArFdry KrF" read as one word) taken apart again,
+    each given its share of the word's width."""
+    names = list(_UNIT_NAME.finditer(word.text))
+    if len(names) < 2 or _UNIT_NAME.sub("", word.text).strip():
+        return [word]
+    width = (word.x1 - word.x0) / max(1, len(word.text))
+    return [Word(word.x0 + match.start() * width, word.y0, word.x0 + match.end() * width, word.y1, match.group(0))
+            for match in names]
+
+
 def _units(cell: list[Word]) -> tuple[dict[str, int], str | None]:
     """Bars read bottom-up: the technologies stand on one line under the bars, and each bar's count is the number
     nearest above its own label. At most one label may be left without a count (named as missing)."""
@@ -207,14 +247,31 @@ def _units(cell: list[Word]) -> tuple[dict[str, int], str | None]:
     return units, (missing[0] if missing else None)
 
 
-def ocr_words(image: bytes) -> list[Word]:
-    """The words of a picture with their boxes, by a local OCR model."""
+def ocr_words(image: bytes, region: tuple[int, int] | None = None, scale: int = 3) -> list[Word]:
+    """The words of a picture with their boxes, by a local OCR model. With `region` (left, top), only the picture
+    from there on is read, enlarged and with its contrast stretched, which brings out small grey figures; the boxes
+    come back in the whole picture's coordinates."""
     from rapidocr_onnxruntime import RapidOCR  # heavy; loaded only when a chart slide is read
 
-    result, _ = _engine(RapidOCR)(image)
+    source: object = image
+    left = top = 0
+    factor = 1
+    if region is not None:
+        import io
+
+        import numpy
+        from PIL import Image, ImageOps
+
+        left, top = region
+        factor = scale
+        picture = Image.open(io.BytesIO(image)).convert("RGB")
+        part = picture.crop((left, top, picture.width, picture.height))
+        part = part.resize((part.width * factor, part.height * factor), Image.LANCZOS)
+        source = numpy.array(ImageOps.autocontrast(ImageOps.grayscale(part), cutoff=2).convert("RGB"))
+    result, _ = _engine(RapidOCR)(source)
     words = []
     for box, text, _score in result or []:
-        xs, ys = [point[0] for point in box], [point[1] for point in box]
+        xs, ys = [point[0] / factor + left for point in box], [point[1] / factor + top for point in box]
         words.append(Word(min(xs), min(ys), max(xs), max(ys), str(text)))
     return words
 

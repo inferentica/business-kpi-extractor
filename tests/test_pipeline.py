@@ -975,7 +975,7 @@ def test_chart_slides_become_revenue_breakdowns_and_unit_metrics_checked_against
     fetched: list[str] = []
     original = (module._fetch_image, module.ocr_words)
     module._fetch_image = lambda link: fetched.append(link) or b""
-    module.ocr_words = lambda _image: [Word(*word) for word in SLIDE]
+    module.ocr_words = lambda _image, _region=None: [Word(*word) for word in SLIDE]
     try:
         pipeline._store_chart_breakdowns([q1, q2])
         values = [value for operation, payload in control.calls if operation == "store" for value in payload["values"]]
