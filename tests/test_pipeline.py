@@ -902,7 +902,7 @@ def test_release_statements_go_to_the_newest_release_presenting_each_quarter():
 
     from kpi_extractor.document import Document, TextBlock
     from kpi_extractor.sec import FilingRef
-    from tests.test_release_statements import BALANCE
+    from test_release_statements import BALANCE
 
     class Recorder(FakeControl):
         def call(self, operation, **payload):
