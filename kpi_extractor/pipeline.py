@@ -402,13 +402,15 @@ class SymbolPipeline:
                 continue
             try:
                 own = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
-                if any(held["accession"] == ref.accession for held in owners.values()):
-                    continue  # already read: it owns what it gave (an annual report gives no quarter of its own)
+                if any(held["accession"] == ref.accession and key[0] == "income" for key, held in owners.items()):
+                    continue  # already read whole: it owns an income statement (an annual report's is its year)
                 owner = owners.get(("income", *own, "quarter"))
                 if owner and str(owner.get("filed_at") or "")[:10] >= ref.filed.isoformat():
                     continue
                 lines: list[dict] = []
                 for statement in release_statements(self._document(ref)):
+                    if statement.currency is None:
+                        continue  # amounts in more than one currency side by side (an offering document): not guessed
                     fiscal_year, fiscal_period = fiscal_label(statement.period_end, self.profile.fiscal_year_end,
                                                               year_offset=self.offset)
                     key = (statement.statement, fiscal_year, fiscal_period, statement.duration)
@@ -417,7 +419,7 @@ class SymbolPipeline:
                         continue  # a newer release already gave this quarter
                     shared = {"statement": statement.statement, "duration": statement.duration, "fiscal_year": fiscal_year,
                               "fiscal_period": fiscal_period, "period_end": statement.period_end.isoformat(),
-                              "form": ref.form, "filed_at": ref.filed.isoformat(), "currency": statement.currency or "USD"}
+                              "form": ref.form, "filed_at": ref.filed.isoformat(), "currency": statement.currency}
                     lines.extend({**line, **shared} for line in statement.lines)
                     owners[key] = {"accession": ref.accession, "filed_at": ref.filed.isoformat()}
                 if lines:

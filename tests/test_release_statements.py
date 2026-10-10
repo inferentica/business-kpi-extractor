@@ -243,3 +243,18 @@ def test_an_annual_report_headed_by_the_bare_year_is_the_year_to_its_balance_she
     statements = release_statements(_report(yearly, [["", "2026", "2025"]], date_text="December 31, 2026"))
     assert [(item.statement, item.duration, item.period_end) for item in statements] == [
         ("balance", "instant", date(2026, 12, 31)), ("cash_flow", "ytd", date(2026, 12, 31)), ("income", "ytd", date(2026, 12, 31))]
+
+
+def test_a_line_between_cost_and_gross_profit_adjusts_the_check_and_a_misread_still_fails():
+    def report(gross: str) -> Document:
+        document = _report(QUARTERLY_INCOME, [["", "Six Months Ended June 30", ""], ["", "2026", "2025"]])
+        rows = document.tables["T3"].rows
+        at = next(index for index, row in enumerate(rows) if row[0] == "GROSS PROFIT")
+        rows[at][1] = gross
+        rows[at:at] = [["GROSS PROFIT BEFORE REALIZED GROSS PROFIT ON SALES TO ASSOCIATES", "860,310,695", "68", "", "", "", "", "", ""],
+                       ["REALIZED GROSS PROFIT ON SALES TO ASSOCIATES", "(37,317)", "-", "", "", "", "", "", ""]]
+        return document
+
+    quarters = [item for item in release_statements(report("860,273,378")) if item.statement == "income" and item.duration == "quarter"]
+    assert len(quarters) == 1 and _line(quarters[0], "Gross profit")["value"] == 860_273_378_000
+    assert not [item for item in release_statements(report("860,999,999")) if item.statement == "income" and item.duration == "quarter"]

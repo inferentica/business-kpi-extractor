@@ -77,6 +77,7 @@ _FULL_DATE = re.compile(rf"({_MONTH_DAY})\s*((?:19|20)\d{{2}})", re.I)
 _SPAN = re.compile(rf"(?:(three|six|nine|twelve)\s+months|(years?))\s+ended\s+({_MONTH_DAY})", re.I)
 _NOTE_REFERENCE = re.compile(r"\s*\([^)]*\bNotes?\b[^)]*\)", re.I)
 _FOOTER = re.compile(r"^\(?(continued|concluded)\)?$|^the accompanying notes", re.I)
+_COST = re.compile(r"^(total )?cost of (sales|revenues?)$", re.I)
 _TOLERANCE = 0.25  # in the statement's own unit: figures are printed to one decimal
 
 
@@ -271,10 +272,19 @@ def _holds(kind: str, lines: list[dict], scale: float) -> bool:
         return None not in (opening, closing, change) and abs(opening + change - closing) <= gap
     revenue = next((line["value"] for line in lines if line["concept"] == "release_Revenues"), None)
     gross = next((line["value"] for line in lines if line["concept"] == "release_GrossProfit"), None)
-    cost = _value(lines, re.compile(r"^(total )?cost of (sales|revenues?)$", re.I))
+    cost = _value(lines, _COST)
     if revenue is None or _value(lines, re.compile(r"^net income$", re.I)) is None:
         return False
-    return gross is None or cost is None or abs(revenue - abs(cost) - gross) <= gap
+    if gross is None or cost is None:
+        return True
+    plain = revenue - abs(cost)
+    # Lines between cost and gross profit adjust it (TSMC's "realized gross profit on sales to associates"); a
+    # subtotal among them ("gross profit before …") restates what is already counted.
+    figures = [line for line in lines if not line["is_heading"]]
+    start = next(index for index, line in enumerate(figures) if _COST.search(line["label"]))
+    end = next(index for index, line in enumerate(figures) if line["concept"] == "release_GrossProfit")
+    between = sum(line["value"] for line in figures[start + 1:end] if abs(line["value"] - plain) > gap) if end > start else 0.0
+    return abs(plain + between - gross) <= gap
 
 
 def _title(table: Table) -> str | None:
