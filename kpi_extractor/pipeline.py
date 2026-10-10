@@ -402,8 +402,10 @@ class SymbolPipeline:
                 continue
             try:
                 own = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
+                if any(held["accession"] == ref.accession for held in owners.values()):
+                    continue  # already read: it owns what it gave (an annual report gives no quarter of its own)
                 owner = owners.get(("income", *own, "quarter"))
-                if owner and (owner["accession"] == ref.accession or str(owner.get("filed_at") or "")[:10] >= ref.filed.isoformat()):
+                if owner and str(owner.get("filed_at") or "")[:10] >= ref.filed.isoformat():
                     continue
                 lines: list[dict] = []
                 for statement in release_statements(self._document(ref)):
