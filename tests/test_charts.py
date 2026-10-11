@@ -189,3 +189,11 @@ def test_a_region_label_cut_into_the_bar_chart_is_not_a_bar():
     stray = Word(1042, 300, 1080, 318, "Korea")
     units = {(chart.fiscal_period, chart.fiscal_year): chart for chart in read_units([Word(*word) for word in SLIDE] + [stray])}
     assert units[("Q2", "2026")].units == {"EUV": 16, "ArFi": 23, "ArF Dry": 8, "KrF": 35, "I-line": 9}
+
+
+def test_immersion_slice_keeps_one_name_across_slide_styles():
+    # 2016-2019 slides print "ArF / Immersion / 74%" on three lines; later ones print "ArFi".
+    from kpi_extractor.charts import _name
+
+    assert {_name("ArF Immersion"), _name("Immersion"), _name("ArF"), _name("ArFi")} == {"ArFi"}
+    assert _name("ArF Dry") == "ArF Dry"

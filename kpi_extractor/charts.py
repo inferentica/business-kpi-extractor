@@ -21,6 +21,8 @@ _WHOLE = (97.5, 102.5)
 # The picture's lettering loses its spaces ("SouthKorea") and an I can read as a 1 ("1-line").
 _NAMES = {
     "euv": "EUV", "arfi": "ArFi", "arfdry": "ArF Dry", "krf": "KrF", "iline": "I-line", "1line": "I-line",
+    # Older slides spell the immersion slice out over two lines, and either line can be the one read with its share.
+    "arfimmersion": "ArFi", "immersion": "ArFi", "arf": "ArFi",
     "metrologyinspection": "Metrology & Inspection", "logic": "Logic", "memory": "Memory",
     "southkorea": "South Korea", "korea": "South Korea", "taiwan": "Taiwan", "china": "China", "usa": "USA", "japan": "Japan",
     "restofasia": "Rest of Asia", "emea": "EMEA", "europe": "Europe", "singapore": "Singapore",
