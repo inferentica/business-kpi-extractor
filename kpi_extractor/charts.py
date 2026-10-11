@@ -28,6 +28,13 @@ _NAMES = {
     "restofasia": "Rest of Asia", "emea": "EMEA", "europe": "Europe", "singapore": "Singapore",
     "restofworld": "Rest of World",
 }
+# What each pie can be split into. A share under any other name is a misread ("Koroa") and the pie is left out; a
+# name that belongs to the pie beside it ("I-line" drifting into end-use) is not this pie's share.
+_AXIS_NAMES = {
+    "technology": {"EUV", "ArFi", "ArF Dry", "KrF", "I-line", "Metrology & Inspection"},
+    "end-use": {"Logic", "Memory", "Foundry", "IDM"},
+    "region": {"South Korea", "Taiwan", "China", "USA", "Japan", "Rest of Asia", "EMEA", "Europe", "Singapore", "Rest of World"},
+}
 # What the bars of units are named for: the lithography technologies, never a region or an end-use from the pies.
 _UNIT_NAMES = {"EUV", "ArFi", "ArF Dry", "KrF", "I-line"}
 _TITLES = {
@@ -60,6 +67,12 @@ class ChartBreakdown:
     fiscal_year: str
     fiscal_period: str
     shares: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def exact(self) -> bool:
+        """The shares add up to exactly 100, as every pie checked by eye does. One that is a point off may have lost
+        or gained a slice, so it needs a second slide showing the same before it is believed."""
+        return abs(sum(self.shares.values()) - 100) < 1e-9
 
 
 @dataclass
@@ -193,7 +206,11 @@ def _read(words: list[Word], detail: list[Word] | None = None, partial: bool = F
         for header in titles:
             left, right = bounds[id(header)]
             cell = [word for word in words if left <= word.cx < right and top <= word.cy < bottom and word is not header]
-            shares = _shares(cell)
+            axis = _TITLES[_squash(header.text)]
+            others = set().union(*(names for other, names in _AXIS_NAMES.items() if other != axis))
+            shares = {name: share for name, share in _shares(cell).items() if name not in others}
+            if any(name not in _AXIS_NAMES[axis] for name in shares):
+                continue
             if len(shares) >= 2 and _WHOLE[0] <= sum(shares.values()) <= _WHOLE[1]:
                 year = period.group(2) if len(period.group(2)) == 4 else f"20{period.group(2)}"
                 charts.append(ChartBreakdown(subject, _TITLES[_squash(header.text)], year, f"Q{period.group(1)}", shares))

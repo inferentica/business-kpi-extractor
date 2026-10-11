@@ -1031,3 +1031,54 @@ def test_units_that_do_not_add_up_to_the_quarter_are_left_out_and_one_unread_bar
     # 0): so it is made only when two readings agree on each of them.
     once = pipeline._unit_records(ChartUnits("2025", "Q3", read, "ArF Dry", frozenset({"ArFi", "KrF", "I-line"})), ref, day(2025, 9, 28), link)
     assert once == []
+
+
+def test_a_pie_a_point_off_100_is_stored_only_once_a_second_slide_shows_the_same():
+    from datetime import date as day
+
+    from kpi_extractor import pipeline as module
+    from kpi_extractor.charts import Word
+    from kpi_extractor.sec import FilingRef
+    from test_charts import SLIDE
+
+    class Recorder(FakeControl):
+        def call(self, operation, **payload):
+            self.calls.append((operation, payload))
+            return {}
+
+    def stored(fiscal_period, period_end, value):
+        return {"group_key": "kpi_revenue_by_product", "kpi_key": "net_system_sales", "kpi_label": "Net system sales",
+                "fiscal_year": "2026", "fiscal_period": fiscal_period, "period_end": period_end, "unit": "currency", "value": value,
+                "currency": "EUR", "method": "ai", "validation_status": "verified", "group_label": "x",
+                "source_url": "https://www.sec.gov/x.htm"}
+
+    # Q2's end-use pie reads 51% + 48%: a slice may have been lost, or a digit misread.
+    position = next(index for index, word in enumerate(SLIDE) if word[4] == "Memory")
+    short = [list(word) for word in SLIDE]
+    share = next(word for word in short if word[4] == "49%" and abs(word[0] - short[position][0]) < 40 and 0 < word[1] - short[position][1] < 40)
+    share[4] = "48%"
+    exhibit = SimpleNamespace(url="https://www.sec.gov/Archives/edgar/data/1/2/deck.htm")
+    html = ('<IMG src="deck008.jpg" title="slide8"> <DIV><FONT size="1">Page 8 Net system sales breakdown (quarterly)</FONT></DIV>')
+    q1 = FilingRef("q1", "6-K", day(2026, 4, 15), "earnings_release", exhibit.url, day(2026, 3, 29), exhibits=[])
+    q2 = FilingRef("q2", "6-K", day(2026, 7, 15), "earnings_release", exhibit.url, day(2026, 6, 28), exhibits=[exhibit])
+    q3 = FilingRef("q3", "6-K", day(2026, 10, 14), "earnings_release", exhibit.url, day(2026, 9, 27), exhibits=[exhibit])
+
+    def run(releases):
+        control = Recorder({})
+        pipeline = _pipeline(control, [stored("Q2", "2026-06-28", 6_564_800_000), stored("Q1", "2026-03-29", 6_279_400_000)])
+        pipeline.offset = 0
+        pipeline._exhibit = lambda _exhibit: SimpleNamespace(result=lambda: html)
+        original = (module._fetch_image, module.ocr_words)
+        module._fetch_image = lambda link: b""
+        module.ocr_words = lambda _image, *_region: [Word(*word) for word in short]
+        try:
+            pipeline._store_chart_breakdowns(releases)
+        finally:
+            module._fetch_image, module.ocr_words = original
+        values = [value for operation, payload in control.calls if operation == "store" for value in payload["values"]]
+        return {(value["group_key"], value["fiscal_period"]) for value in values}
+
+    once = run([q1, q2])
+    assert ("kpi_net_system_sales_by_end_use", "Q2") not in once and ("kpi_net_system_sales_by_technology", "Q2") in once
+    # The next quarter's slide shows Q2 again with the same shares: the rounding is the company's, and it is stored.
+    assert ("kpi_net_system_sales_by_end_use", "Q2") in run([q1, q2, q3])

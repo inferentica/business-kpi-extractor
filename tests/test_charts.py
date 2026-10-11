@@ -197,3 +197,29 @@ def test_immersion_slice_keeps_one_name_across_slide_styles():
 
     assert {_name("ArF Immersion"), _name("Immersion"), _name("ArF"), _name("ArFi")} == {"ArFi"}
     assert _name("ArF Dry") == "ArF Dry"
+
+
+def test_a_share_under_a_garbled_name_leaves_its_pie_out():
+    # "Koroa" is no region: the pie is a misread, and is not offered with a region nobody has heard of.
+    words = [[*word[:4], word[4].replace("Korea", "Koroa")] for word in SLIDE]
+    garbled = _charts(words)
+    kept = _charts()
+    missing = set(kept) - set(garbled)
+    assert missing and all(axis == "region" for axis, _quarter, _year in missing)
+    assert all("Koroa" not in chart.shares for chart in garbled.values())
+
+
+def test_a_label_of_the_pie_beside_it_is_not_this_pies_share():
+    # The technology pie's "I-line 1%" lettering can sit closer to the end-use pie; end-use is still Logic and Memory.
+    end_use = next(word for word in SLIDE if word[4] == "End-use")
+    quarter = next(word for word in SLIDE if word[4] == "Q22026")
+    stray = [end_use[0] + 10, quarter[1], end_use[0] + 70, quarter[1] + 18, "I-line 1%"]
+    charts = _charts([*SLIDE, stray])
+    assert charts[("end-use", "Q2", "2026")].shares == {"Logic": 51, "Memory": 49}
+
+
+def test_a_pie_is_exact_only_when_its_shares_add_up_to_100():
+    from kpi_extractor.charts import ChartBreakdown
+
+    assert ChartBreakdown("Net system sales", "end-use", "2026", "Q2", {"Logic": 51, "Memory": 49}).exact
+    assert not ChartBreakdown("Net system sales", "end-use", "2026", "Q2", {"Logic": 51, "Memory": 48}).exact

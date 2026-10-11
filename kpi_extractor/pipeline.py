@@ -32,7 +32,7 @@ from .document import Document, clean, parse_document, parse_number
 from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, count_jump, describe,
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
-from .charts import ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_units, unit_region
+from .charts import ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_units, unit_region
 from .release_statements import release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
@@ -451,6 +451,8 @@ class SymbolPipeline:
         def complete(quarter: tuple[str, str]) -> bool:
             return len(groups) >= CHART_GROUPS and all((group, *quarter) in have for group in groups)
 
+        # Pies a point off 100, waiting for a second slide to show the same shares.
+        unconfirmed: dict[tuple[str, str, str], dict[str, float]] = {}
         for ref in sorted(releases, key=lambda item: item.filed):
             if ref.period_end is None:
                 continue
@@ -477,6 +479,11 @@ class SymbolPipeline:
                                     else self._chart_records(chart, ref, period_ends[quarter], link))
                             if not rows or (rows[0]["group_key"], *quarter) in have:
                                 continue
+                            if isinstance(chart, ChartBreakdown) and not chart.exact:
+                                key = (rows[0]["group_key"], *quarter)
+                                if unconfirmed.get(key) != chart.shares:
+                                    unconfirmed[key] = dict(chart.shares)
+                                    continue
                             records.extend(rows)
                             have.add((rows[0]["group_key"], *quarter))
                             groups.add(rows[0]["group_key"])
