@@ -1082,3 +1082,14 @@ def test_a_pie_a_point_off_100_is_stored_only_once_a_second_slide_shows_the_same
     assert ("kpi_net_system_sales_by_end_use", "Q2") not in once and ("kpi_net_system_sales_by_technology", "Q2") in once
     # The next quarter's slide shows Q2 again with the same shares: the rounding is the company's, and it is stored.
     assert ("kpi_net_system_sales_by_end_use", "Q2") in run([q1, q2, q3])
+
+
+def test_a_pie_missing_from_a_slides_reading_is_taken_from_a_closer_one():
+    from types import SimpleNamespace as Pie
+    from kpi_extractor.pipeline import fill_pies, missing_pies
+
+    q3 = [Pie(axis="end-use", fiscal_year="2026", fiscal_period="Q3"), Pie(axis="region", fiscal_year="2026", fiscal_period="Q3")]
+    q2 = [Pie(axis=axis, fiscal_year="2026", fiscal_period="Q2") for axis in ("technology", "end-use", "region")]
+    assert missing_pies([*q3, *q2]) and not missing_pies(q2) and not missing_pies([])
+    closer = [Pie(axis="technology", fiscal_year="2026", fiscal_period="Q3"), *q3, *q2]
+    assert [(pie.axis, pie.fiscal_period) for pie in fill_pies([*q3, *q2], closer)] == [("technology", "Q3")]

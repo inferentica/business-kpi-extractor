@@ -49,6 +49,8 @@ CHART_METHOD = "chart"
 CHART_GROUPS = 4
 # The bar chart of units is read again at these enlargements; a count is trusted when readings agree.
 UNIT_SCALES = (3, 4)
+# The enlargement a slide is read again at when a pie is missing from the first reading.
+PIE_SCALE = 3
 _SYSTEMS_SOLD = re.compile(r"lithography systems sold", re.I)
 AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
@@ -471,7 +473,12 @@ class SymbolPipeline:
                         # The bars' small figures are read again from an enlarged cut of the slide.
                         region = unit_region(words)
                         details = [ocr_words(image, region, scale) for scale in UNIT_SCALES] if region else []
-                        for chart in [*read_breakdowns(words), *read_units(words, *details)]:
+                        pies = read_breakdowns(words)
+                        if missing_pies(pies):
+                            # A share misread at the slide's own size ("39%" as "%68") leaves its pie out; the slide
+                            # read again enlarged gives the pies the first reading missed, under the same checks.
+                            pies = [*pies, *fill_pies(pies, read_breakdowns(ocr_words(image, (0, 0), PIE_SCALE)))]
+                        for chart in [*pies, *read_units(words, *details)]:
                             quarter = (chart.fiscal_year, chart.fiscal_period)
                             if quarter not in period_ends:
                                 continue
@@ -2200,6 +2207,21 @@ def keep_current_groups(proposed: Spec, current: Spec) -> Spec:
         return proposed
     groups = [*(group.model_dump() for group in proposed.groups), *(group.model_dump() for group in kept)]
     return Spec.model_validate({"groups": groups[:ai.MAX_GROUPS], "names": proposed.names})
+
+
+def missing_pies(pies: list) -> bool:
+    """Whether a slide's reading lacks a pie: every quarter it shows has a technology, end-use and region pie."""
+    if not pies:
+        return False
+    quarters = {(pie.fiscal_year, pie.fiscal_period) for pie in pies}
+    axes = {pie.axis for pie in pies} | {"technology", "end-use", "region"}
+    return len(pies) < len(quarters) * len(axes)
+
+
+def fill_pies(pies: list, closer: list) -> list:
+    """The pies a closer reading has that the first did not."""
+    have = {(pie.axis, pie.fiscal_year, pie.fiscal_period) for pie in pies}
+    return [pie for pie in closer if (pie.axis, pie.fiscal_year, pie.fiscal_period) not in have]
 
 
 def only_adds(before: Spec, after: Spec) -> bool:
