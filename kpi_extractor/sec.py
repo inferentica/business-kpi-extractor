@@ -17,6 +17,9 @@ _EARNINGS_WINDOW = (timedelta(days=5), timedelta(days=75))
 # Quarterly financial reports furnished on 6-K run to ~10 MB of HTML; only their revenue sections reach the AI.
 _MAX_EXHIBIT_BYTES = 20_000_000
 _LISTING_READERS = 6
+# Recent 6-Ks that are not earnings documents (monthly revenue, buyback notices) are recorded as looked at, so the
+# discovery pass, which counts a filing from the last 30 days that is not recorded as new, does not start runs for them.
+PASSED_OVER_DAYS = timedelta(days=35)
 
 
 def configure_identity() -> None:
@@ -72,11 +75,13 @@ def periodic_reports(company: Company, since: date) -> list[FilingRef]:
     return refs
 
 
-def earnings_releases(company: Company, profile: CompanyProfile, since: date, archive=None) -> list[FilingRef]:
+def earnings_releases(company: Company, profile: CompanyProfile, since: date, archive=None,
+                      passed: list[FilingRef] | None = None) -> list[FilingRef]:
     """Earnings documents and candidates. 8-K Item 2.02 exhibits are confirmed earnings releases. Other filings with
     exhibits furnished within 75 days of a quarter end are candidates for the AI to classify: a U.S. filer's 8-K when
     that quarter has no Item 2.02 release (results furnished under another item), and every foreign filer's 6-K (the
-    earnings release, the quarterly financial report, or unrelated notices)."""
+    earnings release, the quarterly financial report, or unrelated notices). A recent foreign filer's 6-K that is no
+    candidate (no exhibit, or outside the window) goes to `passed`, so it is recorded as looked at."""
     form = "6-K" if profile.foreign else "8-K"
     filings = sorted(company.get_filings(form=form, filing_date=f"{since.isoformat()}:"), key=lambda item: item.filing_date)
     confirmed_quarters = set()
@@ -90,11 +95,15 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date, ar
         item_202 = not profile.foreign and "2.02" in str(getattr(filing, "items", "") or "")
         if item_202 or in_window:
             candidates.append((filing, item_202))
+        elif passed is not None and profile.foreign and filing.filing_date >= date.today() - PASSED_OVER_DAYS:
+            passed.append(_passed_ref(filing))
     # Each candidate's exhibits come from the archive (or SEC), a few at a time rather than one after another.
     with ThreadPoolExecutor(max_workers=_LISTING_READERS) as pool:
         found = list(pool.map(lambda candidate: _archived_exhibits(candidate[0], archive), candidates))
     for (filing, item_202), exhibits in zip(candidates, found):
         if not exhibits:
+            if passed is not None and profile.foreign and filing.filing_date >= date.today() - PASSED_OVER_DAYS:
+                passed.append(_passed_ref(filing))
             continue
         ref = _release_ref(filing, exhibits, profile)
         ref.confirmed = item_202
@@ -142,6 +151,13 @@ def _html_exhibits(filing) -> list:
         attachment for attachment in filing.attachments
         if str(attachment.document_type or "").upper().startswith("EX-99") and attachment.is_html()
     ]
+
+
+def _passed_ref(filing) -> FilingRef:
+    return FilingRef(
+        accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="earnings_release",
+        source_url=filing.filing_url if hasattr(filing, "filing_url") else filing.url, filing=filing, confirmed=False,
+    )
 
 
 def _release_ref(filing, exhibits: list, profile: CompanyProfile) -> FilingRef:

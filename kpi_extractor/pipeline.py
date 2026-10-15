@@ -56,6 +56,7 @@ AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
 _MAX_ATTEMPTS = 3
 _NOT_EARNINGS = "classified as not an earnings document"
+_PASSED_OVER = "not an earnings document: no exhibit, or furnished outside the weeks after a quarter end"
 _AI_PENDING = "AI review unavailable; retried next run"
 _READ_BY_AI = "read by AI"
 MAX_YEAR_RATIO = 3.0
@@ -193,11 +194,15 @@ class SymbolPipeline:
                 # Read before the archive existed: stored now, once, without parsing it.
                 self._archiving.append(self._prefetch.submit(self._archive_xbrl, ref))
         # The earnings releases are listed while the reports are read: the listing waits only on SEC and the archive.
-        listing = self._prefetch.submit(earnings_releases, company, self.profile, self.since, self.archive)
+        passed: list[FilingRef] = []
+        listing = self._prefetch.submit(earnings_releases, company, self.profile, self.since, self.archive, passed)
         self.offset = self._year_offset(reports)
         for ref in reports:
             self._process_report(ref)
         releases = [ref for ref in sorted(listing.result(), key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
+        for ref in passed:
+            if ref.accession not in self.filings:
+                self._store_filing(ref, "skipped", notes=[_PASSED_OVER], counted=False)
         self._newest_release = max((ref.period_end for ref in releases if ref.period_end), default=None)
         self._store_release_statements(reports, releases)
         self._store_chart_breakdowns(releases)
@@ -2150,7 +2155,7 @@ class SymbolPipeline:
 
     def _store_filing(self, ref: FilingRef, status: str, *, records: list[dict] | None = None,
                       period_end: date | None = None, fiscal_year: str | None = None, fiscal_period: str | None = None,
-                      spec_version: int | None = None, notes: list[str] | None = None) -> None:
+                      spec_version: int | None = None, notes: list[str] | None = None, counted: bool = True) -> None:
         records = records or []
         previous = self.filings.get(ref.accession)
         # A re-read replaces the filing's earlier reading: values it no longer produces (a KPI key the new list renamed,
@@ -2176,6 +2181,8 @@ class SymbolPipeline:
         }
         self._store(filings=[filing], values=records)
         self.filings[ref.accession] = filing
+        if not counted:
+            return
         self.result.filings += 1
         self.result.needs_review += sum(1 for record in records if record["validation_status"] == "needs_review")
         self.log(f"{self.symbol}: {ref.form} {ref.filed} {status} ({filing['value_count']} values)")
