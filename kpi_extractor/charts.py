@@ -358,7 +358,7 @@ def _engine(factory):
 
 # A slide given over to one pie of one quarter, titled in its hidden text ("3Q26 Revenue by Platform", TSMC): the pie
 # stands on the left, a chart of growth rates or amounts on the right.
-_TITLED_PIE = re.compile(r"\b([1-4])Q(\d{2})\s+Revenue\s+by\s+(Platform)\b", re.I)
+_TITLED_PIE = re.compile(r"\b([1-4])Q(\d{2})\s+Revenue\s+by\s+(Platform|Technology)\b", re.I)
 _PURE_SHARE = re.compile(r"^(\d{1,3})\s?%$")
 # The lettering of a platform pie, as the OCR reads it ("IoT" can come back as "loT" or "101").
 _PLATFORM_NAMES = {
@@ -379,14 +379,52 @@ def titled_pie_slides(raw_html: str) -> list[tuple[str, str, str, str]]:
     return slides
 
 
+# A technology pie's lettering (TSMC): its names as the company's reports title the series, "16/20nm" under 16nm (20nm
+# is a tenth of a point of wafer revenue). Labels stand close together, so the OCR runs some into one word
+# ("40/45nm4%", "65nm 0.13um") and splits "90nm-" from "0.13um" over two lines.
+_TECHNOLOGY_NAMES = {
+    "2nm": "2nm", "3nm": "3nm", "5nm": "5nm", "7nm": "7nm", "1620nm": "16nm", "28nm": "28nm", "4045nm": "40/45nm",
+    "65nm": "65nm", "90nm013um": "90nm-0.13 Micron", "015um": "0.15 Micron and Above",
+}
+_TECHNOLOGY_TOKEN = re.compile(r"≥?\s?0\.15\s?um|90\s?nm\s?-|0\.13\s?um|\d{2}/\d{2}\s?nm|\d{1,2}\s?nm|\d{1,3}\s?%")
+
+
+def _technology_words(words: list[Word]) -> list[Word]:
+    """The words of a technology pie taken apart into its names and shares, each given its share of the word's width,
+    with "90nm-" joined to the "0.13um" under it."""
+    parts: list[Word] = []
+    for word in words:
+        text = word.text.strip()
+        tokens = list(_TECHNOLOGY_TOKEN.finditer(text))
+        if not tokens or _TECHNOLOGY_TOKEN.sub("", text).strip():
+            continue
+        width = (word.x1 - word.x0) / max(1, len(text))
+        parts.extend(Word(word.x0 + token.start() * width, word.y0, word.x0 + token.end() * width, word.y1, token.group(0))
+                     for token in tokens)
+    joined: list[Word] = []
+    for part in parts:
+        if _squash(part.text) == "013um":
+            head = next((other for other in parts if _squash(other.text) == "90nm" and -6 <= part.y0 - other.y1 <= 12
+                         and abs(other.cx - part.cx) <= 40), None)
+            if head is not None:
+                joined.append(Word(min(head.x0, part.x0), head.y0, max(head.x1, part.x1), part.y1, "90nm-0.13um"))
+            continue
+        if _squash(part.text) != "90nm":
+            joined.append(part)
+    return joined
+
+
 def read_titled_pie(words: list[Word], axis: str, fiscal_year: str, fiscal_period: str) -> ChartBreakdown | None:
-    """The pie on the left half of a titled slide: each share ("21%") under its label ("Smartphone"). Every platform
+    """The pie on the left half of a titled slide: each share ("21%") under its label ("Smartphone"). Every member
     must be found once, and the shares must add up to a whole (rounded to points, 99 to 101)."""
-    if axis != "platform" or not words:
+    if axis not in ("platform", "technology") or not words:
         return None
     middle = max(word.x1 for word in words) / 2
     left = [word for word in words if word.cx < middle]
-    labels = [word for word in left if _PLATFORM_NAMES.get(_squash(word.text))]
+    known = _PLATFORM_NAMES if axis == "platform" else _TECHNOLOGY_NAMES
+    if axis == "technology":
+        left = _technology_words(left)
+    labels = [word for word in left if known.get(_squash(word.text))]
     shares: dict[str, float] = {}
     taken: set[int] = set()
     for share in sorted((word for word in left if _PURE_SHARE.match(word.text.strip())), key=lambda item: item.cy):
@@ -397,13 +435,13 @@ def read_titled_pie(words: list[Word], axis: str, fiscal_year: str, fiscal_perio
             return None
         label = min(above, key=lambda item: (share.y0 - item.y1) + abs(item.cx - share.cx) / 4)
         taken.add(id(label))
-        name = _PLATFORM_NAMES[_squash(label.text)]
+        name = known[_squash(label.text)]
         if name in shares:
             return None
         shares[name] = float(_PURE_SHARE.match(share.text.strip()).group(1))
-    if set(shares) != set(_PLATFORM_NAMES.values()) or not 99 <= sum(shares.values()) <= 101:
+    if set(shares) != set(known.values()) or not 99 <= sum(shares.values()) <= 101:
         return None
-    return ChartBreakdown("Net revenue", "platform", fiscal_year, fiscal_period, shares)
+    return ChartBreakdown("Net revenue" if axis == "platform" else "Wafer revenue", axis, fiscal_year, fiscal_period, shares)
 
 
 _SIGNED_SHARE = re.compile(r"^([+\-−–])\s?(\d{1,3}(?:\.\d)?)\s?%$")

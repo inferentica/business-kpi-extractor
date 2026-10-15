@@ -473,7 +473,10 @@ class SymbolPipeline:
         reported amount of the quarter before ("+22%"), scaled to the quarter's net revenue, which the release states;
         the pie's rounded shares must agree with the result. Whole-point shares alone would misstate the small
         platforms (a 4% slice is anything from 3.5% to 4.5%). The figures go into the series the company's reports fill
-        (matched by the members' names), and the report's own figures replace them. Only a quarter it lacks is read."""
+        (matched by the members' names), and the report's own figures replace them. Only a quarter it lacks is read.
+
+        The technology pie is a split of wafer revenue, an amount the release does not give: its shares are stored as
+        shares (Bedrock's percentage chart shows them) until the report's amounts replace them."""
         for ref in sorted((ref for ref in releases if ref.period_end), key=lambda item: item.filed, reverse=True)[:2]:
             try:
                 quarter = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
@@ -490,13 +493,18 @@ class SymbolPipeline:
                     # Read once: the quarter's report, or this reading already done (figures stored with their rates).
                     if group is None or any(value["group_key"] == group and (value["fiscal_year"], value["fiscal_period"]) == quarter
                                             and value["validation_status"] == "verified"
-                                            and (value["method"] != CHART_METHOD or "growth" in (value.get("locator") or {}))
+                                            and (value["method"] != CHART_METHOD or {"growth", "share_of"} & set(value.get("locator") or {}))
                                             for value in self.values.values()):
                         continue
                     words = ocr_words(_fetch_image(link))
-                    pie, growth = read_titled_pie(words, axis, year, period), read_growth_rates(words)
-                    base = self._release_revenue(ref)
-                    if pie is None or growth is None or base is None:
+                    pie = read_titled_pie(words, axis, year, period)
+                    if pie is None:
+                        continue
+                    if axis == "technology":
+                        records.extend(self._technology_share_records(pie, group, ref, link))
+                        continue
+                    growth, base = read_growth_rates(words), self._release_revenue(ref)
+                    if growth is None or base is None:
                         continue
                     records.extend(self._titled_pie_records(pie, growth, group, base, ref, link))
                 if records:
@@ -506,12 +514,13 @@ class SymbolPipeline:
                 self.log(f"{self.symbol}: pies of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
 
     def _series_for(self, axis: str) -> str | None:
-        """The quarterly revenue series whose members a pie names: the group labelled "Revenue by <axis>" among the
-        values read from the quarters' reports (an annual report's XBRL series of that name is the year's, not this)."""
+        """The quarterly revenue series whose members a pie names: the group labelled "Revenue by <axis>" ("Wafer Revenue
+        by Technology") among the values read from the quarters' reports (an annual report's XBRL series of that name
+        is the year's, not this)."""
         groups = {value["group_key"] for value in self.values.values()
                   if value["validation_status"] == "verified" and value["unit"] == "currency"
                   and value["method"] != "xbrl" and value["fiscal_period"] != "FY"
-                  and str(value.get("group_label") or "").lower() == f"revenue by {axis}"}
+                  and re.fullmatch(rf"(\w+ )?revenue by {axis}", str(value.get("group_label") or "").lower())}
         return groups.pop() if len(groups) == 1 else None
 
     def _release_revenue(self, ref: FilingRef) -> tuple[float, str | None] | None:
@@ -525,6 +534,35 @@ class SymbolPipeline:
         headline = release_headline(document, ref.period_end)
         revenue = next((line["value"] for line in headline.lines if line["concept"] == "release_Revenues"), None) if headline else None
         return (float(revenue), headline.currency) if revenue else None
+
+    def _technology_share_records(self, pie: ChartBreakdown, group: str, ref: FilingRef, link: str) -> list[dict]:
+        """A technology pie's shares of wafer revenue, under the series' members, as percentages. The release's own
+        words ("2-nanometer accounted for 8% of total wafer revenue") must agree with the shares they name."""
+        members: dict[str, dict] = {}
+        for value in sorted(self.values.values(), key=lambda item: (item["fiscal_year"], item["fiscal_period"])):
+            if value["group_key"] == group and value["validation_status"] == "verified" and value["unit"] == "currency":
+                members[member_key(value["kpi_label"])] = value
+        if any(member_key(name) not in members for name in pie.shares):
+            return []
+        try:
+            text = re.sub(r"\s+", " ", " ".join(block.text for block in self._document(ref).blocks.values()))
+        except Exception:  # noqa: BLE001 - without the release's words there is nothing to check against
+            return []
+        stated = {f"{node}nm": float(share) for node, share in
+                  re.findall(r"(\d{1,2})-nanometer accounted for (\d{1,3})%", text)}
+        if not stated or any(pie.shares.get(name) != share for name, share in stated.items()):
+            return []
+        return [self._record(
+            group_key=group, group_label=members[member_key(name)]["group_label"],
+            group_kind=members[member_key(name)]["group_kind"], group_order=members[member_key(name)]["group_order"],
+            kpi_key=members[member_key(name)]["kpi_key"], kpi_label=members[member_key(name)]["kpi_label"],
+            kpi_order=members[member_key(name)]["kpi_order"], unit="percent", value=share, currency=None,
+            method=CHART_METHOD, validation_status="verified", reconciliation_error_pct=round(sum(pie.shares.values()) - 100, 2),
+            notes=[f"the results slide's share of wafer revenue; its amount comes with the quarter's report"]
+                  + (["16/20nm together on the slide"] if name == "16nm" else []),
+            ref=ref, source_url=link, fiscal_year=pie.fiscal_year, fiscal_period=pie.fiscal_period, period_end=ref.period_end,
+            locator={"image": link, "share": share, "share_of": "wafer revenue"},
+        ) for name, share in pie.shares.items()]
 
     def _titled_pie_records(self, pie: ChartBreakdown, growth: dict[str, float], group: str,
                             base: tuple[float, str | None], ref: FilingRef, link: str) -> list[dict]:
@@ -635,7 +673,9 @@ class SymbolPipeline:
         # A share left as a bare percentage (its quarter's amount is not known) is not a revenue breakdown: withdrawn.
         stale = [{**value, "validation_status": "rejected", "notes": ["a share without its amount; read again as a revenue breakdown"]}
                  for value in self.values.values()
-                 if value["method"] == CHART_METHOD and value["unit"] == "percent" and value["validation_status"] != "rejected"]
+                 if value["method"] == CHART_METHOD and value["unit"] == "percent" and value["validation_status"] != "rejected"
+                 # A results-day share of an amount no release gives (TSMC's wafer revenue) is kept as a share.
+                 and "share_of" not in (value.get("locator") or {})]
         for start in range(0, len(stale), 400):
             self._store(values=stale[start:start + 400])
 
