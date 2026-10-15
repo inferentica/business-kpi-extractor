@@ -404,3 +404,34 @@ def read_titled_pie(words: list[Word], axis: str, fiscal_year: str, fiscal_perio
     if set(shares) != set(_PLATFORM_NAMES.values()) or not 99 <= sum(shares.values()) <= 101:
         return None
     return ChartBreakdown("Net revenue", "platform", fiscal_year, fiscal_period, shares)
+
+
+_SIGNED_SHARE = re.compile(r"^([+\-−–])\s?(\d{1,3}(?:\.\d)?)\s?%$")
+_PLATFORM_RUN = re.compile(r"hpc|smartphone|iot|lot|1ot|101|automotive|dce|others?")
+
+
+def read_growth_rates(words: list[Word]) -> dict[str, float] | None:
+    """The quarter-on-quarter growth chart beside a platform pie ("+22%" over HPC, "-12%" under DCE): one signed rate per
+    platform, matched left to right with the platform names along the chart (names that run together, as in
+    "HPC SmartphoneloTAutomotive", are taken apart). Every platform must have exactly one rate."""
+    if not words:
+        return None
+    middle = max(word.x1 for word in words) / 2
+    right = [word for word in words if word.cx >= middle]
+    rates = sorted((word for word in right if _SIGNED_SHARE.match(word.text.strip())), key=lambda item: item.cx)
+    names: list[tuple[float, str]] = []
+    for word in right:
+        text = _squash(word.text)
+        if _SIGNED_SHARE.match(word.text.strip()) or "growth" in text:
+            continue
+        width = (word.x1 - word.x0) / max(1, len(text))
+        for match in _PLATFORM_RUN.finditer(text):
+            names.append((word.x0 + (match.start() + match.end()) / 2 * width, _PLATFORM_NAMES[match.group(0)]))
+    names.sort()
+    if len(rates) != len(names) or {name for _x, name in names} != set(_PLATFORM_NAMES.values()) or len(names) != 6:
+        return None
+    growth: dict[str, float] = {}
+    for rate, (_x, name) in zip(rates, names):
+        sign, figure = _SIGNED_SHARE.match(rate.text.strip()).groups()
+        growth[name] = float(figure) * (1 if sign == "+" else -1)
+    return growth

@@ -33,3 +33,10 @@ def test_the_slide_is_found_by_its_hidden_title():
             'Ltd TSMC Property 3Q26 Revenue by Platform </FONT></DIV>'
             '<IMG src="a3q26presentatione005.jpg"><DIV><FONT size="1">3Q26 Revenue by Technology</FONT></DIV>')
     assert titled_pie_slides(html) == [("a3q26presentatione006.jpg", "platform", "2026", "Q3")]
+
+
+def test_the_growth_chart_gives_each_platform_its_rate_left_to_right():
+    from kpi_extractor.charts import read_growth_rates
+    assert read_growth_rates(WORDS) == {"High Performance Computing": 22, "Smartphone": 10, "Internet of Things": 5,
+                                        "Automotive": 23, "Digital Consumer Electronics": -12, "Others": -10}
+    assert read_growth_rates([word for word in WORDS if word.text != "+5%"]) is None
