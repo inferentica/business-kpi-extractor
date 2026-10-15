@@ -282,3 +282,27 @@ def test_reported_units_come_from_the_quarterly_ratios_row_in_either_layout():
     ])
     document.order.append("T5")
     assert reported_units(document)[date(2020, 12, 31)] == 80 and reported_units(document)[date(2020, 9, 27)] == 60
+
+
+def test_a_release_summary_gives_its_own_quarter_headline_lines():
+    from kpi_extractor.release_statements import release_headline
+    rows = [
+        ["", "3Q26Amounta", "3Q25Amount", "YoYInc. (Dec.) %", "2Q26Amount", "QoQInc. (Dec.) %"],
+        ["Net sales", "1,494,243", "989,918", "50.9", "1,270,381", "17.6"],
+        ["Gross profit", "992,379", "588,543", "68.6", "860,311", "15.4"],
+        ["Income from operations", "876,445", "500,685", "75.0", "766,603", "14.3"],
+        ["Income before tax", "911,039", "525,369", "73.4", "862,430", "5.6"],
+        ["Net income", "763,064", "452,302", "68.7", "706,562", "8.0"],
+        ["EPS (NT$)", "29.43b", "17.44c", "68.7", "27.25b", "8.0"],
+    ]
+    document = Document("https://example.test/release.htm")
+    document.tables["T0"] = Table("T0", "TSMC’s 2026 third quarter consolidated results: (Unit: NT$ million, except for EPS)", rows)
+    document.order.append("T0")
+    headline = release_headline(document, date(2026, 9, 30))
+    assert headline is not None and headline.duration == "headline" and headline.currency == "TWD"
+    values = {line["concept"]: line["value"] for line in headline.lines}
+    assert values["release_Revenues"] == 1_494_243_000_000
+    assert values["release_NetIncomeAttributableToShareholdersOfTheParent"] == 763_064_000_000
+    assert values["release_DilutedEarningsPerShare"] == 29.43  # the footnote mark is not part of it
+    # Another quarter's release, or a summary whose first column is not the release's quarter, gives nothing.
+    assert release_headline(document, date(2026, 6, 30)) is None

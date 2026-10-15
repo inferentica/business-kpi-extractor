@@ -491,3 +491,63 @@ def reported_units(document: Document) -> dict[date, int]:
         widest = len(ends)
         found = {end: int(value) for end, value in zip(ends, values)}
     return found
+
+
+# A release's summary of its quarter beside the year before and the quarter before ("3Q26 Amount | 3Q25 Amount | YoY |
+# 2Q26 Amount | QoQ", TSMC): the selected income lines out on results day, weeks before the full statements.
+_QUARTER_COLUMN = re.compile(r"^\s*([1-4])Q(\d{2})(?!\d)")
+_UNIT_SCALE = re.compile(r"\bunit:\s*(?:NT\$|US\$|\$|€|EUR|USD|TWD)?\s*(thousand|million|billion)s?\b", re.I)
+_HEADLINE_LINES = (
+    (re.compile(r"^(net (sales|revenues?)|(total )?revenues?)$", re.I), "Revenues", "Net revenue"),
+    (re.compile(r"^gross profit$", re.I), "GrossProfit", "Gross profit"),
+    (re.compile(r"^(income|profit) from operations$|^operating (income|profit)$", re.I), "OperatingIncomeLoss",
+     "Income from operations"),
+    (re.compile(r"^income before (income )?tax$", re.I), "IncomeBeforeIncomeTax", "Income before income tax"),
+    (re.compile(r"^net income( attributable to shareholders of the parent( company)?)?$", re.I),
+     "NetIncomeAttributableToShareholdersOfTheParent", "Net income attributable to shareholders of the parent"),
+    (re.compile(r"^(diluted )?eps\b|^(diluted )?earnings per share\b", re.I), "DilutedEarningsPerShare",
+     "Diluted earnings per share"),
+)
+_LEADING_NUMBER = re.compile(r"^\(?-?[\d,]+(?:\.\d+)?\)?")
+
+
+def release_headline(document: Document, period_end: date) -> ReleaseStatement | None:
+    """The quarter's selected income lines from a release's summary table, when its first figures column is that
+    quarter ("3Q26"): revenue, gross profit, operating income, income before tax, net income and EPS. Kept only when
+    they are in order (revenue above gross profit above operating income, all positive revenue)."""
+    for table in document.tables.values():
+        header = table.rows[0] if table.rows else []
+        column = next((index for index, cell in enumerate(header) if _QUARTER_COLUMN.match(clean(cell or ""))), None)
+        if column is None:
+            continue
+        match = _QUARTER_COLUMN.match(clean(header[column]))
+        quarter, year = int(match.group(1)), 2000 + int(match.group(2))
+        if (year, quarter) != (period_end.year, (period_end.month - 1) // 3 + 1):
+            continue
+        text = f"{table.context[-200:]} {' '.join(header)}"
+        unit = _UNIT_SCALE.search(text)
+        scale = _SCALES[unit.group(1).lower() + "s"] if unit else _scale(text)
+        currency = _currency(text)
+        if scale is None or currency is None:
+            continue
+        lines: list[dict] = []
+        for row in table.rows[1:]:
+            label = clean(row[0] if row else "")
+            found = next(((concept, name) for pattern, concept, name in _HEADLINE_LINES if pattern.search(label)), None)
+            if found is None or column >= len(row) or any(line["concept"] == f"release_{found[0]}" for line in lines):
+                continue
+            number = _LEADING_NUMBER.match(clean(row[column] or "").replace(" ", ""))
+            value = _number(number.group(0)) if number else None
+            if value is None:
+                continue
+            per_share = found[0].endswith("PerShare")
+            lines.append({"line": len(lines), "concept": f"release_{found[0]}", "label": found[1], "level": 0,
+                          "is_heading": False, "value": value if per_share else round(value * scale, 2)})
+        values = {line["concept"].removeprefix("release_"): line["value"] for line in lines}
+        revenue, gross, operating = values.get("Revenues"), values.get("GrossProfit"), values.get("OperatingIncomeLoss")
+        if revenue is None or revenue <= 0 or "NetIncomeAttributableToShareholdersOfTheParent" not in values or len(lines) < 4:
+            continue
+        if (gross is not None and gross > revenue) or (gross is not None and operating is not None and operating > gross):
+            continue
+        return ReleaseStatement("income", period_end, "headline", currency, lines)
+    return None

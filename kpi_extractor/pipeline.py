@@ -33,7 +33,7 @@ from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, chec
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
 from .charts import ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_units, unit_region
-from .release_statements import release_statements, reported_units
+from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
 from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
@@ -436,6 +436,33 @@ class SymbolPipeline:
                     self.log(f"{self.symbol}: {ref.form} {ref.filed} statements stored ({len(lines)} lines)")
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+        self._store_headline(releases)
+
+    def _store_headline(self, releases: list[FilingRef]) -> None:
+        """The newest quarter's selected income lines from its earnings release (TSMC's summary table), while that
+        quarter has no full income statement yet: its consolidated report follows weeks later and replaces them."""
+        latest = max((ref for ref in releases if ref.period_end), key=lambda item: item.filed, default=None)
+        if latest is None:
+            return
+        try:
+            own = fiscal_label(latest.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
+            owners = self._statement_owners
+            if any(owners.get(("income", *own, duration)) for duration in ("quarter", "ytd", "year")):
+                return
+            if (owners.get(("income", *own, "headline")) or {}).get("accession") == latest.accession:
+                return
+            statement = release_headline(self._document(latest), latest.period_end)
+            if statement is None:
+                return
+            shared = {"statement": "income", "duration": "headline", "fiscal_year": own[0], "fiscal_period": own[1],
+                      "period_end": statement.period_end.isoformat(), "form": latest.form,
+                      "filed_at": latest.filed.isoformat(), "currency": statement.currency}
+            self.control.call("store_statements", symbol=self.symbol, accession=latest.accession,
+                              lines=[{**line, **shared} for line in statement.lines])
+            owners[("income", *own, "headline")] = {"accession": latest.accession, "filed_at": latest.filed.isoformat()}
+            self.log(f"{self.symbol}: {latest.form} {latest.filed} headline figures stored ({len(statement.lines)} lines)")
+        except Exception as error:  # noqa: BLE001
+            self.log(f"{self.symbol}: headline of {latest.form} {latest.filed} not read ({type(error).__name__}: {error})"[:300])
 
     def _store_chart_breakdowns(self, releases: list[FilingRef]) -> None:
         """What a release shows only as charts (ASML's slide: net system sales by technology, end-use and region as
