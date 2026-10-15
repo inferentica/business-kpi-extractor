@@ -32,7 +32,8 @@ from .document import Document, clean, parse_document, parse_number
 from .extract import (MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, _listed_kpi, check_period, column_header, count_jump, describe,
                       locator_hint, read_values, validate_groups)
 from .fiscal import fiscal_label, learn_year_offset
-from .charts import ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_units, unit_region
+from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_titled_pie, read_units,
+                     titled_pie_slides, unit_region)
 from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
@@ -437,6 +438,7 @@ class SymbolPipeline:
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
         self._store_headline(releases)
+        self._store_titled_pies(releases)
 
     def _store_headline(self, releases: list[FilingRef]) -> None:
         """The newest quarter's selected income lines from its earnings release (TSMC's summary table), while that
@@ -463,6 +465,82 @@ class SymbolPipeline:
             self.log(f"{self.symbol}: {latest.form} {latest.filed} headline figures stored ({len(statement.lines)} lines)")
         except Exception as error:  # noqa: BLE001
             self.log(f"{self.symbol}: headline of {latest.form} {latest.filed} not read ({type(error).__name__}: {error})"[:300])
+
+    def _store_titled_pies(self, releases: list[FilingRef]) -> None:
+        """A quarter's pie on a slide of its own (TSMC's "3Q26 Revenue by Platform"), read by the local OCR model on
+        results day, weeks before the quarter's report gives the amounts. Each share is taken of the quarter's net
+        revenue, which the release states, into the series the company's reports fill (matched by the members'
+        names); the report's own figures replace them when it is read. Only a quarter that series lacks is read."""
+        for ref in sorted((ref for ref in releases if ref.period_end), key=lambda item: item.filed, reverse=True)[:2]:
+            try:
+                quarter = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
+                slides = []
+                for exhibit in ref.exhibits[:6]:
+                    raw = self._waiting(self._exhibit(exhibit).result)
+                    slides.extend((urllib.parse.urljoin(exhibit.url, source), axis, year, period)
+                                  for source, axis, year, period in titled_pie_slides(raw or ""))
+                records: list[dict] = []
+                for link, axis, year, period in slides:
+                    if (year, period) != quarter:
+                        continue
+                    group = self._series_for(axis)
+                    if group is None or any(value["group_key"] == group and (value["fiscal_year"], value["fiscal_period"]) == quarter
+                                            and value["validation_status"] == "verified" for value in self.values.values()):
+                        continue
+                    pie = read_titled_pie(ocr_words(_fetch_image(link)), axis, year, period)
+                    base = self._release_revenue(ref)
+                    if pie is None or base is None:
+                        continue
+                    records.extend(self._titled_pie_records(pie, group, base, ref, link))
+                if records:
+                    self._store(values=records)
+                    self.log(f"{self.symbol}: {ref.form} {ref.filed} pie figures stored ({len(records)} values)")
+            except Exception as error:  # noqa: BLE001
+                self.log(f"{self.symbol}: pies of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+
+    def _series_for(self, axis: str) -> str | None:
+        """The quarterly revenue series whose members a pie names: the group labelled "Revenue by <axis>" among the
+        values read from the quarters' reports (an annual report's XBRL series of that name is the year's, not this)."""
+        groups = {value["group_key"] for value in self.values.values()
+                  if value["validation_status"] == "verified" and value["unit"] == "currency"
+                  and value["method"] != "xbrl" and value["fiscal_period"] != "FY"
+                  and str(value.get("group_label") or "").lower() == f"revenue by {axis}"}
+        return groups.pop() if len(groups) == 1 else None
+
+    def _release_revenue(self, ref: FilingRef) -> tuple[float, str | None] | None:
+        """The quarter's net revenue as its release states it: its income statement, else its summary table."""
+        document = self._document(ref)
+        for statement in release_statements(document):
+            if statement.statement == "income" and abs((statement.period_end - ref.period_end).days) <= 3:
+                revenue = next((line["value"] for line in statement.lines if line["concept"] == "release_Revenues"), None)
+                if revenue:
+                    return float(revenue), statement.currency
+        headline = release_headline(document, ref.period_end)
+        revenue = next((line["value"] for line in headline.lines if line["concept"] == "release_Revenues"), None) if headline else None
+        return (float(revenue), headline.currency) if revenue else None
+
+    def _titled_pie_records(self, pie: ChartBreakdown, group: str, base: tuple[float, str | None], ref: FilingRef,
+                            link: str) -> list[dict]:
+        """The pie's shares as amounts in the stored series, under its members' keys, labels and order."""
+        members: dict[str, dict] = {}
+        for value in sorted(self.values.values(), key=lambda item: (item["fiscal_year"], item["fiscal_period"])):
+            if value["group_key"] == group and value["validation_status"] == "verified":
+                members[member_key(value["kpi_label"])] = value
+        if any(member_key(name) not in members for name in pie.shares):
+            return []  # a member the series does not have: not this series
+        amount, currency = base
+        total = sum(pie.shares.values())
+        return [self._record(
+            group_key=group, group_label=members[member_key(name)]["group_label"],
+            group_kind=members[member_key(name)]["group_kind"], group_order=members[member_key(name)]["group_order"],
+            kpi_key=members[member_key(name)]["kpi_key"], kpi_label=members[member_key(name)]["kpi_label"],
+            kpi_order=members[member_key(name)]["kpi_order"], unit="currency", value=round(amount * share / total, 2),
+            currency=currency or members[member_key(name)].get("currency"), method=CHART_METHOD,
+            validation_status="verified", reconciliation_error_pct=round(total - 100, 2),
+            notes=[f"the slide's rounded share ({share:g}%) of net revenue"], ref=ref, source_url=link,
+            fiscal_year=pie.fiscal_year, fiscal_period=pie.fiscal_period, period_end=ref.period_end,
+            locator={"image": link, "share": share, "total": amount},
+        ) for name, share in pie.shares.items()]
 
     def _store_chart_breakdowns(self, releases: list[FilingRef]) -> None:
         """What a release shows only as charts (ASML's slide: net system sales by technology, end-use and region as
@@ -2389,8 +2467,9 @@ def _significant(value: float) -> bool:
 
 
 def _keeps_verified(existing: dict, incoming: dict) -> bool:
+    # A figure read from a slide's chart is kept too against the same filing's unchecked reading of its text.
     return (existing["validation_status"] == "verified" and incoming["validation_status"] == "needs_review"
-            and existing.get("source_accession") != incoming.get("source_accession"))
+            and (existing.get("source_accession") != incoming.get("source_accession") or existing.get("method") == CHART_METHOD))
 
 
 def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:

@@ -354,3 +354,53 @@ def _engine(factory):
     if _ENGINE is None:
         _ENGINE = factory()
     return _ENGINE
+
+
+# A slide given over to one pie of one quarter, titled in its hidden text ("3Q26 Revenue by Platform", TSMC): the pie
+# stands on the left, a chart of growth rates or amounts on the right.
+_TITLED_PIE = re.compile(r"\b([1-4])Q(\d{2})\s+Revenue\s+by\s+(Platform)\b", re.I)
+_PURE_SHARE = re.compile(r"^(\d{1,3})\s?%$")
+# The lettering of a platform pie, as the OCR reads it ("IoT" can come back as "loT" or "101").
+_PLATFORM_NAMES = {
+    "hpc": "High Performance Computing", "smartphone": "Smartphone", "iot": "Internet of Things", "lot": "Internet of Things",
+    "101": "Internet of Things", "1ot": "Internet of Things", "automotive": "Automotive",
+    "dce": "Digital Consumer Electronics", "others": "Others", "other": "Others",
+}
+
+
+def titled_pie_slides(raw_html: str) -> list[tuple[str, str, str, str]]:
+    """(image, axis, fiscal year, fiscal period) of each slide whose hidden title names one quarter's pie."""
+    slides = []
+    for source, text in _SLIDE.findall(raw_html or ""):
+        text = re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", text))).strip()
+        match = _TITLED_PIE.search(text)
+        if match:
+            slides.append((source, match.group(3).lower(), f"20{match.group(2)}", f"Q{match.group(1)}"))
+    return slides
+
+
+def read_titled_pie(words: list[Word], axis: str, fiscal_year: str, fiscal_period: str) -> ChartBreakdown | None:
+    """The pie on the left half of a titled slide: each share ("21%") under its label ("Smartphone"). Every platform
+    must be found once, and the shares must add up to a whole (rounded to points, 99 to 101)."""
+    if axis != "platform" or not words:
+        return None
+    middle = max(word.x1 for word in words) / 2
+    left = [word for word in words if word.cx < middle]
+    labels = [word for word in left if _PLATFORM_NAMES.get(_squash(word.text))]
+    shares: dict[str, float] = {}
+    taken: set[int] = set()
+    for share in sorted((word for word in left if _PURE_SHARE.match(word.text.strip())), key=lambda item: item.cy):
+        # The label stands right over its share, their centres close.
+        above = [label for label in labels if id(label) not in taken and -8 <= share.y0 - label.y1 <= 26
+                 and abs(label.cx - share.cx) <= max(45.0, (label.x1 - label.x0) / 2)]
+        if not above:
+            return None
+        label = min(above, key=lambda item: (share.y0 - item.y1) + abs(item.cx - share.cx) / 4)
+        taken.add(id(label))
+        name = _PLATFORM_NAMES[_squash(label.text)]
+        if name in shares:
+            return None
+        shares[name] = float(_PURE_SHARE.match(share.text.strip()).group(1))
+    if set(shares) != set(_PLATFORM_NAMES.values()) or not 99 <= sum(shares.values()) <= 101:
+        return None
+    return ChartBreakdown("Net revenue", "platform", fiscal_year, fiscal_period, shares)
