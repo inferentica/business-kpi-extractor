@@ -213,6 +213,9 @@ class SymbolPipeline:
                 for exhibit in ref.exhibits[:6]:
                     self._exhibit(exhibit)
         spec, version, proposed = self._spec(state.get("spec"), releases)
+        self._owner_edited = bool((state.get("spec") or {}).get("owner_edited_at"))
+        if spec is not None and not proposed:
+            self._carry_owner_additions(spec, version, state.get("previousSpec"), releases)
         if spec is not None:
             processed = self._process_releases(releases, spec, version)
             latest_end = releases[-1].period_end if releases else None
@@ -813,7 +816,8 @@ class SymbolPipeline:
     # The KPI list: proposed once, then audited every new quarter.
 
     def _spec(self, row: dict | None, releases: list[FilingRef]) -> tuple[Spec | None, int, bool]:
-        if row and not self.force:
+        # A list the owner edited (Bedrock's KPI templates) is kept as edited, even on a forced run.
+        if row and (not self.force or row.get("owner_edited_at")):
             stored = Spec.model_validate({"groups": row["groups"], "names": row.get("names") or {}})
             spec, version = self._capped(stored), int(row["version"])
             if spec.model_dump() != stored.model_dump():
@@ -885,6 +889,9 @@ class SymbolPipeline:
         try:
             answer = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.MAINTAIN_TASK, data),
                                "maintain", ai.Maintenance, thinking_first=True, model="pro")
+            if getattr(self, "_owner_edited", False):
+                # The owner decides what an edited list tracks: the audit may suggest additions, never retirements.
+                answer = answer.model_copy(update={"retire": []})
             updated = apply_maintenance(spec, answer)
         except (AiResponseError, ControlError, ValueError) as error:
             self.result.errors.append(f"KPI list audit: {error}"[:300])
@@ -1157,6 +1164,31 @@ class SymbolPipeline:
         """A breakdown row under 1% of its total, whose swings say nothing (as validate_groups treats it)."""
         total = (value.get("locator") or {}).get("total")
         return value["group_kind"] == "revenue_breakdown" and bool(total) and abs(float(value["value"])) < 0.01 * abs(float(total))
+
+    def _carry_owner_additions(self, spec: Spec, version: int, previous: dict | None, releases: list[FilingRef]) -> None:
+        """When the owner only added KPIs (a new list version that keeps every KPI of the one before), older quarters
+        keep their readings and move to the new version; only the last four quarters are read for the additions, as
+        the audit's additions are."""
+        if not previous or int(previous.get("version") or 0) >= version or not releases:
+            return
+        try:
+            before = Spec.model_validate({"groups": previous.get("groups") or [], "names": {}})
+        except ValueError:
+            return
+        if not only_adds(before, spec):
+            return
+        latest_end = max(ref.period_end for ref in releases if ref.period_end) if any(ref.period_end for ref in releases) else None
+        if latest_end is None:
+            return
+        cutoff = latest_end - timedelta(days=370)
+        carried = 0
+        for ref in releases:
+            filing = self.filings.get(ref.accession) or {}
+            if ref.period_end and ref.period_end < cutoff and filing.get("spec_version") == int(previous["version"]):
+                self._carry_to_version(ref, version)
+                carried += 1
+        if carried:
+            self.log(f"{self.symbol}: owner added KPIs; {carried} older filings kept, the last four quarters read again")
 
     def _carry_to_version(self, ref: FilingRef, version: int) -> None:
         filing = self.filings.get(ref.accession)
