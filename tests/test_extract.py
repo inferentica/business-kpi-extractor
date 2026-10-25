@@ -139,3 +139,23 @@ def test_a_quote_from_a_bullet_laid_out_as_a_table_is_read_as_text():
     values, problems = read_values(document, spec, located, "USD")
     assert problems == []
     assert [item.value for item in values] == [2_260_000_000]
+
+
+def test_a_row_that_states_its_own_scale_overrides_the_tables():
+    # JPM's supplement: a table "(in millions)" with "Debit and credit card sales volume (in billions)".
+    document = parse_document("""
+<p>(in millions)</p>
+<table>
+<tr><td>(in millions)</td><td>3Q26</td></tr>
+<tr><td>Net revenue</td><td>18,300</td></tr>
+<tr><td>Debit and credit card sales volume (in billions)</td><td>539.5</td></tr>
+</table>""", "https://example.com/ex99.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "card", "label": "Card sales volume", "unit": "currency"}]}]})
+    located = Located.model_validate({"period_end": "2026-09-30", "values": [
+        {"kpi": "ops.card", "table": table, "row": 2, "col": 1, "scale": 1000000000}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == []
+    assert [item.value for item in values] == [539_500_000_000]
+    assert values[0].notes == []

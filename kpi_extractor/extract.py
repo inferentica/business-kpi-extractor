@@ -135,7 +135,9 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
             value *= row_scale or (locator.scale if locator.scale in (1, 1e3, 1e6, 1e9) else 1)
             return value, None, notes
         if kpi.unit == "currency" and parsed.scale_word is None:
-            declared = table.declared_scale()
+            # A row that states its own scale overrides the table's: JPM's "Debit and credit card sales volume (in
+            # billions)" in a table "(in millions)".
+            declared = _row_scale(" ".join(table.rows[locator.row])) or table.declared_scale()
             if declared is None:
                 declared = document.default_scale()
             if declared is not None:
@@ -269,7 +271,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         label = _row_label(source.rows[index], col)
         if unit == "percent" and not parsed.percent and "%" not in header and "percent" not in header.lower():
             raise LocateError(f"{text!r} in row {index} is not a percentage")
-        value = parsed.value if parsed.scale_word or unit == "percent" else parsed.value * scale
+        own = _row_scale(" ".join(source.rows[index])) if unit == "currency" else None  # a row's own "(in billions)" wins
+        value = parsed.value if parsed.scale_word or unit == "percent" else parsed.value * (own or scale)
         return label, value, text
 
     parts: dict[str, tuple[str, float, int]] = {}
