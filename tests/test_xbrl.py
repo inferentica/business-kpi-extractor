@@ -206,3 +206,25 @@ def test_a_declared_parent_is_a_subtotal_even_when_it_is_not_its_childrens_sum()
     split = {"x:ProductMember": 40.0, "x:ServiceMember": 60.0, "x:AMember": 30.0, "x:BMember": 10.0, "x:CMember": 60.0}
     tree = {"x:ProductMember": {"x:AMember", "x:BMember"}, "x:ServiceMember": {"x:CMember", "x:AMember"}}
     assert drop_declared_parents(split, 100.0, tree) == split
+
+
+
+
+def test_a_two_line_split_inside_one_segment_is_completed_by_the_other_segments():
+    # AMD since 2025: Data Center, Client and Gaming, Embedded as segments; Client and Gaming also tagged by product.
+    def both(value, product, start="2026-04-01", end="2026-06-30"):
+        return {**_fact("us-gaap:Revenues", value, "amd:ClientAndGamingMember", axis="dim_us-gaap_StatementBusinessSegmentsAxis",
+                        start=start, end=end), "dim_srt_ProductOrServiceAxis": product}
+    def segment(value, member, **period):
+        return _fact("us-gaap:Revenues", value, member, axis="dim_us-gaap_StatementBusinessSegmentsAxis",
+                     consolidation="us-gaap:OperatingSegmentsMember", **period)
+    facts = pd.DataFrame([
+        _fact("us-gaap:Revenues", 7438.0),
+        segment(3674.0, "amd:DataCenterMember"), segment(2941.0, "amd:ClientAndGamingMember"), segment(823.0, "amd:EmbeddedMember"),
+        both(2294.0, "amd:ClientMember"), both(647.0, "amd:GamingMember"),
+    ])
+    result = extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q")
+    groups = {group.key: group for group in result.groups}
+    assert {key: value for key, _label, value in groups["segments"].members} == {"datacenter": 3674.0, "clientandgaming": 2941.0, "embedded": 823.0}
+    assert {key: value for key, _label, value in groups["products"].members} == {"datacenter": 3674.0, "client": 2294.0, "embedded": 823.0, "gaming": 647.0}
+    assert result.rejected == []

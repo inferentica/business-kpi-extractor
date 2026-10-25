@@ -426,7 +426,9 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         # Worth an AI review only when it could plausibly be a breakdown: a standard axis, or a custom one whose rows
         # are of the right order of magnitude.
         positive = sum(value for value in members.values() if value > 0)
-        if 3 <= len(members) <= 40 and (standard or 0.5 * total <= positive <= 3 * total):
+        # Two lines may still be one segment's split (AMD's Client and Gaming, by product since 2025): kept to be completed
+        # by the other segments below, never sent for review alone.
+        if 2 <= len(members) <= 40 and (standard or 0.5 * total <= positive <= 3 * total or len(members) == 2):
             rejected.append(XbrlCandidate(key, title, order, concept, total, currencies.get(concept),
                                           {k: (n, v) for k, n, v in named(members)}, prior, elements(members),
                                           ytd, ytd_total, prior_ytd, prior_ytd_total))
@@ -435,6 +437,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         if completed is not None:
             groups.append(completed)
             rejected.remove(candidate)
+    rejected = [candidate for candidate in rejected if len(candidate.members) >= 3]
     groups.sort(key=lambda group: (group.order, group.key))
     total_revenue = next((totals[concept] for concept in REVENUE_CONCEPTS if concept in totals), None)
     return XbrlBreakdowns(period_end, annual, _fiscal_year(entity), groups, total_revenue, rejected)
