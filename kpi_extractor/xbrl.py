@@ -29,6 +29,7 @@ _CONSOLIDATION_NAMES = {"IntersegmentEliminationMember": "Eliminations", "Corpor
                         "MaterialReconcilingItemsMember": "Reconciling items",
                         "SegmentReconcilingItemsMember": "Reconciling items"}
 _SEGMENT_AXES = {"StatementBusinessSegmentsAxis", "SegmentsAxis"}
+_PART_AXES = {"ProductOrServiceAxis"}
 # Revenue the company reports outside every split (Alphabet's hedging gains and losses, inside its contract-revenue total
 # in some years and outside it in others): found when two splits agree on a sum just short of revenue, and kept as one
 # row so the split adds up to revenue exactly.
@@ -269,6 +270,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     for (concept, axis), members in single.items():
         candidates.setdefault(axis, []).append((concept, members))
     for (concept, axes), items in paired.items():
+        found = False
         for fixed in axes:
             if len({dimensions[fixed] for dimensions, _value in items}) != 1:
                 continue
@@ -278,6 +280,17 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
                 members.setdefault(dimensions[other], value)
             candidates.setdefault(other, []).append((concept, members))
             fixed_for.setdefault((other, concept), (fixed, items[0][0][fixed]))
+            found = True
+        # Products tagged under segments where the filer typed one segment wrong (AMD's FY2025 10-K files Gaming under a
+        # "Gaming" segment, Client under "Client and Gaming"): the product lines alone, which _completed_by_segments
+        # keeps only when they add up exactly to one real segment.
+        part = next((axis for axis in axes if axis in _PART_AXES), None)
+        if not found and part and any(axis in _SEGMENT_AXES for axis in axes):
+            members = {}
+            for dimensions, value in items:
+                members.setdefault(dimensions[part], value)
+            if len(members) == len(items):
+                candidates.setdefault(part, []).append((concept, members))
 
     def total_for(concept: str) -> float | None:
         return totals.get(concept) or next((totals[other] for other in REVENUE_CONCEPTS if other in totals), None)
