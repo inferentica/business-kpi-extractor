@@ -21,6 +21,8 @@ _SCALE_ABBREVIATIONS = {"bn": "billion", "b": "billion", "m": "million", "k": "t
 _RELEVANT = re.compile(r"revenue|net sales|\bsales\b|shipment|subscri|users|members|platform|technolog|geograph|region",
                        re.I)
 _AMOUNT = re.compile(r"[^\w]*\d[\d,.]*\s*[%)]*")
+# Words that name what a declared scale applies to as money, beside one for counts ("Units in thousands").
+_AMOUNT_WORDS = re.compile(r"revenue|net sales|\bsales\b|amounts?|dollars?|\$\s*$", re.I)
 _TABLE_SCALE = re.compile(r"\b(?:in|amounts in|\(in)\s+(?:[A-Z]{0,3}\$\s*|NT\$\s*|US\$\s*)?(?P<word>thousands|millions|billions)\b", re.I)
 
 
@@ -58,10 +60,18 @@ class Table:
         return None
 
     def declared_scale(self) -> float | None:
-        """The multiplier a table's own header or caption declares, e.g. "(in millions)"."""
+        """The multiplier a table's own header or caption declares for its amounts, e.g. "(in millions)". A header that
+        declares one scale for counts and another for amounts ("(Units in thousands, Revenue in millions)", Apple's
+        summary data to 2018) gives amounts the scale named for them."""
         header = " ".join(" ".join(row) for row in self.rows[:4])
-        match = _TABLE_SCALE.search(f"{self.context[-160:]} {header}")
-        return _SCALE_WORDS[match.group("word").lower().rstrip("s")] if match else None
+        text = f"{self.context[-160:]} {header}"
+        found = [(text[max(0, match.start() - 24):match.start()], _SCALE_WORDS[match.group("word").lower().rstrip("s")])
+                 for match in _TABLE_SCALE.finditer(text)]
+        if len({scale for _, scale in found}) > 1:
+            named = [scale for before, scale in found if _AMOUNT_WORDS.search(before)]
+            if named:
+                return named[-1]
+        return found[0][1] if found else None
 
     def render(self) -> str:
         lines = [f"[{self.id}] context: {self.context[-160:]!r}"]

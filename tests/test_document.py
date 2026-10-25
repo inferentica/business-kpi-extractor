@@ -125,3 +125,17 @@ def test_statements_that_arrive_as_dot_leader_text_become_tables():
     assert first.rows[3] == ["Three Months Ended June 30, 2025"] and first.declared_scale() == 1e6
     assert second.rows[1] == ["", "2026", "2025", "2026", "2025"] and second.rows[2][0] == "Domestic"
     assert "86,017" not in next(iter(document.blocks.values())).text
+
+
+def test_a_table_declaring_scales_for_units_and_revenue_gives_amounts_the_revenue_scale():
+    # Apple's summary data to 2018: "(Units in thousands, Revenue in millions)".
+    document = parse_document("""
+<table>
+<tr><td>Q1 2018 Unaudited Summary Data</td></tr>
+<tr><td>(Units in thousands, Revenue in millions)</td></tr>
+<tr><td></td><td>Units</td><td>Revenue</td></tr>
+<tr><td>iPhone</td><td>77,316</td><td>$61,576</td></tr>
+</table>""", "https://example.com/ex992.htm")
+    assert next(iter(document.tables.values())).declared_scale() == 1_000_000
+    one = parse_document("<table><tr><td>(in thousands)</td></tr><tr><td>Cloud</td><td>5</td></tr></table>", "https://example.com/x.htm")
+    assert next(iter(one.tables.values())).declared_scale() == 1_000
