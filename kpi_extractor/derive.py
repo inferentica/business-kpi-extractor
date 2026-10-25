@@ -6,7 +6,9 @@ QUARTERS = ("Q1", "Q2", "Q3")
 # split). A period without one had nothing to balance: the row is zero there, not a business that is missing; and
 # unlike a business, it may turn negative.
 def balancing(key: str) -> bool:
-    return "elimination" in key or key in ("unallocated", "reconcilingitems", "corporate")
+    """A line that may turn either way in a quarter: eliminations, reconciling items, and the gap a split leaves, by
+    whatever name the filing gives it (Alphabet's "Hedging gains (losses)", once stored as "Unallocated")."""
+    return "elimination" in key or "hedg" in key or "gainsloss" in key or key in ("unallocated", "reconcilingitems", "corporate")
 
 
 def derive_periods(values: list[dict]) -> list[dict]:

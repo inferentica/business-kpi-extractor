@@ -170,3 +170,10 @@ def test_a_balancing_row_may_be_negative_in_a_derived_quarter():
     rows = _combine_year_to_date(year, nine, 125629.0, year)
     assert all(row["validation_status"] == "verified" for row in rows)
     assert {row["kpi_key"]: row["value"] for row in rows}["unallocated"] == -2.0
+
+
+
+def test_a_hedging_line_may_turn_negative_in_a_derived_quarter():
+    from kpi_extractor.derive import balancing
+    assert balancing("hedginggains") and balancing("hedginggainslosses") and balancing("unallocated")
+    assert not balancing("googlecloud")
