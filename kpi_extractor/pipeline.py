@@ -71,7 +71,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 17"
+_XBRL_READER = "xbrl reader 18"
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -378,6 +378,7 @@ class SymbolPipeline:
                         notes=extra_notes, ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
                         period_end=breakdowns.period_end, locator={
                             "concept": group.concept, "total": group.total, "member": group.elements.get(reported),
+                            **({"parent": group.parents[reported]} if reported in group.parents else {}),
                             "prior": group.prior.get(reported),
                             **({"prior_total": group.prior_total} if group.prior_total else {}),
                             **({"ytd": ytd, "ytd_total": group.year_to_date_total}

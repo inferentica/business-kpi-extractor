@@ -228,6 +228,7 @@ def test_a_two_line_split_inside_one_segment_is_completed_by_the_other_segments(
     assert {key: value for key, _label, value in groups["segments"].members} == {"datacenter": 3674.0, "clientandgaming": 2941.0, "embedded": 823.0}
     assert {key: value for key, _label, value in groups["products"].members} == {"datacenter": 3674.0, "client": 2294.0, "embedded": 823.0, "gaming": 647.0}
     assert result.rejected == []
+    assert groups["products"].parents == {"client": "clientandgaming", "gaming": "clientandgaming"}
     # AMD's FY2025 10-K tags Gaming under a "Gaming" segment of its own: the lines still complete Client and Gaming.
     mistyped = facts.copy()
     mistyped.loc[mistyped["dim_srt_ProductOrServiceAxis"] == "amd:GamingMember", "dim_us-gaap_StatementBusinessSegmentsAxis"] = "amd:GamingMember"

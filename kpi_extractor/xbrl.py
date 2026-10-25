@@ -84,6 +84,9 @@ class XbrlGroup:
     alternative: list[tuple[str, str, float]] = field(default_factory=list)
     # Revenue one year earlier as this filing restates it: what a restated year-ago split must add up to.
     prior_total: float | None = None
+    # Member key → the segment it is a line of (Alphabet's Search under Google Services, AMD's Client under Client and
+    # Gaming), for a split tagged inside one segment and completed by the others: the page nests lines under it.
+    parents: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -484,7 +487,7 @@ def _completed_by_segments(candidate: XbrlCandidate, groups: list[XbrlGroup]) ->
                          {**segments.elements, **candidate.elements},
                          merged(candidate.year_to_date, segments.year_to_date), segments.year_to_date_total,
                          merged(candidate.prior_year_to_date, segments.prior_year_to_date), segments.prior_year_to_date_total,
-                         prior_total=segments.prior_total)
+                         prior_total=segments.prior_total, parents={line: key for line in leaves})
     return None
 
 
