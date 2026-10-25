@@ -19,7 +19,8 @@ Unit = Literal["currency", "percent", "count", "ratio"]
 _KEY = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
 
 MAX_GROUPS = 8
-MAX_KPIS_PER_GROUP = 16
+# A breakdown keeps its history: TSMC lists today's merged node buckets beside the finer nodes they replaced (17).
+MAX_KPIS_PER_GROUP = 24
 # A focused list: every KPI is read, and possibly disputed, every quarter. The proposal is asked for at most six
 # groups; the code keeps any list to this many KPIs (see normalize_spec).
 MAX_LISTED_KPIS = 24
