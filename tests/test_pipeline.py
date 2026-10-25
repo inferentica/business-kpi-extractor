@@ -1104,3 +1104,25 @@ def test_a_release_whose_quote_from_a_bullet_table_was_dropped_is_read_again_onc
     assert release_reread_due({**dropped, "status": "processed", "notes": [*dropped["notes"], "release reader 1"]}) is True
     assert release_reread_due({**dropped, "notes": [*dropped["notes"], _RELEASE_READER]}) is False
     assert release_reread_due({**dropped, "status": "failed"}) is False
+
+
+def test_a_report_without_xbrl_is_judged_once_and_never_counts_past_the_store():
+    from kpi_extractor import pipeline
+    from kpi_extractor.sec import FilingRef
+
+    stored = []
+
+    class Control:
+        def call(self, operation, **payload):
+            stored.extend(payload.get("filings") or [])
+            return {}
+
+    run = pipeline.SymbolPipeline(Control(), "TSM", 20, False, log=lambda *_: None)
+    ref = FilingRef("0001193125-17-122097", "20-F", date(2017, 4, 13), "periodic_report", "https://www.sec.gov/x.htm",
+                    period_end=date(2016, 12, 31))
+    run.filings[ref.accession] = {"status": "skipped", "attempts": 100, "notes": ["no XBRL"]}
+    assert run._pending(ref)  # an unstamped judgement: read again
+    run._store_filing(ref, "skipped", notes=["no XBRL", pipeline._XBRL_READER], counted=False)
+    assert stored[-1]["attempts"] == 100
+    run.filings[ref.accession] = stored[-1]
+    assert not run._pending(ref)

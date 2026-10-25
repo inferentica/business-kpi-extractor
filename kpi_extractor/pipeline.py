@@ -56,6 +56,8 @@ PIE_SCALE = 3
 _SYSTEMS_SOLD = re.compile(r"lithography systems sold", re.I)
 AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
+# The most attempts the store accepts for a filing: a count past it would fail the company's whole store.
+_STORED_ATTEMPTS = 100
 _MAX_ATTEMPTS = 3
 _NOT_EARNINGS = "classified as not an earnings document"
 _PASSED_OVER = "not an earnings document: no exhibit, or furnished outside the weeks after a quarter end"
@@ -323,12 +325,13 @@ class SymbolPipeline:
         try:
             xbrl = self._xbrl(ref)
             if xbrl is None:
-                self._store_filing(ref, "skipped", notes=["no XBRL"])
+                # Judged by this reader: stamped, so later runs leave it (it was re-read every run until attempts ran out).
+                self._store_filing(ref, "skipped", notes=["no XBRL", _XBRL_READER])
                 return
             breakdowns = extract_breakdowns(xbrl.facts.to_dataframe(), xbrl.entity_info or {}, ref.form,
                                             official_labels(getattr(xbrl, "element_catalog", None)), member_children(xbrl))
             if breakdowns is None:
-                self._store_filing(ref, "skipped", notes=["no document period"])
+                self._store_filing(ref, "skipped", notes=["no document period", _XBRL_READER])
                 return
             fiscal_year, fiscal_period = fiscal_label(breakdowns.period_end, self.profile.fiscal_year_end,
                                                       annual=breakdowns.annual, year_offset=self.offset)
@@ -2376,7 +2379,7 @@ class SymbolPipeline:
             "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(), "document_role": ref.role,
             "period_end": period_end.isoformat() if period_end else None, "fiscal_year": fiscal_year,
             "fiscal_period": fiscal_period, "status": status, "spec_version": spec_version,
-            "value_count": sum(1 for record in records if record["validation_status"] != "rejected"), "attempts": (previous.get("attempts", 0) + 1) if previous else 1,
+            "value_count": sum(1 for record in records if record["validation_status"] != "rejected"), "attempts": min(_STORED_ATTEMPTS, previous.get("attempts", 0) + 1) if previous else 1,
             "notes": [note[:300] for note in (notes or [])][:30], "source_url": ref.source_url,
         }
         self._store(filings=[filing], values=records)
