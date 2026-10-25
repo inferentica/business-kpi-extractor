@@ -173,3 +173,41 @@ def test_a_share_is_never_read_as_an_amount():
     values, problems = read_values(document, spec, located, "TWD")
     assert values == []
     assert any("percentage, not an amount" in problem for problem in problems)
+
+
+def _nested_spec():
+    return Spec.model_validate({"groups": [{"key": "segments", "label": "Revenue by segment", "kind": "revenue_breakdown",
+                                             "total_kpi": "total", "kpis": [
+        {"key": "uhc", "label": "UnitedHealthcare", "unit": "currency"},
+        {"key": "optum", "label": "Total Optum", "unit": "currency"},
+        {"key": "health", "label": "Optum Health", "unit": "currency", "parent": "optum"},
+        {"key": "rx", "label": "Optum Rx", "unit": "currency", "parent": "optum"},
+        {"key": "total", "label": "Total revenues", "unit": "currency"}]}]})
+
+
+def test_a_parent_and_its_lines_are_checked_each_at_their_level():
+    from kpi_extractor.extract import ReadValue
+
+    group = _nested_spec().groups[0]
+    kpi = {k.key: k for k in group.kpis}
+    read = lambda values: [ReadValue(group, kpi[key], value, "USD", {}) for key, value in values.items()]
+    good = read({"uhc": 60.0, "optum": 40.0, "health": 25.0, "rx": 15.0, "total": 100.0})
+    validate_groups(good, {})
+    assert all(item.status == "verified" for item in good)  # Optum counted once, its lines against it
+    off = read({"uhc": 60.0, "optum": 40.0, "health": 25.0, "rx": 10.0, "total": 100.0})
+    validate_groups(off, {})
+    assert {item.kpi.key for item in off if item.status == "needs_review"} == {"optum", "health", "rx"}
+    assert any("lines differ from Total Optum" in note for item in off for note in item.notes)
+    # Without the parent this quarter, its lines stand in for it.
+    alone = read({"uhc": 60.0, "health": 25.0, "rx": 15.0, "total": 100.0})
+    validate_groups(alone, {})
+    assert all(item.status == "verified" for item in alone)
+
+
+def test_a_parent_must_be_another_kpi_of_the_group_and_never_loop():
+    spec = _nested_spec().model_dump()
+    kpis = spec["groups"][0]["kpis"]
+    kpis[2]["parent"] = "missing"
+    kpis[1]["parent"] = "rx"  # Total Optum under its own line: a loop
+    group = Spec.model_validate(spec).groups[0]
+    assert {kpi.key: kpi.parent for kpi in group.kpis} == {"uhc": None, "optum": None, "health": None, "rx": "optum", "total": None}

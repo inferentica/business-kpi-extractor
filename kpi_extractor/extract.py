@@ -322,6 +322,11 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         block = _block_summing_to(parts, total_index, total)
         if block:
             kept = {key: parts[key][1] for key in block}
+    # A subtotal the list names as a parent (the owner's Total Optum over Optum Health, Insight and Rx) is kept beside its
+    # lines: they are checked against it.
+    parents = {kpi.parent for kpi in group.kpis if kpi.parent}
+    for key in parents & set(parts):
+        kept.setdefault(key, parts[key][1])
     if len(kept) < 2:
         raise LocateError("fewer than two rows")
     context = f"{table.context} {header}"
@@ -550,7 +555,7 @@ def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None
         reason = None
         if group.kind == "mix":
             # A mix's own "Total 100%" row (its named total) is its check, not one of its shares.
-            shares = [item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]
+            shares = _top_level([item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)])
             stated = next((item.value for item in items if item.is_total or item.kpi.key == group.total_kpi), None)
             if any(not 0 <= item.value <= 100 for item in items):
                 reason = "share outside 0-100%"
@@ -562,7 +567,7 @@ def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None
                     reason = f"shares add up to {total:.1f}%"
         elif group.kind == "revenue_breakdown":
             total_item = next((item for item in items if item.is_total or item.kpi.key == group.total_kpi), None)
-            parts = [item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]
+            parts = _top_level([item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)])
             if total_item is None or not total_item.value:
                 reason = "no total revenue to reconcile against"
             elif len(parts) < 2:
@@ -575,7 +580,18 @@ def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None
             for item in items:
                 item.status = "needs_review"
                 item.notes.append(reason)
-        parts_total = sum(item.value for item in items if not (item.is_total or item.kpi.key == group.total_kpi))
+        # Each parent the list names against its lines: a parent and its lines that do not add up need review.
+        if group.kind in ("revenue_breakdown", "mix"):
+            for parent in items:
+                lines = [item for item in items if item.kpi.parent == parent.kpi.key]
+                if not lines or not parent.value:
+                    continue
+                error = (sum(item.value for item in lines) - parent.value) / parent.value
+                if abs(error) > (MIX_TOLERANCE / 100 if group.kind == "mix" else BREAKDOWN_TOLERANCE):
+                    for item in [parent, *lines]:
+                        item.status = "needs_review"
+                        item.notes.append(f"lines differ from {parent.kpi.label} by {error:.1%}")
+        parts_total = sum(item.value for item in _top_level([item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]))
         previous_total = sum(value for key, value in previous.items() if key.startswith(f"{group_key}."))
         for item in items:
             if group.kind == "revenue_breakdown" and parts_total and abs(item.value) < 0.01 * abs(parts_total):
@@ -588,6 +604,21 @@ def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None
             if jump:
                 item.status = "needs_review"
                 item.notes.append(jump)
+
+
+def _top_level(parts: list[ReadValue]) -> list[ReadValue]:
+    """The parts a total is made of: those the list puts at the top, and the lines of a parent not read this quarter."""
+    read = {item.kpi.key for item in parts}
+    def counted(item: ReadValue) -> bool:
+        parent = item.kpi.parent
+        # A line counts in place of its parent when the parent was not read (nor any parent above it).
+        while parent is not None:
+            if parent in read:
+                return False
+            parent = next((other.kpi.parent for other in parts if other.kpi.key == parent), None) \
+                or next((kpi.parent for kpi in item.group.kpis if kpi.key == parent), None)
+        return True
+    return [item for item in parts if counted(item)]
 
 
 def _jump(item: ReadValue, before: float | None) -> str | None:

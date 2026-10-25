@@ -46,6 +46,9 @@ class KpiSpec(BaseModel):
     key: str
     label: str = Field(min_length=1, max_length=80)
     unit: Unit
+    # The KPI of its own group it is a line of (UnitedHealth's Optum Health under Total Optum; Alphabet's Search under
+    # Google advertising, under Google Services), set by the owner: lines add up to it, and it is a part of the group.
+    parent: str | None = None
 
     @field_validator("key")
     @classmethod
@@ -70,6 +73,16 @@ class GroupSpec(BaseModel):
         keys = [kpi.key for kpi in self.kpis]
         if len(set(keys)) != len(keys):
             raise ValueError(f"duplicate KPI keys in {self.key}")
+        # A parent must be another KPI of the group, never the total, and never lead back round to the line: else dropped.
+        parent_of = {kpi.key: kpi.parent for kpi in self.kpis}
+        for kpi in self.kpis:
+            seen, at = {kpi.key}, kpi.parent
+            while at is not None and at in parent_of and at not in seen and at != self.total_kpi:
+                seen.add(at)
+                at = parent_of[at]
+            if kpi.parent is not None and (kpi.parent not in parent_of or at is not None):
+                kpi.parent = None
+                parent_of[kpi.key] = None  # a loop broken once: the rest of it stands
         if self.kind == "revenue_breakdown":
             if any(kpi.unit != "currency" for kpi in self.kpis):
                 raise ValueError(f"{self.key}: revenue breakdowns hold currency amounts")
@@ -409,7 +422,8 @@ def kpi_lines(spec: Spec, hints: dict[str, str] | None = None) -> str:
         for kpi in group.kpis:
             key = f"{group.key}.{kpi.key}"
             hint = f" (last quarter: {hints[key]})" if hints and key in hints else ""
-            lines.append(f"- {key}: {group.label} / {kpi.label} [{kpi.unit}]{hint}")
+            part_of = next((f" (a line of {other.label})" for other in group.kpis if other.key == kpi.parent), "")
+            lines.append(f"- {key}: {group.label} / {kpi.label} [{kpi.unit}]{part_of}{hint}")
     return "\n".join(lines)
 
 
