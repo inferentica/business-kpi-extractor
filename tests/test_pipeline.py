@@ -1126,3 +1126,21 @@ def test_a_report_without_xbrl_is_judged_once_and_never_counts_past_the_store():
     assert stored[-1]["attempts"] == 100
     run.filings[ref.accession] = stored[-1]
     assert not run._pending(ref)
+
+
+def test_a_group_repeating_a_breakdown_still_tagged_in_xbrl_is_never_added():
+    from kpi_extractor import ai
+    from kpi_extractor.pipeline import apply_maintenance, without_xbrl_repeats
+
+    spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "dap", "label": "DAP", "unit": "count"}]}]})
+    segments = {"key": "revenue_by_segment", "label": "Revenue by Segment", "kind": "metric",
+                "kpis": [{"key": "family_of_apps", "label": "Family of Apps", "unit": "currency"},
+                         {"key": "reality_labs", "label": "Reality Labs", "unit": "currency"}]}
+    answer = ai.Maintenance.model_validate({"add_groups": [segments], "add_kpis": {}, "retire": []})
+    covered = [{"familyofapps", "realitylabs"}]
+    assert apply_maintenance(spec, answer, covered) is None
+    assert [group.key for group in apply_maintenance(spec, answer, []).groups] == ["operating", "revenue_by_segment"]
+    proposed = Spec.model_validate({"groups": [spec.groups[0].model_dump(), segments]})
+    assert [group.key for group in without_xbrl_repeats(proposed, covered).groups] == ["operating"]
+    assert [group.key for group in without_xbrl_repeats(proposed, covered, keep=proposed).groups] == ["operating", "revenue_by_segment"]

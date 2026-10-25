@@ -18,9 +18,9 @@ def _release(accession: str, period_end: date) -> FilingRef:
     return FilingRef(accession=accession, form="8-K", filed=period_end, role="earnings_release", source_url="", period_end=period_end)
 
 
-def _pipeline(filings: dict) -> SimpleNamespace:
+def _pipeline(filings: dict, quarters: int = 20) -> SimpleNamespace:
     carried: list[str] = []
-    fake = SimpleNamespace(symbol="X", filings=filings, carried=carried, log=lambda message: None)
+    fake = SimpleNamespace(symbol="X", filings=filings, carried=carried, quarters=quarters, log=lambda message: None)
     fake._carry_to_version = lambda ref, version: carried.append(ref.accession)
     return fake
 
@@ -38,4 +38,12 @@ def test_a_removal_or_change_is_not_carried():
     releases = [_release(f"a{index}", date(2024 + index // 4, 3 * (index % 4) + 1, 28)) for index in range(8)]
     fake = _pipeline({ref.accession: {"spec_version": 3, "status": "done"} for ref in releases})
     SymbolPipeline._carry_owner_additions(fake, _spec("dau"), 4, {"version": 3, "groups": _spec("dau", "mau").model_dump()["groups"]}, releases)
+    assert fake.carried == []
+
+
+def test_a_history_read_reads_owner_additions_in_every_quarter():
+    # Read filings (40 quarters): a KPI's history, e.g. Meta's Facebook DAUs to 2023, is read, not carried.
+    releases = [_release(f"a{index}", date(2024 + index // 4, 3 * (index % 4) + 1, 28)) for index in range(8)]
+    fake = _pipeline({ref.accession: {"spec_version": 3, "status": "done"} for ref in releases}, quarters=40)
+    SymbolPipeline._carry_owner_additions(fake, _spec("dau", "mau"), 4, {"version": 3, "groups": _spec("dau").model_dump()["groups"]}, releases)
     assert fake.carried == []

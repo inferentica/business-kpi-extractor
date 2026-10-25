@@ -56,6 +56,8 @@ PIE_SCALE = 3
 _SYSTEMS_SOLD = re.compile(r"lithography systems sold", re.I)
 AI_GROUP_ORDER = 20
 _DONE = {"processed", "needs_review", "skipped"}
+# The quarters a refresh or a scheduled run covers; Read filings reaches further (40).
+REFRESH_QUARTERS = 20
 # The most attempts the store accepts for a filing: a count past it would fail the company's whole store.
 _STORED_ATTEMPTS = 100
 _MAX_ATTEMPTS = 3
@@ -121,6 +123,7 @@ class SymbolPipeline:
         self.control = control
         self.symbol = symbol
         self.force = force
+        self.quarters = quarters
         # Earnings releases cost AI to read, so they keep the run's window; 10-Qs and 10-Ks are read by code from XBRL
         # and may reach further back (report_quarters).
         self.since = (today or date.today()) - timedelta(days=92 * quarters + 120)
@@ -855,6 +858,7 @@ class SymbolPipeline:
             return None, 0, False
         if current is not None:
             spec = keep_current_groups(spec, current)
+        spec = without_xbrl_repeats(spec, [] if self.profile.foreign else self._current_xbrl_members(), keep=current)
         spec = self._capped(spec)
         # Names may only rename breakdowns and members that exist.
         names = {
@@ -895,7 +899,8 @@ class SymbolPipeline:
             if getattr(self, "_owner_edited", False):
                 # The owner decides what an edited list tracks: the audit may suggest additions, never retirements.
                 answer = answer.model_copy(update={"retire": []})
-            updated = apply_maintenance(spec, answer)
+            covered = [] if self.profile.foreign else self._current_xbrl_members()
+            updated = apply_maintenance(spec, answer, covered)
         except (AiResponseError, ControlError, ValueError) as error:
             self.result.errors.append(f"KPI list audit: {error}"[:300])
             return None
@@ -926,6 +931,20 @@ class SymbolPipeline:
                 group = breakdowns.setdefault(value["group_key"], {"label": value["group_label"], "members": {}})
                 group["members"][value["kpi_key"]] = value["kpi_label"]
         return breakdowns
+
+    def _current_xbrl_members(self) -> list[set[str]]:
+        """The member names of each XBRL breakdown the company still tags (its latest quarter within ~4 months of the
+        newest XBRL figure): a list need not read these from releases. One the company stopped tagging (Meta's
+        advertising and other revenue, to 2021) is not here, so its later quarters can come from releases."""
+        newest = max((value["period_end"] for value in self.values.values() if value["method"] == "xbrl"), default=None)
+        if newest is None:
+            return []
+        latest: dict[str, str] = {}
+        for value in self.values.values():
+            if value["method"] == "xbrl" and value["period_end"] >= latest.get(value["group_key"], ""):
+                latest[value["group_key"]] = value["period_end"]
+        return [{_identity_text(label) for label in group["members"].values()}
+                for key, group in self._xbrl_breakdowns().items() if abs(_days(latest[key], newest)) <= 125]
 
     def _harmonize_labels(self) -> None:
         """One name per XBRL series across every period: the company's approved name, else its latest label."""
@@ -1171,8 +1190,9 @@ class SymbolPipeline:
     def _carry_owner_additions(self, spec: Spec, version: int, previous: dict | None, releases: list[FilingRef]) -> None:
         """When the owner only added KPIs (a new list version that keeps every KPI of the one before), older quarters
         keep their readings and move to the new version; only the last four quarters are read for the additions, as
-        the audit's additions are."""
-        if not previous or int(previous.get("version") or 0) >= version or not releases:
+        the audit's additions are. A run reaching past a refresh's window (the page's Read filings, ten years) reads the
+        additions in every quarter it covers: a KPI's history (Meta's Facebook DAUs, reported to 2023)."""
+        if not previous or int(previous.get("version") or 0) >= version or not releases or self.quarters > REFRESH_QUARTERS:
             return
         try:
             before = Spec.model_validate({"groups": previous.get("groups") or [], "names": {}})
@@ -2440,9 +2460,28 @@ def only_adds(before: Spec, after: Spec) -> bool:
     return all((group.key, group.kind, kpi.key, kpi.unit) in kept for group in before.groups for kpi in group.kpis)
 
 
-def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
+def repeats_xbrl(group, covered: list[set[str]]) -> bool:
+    """Whether a group (of any kind) names the same rows as a breakdown the company still tags in XBRL (Meta's Family
+    of Apps and Reality Labs, once added as "metrics"): read by code with its whole history, never again from
+    releases."""
+    names = {_identity_text(kpi.label) for kpi in group.kpis if kpi.key != group.total_kpi}
+    return len(names) >= 2 and any(names <= members for members in covered)
+
+
+def without_xbrl_repeats(spec: Spec, covered: list[set[str]], keep: Spec | None = None) -> Spec:
+    """A proposed list without groups that repeat a breakdown still tagged in XBRL; a group the current list already
+    has stays (the owner or the audit's history decides it)."""
+    kept_keys = {group.key for group in keep.groups} if keep else set()
+    groups = [group for group in spec.groups if group.key in kept_keys or not repeats_xbrl(group, covered)]
+    if len(groups) == len(spec.groups):
+        return spec
+    return Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names})
+
+
+def apply_maintenance(spec: Spec, answer: ai.Maintenance, covered: list[set[str]] = ()) -> Spec | None:
     """The list with the audit's additions and retirements, or None when nothing changes. Existing keys keep their
-    meaning; a new key that collides with an existing one is ignored."""
+    meaning; a new key that collides with an existing one is ignored; a group that repeats a breakdown the company
+    still tags in XBRL is not added."""
     groups = [group.model_copy(deep=True) for group in spec.groups]
     by_key = {group.key: group for group in groups}
     changed = False
@@ -2461,6 +2500,8 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance) -> Spec | None:
     for group in answer.add_groups:
         if group.kind == "mix" and _dimension(group.label) in amounts:
             continue  # shares of a breakdown already tracked as amounts add nothing (TSMC's technology mix)
+        if repeats_xbrl(group, list(covered)):
+            continue
         if group.key not in by_key and len(groups) < ai.MAX_GROUPS:
             groups.append(group)
             by_key[group.key] = group
