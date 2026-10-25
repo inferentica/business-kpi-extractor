@@ -234,3 +234,19 @@ def test_a_two_line_split_inside_one_segment_is_completed_by_the_other_segments(
     mistyped.loc[mistyped["dim_srt_ProductOrServiceAxis"] == "amd:GamingMember", "dim_us-gaap_StatementBusinessSegmentsAxis"] = "amd:GamingMember"
     groups = {group.key: group for group in extract_breakdowns(mistyped, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
     assert {key: value for key, _label, value in groups["products"].members} == {"datacenter": 3674.0, "client": 2294.0, "embedded": 823.0, "gaming": 647.0}
+
+
+
+def test_a_gap_the_filing_reports_as_its_own_line_takes_its_name():
+    # Alphabet: segments short of revenue by its hedging gains, tagged RevenueNotFromContractWithCustomer.
+    segment = lambda value, member: _fact("us-gaap:Revenues", value, member, axis="dim_us-gaap_StatementBusinessSegmentsAxis",
+                                          consolidation="us-gaap:OperatingSegmentsMember")
+    product = lambda value, member: _fact("us-gaap:Revenues", value, member)
+    facts = pd.DataFrame([
+        _fact("us-gaap:Revenues", 1000.0),
+        {**_fact("us-gaap:RevenueNotFromContractWithCustomer", 10.0), "label": "Hedging gains (losses)"},
+        segment(700.0, "x:ServicesMember"), segment(290.0, "x:CloudMember"),
+        product(600.0, "x:SearchMember"), product(390.0, "x:OtherMember"),
+    ])
+    groups = {g.key: g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
+    assert ("hedginggains", "Hedging gains (losses)", 10.0) in groups["segments"].members

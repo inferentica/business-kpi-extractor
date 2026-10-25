@@ -54,6 +54,13 @@ def derive_periods(values: list[dict]) -> list[dict]:
     return derived
 
 
+def _kept(row: dict) -> dict | None:
+    """What a derived figure keeps of its source's locator: the segment it is a line of (AMD's Client under Client and
+    Gaming), so a worked-out Q4 nests where its quarters do."""
+    parent = (row.get("locator") or {}).get("parent")
+    return {"parent": parent} if parent else None
+
+
 def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dict]:
     rows = []
     for key in (annual or quarters[-1]):
@@ -77,7 +84,7 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
             "validation_status": "verified" if verified else "needs_review",
             "reconciliation_error_pct": None,
             "notes": notes,
-            "locator": None,
+            "locator": _kept(base),
         })
     # Carry the reported revenue total through the same arithmetic, so derived periods still reconcile.
     totals = [_total(period) for period in quarters]
@@ -169,7 +176,7 @@ def _combine_year_to_date(annual: dict, nine: dict, nine_total: float, sources: 
             verified, notes = False, [*notes, "derived Q4 is negative"]
         rows.append({**year, "fiscal_period": "Q4", "value": value, "method": "derived",
                      "validation_status": "verified" if verified else "needs_review",
-                     "reconciliation_error_pct": None, "notes": notes, "locator": None})
+                     "reconciliation_error_pct": None, "notes": notes, "locator": _kept(year)})
     annual_total = _total(annual)
     if annual_total is not None:
         total = annual_total - nine_total
@@ -187,7 +194,7 @@ def _reconcile(rows: list[dict], total: float) -> None:
     error = (sum(row["value"] for row in rows) - total) / total
     for row in rows:
         row["reconciliation_error_pct"] = error
-        row["locator"] = {"total": total}
+        row["locator"] = {**(row.get("locator") or {}), "total": total}
         if abs(error) > MAX_DERIVED_GAP and row["validation_status"] == "verified":
             row["validation_status"] = "needs_review"
             row["notes"] = [*row["notes"], f"derived parts differ from the derived total by {error:.1%}"]

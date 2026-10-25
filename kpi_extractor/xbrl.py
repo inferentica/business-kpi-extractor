@@ -352,9 +352,17 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
                 return float(values.iloc[0])
         return None
 
+    # Plain figures of the period that sit beside revenue (Alphabet's "Hedging gains (losses)", tagged
+    # RevenueNotFromContractWithCustomer): what a gap the splits leave is, when one of them matches it.
+    plain = _plain_revenue_figures(facts, period_end, annual, label)
+
+    def outside_name(gap: float) -> str | None:
+        return next((name for value, name in plain if abs(value - gap) <= max(abs(gap) * 1e-6, 0.5)), None)
+
     groups: list[XbrlGroup] = []
     rejected: list[XbrlCandidate] = []
     for axis, (concept, members) in best_by_axis.items():
+        outside_label: str | None = None
         if len(members) < 2:
             continue
         # Every breakdown must add up to reported revenue; one that cannot be checked is not kept.
@@ -379,7 +387,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         def named(rows: dict[str, float]) -> list[tuple[str, str, float]]:
             out = []
             for member, value in sorted(rows.items(), key=lambda item: -item[1]):
-                name = "Unallocated" if member == _UNALLOCATED else consolidation_name(member) \
+                name = (outside_label or "Unallocated") if member == _UNALLOCATED else consolidation_name(member) \
                     or label(member) or labels.get(member) or humanize(member)
                 out.append((member_key(name), name, value))
             return out
@@ -389,6 +397,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
                     for member in rows}
 
         outside = unallocated(axis, concept, members)
+        outside_label = outside_name(outside) if outside is not None else None
         members = reconciled(axis, concept, members)
         consolidation = [member for member in members if member in eliminations.get(concept, {})]
         if outside is not None:
@@ -509,6 +518,27 @@ def _consolidation_items(frame: pd.DataFrame, concept: str, dimension_columns: l
             member = dimensions["ConsolidationItemsAxis"]
             items[member] = items.get(member, 0.0) + float(fact["numeric_value"])
     return items
+
+
+def _plain_revenue_figures(facts: pd.DataFrame, period_end, annual: bool, label: Callable[[str], str | None]) -> list[tuple[float, str]]:
+    """Undimensioned revenue-like figures of the period other than revenue itself, with the filing's own names."""
+    source = facts[(facts["period_type"] == "duration") & facts["numeric_value"].notna()]
+    source = source[source["concept"].astype(str).str.contains("Revenue") & ~source["concept"].isin(REVENUE_CONCEPTS)]
+    if source.empty:
+        return []
+    start = pd.to_datetime(source["period_start"], errors="coerce")
+    end = pd.to_datetime(source["period_end"], errors="coerce")
+    days = (end - start).dt.days
+    keep = (end.dt.date == period_end) & (days.between(330, 400) if annual else days.between(80, 100))
+    dimensions = [column for column in source.columns if column.startswith("dim_")]
+    if dimensions:
+        keep &= source[dimensions].isna().all(axis=1)
+    figures = []
+    for _, fact in source[keep].iterrows():
+        own = fact.get("label")
+        name = own if isinstance(own, str) and own.strip() else label(str(fact["concept"])) or humanize(str(fact["concept"]))
+        figures.append((float(fact["numeric_value"]), name.strip()))
+    return figures
 
 
 def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str],
