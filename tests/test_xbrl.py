@@ -262,3 +262,19 @@ def test_a_split_keeps_the_filings_subtotals_as_levels_of_its_tree():
     assert subtotals == {"properties": 31375.0, "advertising": 37095.0}
     assert parents == {"search": "properties", "youtube": "properties", "properties": "advertising", "network": "advertising",
                        "advertising": "google", "cloud": "google", "other": "google"}
+
+
+def test_regional_segments_read_as_regions_and_the_country_split_as_countries():
+    from kpi_extractor.xbrl import XbrlGroup, _name_regional_views
+    apple = [XbrlGroup("segments", "Revenue by Segment", 0, [("americas", "Americas", 45.8), ("europe", "Europe", 29.4),
+                                                           ("greaterchina", "Greater China", 18.8), ("japan", "Japan", 6.6),
+                                                           ("restofasiapacific", "Rest of Asia Pacific", 8.9)], 109.4, 0.0, "USD", "c"),
+             XbrlGroup("geography", "Revenue by Geography", 2, [("us", "U.S.", 40.0), ("china", "China", 18.8),
+                                                               ("othercountries", "Other countries", 50.6)], 109.4, 0.0, "USD", "c")]
+    _name_regional_views(apple)
+    assert [group.label for group in apple] == ["Revenue by Region", "Revenue by Country"]
+    # Amazon's segments mix a business (AWS) with regions: still segments.
+    amazon = [XbrlGroup("segments", "Revenue by Segment", 0, [("northamerica", "North America", 100.0), ("international", "International", 40.0),
+                                                            ("aws", "AWS", 30.0)], 170.0, 0.0, "USD", "c")]
+    _name_regional_views(amazon)
+    assert amazon[0].label == "Revenue by Segment"

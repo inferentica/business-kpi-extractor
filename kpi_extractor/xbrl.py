@@ -470,8 +470,28 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             rejected.remove(candidate)
     rejected = [candidate for candidate in rejected if len(candidate.members) >= 3]
     groups.sort(key=lambda group: (group.order, group.key))
+    _name_regional_views(groups)
     total_revenue = next((totals[concept] for concept in REVENUE_CONCEPTS if concept in totals), None)
     return XbrlBreakdowns(period_end, annual, _fiscal_year(entity), groups, total_revenue, rejected)
+
+
+# Words that name a place: a company whose every segment is one (Apple's Americas, Europe, Greater China, Japan and Rest
+# of Asia Pacific) reports by region.
+_PLACE = re.compile(r"\b(americas?|north|south|latin|europe|european|emea|apac|asia|pacific|china|japan|india|africa|"
+                    r"middle east|international|united states|u\.s\.|us|canada|mexico|brazil|korea|taiwan|germany|"
+                    r"united kingdom|uk|france|rest of world|other countries|countries|regions?|greater)\b", re.IGNORECASE)
+
+
+def _name_regional_views(groups: list[XbrlGroup]) -> None:
+    """Segments that are regions read as "Revenue by Region", and the country split beside them as "Revenue by Country",
+    so two geographic views never pass as one by segment and one by geography."""
+    segments = next((group for group in groups if group.key == "segments"), None)
+    if segments is None or not segments.members or not all(_PLACE.search(name) for _key, name, _value in segments.members):
+        return
+    segments.label = "Revenue by Region"
+    for group in groups:
+        if group.key == "geography":
+            group.label = "Revenue by Country"
 
 
 def _completed_by_segments(candidate: XbrlCandidate, groups: list[XbrlGroup]) -> XbrlGroup | None:
