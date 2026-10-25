@@ -139,3 +139,8 @@ def test_a_table_declaring_scales_for_units_and_revenue_gives_amounts_the_revenu
     assert next(iter(document.tables.values())).declared_scale() == 1_000_000
     one = parse_document("<table><tr><td>(in thousands)</td></tr><tr><td>Cloud</td><td>5</td></tr></table>", "https://example.com/x.htm")
     assert next(iter(one.tables.values())).declared_scale() == 1_000
+
+
+
+def test_a_scale_word_gives_the_exact_figure():
+    assert parse_number("DAUs were 2.11 billion on average").value == 2_110_000_000

@@ -207,7 +207,8 @@ def parse_number(text: str | None) -> ParsedNumber | None:
     if scale:
         scale_word = scale.group("word").lower() if scale.group("word") else _SCALE_ABBREVIATIONS[scale.group("abbr").lower()]
     if scale_word:
-        value *= _SCALE_WORDS[scale_word]
+        # "2.11 billion" is 2,110,000,000, not the float product 2,109,999,999.9999998.
+        value = round(value * _SCALE_WORDS[scale_word], 6)
     return ParsedNumber(-value if negative else value, "%" in after[:3], scale_word)
 
 
