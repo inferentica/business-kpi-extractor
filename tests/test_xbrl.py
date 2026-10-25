@@ -250,3 +250,15 @@ def test_a_gap_the_filing_reports_as_its_own_line_takes_its_name():
     ])
     groups = {g.key: g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
     assert ("hedginggains", "Hedging gains (losses)", 10.0) in groups["segments"].members
+
+
+def test_a_split_keeps_the_filings_subtotals_as_levels_of_its_tree():
+    # Alphabet's Q3 2020 10-Q: inside the Google segment, Search + YouTube = Google properties; it + Network = advertising.
+    from kpi_extractor.xbrl import subtotal_tree
+    rows = {"search": 26338.0, "youtube": 5037.0, "properties": 31375.0, "network": 5720.0, "advertising": 37095.0,
+            "cloud": 3444.0, "other": 5478.0}
+    leaves = {key: rows[key] for key in ("search", "youtube", "network", "cloud", "other")}
+    parents, subtotals = subtotal_tree(rows, leaves, "google")
+    assert subtotals == {"properties": 31375.0, "advertising": 37095.0}
+    assert parents == {"search": "properties", "youtube": "properties", "properties": "advertising", "network": "advertising",
+                       "advertising": "google", "cloud": "google", "other": "google"}

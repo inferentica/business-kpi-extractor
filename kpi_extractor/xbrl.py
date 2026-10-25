@@ -87,6 +87,12 @@ class XbrlGroup:
     # Member key → the segment it is a line of (Alphabet's Search under Google Services, AMD's Client under Client and
     # Gaming), for a split tagged inside one segment and completed by the others: the page nests lines under it.
     parents: dict[str, str] = field(default_factory=dict)
+    # The filing's subtotals inside such a split (Alphabet's Google properties = Search + YouTube, Google advertising =
+    # properties + Network): (key, label, value), with their year-ago and to-date figures. Kept apart from members, so
+    # every sum of a breakdown still counts each line once; parents places them and their lines.
+    levels: list[tuple[str, str, float]] = field(default_factory=list)
+    level_prior: dict[str, float] = field(default_factory=dict)
+    level_year_to_date: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -491,12 +497,43 @@ def _completed_by_segments(candidate: XbrlCandidate, groups: list[XbrlGroup]) ->
             return None
         def merged(lines: dict[str, float], rest: dict[str, float]) -> dict[str, float]:
             return {**{k: v for k, v in lines.items() if k in leaves}, **{k: v for k, v in rest.items() if k != key}}
+        parents, subtotals = subtotal_tree(rows, leaves, key)
         return XbrlGroup(candidate.key, candidate.label, candidate.order, members, segments.total, error,
                          segments.currency, candidate.concept, merged(candidate.prior, segments.prior),
                          {**segments.elements, **candidate.elements},
                          merged(candidate.year_to_date, segments.year_to_date), segments.year_to_date_total,
                          merged(candidate.prior_year_to_date, segments.prior_year_to_date), segments.prior_year_to_date_total,
-                         prior_total=segments.prior_total, parents={line: key for line in leaves})
+                         prior_total=segments.prior_total, parents=parents,
+                         levels=[(k, candidate.members[k][0], v) for k, v in sorted(subtotals.items(), key=lambda item: -item[1])],
+                         level_prior={k: v for k, v in candidate.prior.items() if k in subtotals},
+                         level_year_to_date={k: v for k, v in candidate.year_to_date.items() if k in subtotals})
+    return None
+
+
+def subtotal_tree(rows: dict[str, float], leaves: dict[str, float], segment: str) -> tuple[dict[str, str], dict[str, float]]:
+    """Inside one segment's split: each line's parent, the smallest subtotal the filing tags that holds it (Search and
+    YouTube in Google properties; it and Network in Google advertising), else the segment; and those subtotals."""
+    positive = [key for key, value in leaves.items() if value > 0]
+    covers: dict[str, frozenset] = {}
+    for key, value in rows.items():
+        if key in leaves or value <= 0:
+            continue
+        found = _leaves_summing_to(leaves, positive, value)
+        if found and len(found) < len(positive):
+            covers[key] = found
+    sets = {**{key: frozenset([key]) for key in leaves}, **covers}
+    parents: dict[str, str] = {}
+    for key, held in sets.items():
+        holders = [other for other, cover in covers.items() if other != key and held < cover]
+        parents[key] = min(holders, key=lambda other: rows[other]) if holders else segment
+    return parents, {key: rows[key] for key in covers}
+
+
+def _leaves_summing_to(leaves: dict[str, float], keys: list[str], target: float) -> frozenset | None:
+    for size in range(2, min(len(keys), 10) + 1):
+        for combo in combinations(keys, size):
+            if abs(sum(leaves[key] for key in combo) - target) <= abs(target) * 1e-5:
+                return frozenset(combo)
     return None
 
 

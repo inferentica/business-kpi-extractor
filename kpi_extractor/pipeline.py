@@ -71,7 +71,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 19"
+_XBRL_READER = "xbrl reader 20"
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -385,6 +385,24 @@ class SymbolPipeline:
                                if ytd is not None and group.year_to_date_total else {}),
                             **({"prior_ytd": prior_ytd, "prior_ytd_total": group.prior_year_to_date_total}
                                if prior_ytd is not None and group.prior_year_to_date_total else {}),
+                        },
+                    ))
+            # A split's subtotals (Alphabet's Google properties, Google advertising) in a group of their own: placed in the
+            # tree by their parents, never added into a breakdown's sum.
+            for group, extra_notes in groups:
+                named = self.names.get(group.key) or {}
+                for order, (member, label, value) in enumerate(group.levels):
+                    ytd = group.level_year_to_date.get(member)
+                    records.append(self._record(
+                        group_key=f"{group.key}_levels", group_label=f"{named.get('label') or group.label} subtotals",
+                        group_kind="metric", group_order=group.order, kpi_key=member,
+                        kpi_label=(named.get("members") or {}).get(member) or label, kpi_order=order, unit="currency",
+                        value=value, currency=group.currency, method="xbrl", validation_status="verified",
+                        reconciliation_error_pct=None, notes=extra_notes, ref=ref, fiscal_year=fiscal_year,
+                        fiscal_period=fiscal_period, period_end=breakdowns.period_end, locator={
+                            "concept": group.concept, "member": group.elements.get(member), "subtotal": True,
+                            "parent": group.parents.get(member), "prior": group.level_prior.get(member),
+                            **({"ytd": ytd, "ytd_total": group.year_to_date_total} if ytd is not None and group.year_to_date_total else {}),
                         },
                     ))
             status = "failed" if ai_pending else "processed" if records else "skipped"
