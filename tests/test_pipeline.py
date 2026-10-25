@@ -1144,3 +1144,13 @@ def test_a_group_repeating_a_breakdown_still_tagged_in_xbrl_is_never_added():
     proposed = Spec.model_validate({"groups": [spec.groups[0].model_dump(), segments]})
     assert [group.key for group in without_xbrl_repeats(proposed, covered).groups] == ["operating"]
     assert [group.key for group in without_xbrl_repeats(proposed, covered, keep=proposed).groups] == ["operating", "revenue_by_segment"]
+
+
+
+def test_a_group_repeating_xbrl_with_a_subtotal_beside_its_parts_is_still_a_repeat():
+    from kpi_extractor.pipeline import repeats_xbrl
+
+    group = ai.GroupSpec.model_validate({"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown", "kpis": [
+        {"key": k, "label": label, "unit": "currency"} for k, label in
+        [("uhc", "UnitedHealthcare"), ("health", "Optum Health"), ("rx", "Optum Rx"), ("optum", "Total Optum")]]})
+    assert repeats_xbrl(group, [{"unitedhealthcare", "optumhealth", "optumrx", "optuminsight", "optumeliminations"}])

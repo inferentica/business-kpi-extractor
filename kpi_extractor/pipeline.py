@@ -2464,7 +2464,9 @@ def repeats_xbrl(group, covered: list[set[str]]) -> bool:
     """Whether a group (of any kind) names the same rows as a breakdown the company still tags in XBRL (Meta's Family
     of Apps and Reality Labs, once added as "metrics"): read by code with its whole history, never again from
     releases."""
-    names = {_identity_text(kpi.label) for kpi in group.kpis if kpi.key != group.total_kpi}
+    # A subtotal row the release adds ("Total Optum" beside its three segments, UnitedHealth) does not make it new.
+    names = {_identity_text(kpi.label) for kpi in group.kpis
+             if kpi.key != group.total_kpi and not _identity_text(kpi.label).startswith("total")}
     return len(names) >= 2 and any(names <= members for members in covered)
 
 
