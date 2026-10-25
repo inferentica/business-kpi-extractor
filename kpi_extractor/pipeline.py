@@ -1928,6 +1928,10 @@ class SymbolPipeline:
                 if current and not {key for key in set(annual) - set(current) if not balancing(key)}:
                     continue  # on the year's layout, or finer (Nvidia's 10-Qs list regions its 10-K folds into Other)
                 following = rows.get((group, str(int(year) + 1), quarter)) or {}
+                # A business the following year added (Amazon's physical stores, from Whole Foods in August 2017) shows
+                # as nothing in the restated quarter: not a row of the year's layout, so left out.
+                following = {key: row for key, row in following.items()
+                             if key in annual or (row.get("locator") or {}).get("prior") not in (0, 0.0, None)}
                 priors = {key: (row.get("locator") or {}).get("prior") for key, row in following.items()}
                 if not priors or set(priors) != set(annual) or not all(isinstance(v, (int, float)) for v in priors.values()):
                     continue

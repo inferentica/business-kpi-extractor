@@ -729,6 +729,25 @@ def test_a_quarter_on_an_older_layout_takes_the_following_years_restatement():
     assert pipeline.values[("products", "properties", "2019", "Q2")]["validation_status"] == "rejected"
 
 
+def test_a_business_added_the_following_year_does_not_block_the_restatement():
+    def row(key, year, period, end, value, prior=None, total=None, accession="a"):
+        return {"group_key": "products", "group_kind": "revenue_breakdown", "group_label": "Revenue by Product", "kpi_key": key,
+                "kpi_label": key, "fiscal_year": year, "fiscal_period": period, "period_end": end, "method": "xbrl",
+                "validation_status": "verified", "value": value, "source_accession": accession,
+                "locator": {"total": total, **({"prior": prior} if prior is not None else {})}}
+    # Amazon's 2016 10-Q split media from merchandise; its Q3 2017 10-Q restates Q3 2016 by store type, with physical
+    # stores (Whole Foods, bought in August 2017) at nothing a year earlier.
+    values = [row("online", "2016", "FY", "2016-12-31", 91.0, total=136.0), row("aws", "2016", "FY", "2016-12-31", 45.0, total=136.0),
+              row("media", "2016", "Q3", "2016-09-30", 6.0, total=32.0), row("merchandise", "2016", "Q3", "2016-09-30", 26.0, total=32.0),
+              row("online", "2017", "Q3", "2017-09-30", 26.0, prior=29.0, total=44.0, accession="b"),
+              row("aws", "2017", "Q3", "2017-09-30", 5.0, prior=3.0, total=44.0, accession="b"),
+              row("physical", "2017", "Q3", "2017-09-30", 13.0, prior=0.0, total=44.0, accession="b")]
+    pipeline = _pipeline(FakeControl({}), values)
+    pipeline._adopt_restated_quarters()
+    q3 = {k: v["value"] for (g, k, y, p), v in pipeline.values.items() if y == "2016" and p == "Q3" and v["validation_status"] == "verified"}
+    assert q3 == {"online": 29.0, "aws": 3.0}
+
+
 def test_a_quarter_finer_than_its_year_keeps_its_own_rows():
     def row(key, year, period, end, value, prior=None, total=None, accession="a"):
         return {"group_key": "geography", "group_kind": "revenue_breakdown", "group_label": "Revenue by Geography", "kpi_key": key,
