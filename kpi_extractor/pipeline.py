@@ -72,7 +72,7 @@ _XBRL_READER = "xbrl reader 15"
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
 # stamping began are never re-read by it, so a bump cannot re-read every company's history.
-_RELEASE_READER = "release reader 1"
+_RELEASE_READER = "release reader 2"
 _RELEASE_READER_PREFIX = "release reader "
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
@@ -2616,13 +2616,20 @@ def _fetch_image(link: str) -> bytes:
 
 
 def release_reread_due(previous: dict | None) -> bool:
-    """Whether a finished release should be read again: an older reader (its stamp names another version) left a
-    tracked group unread. A complete release, or one read before stamping began, is left alone."""
-    if not previous or previous.get("status") != "processed":
+    """Whether a finished release should be read again, once, by the reader that fixes what an older one missed:
+    * reader 1 reads every tracked group: a release an earlier stamped reader left with a group unread (one read
+      before stamping began is left alone);
+    * reader 2 reads a quote from a table laid out as text (Meta's highlight bullets): a release where a reading was
+      dropped as "unknown text block", whatever came of it."""
+    if not previous or previous.get("status") not in _DONE:
         return False
     notes = previous.get("notes") or []
     stamp = next((note for note in notes if note.startswith(_RELEASE_READER_PREFIX)), None)
-    return stamp is not None and stamp != _RELEASE_READER and any(note.startswith(_NOT_REPORTED) for note in notes)
+    version = int(stamp.removeprefix(_RELEASE_READER_PREFIX)) if stamp and stamp.removeprefix(_RELEASE_READER_PREFIX).isdigit() else None
+    if (version is None or version < 2) and any("unknown text block" in note for note in notes):
+        return True
+    return (previous.get("status") == "processed" and version is not None and version < 1
+            and any(note.startswith(_NOT_REPORTED) for note in notes))
 
 
 _INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in|combined line")

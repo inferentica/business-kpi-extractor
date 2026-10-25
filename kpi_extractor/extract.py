@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from .ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
-from .document import Document, Table, clean, declared_currency, parse_number
+from .document import Document, Table, TextBlock, clean, declared_currency, parse_number
 from .xbrl import member_key, remove_subtotals
 
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
@@ -150,7 +150,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
                 raise LocateError("amount scale unknown")
         context = f"{table.context} {' '.join(' '.join(row) for row in table.rows[:4])}"
         return value, _currency(text, kpi, default_currency, context), notes
-    block = document.blocks.get(locator.block or "")
+    block = document.blocks.get(locator.block or "") or _table_as_text(document, locator.block)
     if block is None:
         raise LocateError(f"unknown text block {locator.block}")
     quote, value_text = clean(locator.quote or ""), clean(locator.value_text or "")
@@ -174,6 +174,15 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         elif value < 1_000:
             raise LocateError(f"{value_text!r} has no amount scale")
     return value, _currency(f"{value_text} {quote}", kpi, default_currency, block.text), notes
+
+
+def _table_as_text(document: Document, key: str | None) -> TextBlock | None:
+    """A table quoted as text: a release's highlight bullets laid out as one-row tables ("•" | "Family daily active
+    people (DAP) – DAP was 2.26 billion…", Meta 2017–2020) are sentences, and a quote of one is read like a block's."""
+    table = document.tables.get(key or "")
+    if table is None:
+        return None
+    return TextBlock(table.id, clean(" ".join(cell for row in table.rows for cell in row if cell)))
 
 
 def _identity(text: str) -> str:

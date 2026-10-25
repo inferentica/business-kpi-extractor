@@ -323,13 +323,16 @@ For each other KPI, in "values", either:
 header such as "(in millions, except employee data)" does not apply to the rows it excepts: use 1 for them.
 - or text: {{"kpi": "<group>.<kpi>", "block": "A_P7", "quote": "<exact excerpt, max 160 chars>", "value_text": "3.60 billion"}}
   The quote is copied character for character from that block and contains value_text, the number exactly as written \
-with its unit word or % sign. Ids containing P are text blocks: quote them; only ids containing T are tables.
+with its unit word or % sign. Ids containing P are text blocks: quote them; only ids containing T are tables. A table \
+whose cells are sentences (highlights set as bullets) may be quoted the same way, with its id as "block".
 
 Rules:
 - Use the reported quarter's column (three months ended at the period end), never the prior-year quarter, the prior \
 quarter, year-to-date or full-year columns.
 - For a percentage, point to the percentage itself, not an amount.
 - If a KPI is not reported for this quarter, list its key in "missing". Do not guess.
+- The value must be the measure the KPI names, not a related one under another name: one app's daily active users \
+(DAUs) are not a family's daily active people (DAP), bookings are not revenue. List such a KPI in "missing".
 - "period_end" is the last day of the reported quarter as YYYY-MM-DD.
 - If the document reports only full-year figures for the period (an annual report with no three-month column), use \
 the full-year column, set "annual": true, and use the fiscal year end as "period_end".
@@ -338,8 +341,8 @@ JSON shape: {{"period_end": "2026-06-30", "annual": false, "tables": [...], "val
 
 REVIEW_TASK = """Two independent readings of this document disagree on the KPIs below. For each, decide which reading \
 is the value for the reported quarter, checking the document yourself. Answer "A" or "B", or "none" if neither is the \
-reported quarter's value for that KPI (a prior-year column, a year-to-date figure, a different metric, or a KPI the \
-document does not report).
+reported quarter's value for that KPI (a prior-year column, a year-to-date figure, a different metric such as an \
+app's DAUs for a family's DAP, or a KPI the document does not report).
 
 JSON shape: {"choices": {"<group>.<kpi>": "A"}}"""
 

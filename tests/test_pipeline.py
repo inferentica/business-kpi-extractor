@@ -891,6 +891,7 @@ def test_a_release_an_older_reader_left_incomplete_is_read_again():
     assert release_reread_due(incomplete) is True
     # Read by the current reader, complete, never stamped (read before stamping began) or not finished: left alone.
     assert release_reread_due({**incomplete, "notes": ["read by AI", _RELEASE_READER, incomplete["notes"][2]]}) is False
+    assert release_reread_due({**incomplete, "notes": ["read by AI", "release reader 1", incomplete["notes"][2]]}) is False
     assert release_reread_due({**incomplete, "notes": ["read by AI", "release reader 0"]}) is False
     assert release_reread_due({**incomplete, "notes": ["read by AI", incomplete["notes"][2]]}) is False
     assert release_reread_due({**incomplete, "status": "skipped"}) is False
@@ -1093,3 +1094,13 @@ def test_a_pie_missing_from_a_slides_reading_is_taken_from_a_closer_one():
     assert missing_pies([*q3, *q2]) and not missing_pies(q2) and not missing_pies([])
     closer = [Pie(axis="technology", fiscal_year="2026", fiscal_period="Q3"), *q3, *q2]
     assert [(pie.axis, pie.fiscal_period) for pie in fill_pies([*q3, *q2], closer)] == [("technology", "Q3")]
+
+
+def test_a_release_whose_quote_from_a_bullet_table_was_dropped_is_read_again_once():
+    from kpi_extractor.pipeline import _RELEASE_READER, release_reread_due
+
+    dropped = {"status": "skipped", "notes": ["read by AI", "not reported: operating.dap", "flash operating.dap: unknown text block A_T3"]}
+    assert release_reread_due(dropped) is True
+    assert release_reread_due({**dropped, "status": "processed", "notes": [*dropped["notes"], "release reader 1"]}) is True
+    assert release_reread_due({**dropped, "notes": [*dropped["notes"], _RELEASE_READER]}) is False
+    assert release_reread_due({**dropped, "status": "failed"}) is False

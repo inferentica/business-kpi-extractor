@@ -121,3 +121,21 @@ def test_ai_responses_are_validated():
         parse_located('{"values": [{"kpi": "a.b", "table": "T0", "row": 1}]}')
     with pytest.raises(AiResponseError):
         parse_spec('{"groups": [{"key": "mix", "label": "Mix", "kind": "mix", "kpis": [{"key": "a", "label": "A", "unit": "currency"}]}]}')
+
+
+def test_a_quote_from_a_bullet_laid_out_as_a_table_is_read_as_text():
+    # Meta's releases (2017–2020) set each highlight as a one-row table: "•" | the sentence. The AI quotes the
+    # sentence and names the table as its block.
+    document = parse_document("""
+<p>Fourth Quarter and Full Year 2019 Operational and Other Financial Highlights</p>
+<table><tr><td>•</td><td>Family daily active people (DAP) – DAP was 2.26 billion on average for December 2019, an increase of 11% year-over-year.</td></tr></table>
+""", "https://example.com/ex99.htm")
+    table = next(key for key, item in document.tables.items() if "DAP was" in " ".join(" ".join(row) for row in item.rows))
+    spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating metrics", "kind": "metric",
+                                             "kpis": [{"key": "dap", "label": "Daily active people", "unit": "count"}]}]})
+    located = Located.model_validate({"period_end": "2019-12-31", "values": [
+        {"kpi": "operating.dap", "block": table, "quote": "DAP was 2.26 billion on average for December 2019", "value_text": "2.26 billion"},
+    ]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == []
+    assert [item.value for item in values] == [2_260_000_000]
