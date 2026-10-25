@@ -159,3 +159,17 @@ def test_a_row_that_states_its_own_scale_overrides_the_tables():
     assert problems == []
     assert [item.value for item in values] == [539_500_000_000]
     assert values[0].notes == []
+
+
+
+def test_a_share_is_never_read_as_an_amount():
+    # TSMC's results-day slide: "28nm 7% 16/20nm 7% 0.15/0.18um 2%" once became $2 billion of 0.15 micron revenue.
+    document = parse_document("<p>Revenue by technology (in billions): 28nm 7% 16/20nm 7% 0.15/0.18um 2%</p>", "https://example.com/x.htm")
+    block = next(iter(document.blocks))
+    spec = Spec.model_validate({"groups": [{"key": "tech", "label": "Revenue by technology", "kind": "metric",
+                                             "kpis": [{"key": "old", "label": "0.15 micron and above", "unit": "currency"}]}]})
+    located = Located.model_validate({"period_end": "2026-03-31", "values": [
+        {"kpi": "tech.old", "block": block, "quote": "0.15/0.18um 2%", "value_text": "2%"}]})
+    values, problems = read_values(document, spec, located, "TWD")
+    assert values == []
+    assert any("percentage, not an amount" in problem for problem in problems)

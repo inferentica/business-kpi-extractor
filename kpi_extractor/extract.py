@@ -124,6 +124,8 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         parsed = parse_number(text)
         if parsed is None:
             raise LocateError(f"no number in {locator.table} r{locator.row} c{locator.col}")
+        if kpi.unit in ("currency", "count") and parsed.percent:
+            raise LocateError(f"{text!r} is a percentage, not an amount")
         header = " ".join(" ".join(row) for row in table.rows[:3])
         if kpi.unit == "percent" and not parsed.percent and not re.search(r"%|\bpercent", f"{' '.join(table.rows[locator.row])} {header}", re.I):
             raise LocateError(f"{text!r} is not a percentage")
@@ -165,6 +167,9 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         raise LocateError(f"no number in {value_text!r}")
     if kpi.unit == "percent" and not parsed.percent and not re.search(r"\bpercent\b", quote, re.I):
         raise LocateError(f"{value_text!r} is not a percentage")
+    if kpi.unit in ("currency", "count") and parsed.percent:
+        # TSMC's results-day slide gives node shares ("0.15/0.18um 2%"), never amounts: a share is not this KPI.
+        raise LocateError(f"{value_text!r} is a percentage, not an amount")
     value = parsed.value
     if kpi.unit == "currency" and parsed.scale_word is None:
         declared = block.declared_scale() or document.default_scale()
