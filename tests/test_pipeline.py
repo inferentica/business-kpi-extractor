@@ -42,8 +42,10 @@ class FakeControl:
         self.calls = []
 
     def ai(self, symbol, purpose, system, user, thinking, model="flash"):
-        self.calls.append((purpose, model))
-        return json.dumps(self.answers[(purpose, model)])
+        # Every call is Flash; a reasoning call (the second reading, a review) answers as "reasoning".
+        reader = "reasoning" if thinking else model
+        self.calls.append((purpose, reader))
+        return json.dumps(self.answers[(purpose, reader)])
 
     def call(self, operation, **payload):
         self.calls.append((operation, None))
@@ -68,10 +70,11 @@ def _history(document, answer, period_end="2026-03-31", fiscal_period="Q1"):
 
 def test_first_quarters_are_read_by_both_models():
     document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
-    control = FakeControl({("locate", "flash"): _answer(document), ("locate", "pro"): _answer(document)})
+    control = FakeControl({("locate", "flash"): _answer(document), ("locate", "reasoning"): _answer(document)})
     read, _problems, _located = _pipeline(control)._read("prompt", document, SPEC, EXPECTED)
     assert {item.kpi.key: item.value for item in read} == {"n3": 30, "n5": 33, "other": 37}
-    assert ("locate", "pro") in control.calls and ("review", "pro") not in control.calls
+    # The rest gets the second, reasoning reading; nothing needs a review.
+    assert ("locate", "reasoning") in control.calls and not any(purpose == "review" for purpose, _model in control.calls)
 
 
 def test_flash_alone_when_everything_is_where_it_was_last_quarter():
@@ -88,8 +91,8 @@ def test_a_reading_in_a_new_place_brings_in_pro_and_the_checks_settle_it():
     document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
     control = FakeControl({
         ("locate", "flash"): _answer(document, "3-nanometer accounted for 20%", "20%"),
-        ("locate", "pro"): _answer(document),
-        ("review", "pro"): {"choices": {"technology.n3": "B"}},
+        ("locate", "reasoning"): _answer(document),
+        ("review", "reasoning"): {"choices": {"technology.n3": "B"}},
     })
     history = _history(document, _answer(document))
     history[0]["locator"] = {"block": "P9", "quote": "Leading-edge 3-nanometer share: 29%", "value_text": "29%"}
@@ -97,7 +100,7 @@ def test_a_reading_in_a_new_place_brings_in_pro_and_the_checks_settle_it():
     values = {item.kpi.key: item for item in read}
     # Flash's 20% (the year-ago share) leaves the mix at 90%; Pro's 30% makes it whole: no review needed.
     assert values["n3"].value == 30 and "settled by the checks" in values["n3"].notes
-    assert ("review", "pro") not in control.calls
+    assert ("review", "reasoning") not in control.calls
 
 
 def test_review_rejecting_both_readings_drops_the_kpi():
@@ -105,8 +108,8 @@ def test_review_rejecting_both_readings_drops_the_kpi():
     flash = {"period_end": "2026-06-30", "values": [_quote(document, "technology.n3", "3-nanometer accounted for 20%", "20%")]}
     control = FakeControl({
         ("locate", "flash"): flash,
-        ("locate", "pro"): {"period_end": "2026-06-30", "values": []},
-        ("review", "pro"): {"choices": {"technology.n3": "none"}},
+        ("locate", "reasoning"): {"period_end": "2026-06-30", "values": []},
+        ("review", "reasoning"): {"choices": {"technology.n3": "none"}},
     })
     read, problems, _ = _pipeline(control)._read("prompt", document, SPEC, EXPECTED)
     assert read == []
@@ -145,10 +148,10 @@ def test_curation_asks_once_for_the_same_rows():
     candidate = XbrlCandidate("geography", "Revenue by Geography", 2, "us-gaap:Revenues", 200.0, "USD", {
         "uscanada": ("US & Canada", 80.0), "europe": ("Europe", 70.0), "rest": ("Rest of World", 50.0), "us": ("U.S.", 75.0),
     })
-    control = FakeControl({("curate", "pro"): {"members": ["uscanada", "europe", "rest"]}})
+    control = FakeControl({("curate", "reasoning"): {"members": ["uscanada", "europe", "rest"]}})
     pipeline = _pipeline(control)
     assert pipeline._curate(candidate) is not None and pipeline._curate(candidate) is not None
-    assert control.calls.count(("curate", "pro")) == 1
+    assert control.calls.count(("curate", "reasoning")) == 1
 
 
 def test_jumps_stand_only_with_a_quote_found_in_the_document():
@@ -163,7 +166,7 @@ def test_jumps_stand_only_with_a_quote_found_in_the_document():
                             ("Invented sentence that is not in the filing at all", "needs_review")):
         read, _ = read_values(document, spec, located, None)
         read[0].status, read[0].notes = "needs_review", ["changed 3.0x in a quarter"]
-        control = FakeControl({("explain", "pro"): {"items": {"operating.subs": {"legitimate": True, "quote": quote}}}})
+        control = FakeControl({("explain", "reasoning"): {"items": {"operating.subs": {"legitimate": True, "quote": quote}}}})
         _pipeline(control)._explain_jumps(read, document, spec)
         assert read[0].status == expected
 
@@ -771,7 +774,7 @@ def test_an_overlong_kpi_key_is_repaired_instead_of_discarding_the_list():
     assert KpiSpec(key="3nm Share", label="x", unit="percent").key == "k_3nm_share"
 
 
-def test_a_group_confirmed_on_its_own_stands_and_pro_reads_only_the_rest():
+def test_a_group_confirmed_on_its_own_stands_and_the_second_reading_reads_only_the_rest():
     html = RELEASE + "<p>Employees at quarter end: 76,000.</p>"
     document = parse_document(html, "https://www.sec.gov/x.htm")
     spec = Spec.model_validate({"groups": [SPEC.groups[0].model_dump(), {"key": "ops", "label": "Operating", "kind": "metric",
@@ -780,11 +783,11 @@ def test_a_group_confirmed_on_its_own_stands_and_pro_reads_only_the_rest():
     headcount = {"kpi": "ops.headcount", "block": block, "quote": "Employees at quarter end: 76,000", "value_text": "76,000"}
     flash = {**_answer(document), "values": _answer(document)["values"] + [headcount]}
     control = FakeControl({("locate", "flash"): flash,
-                           ("locate", "pro"): {"period_end": "2026-06-30", "values": [headcount]}})
+                           ("locate", "reasoning"): {"period_end": "2026-06-30", "values": [headcount]}})
     history = _history(document, _answer(document))  # the mix was found here last quarter; headcount is new
     read, _, _ = _pipeline(control, history)._read(lambda subset=None: "prompt", document, spec, EXPECTED)
     assert {item.kpi.key for item in read} == {"n3", "n5", "other", "headcount"}
-    assert ("locate", "pro") in control.calls and ("review", "pro") not in control.calls
+    assert ("locate", "reasoning") in control.calls and ("review", "reasoning") not in control.calls
 
 
 def test_code_finds_the_sections_naming_every_kpi():
@@ -1175,13 +1178,12 @@ def test_a_group_repeating_xbrl_with_a_subtotal_beside_its_parts_is_still_a_repe
     assert repeats_xbrl(group, [{"unitedhealthcare", "optumhealth", "optumrx", "optuminsight", "optumeliminations"}])
 
 
-def test_an_ai_profile_puts_flash_reasoning_in_pros_place(monkeypatch):
+def test_every_call_is_flash_and_reasoning_runs_at_the_profiles_effort(monkeypatch):
     from kpi_extractor.control import ai_profile
     monkeypatch.delenv("KPI_AI_PROFILE", raising=False)
-    assert ai_profile("pro", True) == ("pro", True, None)
+    assert ai_profile("flash", True) == ("flash", True, "high")
+    assert ai_profile("flash", False) == ("flash", False, None)  # the first reading stays without reasoning
     monkeypatch.setenv("KPI_AI_PROFILE", "flash-max")
-    assert ai_profile("pro", True) == ("flash", True, "max")
-    assert ai_profile("flash", False) == ("flash", False, None)  # Flash's first reading stays without reasoning
     assert ai_profile("flash", True) == ("flash", True, "max")
     monkeypatch.setenv("KPI_AI_PROFILE", "flash-max-all")
     assert ai_profile("flash", False) == ("flash", True, "max")

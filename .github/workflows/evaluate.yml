@@ -9,21 +9,12 @@ on:
         required: true
         default: "6"
         type: string
-      second_reader:
-        description: Second reader when Flash's reading cannot stand alone
-        required: true
-        default: pro
-        type: choice
-        options:
-          - pro
-          - flash-thinking
       ai_profile:
-        description: Models - pro as built, or Flash reasoning in Pro's place (flash-high, flash-max), or on every call (flash-max-all)
+        description: Reasoning effort - flash-high (production), flash-max, or reasoning on every call (flash-max-all)
         required: true
-        default: pro
+        default: flash-high
         type: choice
         options:
-          - pro
           - flash-high
           - flash-max
           - flash-max-all
@@ -68,9 +59,8 @@ jobs:
       - name: Score against the golden set
         env:
           QUARTERS: ${{ inputs.quarters || '6' }}
-          KPI_SECOND_READER: ${{ inputs.second_reader || 'pro' }}
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}
-          KPI_AI_PROFILE: ${{ inputs.ai_profile || 'pro' }}
+          KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
         run: python -m kpi_extractor.evaluate --quarters "$QUARTERS"
       - uses: actions/upload-artifact@v6
         if: always()

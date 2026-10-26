@@ -86,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
             "needsReview": sum(result.needs_review for result in results),
             "aiCalls": sum(result.ai_calls for result in results),
             "flashOnlyReads": sum(result.flash_only_reads for result in results),
-            "proReads": sum(result.pro_reads for result in results),
+            "secondReads": sum(result.second_reads for result in results),
             "replayedReads": sum(result.replayed_reads for result in results),
             "q4Gaps": {result.symbol: result.q4_gaps[:10] for result in results if result.q4_gaps},
             # Companies whose earnings-document values are mostly unverified: a list or reading that needs attention.

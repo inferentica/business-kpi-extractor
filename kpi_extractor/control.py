@@ -82,22 +82,18 @@ class ControlPlane:
         return token
 
 
-# Which models answer (KPI_AI_PROFILE): "pro" as built (Flash reads, Pro cross-checks, reviews and names), or Flash
-# reasoning in Pro's place at an effort ("flash-high", "flash-max"), or Flash reasoning at max on every call ("flash-max-all").
-AI_PROFILES = ("pro", "flash-high", "flash-max", "flash-max-all")
+# How hard the reasoning calls think (KPI_AI_PROFILE). Every call is Flash: the first reading without reasoning, the second
+# reading, reviews and naming with it. "flash-high" (DeepSeek's default effort) matched the former Pro reader on the
+# golden set at half the cost (2026-10-26); "flash-max" reasons longer, "flash-max-all" reasons on every call.
+AI_PROFILES = ("flash-high", "flash-max", "flash-max-all")
 
 
 def ai_profile(model: str, thinking: bool) -> tuple[str, bool, str | None]:
     """The model, reasoning and effort a call is made with under the configured profile."""
-    profile = os.environ.get("KPI_AI_PROFILE", "pro")
+    profile = os.environ.get("KPI_AI_PROFILE", "flash-high")
     if profile == "flash-max-all":
         return "flash", True, "max"
-    if profile in ("flash-high", "flash-max"):
-        effort = profile.removeprefix("flash-")
-        if model == "pro":
-            return "flash", True, effort
-        return model, thinking, effort if thinking else None
-    return model, thinking, None
+    return model, thinking, ("max" if profile == "flash-max" else "high") if thinking else None
 
 
 class DryRunControl:

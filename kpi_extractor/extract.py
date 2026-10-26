@@ -77,7 +77,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             continue
         seen.add(locator.kpi)
         values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator), notes))
-    # One gate for every reading (replay, Flash, Pro): the column's own header outranks a period the AI states.
+    # One gate for every reading (replay, Flash, the reasoning reader): the column's own header outranks a period the AI states.
     kept = []
     for item in values:
         mismatch = column_duration_problem(str(item.locator.get("header") or ""), located.annual)
@@ -205,7 +205,7 @@ def _identity(text: str) -> str:
 
 def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
     """The KPI on the company's list a table row is, so a whole-table reading and a row-by-row reading of one table use
-    one key (Flash and Pro then agree, and a breakdown is never stored twice under two names)."""
+    one key (both readings then agree, and a breakdown is never stored twice under two names)."""
     wanted = _identity(label)
     listed = [kpi for kpi in group.kpis if kpi.key != group.total_kpi]
     matches = [kpi for kpi in listed if wanted in (_identity(kpi.label), _identity(kpi.key))]

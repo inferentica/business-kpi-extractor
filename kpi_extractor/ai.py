@@ -3,7 +3,7 @@
 The AI never supplies a number that gets stored. It chooses (which documents, sections, KPIs and rows matter) and it
 points (a table cell, or a quote with the number as written); code reads every value from the document and checks it.
 
-Every prompt shares one system message and puts the document first, so repeated tasks on the same document (Pro's
+Every prompt shares one system message and puts the document first, so repeated tasks on the same document (the reasoning reader's
 reading, review, audit and explanations) hit DeepSeek's context cache and cost a fraction of a fresh read.
 """
 from __future__ import annotations
@@ -172,7 +172,7 @@ class Located(BaseModel):
 
 
 class Review(BaseModel):
-    """Pro's verdict on KPIs the two readings disagree on: "A", "B" or "none" per KPI key."""
+    """The reasoning reader's verdict on KPIs the two readings disagree on: "A", "B" or "none" per KPI key."""
     choices: dict[str, Literal["A", "B", "none"]] = Field(default_factory=dict)
 
 

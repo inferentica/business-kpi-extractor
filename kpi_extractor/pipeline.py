@@ -2,11 +2,11 @@
 
 AI decides and points; code reads and proves. Every AI answer is checked before it changes anything stored:
 - Flash reads each earnings document. When its reading matches where each KPI was found last quarter and every check
-  passes, it stands. Otherwise Pro reads the document independently and values stand only where the two agree or
-  where Pro's review picks one of the two readings.
-- Pro picks the rows of an XBRL breakdown the rules cannot reconcile; the rows must add up to reported revenue.
-- Pro explains a flagged jump; the explanation counts only with a quote found in the document.
-- Pro audits each new quarter against the KPI list and may add KPIs or retire ones no longer reported.
+  passes, it stands. Otherwise the reasoning reader reads the document independently and values stand only where the two agree or
+  where the reasoning reader's review picks one of the two readings.
+- The reasoning reader picks the rows of an XBRL breakdown the rules cannot reconcile; the rows must add up to reported revenue.
+- The reasoning reader explains a flagged jump; the explanation counts only with a quote found in the document.
+- The reasoning reader audits each new quarter against the KPI list and may add KPIs or retire ones no longer reported.
 """
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ class SymbolResult:
     values: int = 0
     needs_review: int = 0
     ai_calls: int = 0
-    pro_reads: int = 0
+    second_reads: int = 0
     flash_only_reads: int = 0
     replayed_reads: int = 0
     # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.
@@ -803,16 +803,16 @@ class SymbolPipeline:
         return group
 
     def _curate(self, candidate: XbrlCandidate):
-        """Pro picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""
+        """The reasoning reader picks the rows that make up revenue; the same rows are reused for later filings with the same rows."""
         cache_key = (candidate.key, ",".join(sorted(candidate.members))[:2000])  # stored under the same key
         if cache_key in self._curations:
-            return candidate.group(self._curations[cache_key])  # Pro's choice, kept between runs
+            return candidate.group(self._curations[cache_key])  # The reasoning reader's choice, kept between runs
         rows = "\n".join(f"- {key}: {label} = {value:,.0f}" for key, (label, value) in candidate.members.items())
         data = (f"Breakdown: {candidate.label} ({candidate.concept})\nReported total revenue: {candidate.total:,.0f}\n"
                 f"Rows (member key: label = amount):\n{rows}")
         try:
             answer = self._ask(ai.prompt(self.company, "(XBRL facts, listed below)", ai.CURATE_TASK, data),
-                               "curate", ai.Curation, thinking_first=True, model="pro")
+                               "curate", ai.Curation, thinking_first=True, model="flash")
         except AiResponseError:
             return None
         self._curations[cache_key] = answer.members
@@ -868,10 +868,10 @@ class SymbolPipeline:
         try:
             document = self._document(*latest_quarter)
             text = self._prompt_document(document, None)
-            # Pro, reasoning first: the KPI list and names shape every later quarter.
+            # Reasoning first: the KPI list and names shape every later quarter.
             current = Spec.model_validate({"groups": row["groups"]}) if row else None
             spec = self._ask(ai.prompt(self.company, text, ai.PROPOSE_TASK, ai.propose_data(covered, to_name, current)),
-                             "propose", Spec, thinking_first=True, model="pro")
+                             "propose", Spec, thinking_first=True, model="flash")
         except Exception as error:  # noqa: BLE001
             self.result.errors.append(f"KPI list: {error}"[:300])
             return None, 0, False
@@ -903,7 +903,7 @@ class SymbolPipeline:
         return normalized
 
     def _maintain(self, spec: Spec, version: int, latest_quarter: list[FilingRef]) -> tuple[Spec, int] | None:
-        """Pro audits the newest quarter against the list: KPIs the documents report that the list lacks, and KPIs the
+        """The reasoning reader audits the newest quarter against the list: KPIs the documents report that the list lacks, and KPIs the
         company stopped reporting. Additions only extend the list; existing keys never change meaning."""
         document = self._document(*latest_quarter)
         period_end = max(ref.period_end for ref in latest_quarter).isoformat()
@@ -914,7 +914,7 @@ class SymbolPipeline:
         data = f"KPI list:\n{ai.kpi_lines(spec)}\n\nCaptured for this quarter:\n" + ("\n".join(captured) or "- nothing")
         try:
             answer = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.MAINTAIN_TASK, data),
-                               "maintain", ai.Maintenance, thinking_first=True, model="pro")
+                               "maintain", ai.Maintenance, thinking_first=True, model="flash")
             if getattr(self, "_owner_edited", False):
                 # The owner decides what an edited list tracks: the audit may suggest additions, never retirements.
                 answer = answer.model_copy(update={"retire": []})
@@ -1047,7 +1047,7 @@ class SymbolPipeline:
 
     def _readable(self, spec: Spec) -> Spec:
         """The list without groups that have never verified in at least eight quarters read (JPMorgan's income-statement
-        lines listed as a breakdown): reading them again would only flag them again, at a Pro read each quarter. Decided
+        lines listed as a breakdown): reading them again would only flag them again, at a reasoning read each quarter. Decided
         once per run (see _process_releases), before re-reading a filing could withdraw their history. Used for older
         quarters only: the newest is read whole every run, so a group that failed for an extractor bug verifies again
         once the bug is fixed, and is read in full from then on."""
@@ -1163,9 +1163,9 @@ class SymbolPipeline:
         self._explain_stored({key for key, note in flagged.items() if _is_jump(note)}, refs)
 
     def _explain_stored(self, keys: set[tuple], refs: list[FilingRef]) -> None:
-        """Jumps the date-order check found, given the reading-time treatment: Pro is asked whether each is a real
+        """Jumps the date-order check found, given the reading-time treatment: the reasoning reader is asked whether each is a real
         change, and one backed by a quote found in the document stands (its breakdown's other parts are released by
-        _release_held_breakdowns). One Pro call per release with such a jump."""
+        _release_held_breakdowns). One reasoning call per release with such a jump."""
         by_accession = {ref.accession: ref for ref in refs}
         jumps: dict[str, list[dict]] = {}
         for key in keys:
@@ -1180,13 +1180,13 @@ class SymbolPipeline:
                     f"- {v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']} ({v['group_label']} / {v['kpi_label']}): "
                     f"now {float(v['value']):g}; {'; '.join(n for n in v.get('notes') or [] if _is_jump(n))}" for v in rows)
                 answer = self._ask(ai.prompt(self.company, self._prompt_document(document, None), ai.EXPLAIN_TASK, lines),
-                                   "explain", ai.Explanations, thinking_first=True, model="pro")
+                                   "explain", ai.Explanations, thinking_first=True, model="flash")
                 return rows, document, answer
             except Exception:  # noqa: BLE001 - unexplained, they stay flagged
                 return rows, None, None
 
         cleared = []
-        with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:  # one Pro call per release, side by side
+        with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:  # one reasoning call per release, side by side
             answers = list(pool.map(explain, jumps.items()))
         for rows, document, answer in answers:
             if answer is None:
@@ -1284,8 +1284,8 @@ class SymbolPipeline:
     def _read(self, text, document: Document, spec: Spec, expected: date, version: int | None = None):
         """Code first: each group read the way it was last quarter (or in the nearest quarter read), standing only on
         the checks a Flash reading must pass; this holds across KPI-list versions, so a list change sends only new or
-        changed groups to the AI. The rest goes to Flash. A group Flash's reading confirms stands alone; Pro reads the
-        others independently, values stand where the two agree or where the checks settle them, and Pro reviews the
+        changed groups to the AI. The rest goes to Flash. A group Flash's reading confirms stands alone; the reasoning reader reads the
+        others independently, values stand where the two agree or where the checks settle them, and the reasoning reader reviews the
         rest."""
         currency = self._default_currency()
         self._local.replayed = False
@@ -1314,7 +1314,7 @@ class SymbolPipeline:
                 not flash.tables and not flash.values and self._kind_reports_nothing(document, expected, version)):
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
-        # Groups Flash's reading confirms on their own stand; Pro reads only the rest of the list.
+        # Groups Flash's reading confirms on their own stand; the reasoning reader reads only the rest of the list.
         confirmed = self._confirmed_groups(flash, flash_read, spec, expected, document)
         open_groups = [group for group in spec.groups if group.key not in confirmed]
         kept = [item for item in flash_read if item.group.key in confirmed]
@@ -1323,12 +1323,10 @@ class SymbolPipeline:
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
         subset = spec if not confirmed else Spec.model_validate({"groups": [g.model_dump() for g in open_groups],
                                                                  "names": {}})
-        self.result.pro_reads += 1
-        # The second reader: Pro, or Flash reasoning first when the evaluation compares them (KPI_SECOND_READER).
-        flash_second = os.environ.get("KPI_SECOND_READER") == "flash-thinking"
+        self.result.second_reads += 1
+        # The second reader: Flash, reasoning first, reading the document on its own.
         pro, pro_read, pro_problems = self._locate(full_text if subset is spec else build(subset), document, subset,
-                                                   currency, model="flash" if flash_second else "pro",
-                                                   thinking_first=flash_second)
+                                                   currency, model="flash", thinking_first=True)
         open_keys = {group.key for group in open_groups}
         by_flash = {f"{item.group.key}.{item.kpi.key}": item for item in flash_read if item.group.key in open_keys}
         by_pro = {f"{item.group.key}.{item.kpi.key}": item for item in pro_read}
@@ -1345,12 +1343,12 @@ class SymbolPipeline:
         if disputed:
             lines = [f"- {key}: A = {describe(document, a) if a else 'not reported'}; "
                      f"B = {describe(document, b) if b else 'not reported'}" for key, (a, b) in disputed.items()]
-            # Pro reviews only the tables and passages the two readings point to, with the opening for the period.
+            # The reasoning reader reviews only the tables and passages the two readings point to, with the opening for the period.
             pointed = {str(item.locator.get("table") or item.locator.get("block")) for pair in disputed.values()
                        for item in pair if item}
             review = self._ask(ai.prompt(self.company, document.render_ids(pointed, MAX_DOCUMENT_CHARS, opening=3),
                                          ai.REVIEW_TASK, "Disputed KPIs:\n" + "\n".join(lines)),
-                               "review", ai.Review, thinking_first=True, model="pro")
+                               "review", ai.Review, thinking_first=True, model="flash")
             for key, (a, b) in disputed.items():
                 chosen = {"A": a, "B": b}.get(review.choices.get(key, "none"))
                 if chosen is None:
@@ -1400,7 +1398,7 @@ class SymbolPipeline:
         return confirmed
 
     def _settle_by_checks(self, agreed: list[ReadValue], disputed: dict[str, tuple], expected: date) -> None:
-        """Two readings of a group that disagree, settled without a Pro review only on structural evidence: one adds up
+        """Two readings of a group that disagree, settled without a reasoning review only on structural evidence: one adds up
         (a breakdown to its total, a mix to 100%) and holds no number repeated from an earlier period, while the other
         does not add up or repeats an earlier period's number. A jump alone never decides: last quarter's figure read
         from another column passes the jump check precisely because it did not move, so a jump goes to the review and
@@ -1485,7 +1483,7 @@ class SymbolPipeline:
     def _kind_reports_nothing(self, document: Document, expected: date, version: int | None) -> bool:
         """Whether both models already read this kind of document for this KPI list and found nothing in it (TSMC's
         earnings release once its amounts come from the quarterly report). Flash pointing at nothing again then stands;
-        a pointer that does not hold (a partial table) still goes to Pro."""
+        a pointer that does not hold (a partial table) still goes to the reasoning reader."""
         if version is None:
             return False
         source = _source_template(document.source_url)
@@ -1535,7 +1533,7 @@ class SymbolPipeline:
         """Every value is accounted for: confirmed by the release's own year-ago column (read by code from the same row,
         in a column headed for the same length of period, equal to what is stored for that quarter last year) or found
         where it was last quarter; at least two by the year-ago column. A value with neither (a new KPI, a quoted
-        figure) sends the reading to Pro. Costs no AI."""
+        figure) sends the reading to the reasoning reader. Costs no AI."""
         target = (expected - timedelta(days=365)).isoformat()
         stored = {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
                   for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
@@ -1576,7 +1574,7 @@ class SymbolPipeline:
                     item.notes.append("fewer rows and under half the total of the quarter compared: likely part of the table")
 
     def _explain_jumps(self, read: list[ReadValue], document: Document, spec: Spec) -> None:
-        """Values flagged only for a sharp change get a reading by Pro; a real change backed by a quote stands."""
+        """Values flagged only for a sharp change get a reading by the reasoning reader; a real change backed by a quote stands."""
         flagged = [item for item in read if item.status == "needs_review"
                    and item.notes and all(_is_jump(note) for note in item.notes if note != "confirmed by review")]
         if not flagged:
@@ -1585,7 +1583,7 @@ class SymbolPipeline:
                           f"; {'; '.join(item.notes)}" for item in flagged)
         try:
             answer = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.EXPLAIN_TASK, lines),
-                               "explain", ai.Explanations, thinking_first=True, model="pro")
+                               "explain", ai.Explanations, thinking_first=True, model="flash")
         except (AiResponseError, ControlError):
             return  # the flagged values stay needs_review
         haystack = _document_text(document)

@@ -63,8 +63,10 @@ class NoAi:
         self.calls = []
 
     def ai(self, symbol, purpose, system, user, thinking, model="flash"):
-        self.calls.append((purpose, model))
-        return json.dumps(self.answers[(purpose, model)])
+        # Every call is Flash; a reasoning call (the second reading, a review) answers as "reasoning".
+        reader = "reasoning" if thinking else model
+        self.calls.append((purpose, reader))
+        return json.dumps(self.answers[(purpose, reader)])
 
     def call(self, operation, **payload):
         return {}
@@ -105,7 +107,7 @@ def test_a_replayed_quarter_needs_no_ai_call():
 def test_replay_is_refused_when_a_number_repeats_but_holds_across_a_new_list_version():
     first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
     flash = {"period_end": "2026-06-30", "values": []}
-    answers = {("locate", "flash"): flash, ("locate", "pro"): flash}
+    answers = {("locate", "flash"): flash, ("locate", "reasoning"): flash}
     history = _history(first)
     same = parse_document(report("June 30", 10, 20, 30, 40, 300), URL.format(n=2))  # last quarter's numbers again
     control = NoAi(answers)
@@ -126,11 +128,11 @@ def test_kpis_missing_last_quarter_are_looked_for_by_the_ai_every_other_quarter(
     first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
     second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
     flash = {"period_end": "2026-06-30", "values": []}
-    control = NoAi({("locate", "flash"): flash, ("locate", "pro"): flash})
+    control = NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash})
     _pipeline(control, _history(first), notes=("read by AI", "not reported: operating.stores"))._read(
         lambda: "prompt", second, spec, Q2, version=1)
     assert control.calls == []
-    control = NoAi({("locate", "flash"): flash, ("locate", "pro"): flash})
+    control = NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash})
     _pipeline(control, _history(first), notes=("read by replay", "not reported: operating.stores"))._read(
         lambda: "prompt", second, spec, Q2, version=1)
     assert ("locate", "flash") in control.calls
@@ -160,17 +162,17 @@ def test_a_kind_of_document_both_models_found_empty_is_read_by_flash_alone():
     assert read == [] and control.calls == [("locate", "flash")]
 
 
-def test_a_partial_flash_reading_of_an_empty_kind_still_goes_to_pro():
+def test_a_partial_flash_reading_of_an_empty_kind_still_gets_a_second_reading():
     document = parse_document("<p>Quarterly report.</p><table><tr><td>Wafer</td><td>5</td></tr></table>", URL.format(n=2))
     table = next(iter(document.tables))
     partial = {"period_end": "2026-06-30", "tables": [
         {"group": "technology", "table": table, "col": 1, "first_row": 0, "last_row": 0}]}
-    control = NoAi({("locate", "flash"): partial, ("locate", "pro"): {"period_end": "2026-06-30"}})
+    control = NoAi({("locate", "flash"): partial, ("locate", "reasoning"): {"period_end": "2026-06-30"}})
     pipeline = _pipeline(control, [])
     pipeline.filings = {"q1": {"accession": "q1", "spec_version": 1, "status": "skipped", "value_count": 0,
                                "notes": ["read by AI"], "source_url": URL.format(n=1), "period_end": "2026-03-31"}}
     pipeline._read(lambda: "prompt", document, SPEC, Q2, version=1)
-    assert ("locate", "pro") in control.calls
+    assert ("locate", "reasoning") in control.calls
 
 
 def test_a_six_month_column_is_never_replayed_as_the_quarter():

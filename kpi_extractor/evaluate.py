@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     report = score(golden, captured)
     report["aiCalls"] = sum(result.ai_calls for result in results)
     report["flashOnlyReads"] = sum(result.flash_only_reads for result in results)
-    report["proReads"] = sum(result.pro_reads for result in results)
+    report["secondReads"] = sum(result.second_reads for result in results)
     report["replayedReads"] = sum(result.replayed_reads for result in results)
     report["errors"] = {result.symbol: result.errors[:5] for result in results if result.errors}
     plane.call("finish", summary={key: value for key, value in report.items() if key != "results"})
