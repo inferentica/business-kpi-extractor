@@ -520,7 +520,7 @@
  {
   "symbol": "GOOGL",
   "period_end": "2025-06-30",
-  "label": "^unallocated$",
+  "label": "^(unallocated|hedging gains \\(losses\\))$",
   "unit": "currency",
   "value": -112000000,
   "currency": "USD",
