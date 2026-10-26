@@ -51,11 +51,12 @@ class ControlPlane:
         raise ControlError(f"{operation} failed")
 
     def ai(self, symbol: str, purpose: str, system: str, user: str, thinking: bool, model: str = "flash") -> str:
+        model, thinking, effort = ai_profile(model, thinking)
         # The reply streams keep-alive spaces before its JSON, so a long reasoning call outlasts the gateway's idle
         # limit; a failure after the first byte arrives as {"error": ...} and is retried once.
         for attempt in (1, 2):
             response = self.call("ai", timeout=390, attempts=2, symbol=symbol, purpose=purpose, model=model,
-                                 system=system, user=user, thinking=thinking)
+                                 system=system, user=user, thinking=thinking, **({"effort": effort} if effort else {}))
             if not response.get("error"):
                 return str(response.get("content") or "")
             if attempt == 2:
@@ -79,6 +80,24 @@ class ControlPlane:
             token = json.loads(response.read())["value"]
         self._token = (token, time.monotonic() + _TOKEN_LIFETIME_SECONDS)
         return token
+
+
+# Which models answer (KPI_AI_PROFILE): "pro" as built (Flash reads, Pro cross-checks, reviews and names), or Flash
+# reasoning in Pro's place at an effort ("flash-high", "flash-max"), or Flash reasoning at max on every call ("flash-max-all").
+AI_PROFILES = ("pro", "flash-high", "flash-max", "flash-max-all")
+
+
+def ai_profile(model: str, thinking: bool) -> tuple[str, bool, str | None]:
+    """The model, reasoning and effort a call is made with under the configured profile."""
+    profile = os.environ.get("KPI_AI_PROFILE", "pro")
+    if profile == "flash-max-all":
+        return "flash", True, "max"
+    if profile in ("flash-high", "flash-max"):
+        effort = profile.removeprefix("flash-")
+        if model == "pro":
+            return "flash", True, effort
+        return model, thinking, effort if thinking else None
+    return model, thinking, None
 
 
 class DryRunControl:

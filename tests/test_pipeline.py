@@ -1173,3 +1173,15 @@ def test_a_group_repeating_xbrl_with_a_subtotal_beside_its_parts_is_still_a_repe
         {"key": k, "label": label, "unit": "currency"} for k, label in
         [("uhc", "UnitedHealthcare"), ("health", "Optum Health"), ("rx", "Optum Rx"), ("optum", "Total Optum")]]})
     assert repeats_xbrl(group, [{"unitedhealthcare", "optumhealth", "optumrx", "optuminsight", "optumeliminations"}])
+
+
+def test_an_ai_profile_puts_flash_reasoning_in_pros_place(monkeypatch):
+    from kpi_extractor.control import ai_profile
+    monkeypatch.delenv("KPI_AI_PROFILE", raising=False)
+    assert ai_profile("pro", True) == ("pro", True, None)
+    monkeypatch.setenv("KPI_AI_PROFILE", "flash-max")
+    assert ai_profile("pro", True) == ("flash", True, "max")
+    assert ai_profile("flash", False) == ("flash", False, None)  # Flash's first reading stays without reasoning
+    assert ai_profile("flash", True) == ("flash", True, "max")
+    monkeypatch.setenv("KPI_AI_PROFILE", "flash-max-all")
+    assert ai_profile("flash", False) == ("flash", True, "max")
