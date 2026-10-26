@@ -877,7 +877,11 @@ class SymbolPipeline:
             return None, 0, False
         if current is not None:
             spec = keep_current_groups(spec, current)
-        spec = without_xbrl_repeats(spec, [] if self.profile.foreign else self._current_xbrl_members(), keep=current)
+        # A group the owner kept stays; one the extractor itself listed that repeats an XBRL breakdown (Amazon's product
+        # and service sales, listed before XBRL tagged them as a view) goes.
+        spec = without_xbrl_repeats(spec, [] if self.profile.foreign else self._current_xbrl_members(),
+                                    keep=current if getattr(self, "_owner_edited", False) else None)
+        self._set_aside_dropped(current, spec)
         spec = self._capped(spec)
         # Names may only rename breakdowns and members that exist.
         names = {
@@ -889,6 +893,25 @@ class SymbolPipeline:
         self.names = names
         self.log(f"{self.symbol}: KPI list v{version} with {sum(len(g.kpis) for g in spec.groups)} KPIs")
         return spec, version, True
+
+    def _set_aside_dropped(self, before: Spec | None, after: Spec) -> None:
+        """Figures of a group the list no longer has because it repeats an XBRL breakdown are set aside, as the template
+        page's save does, so the breakdown is not shown twice (once from XBRL, once as releases' leftover rows)."""
+        if before is None:
+            return
+        covered = [] if self.profile.foreign else self._current_xbrl_members()
+        kept = {group.key for group in after.groups}
+        dropped = {f"{AI_GROUP_PREFIX}{group.key}" for group in before.groups
+                   if group.key not in kept and repeats_xbrl(group, covered)}
+        if not dropped:
+            return
+        aside = [{**value, "validation_status": "rejected", "notes": ["repeats a breakdown read from XBRL"]}
+                 for value in self.values.values()
+                 if value["group_key"] in dropped and value["method"] in ("ai", "derived") and value["validation_status"] != "rejected"]
+        for start in range(0, len(aside), 400):
+            self._store(values=aside[start:start + 400])
+        if aside:
+            self.log(f"{self.symbol}: {len(aside)} values of {', '.join(sorted(dropped))} set aside (repeats XBRL)")
 
     def _capped(self, spec: Spec) -> Spec:
         """normalize_spec, with any KPI the cap took off recorded for the run summary."""
@@ -920,6 +943,10 @@ class SymbolPipeline:
                 answer = answer.model_copy(update={"retire": []})
             covered = [] if self.profile.foreign else self._current_xbrl_members()
             updated = apply_maintenance(spec, answer, covered)
+            if not getattr(self, "_owner_edited", False):
+                # The extractor's own repeats of an XBRL breakdown go, whether or not the audit changed anything else.
+                cleaned = without_xbrl_repeats(updated or spec, covered)
+                updated = cleaned if cleaned is not spec else updated
         except (AiResponseError, ControlError, ValueError) as error:
             self.result.errors.append(f"KPI list audit: {error}"[:300])
             return None
@@ -928,6 +955,7 @@ class SymbolPipeline:
         updated = self._capped(updated)  # the audit's additions are kept to the cap like any list
         if updated.model_dump() == spec.model_dump():
             return None
+        self._set_aside_dropped(spec, updated)
         self._store_spec(updated, self.names, version + 1, latest_quarter[-1].accession)
         self.log(f"{self.symbol}: KPI list v{version + 1} after audit ({sum(len(g.kpis) for g in updated.groups)} KPIs)")
         return updated, version + 1

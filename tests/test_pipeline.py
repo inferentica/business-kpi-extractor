@@ -7,7 +7,7 @@ from kpi_extractor.ai import Spec
 from kpi_extractor.document import parse_document
 from kpi_extractor.evaluate import score
 from kpi_extractor.extract import read_values
-from kpi_extractor.pipeline import SymbolPipeline, _template, apply_maintenance
+from kpi_extractor.pipeline import SymbolPipeline, _template, apply_maintenance, without_xbrl_repeats
 from kpi_extractor.xbrl import XbrlCandidate
 
 RELEASE = """
@@ -1187,3 +1187,25 @@ def test_every_call_is_flash_and_reasoning_runs_at_the_profiles_effort(monkeypat
     assert ai_profile("flash", True) == ("flash", True, "max")
     monkeypatch.setenv("KPI_AI_PROFILE", "flash-max-all")
     assert ai_profile("flash", False) == ("flash", True, "max")
+
+
+def test_a_group_dropped_for_repeating_xbrl_has_its_figures_set_aside():
+    # Amazon's list carried "Revenue by Product Type" (net product and service sales), which XBRL tags every quarter.
+    def row(key, value):
+        return {"group_key": "kpi_product_type", "group_kind": "revenue_breakdown", "group_label": "Revenue by Product Type",
+                "kpi_key": key, "kpi_label": key, "fiscal_year": "2026", "fiscal_period": "Q2", "period_end": "2026-06-30",
+                "method": "ai", "validation_status": "verified", "value": value, "locator": {}, "unit": "currency"}
+    control = FakeControl({})
+    pipeline = _pipeline(control, [row("net_product_sales", 77.6), row("net_service_sales", 123.0)])
+    pipeline.profile = SimpleNamespace(name="Amazon", fiscal_year_end="1231", foreign=False)
+    pipeline._current_xbrl_members = lambda: [{"netproductsales", "netservicesales"}]
+    before = Spec.model_validate({"groups": [
+        {"key": "product_type", "label": "Revenue by Product Type", "kind": "revenue_breakdown", "kpis": [
+            {"key": "net_product_sales", "label": "Net Product Sales", "unit": "currency"},
+            {"key": "net_service_sales", "label": "Net Service Sales", "unit": "currency"}]},
+        {"key": "ops", "label": "Operating", "kind": "metric", "kpis": [{"key": "employees", "label": "Employees", "unit": "count"}]}]})
+    after = without_xbrl_repeats(before, pipeline._current_xbrl_members())
+    assert [group.key for group in after.groups] == ["ops"]
+    pipeline._set_aside_dropped(before, after)
+    statuses = {v["kpi_key"]: v["validation_status"] for v in pipeline.values.values()}
+    assert statuses == {"net_product_sales": "rejected", "net_service_sales": "rejected"}
