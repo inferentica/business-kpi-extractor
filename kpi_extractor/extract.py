@@ -215,9 +215,14 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
         # Not after a joining word: "Markets & Securities Services" is a combined line, not Securities Services.
         matches = [kpi for kpi in listed if len(_identity(kpi.label)) >= 8 and wanted.endswith(_identity(kpi.label))
                    and not re.search(r"(?:&|\band|\+|,|/)\s*$", label[:len(label) - len(_tail(label, kpi.label))], re.I)]
+    if not matches and (bare := _SPACED_FOOTNOTE.sub("", label)) != label:
+        # A footnote mark set apart from the label ("Net system sales 3", ASML's 2017 releases) when the label without
+        # it is a listed KPI: never a name's own number ("Tier 1"), which would have no listed KPI to match.
+        return _listed_kpi(group, bare)
     return matches[0] if len(matches) == 1 else None
 
 
+_SPACED_FOOTNOTE = re.compile(r"\s+\d{1,2}$")
 _TOTAL_LABEL = re.compile(r"\s*total\b", re.I)
 
 

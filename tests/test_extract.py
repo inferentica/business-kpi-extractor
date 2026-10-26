@@ -224,3 +224,13 @@ def test_a_parent_must_be_another_kpi_of_the_group_and_never_loop():
     kpis[1]["parent"] = "rx"  # Total Optum under its own line: a loop
     group = Spec.model_validate(spec).groups[0]
     assert {kpi.key: kpi.parent for kpi in group.kpis} == {"uhc": None, "optum": None, "health": None, "rx": "optum", "total": None}
+
+
+def test_a_row_with_a_footnote_mark_set_apart_is_its_listed_kpi():
+    # ASML's Q1 2017 release: "Net system sales 3" was stored again as a KPI of its own, doubling the quarter.
+    from kpi_extractor.ai import GroupSpec
+    from kpi_extractor.extract import _listed_kpi
+    group = GroupSpec.model_validate({"key": "product", "label": "Revenue by product", "kind": "revenue_breakdown", "kpis": [
+        {"key": "net_system_sales", "label": "Net system sales", "unit": "currency"}]})
+    assert _listed_kpi(group, "Net system sales 3").key == "net_system_sales"
+    assert _listed_kpi(group, "Something else 3") is None
