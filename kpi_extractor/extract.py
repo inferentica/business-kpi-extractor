@@ -171,6 +171,9 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         # TSMC's results-day slide gives node shares ("0.15/0.18um 2%"), never amounts: a share is not this KPI.
         raise LocateError(f"{value_text!r} is a percentage, not an amount")
     value = parsed.value
+    if kpi.unit == "count" and parsed.scale_word is None:
+        # A count takes its label's own scale, as a table row's does: "Starlink Subscribers (#, in millions) 12.0".
+        value *= _row_scale(quote[:quote.find(value_text)]) or 1
     if kpi.unit == "currency" and parsed.scale_word is None:
         declared = block.declared_scale() or document.default_scale()
         if declared is None and locator.scale in (1, 1e3, 1e6, 1e9):
@@ -244,12 +247,14 @@ def row_key(label: str) -> str:
     return (key if key[:1].isalpha() else f"r{key}")[:48] or "row"
 
 
-_ROW_SCALE = re.compile(r"\((?:in\s+)?(?P<word>thousands|millions|billions)\)", re.I)
+# A row label's own scale: "(in millions)", "(millions)", or within a longer note ("Starlink Subscribers (#, in millions,
+# as of period end)", SpaceX).
+_ROW_SCALE = re.compile(r"\((?:in\s+)?(?P<word>thousands|millions|billions)\)|\([^()]*\bin\s+(?P<within>thousands|millions|billions)\b[^()]*\)", re.I)
 
 
 def _row_scale(text: str) -> float | None:
     match = _ROW_SCALE.search(text)
-    return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[match.group("word").lower()] if match else None
+    return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(match.group("word") or match.group("within")).lower()] if match else None
 
 
 def _read_table(document: Document, locator: TableLocator, group: GroupSpec, default_currency: str | None) -> list[ReadValue]:

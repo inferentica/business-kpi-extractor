@@ -162,6 +162,19 @@ def test_a_row_that_states_its_own_scale_overrides_the_tables():
 
 
 
+def test_a_count_read_from_text_takes_its_labels_scale():
+    # SpaceX's Q2 2026 release, its table flattened into text: "Starlink Subscribers (#, in millions, ...) 12.0" was 12.
+    document = parse_document("<p>Starlink Subscribers (#, in millions, as of period end) 12.0 10.3 6.0</p>", "https://example.com/x.htm")
+    block = next(iter(document.blocks))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "subs", "label": "Starlink subscribers", "unit": "count"}]}]})
+    located = Located.model_validate({"period_end": "2026-06-30", "values": [
+        {"kpi": "ops.subs", "block": block, "quote": "Starlink Subscribers (#, in millions, as of period end) 12.0", "value_text": "12.0"}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == []
+    assert [item.value for item in values] == [12_000_000]
+
+
 def test_a_share_is_never_read_as_an_amount():
     # TSMC's results-day slide: "28nm 7% 16/20nm 7% 0.15/0.18um 2%" once became $2 billion of 0.15 micron revenue.
     document = parse_document("<p>Revenue by technology (in billions): 28nm 7% 16/20nm 7% 0.15/0.18um 2%</p>", "https://example.com/x.htm")
