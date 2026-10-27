@@ -1223,3 +1223,12 @@ def test_a_breakdown_part_restated_alone_returns_to_its_filed_figure():
     pipeline = _pipeline(FakeControl({}), values)
     pipeline._prove_flagged([])
     assert {v["kpi_key"]: v["value"] for v in pipeline.values.values()} == {"n7": 25.3, "n16": 74.7}
+
+
+def test_a_6k_named_for_its_form_is_never_assumed_empty_like_an_earlier_one():
+    # TSMC's 2017 financial statements (no technology table) and its 2018 ones shared a file-name shape.
+    pipeline = _pipeline(FakeControl({}))
+    pipeline.filings = {"a": {"spec_version": 3, "status": "skipped", "notes": ["read by AI"], "value_count": 0, "period_end": "2017-09-30",
+                              "source_url": "https://www.sec.gov/Archives/edgar/data/1046179/000119312517344732/d495393d6k.htm"}}
+    document = SimpleNamespace(source_url="https://www.sec.gov/Archives/edgar/data/1046179/000119312518153715/d582139d6k.htm")
+    assert pipeline._kind_reports_nothing(document, date(2018, 3, 31), 3) is False

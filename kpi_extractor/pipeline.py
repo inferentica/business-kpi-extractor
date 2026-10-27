@@ -64,6 +64,7 @@ _MAX_ATTEMPTS = 3
 _NOT_EARNINGS = "classified as not an earnings document"
 # A 6-K read from its own document is classified from the report after its cover; one judged on the cover before is
 # asked again once (TSMC's 2016–2019 results and financial statements were all judged on the cover).
+_OWN_6K_DOCUMENT = re.compile(r"6-?k", re.I)
 _CLASSIFIED_PAST_COVER = "classified past the cover 2"  # 2: covers written with &nbsp; too
 _PASSED_OVER = "not an earnings document: no exhibit, or furnished outside the weeks after a quarter end"
 _AI_PENDING = "AI review unavailable; retried next run"
@@ -1518,6 +1519,10 @@ class SymbolPipeline:
         earnings release once its amounts come from the quarterly report). Flash pointing at nothing again then stands;
         a pointer that does not hold (a partial table) still goes to the reasoning reader."""
         if version is None:
+            return False
+        if _OWN_6K_DOCUMENT.search(document.source_url.rsplit("/", 1)[-1]):
+            # A 6-K's own document is named for the form, not its content (TSMC's "d582139d6k.htm" is a results release
+            # one quarter and the financial statements the next): its name says nothing of what an earlier one held.
             return False
         source = _source_template(document.source_url)
         return any(filing.get("spec_version") == version and filing["status"] == "skipped"
