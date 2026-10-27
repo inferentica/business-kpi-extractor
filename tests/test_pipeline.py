@@ -1209,3 +1209,17 @@ def test_a_group_dropped_for_repeating_xbrl_has_its_figures_set_aside():
     pipeline._set_aside_dropped(before, after)
     statuses = {v["kpi_key"]: v["validation_status"] for v in pipeline.values.values()}
     assert statuses == {"net_product_sales": "rejected", "net_service_sales": "rejected"}
+
+
+def test_a_breakdown_part_restated_alone_returns_to_its_filed_figure():
+    # TSMC's Q3 2018: nine nodes restated by the Q3 2019 release, 16/20nm (split in two there) not, so the quarter
+    # added up to neither total. It goes back to the figures as filed.
+    def row(key, value, notes=()):
+        return {"group_key": "kpi_technology", "group_kind": "revenue_breakdown", "group_label": "Technology", "kpi_key": key,
+                "kpi_label": key, "fiscal_year": "2018", "fiscal_period": "Q3", "period_end": "2018-09-30", "method": "ai",
+                "validation_status": "needs_review", "value": value, "locator": {"total": 100.0}, "unit": "currency",
+                "notes": list(notes)}
+    values = [row("n7", 25.4, ["restated in the next year's release (was 25.3)"]), row("n16", 74.7)]
+    pipeline = _pipeline(FakeControl({}), values)
+    pipeline._prove_flagged([])
+    assert {v["kpi_key"]: v["value"] for v in pipeline.values.values()} == {"n7": 25.3, "n16": 74.7}

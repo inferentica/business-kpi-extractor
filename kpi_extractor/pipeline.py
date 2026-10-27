@@ -2149,6 +2149,26 @@ class SymbolPipeline:
             if waiting and len(rows) >= 2 and whole(rows[0]) and reported(rows[0], sum(float(v["value"]) for v in rows), 1e-5):
                 for v in waiting:
                     settle(v, _ADDS_TO_XBRL)
+        # A breakdown period takes the next year's restated figures whole or not at all: a part the next release no longer
+        # shows (TSMC's 16/20nm, split in two from 2019) left beside restated parts made Q3 2018 add up to neither total.
+        restatements: dict[tuple, list[tuple[dict, float, str]]] = {}
+
+        def period_of(row: dict) -> tuple:
+            return (row["group_key"], row["fiscal_year"], row["fiscal_period"])
+
+        def ai_parts(row: dict) -> list[dict]:
+            return [o for o in self.values.values() if period_of(o) == period_of(row)
+                    and o["method"] == "ai" and o["validation_status"] != "rejected"]
+
+        # Parts restated alone before this rule, beside parts that were not: the period goes back to its own figures.
+        for v in self.values.values():
+            if v["method"] != "ai" or v["group_kind"] != "revenue_breakdown" or v["validation_status"] == "rejected":
+                continue
+            note = next((n for n in v.get("notes") or [] if n.startswith(_RESTATED_LATER)), None)
+            match = re.search(r"\(was ([-\d.e+]+)\)", note or "")
+            if match and not all(any(n.startswith(_RESTATED_LATER) for n in o.get("notes") or []) for o in ai_parts(v)):
+                settled[value_key(v)] = {**v, "value": float(match.group(1)), "validation_status": "needs_review",
+                                         "notes": [n for n in v.get("notes") or [] if n != note]}
         by_accession = {ref.accession: ref for ref in releases}
         for v in flagged:
             if value_key(v) in settled:
@@ -2175,12 +2195,26 @@ class SymbolPipeline:
             if any(abs(cell - value) <= max(abs(value) * 1e-4, 1e-9) for cell in cells):
                 settle(v, _CONFIRMED_LATER)
             elif named and len(cells) == 1 and abs(cells[0] - value) <= abs(value) * MAX_RESTATEMENT:
-                settle(v, f"{_RESTATED_LATER} (was {value:g})", value=round(cells[0], 2))
+                if v["group_kind"] == "revenue_breakdown":
+                    restatements.setdefault(period_of(v), []).append((v, round(cells[0], 2), checked))
+                else:
+                    settle(v, f"{_RESTATED_LATER} (was {value:g})", value=round(cells[0], 2))
             elif named and len(cells) > 1:
                 settled[value_key(v)] = {**v, "validation_status": "rejected",
                                          "notes": [*(v.get("notes") or []), "contradicted by the next year's release"]}
             else:
                 settled[value_key(v)] = {**v, "notes": [*(v.get("notes") or []), checked]}
+        for period, items in restatements.items():
+            restated = {value_key(row) for row, _figure, _checked in items}
+            parts = ai_parts(items[0][0])
+            if all(value_key(o) in restated or _CONFIRMED_LATER in ((settled.get(value_key(o)) or o).get("notes") or [])
+                   for o in parts):
+                for row, figure, _checked in items:
+                    settle(row, f"{_RESTATED_LATER} (was {float(row['value']):g})", value=figure)
+            else:
+                # Kept as filed; recorded as checked so the next release is not read for it again.
+                for row, _figure, checked in items:
+                    settled[value_key(row)] = {**row, "notes": [*(row.get("notes") or []), checked]}
         # A breakdown or mix is proven whole or not at all: a part confirmed on its own, beside parts still flagged, stays
         # flagged with them (its confirmation note kept for when the rest is settled).
         for key, row in list(settled.items()):
