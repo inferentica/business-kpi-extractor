@@ -131,7 +131,7 @@ def is_own_document(attachment) -> bool:
 
 
 # A 6-K's cover ends with its signature: "By /s/ Lora Ho … Senior Vice President & Chief Financial Officer".
-_SIGNED = re.compile(r"By:?\s*/s/.{0,200}?\b(?:Officer|Director|Secretary|President|Manager|Counsel)\b", re.I)
+_SIGNED = re.compile(r"By:?\s*/s/.{0,120}\b(?:Officer|Director|Secretary|President|Manager|Counsel)\b", re.I)
 
 
 def _after_cover(text: str) -> int:
