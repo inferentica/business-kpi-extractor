@@ -119,8 +119,24 @@ def classification_excerpt(ref: FilingRef, chars: int = 1_500) -> str:
     for exhibit in ref.exhibits[:4]:
         raw = exhibit_html(exhibit) or ""
         text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw[:200_000])).strip()
+        if is_own_document(exhibit):
+            text = text[_after_cover(text):]  # the report, not the form's cover page and signature
         parts.append(f"{exhibit.document_type} {exhibit.document} ({getattr(exhibit, 'description', '') or ''}): {text[:chars]}")
     return f"Form {ref.form} filed {ref.filed}\n" + "\n\n".join(parts)
+
+
+def is_own_document(attachment) -> bool:
+    """A 6-K's own document read in place of exhibits it does not have."""
+    return str(getattr(attachment, "document_type", "") or "").upper() == "6-K"
+
+
+# A 6-K's cover ends with its signature: "By /s/ Lora Ho … Senior Vice President & Chief Financial Officer".
+_SIGNED = re.compile(r"By:?\s*/s/.{0,200}?\b(?:Officer|Director|Secretary|President|Manager|Counsel)\b", re.I)
+
+
+def _after_cover(text: str) -> int:
+    match = _SIGNED.search(text[:6_000])
+    return match.end() if match else 0
 
 
 def exhibit_html(attachment) -> str | None:

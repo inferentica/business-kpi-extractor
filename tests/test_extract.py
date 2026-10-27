@@ -234,3 +234,13 @@ def test_a_row_with_a_footnote_mark_set_apart_is_its_listed_kpi():
         {"key": "net_system_sales", "label": "Net system sales", "unit": "currency"}]})
     assert _listed_kpi(group, "Net system sales 3").key == "net_system_sales"
     assert _listed_kpi(group, "Something else 3") is None
+
+
+def test_a_6k_read_from_its_own_document_is_classified_from_the_report_after_its_cover():
+    # TSMC's 6-Ks until October 2019: the cover and signature, then the release itself.
+    from kpi_extractor.sec import _after_cover
+    text = ("FORM 6-K REPORT OF FOREIGN PRIVATE ISSUER ... Indicate by check mark whether the registrant files annual reports "
+            "under cover of Form 20-F ... SIGNATURES Pursuant to the requirements of the Securities Exchange Act of 1934 ... "
+            "By /s/ Lora Ho Lora Ho Senior Vice President & Chief Financial Officer TSMC Reports Third Quarter EPS of NT$3.44")
+    assert text[_after_cover(text):].strip().startswith("TSMC Reports Third Quarter")
+    assert _after_cover("A release with no cover") == 0

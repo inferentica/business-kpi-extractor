@@ -38,7 +38,7 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
 from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
-from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, periodic_reports
+from .sec import FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, is_own_document, periodic_reports
 from .xbrl import XbrlCandidate, extract_breakdowns, member_children, member_key, official_labels
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
@@ -62,6 +62,9 @@ REFRESH_QUARTERS = 20
 _STORED_ATTEMPTS = 100
 _MAX_ATTEMPTS = 3
 _NOT_EARNINGS = "classified as not an earnings document"
+# A 6-K read from its own document is classified from the report after its cover; one judged on the cover before is
+# asked again once (TSMC's 2016–2019 results and financial statements were all judged on the cover).
+_CLASSIFIED_PAST_COVER = "classified past the cover"
 _PASSED_OVER = "not an earnings document: no exhibit, or furnished outside the weeks after a quarter end"
 _AI_PENDING = "AI review unavailable; retried next run"
 _READ_BY_AI = "read by AI"
@@ -826,7 +829,9 @@ class SymbolPipeline:
         if ref.confirmed:
             return True
         previous = self.filings.get(ref.accession)
-        if previous:
+        own = any(is_own_document(exhibit) for exhibit in ref.exhibits)
+        if previous and not (own and _NOT_EARNINGS in (previous.get("notes") or [])
+                             and _CLASSIFIED_PAST_COVER not in (previous.get("notes") or [])):
             return _NOT_EARNINGS not in (previous.get("notes") or [])
         try:
             answer = self._ask(ai.prompt(self.company, classification_excerpt(ref), ai.CLASSIFY_TASK),
@@ -834,7 +839,7 @@ class SymbolPipeline:
         except (AiResponseError, ControlError):
             return False  # nothing is recorded, so the next run classifies it again
         if answer.kind == "other":
-            self._store_filing(ref, "skipped", notes=[_NOT_EARNINGS])
+            self._store_filing(ref, "skipped", notes=[_NOT_EARNINGS, *([_CLASSIFIED_PAST_COVER] if own else [])])
             return False
         return True
 
