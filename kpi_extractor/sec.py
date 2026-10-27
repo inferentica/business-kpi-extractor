@@ -132,25 +132,34 @@ def exhibit_html(attachment) -> str | None:
     return content
 
 
+# The archive's record of a filing's documents; "exhibits-2" since a 6-K without exhibits counts its own document.
+_DOCUMENTS_RECORD = "exhibits-2.json"
+
+
 def _archived_exhibits(filing, archive) -> list:
     """A filing's HTML exhibits from the archive, else from EDGAR and then archived (an empty list too, so a filing
     with none is not fetched again)."""
     if archive is None:
         return _html_exhibits(filing)
     folder = filing_folder(filing.filing_date, filing.form, filing.accession_no)
-    stored = archive.read_json(folder, "exhibits.json")
+    stored = archive.read_json(folder, _DOCUMENTS_RECORD)
     if stored is not None:
         return exhibits_from_record(stored)
     exhibits = _html_exhibits(filing)
-    archive.write_json(folder, "exhibits.json", exhibits_record(exhibits, _MAX_EXHIBIT_BYTES))
+    archive.write_json(folder, _DOCUMENTS_RECORD, exhibits_record(exhibits, _MAX_EXHIBIT_BYTES))
     return exhibits
 
 
 def _html_exhibits(filing) -> list:
-    return [
-        attachment for attachment in filing.attachments
-        if str(attachment.document_type or "").upper().startswith("EX-99") and attachment.is_html()
-    ]
+    """A filing's HTML exhibits. A 6-K with none carries its content in its own document (TSMC's until October 2019:
+    its results and quarterly financial statements, by technology from 2018), which then stands in for them."""
+    attachments = list(filing.attachments)
+    exhibits = [attachment for attachment in attachments
+                if str(attachment.document_type or "").upper().startswith("EX-99") and attachment.is_html()]
+    if exhibits or filing.form != "6-K":
+        return exhibits
+    return [attachment for attachment in attachments
+            if str(attachment.document_type or "").upper() == "6-K" and attachment.is_html()][:1]
 
 
 def _passed_ref(filing) -> FilingRef:
