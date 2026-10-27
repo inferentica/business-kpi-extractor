@@ -1664,9 +1664,20 @@ class SymbolPipeline:
                 ids = {item for item in answer.ids if item in document.tables or item in document.blocks}
             except AiResponseError:
                 ids = set()
+            # Sections that name a listed KPI go in whatever Flash picks: its outline is cut off in a long report, and
+            # TSMC's 2018 statements hold the technology table past that cut (with no 2nm–7nm rows to name them all).
+            ids |= self._sections_naming_kpis(document, spec) if spec is not None else set()
             text = document.render_ids(ids, MAX_DOCUMENT_CHARS) if ids else document.render_for_prompt(MAX_DOCUMENT_CHARS)
         self._prompt_documents[key] = text
         return text
+
+    def _sections_naming_kpis(self, document: Document, spec: Spec) -> set[str]:
+        """The tables with a row named for a listed KPI (by its label, or the row label it had last quarter)."""
+        hints = {key: (value.get("locator") or {}).get("row_label") for key, value in self._ai_history(date.max).items()}
+        names = {_identity_text(kpi.label) for group in spec.groups for kpi in group.kpis if kpi.key != group.total_kpi}
+        names |= {_identity_text(label) for label in hints.values() if label}
+        names.discard("")
+        return {key for key, table in document.tables.items() if any(_identity_text(row[0]) in names for row in table.rows if row)}
 
     def _sections_with_every_kpi(self, document: Document, spec: Spec) -> set[str] | None:
         """The tables and passages naming each listed KPI (by its label, or the row label it had last quarter), when

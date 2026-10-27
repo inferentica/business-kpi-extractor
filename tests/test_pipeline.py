@@ -1232,3 +1232,17 @@ def test_a_6k_named_for_its_form_is_never_assumed_empty_like_an_earlier_one():
                               "source_url": "https://www.sec.gov/Archives/edgar/data/1046179/000119312517344732/d495393d6k.htm"}}
     document = SimpleNamespace(source_url="https://www.sec.gov/Archives/edgar/data/1046179/000119312518153715/d582139d6k.htm")
     assert pipeline._kind_reports_nothing(document, date(2018, 3, 31), 3) is False
+
+
+def test_a_table_naming_a_listed_kpi_is_always_shown_to_the_reader():
+    # TSMC's Q1 2018 statements: technology under an "Application Type" table, with no row for every listed node.
+    from kpi_extractor.document import parse_document
+    html = ("<table><tr><td>Application Type</td><td>Three Months Ended March 31, 2018</td></tr>"
+            "<tr><td>Communication</td><td>136,894,555</td></tr><tr><td>Resolution</td><td></td></tr>"
+            "<tr><td>10-nanometer</td><td>40,853,554</td></tr></table><table><tr><td>Leases</td><td>5</td></tr></table>")
+    document = parse_document(html, "https://www.sec.gov/x/d582139d6k.htm")
+    spec = Spec.model_validate({"groups": [{"key": "technology", "label": "Technology", "kind": "revenue_breakdown", "kpis": [
+        {"key": "n10", "label": "10-nanometer", "unit": "currency"}, {"key": "n3", "label": "3nm", "unit": "currency"}]}]})
+    pipeline = _pipeline(FakeControl({}))
+    found = pipeline._sections_naming_kpis(document, spec)
+    assert len(found) == 1 and "10-nanometer" in document.tables[next(iter(found))].render()
