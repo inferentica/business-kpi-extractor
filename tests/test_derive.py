@@ -177,3 +177,18 @@ def test_a_hedging_line_may_turn_negative_in_a_derived_quarter():
     from kpi_extractor.derive import balancing
     assert balancing("hedginggains") and balancing("hedginggainslosses") and balancing("unallocated")
     assert not balancing("googlecloud")
+
+
+def test_a_row_a_complete_quarter_does_not_list_was_nothing_then():
+    # TSMC 2018: 7nm began in Q2, so Q1's table (adding up to its own total) has no 7nm row while the year has one.
+    def v(period, kpi, value, total):
+        return {**_value(period, kpi, value, method="ai", group="kpi_technology", year="2018"), "kpi_label": kpi, "locator": {"total": total}}
+    values = [v("FY", "n7", 30, 130), v("FY", "n16", 100, 130),
+              v("Q1", "n16", 25, 25),
+              v("Q2", "n7", 5, 30), v("Q2", "n16", 25, 30),
+              v("Q3", "n7", 10, 35), v("Q3", "n16", 25, 35)]
+    q4 = {row["kpi_key"]: row["value"] for row in derive_periods(values) if row["fiscal_period"] == "Q4"}
+    assert q4 == {"n7": 15, "n16": 25}
+    # A quarter that does not add up to its own total does not stand in for zeros: no Q4.
+    values[2] = v("Q1", "n16", 25, 40)
+    assert not [row for row in derive_periods(values) if row["fiscal_period"] == "Q4" and row["validation_status"] == "verified"]

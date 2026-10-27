@@ -102,8 +102,10 @@ def _align(annual: dict, quarter: dict) -> dict:
     """A quarter laid out like its year before subtracting:
     - rows the year folds into "Other" (Nvidia's 10-K shows four regions, its 10-Qs six) are added to the quarter's
       "Other";
-    - an immaterial row the year does not list (TSMC's 10nm, under 1% of the quarter) is left out."""
-    missing = [key for key in annual if balancing(key) and key not in quarter]
+    - an immaterial row the year does not list (TSMC's 10nm, under 1% of the quarter) is left out;
+    - a row the year lists that a whole quarter does not (TSMC's 7nm before its Q2 2018 ramp) was nothing then: the
+      quarter's own parts already add up to its total."""
+    missing = [key for key in annual if (balancing(key) or _complete(quarter)) and key not in quarter]
     if missing and quarter:
         template = next(iter(quarter.values()))
         quarter = {**quarter, **{key: {**template, "kpi_key": key, "kpi_label": annual[key]["kpi_label"], "value": 0.0}
@@ -123,6 +125,12 @@ def _align(annual: dict, quarter: dict) -> dict:
     if folded:
         aligned["other"] = {**quarter["other"], "value": float(quarter["other"]["value"]) + folded}
     return aligned
+
+
+def _complete(quarter: dict) -> bool:
+    """Whether a quarter's parts add up to the total its own report gives."""
+    total = _total(quarter) if quarter else None
+    return bool(total) and abs(sum(float(row["value"]) for row in quarter.values()) - total) <= abs(total) * 0.001
 
 
 def _nine_months(annual: dict, third: dict | None, next_third: dict | None) -> tuple[dict, float, dict] | None:
