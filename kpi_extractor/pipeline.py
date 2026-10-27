@@ -2215,7 +2215,7 @@ class SymbolPipeline:
                 if v["group_kind"] == "revenue_breakdown":
                     restatements.setdefault(period_of(v), []).append((v, round(cells[0], 2), checked))
                 else:
-                    settle(v, f"{_RESTATED_LATER} (was {value:g})", value=round(cells[0], 2))
+                    settle(v, f"{_RESTATED_LATER} (was {value:.15g})", value=round(cells[0], 2))
             elif named and len(cells) > 1:
                 settled[value_key(v)] = {**v, "validation_status": "rejected",
                                          "notes": [*(v.get("notes") or []), "contradicted by the next year's release"]}
@@ -2227,7 +2227,7 @@ class SymbolPipeline:
             if all(value_key(o) in restated or _CONFIRMED_LATER in ((settled.get(value_key(o)) or o).get("notes") or [])
                    for o in parts):
                 for row, figure, _checked in items:
-                    settle(row, f"{_RESTATED_LATER} (was {float(row['value']):g})", value=figure)
+                    settle(row, f"{_RESTATED_LATER} (was {float(row['value']):.15g})", value=figure)
             else:
                 # Kept as filed; recorded as checked so the next release is not read for it again.
                 for row, _figure, checked in items:

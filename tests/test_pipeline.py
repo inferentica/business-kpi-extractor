@@ -1256,3 +1256,8 @@ def test_a_reserved_section_fits_before_earlier_choices_fill_the_budget():
     everything = set(document.order)
     text = document.render_ids(everything, 2_000, first={table})
     assert "40,853,554" in text and len(text) <= 2_100
+
+
+def test_a_restated_figure_keeps_the_filed_one_exactly():
+    # TSMC's Q3 2018 7nm: 25,336,977 thousand came back as 25,337,000 from a note written to six digits.
+    assert f"{25_336_977_000.0:.15g}" == "25336977000"
