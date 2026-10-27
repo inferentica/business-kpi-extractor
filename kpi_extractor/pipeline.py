@@ -1666,8 +1666,9 @@ class SymbolPipeline:
                 ids = set()
             # Sections that name a listed KPI go in whatever Flash picks: its outline is cut off in a long report, and
             # TSMC's 2018 statements hold the technology table past that cut (with no 2nm–7nm rows to name them all).
-            ids |= self._sections_naming_kpis(document, spec) if spec is not None else set()
-            text = document.render_ids(ids, MAX_DOCUMENT_CHARS) if ids else document.render_for_prompt(MAX_DOCUMENT_CHARS)
+            named = self._sections_naming_kpis(document, spec) if spec is not None else set()
+            ids |= named
+            text = document.render_ids(ids, MAX_DOCUMENT_CHARS, first=named) if ids else document.render_for_prompt(MAX_DOCUMENT_CHARS)
         self._prompt_documents[key] = text
         return text
 

@@ -142,18 +142,19 @@ class Document:
                 lines.append(f"[{key}] {self.blocks[key].text[:150]}")
         return "\n".join(lines)[:max_chars]
 
-    def render_ids(self, ids: set[str], max_chars: int, opening: int = 6) -> str:
-        """The chosen tables and blocks (plus the opening blocks, which name the period) in document order."""
-        parts, used = [], 0
-        for index, key in enumerate(self.order):
-            if index >= opening and key not in ids:
+    def render_ids(self, ids: set[str], max_chars: int, opening: int = 6, first: set[str] = frozenset()) -> str:
+        """The chosen tables and blocks (plus the opening blocks, which name the period) in document order. The opening
+        and `first` are kept before the other choices; a section that does not fit is left out and the rest still go in
+        (TSMC's Q1 2018 technology table came after 140,000 characters of other chosen sections, and was cut)."""
+        text_of = {key: (self.tables.get(key) or self.blocks[key]).render() for key in self.order}
+        kept, used = set(), 0
+        rest = [key for key in self.order if key in ids and key not in first]
+        for key in [*self.order[:opening], *[key for key in self.order if key in first], *rest]:
+            if key in kept or used + len(text_of[key]) > max_chars:
                 continue
-            text = (self.tables.get(key) or self.blocks[key]).render()
-            if used + len(text) > max_chars:
-                break
-            parts.append(text)
-            used += len(text) + 2
-        return "\n\n".join(parts)
+            kept.add(key)
+            used += len(text_of[key]) + 2
+        return "\n\n".join(text_of[key] for key in self.order if key in kept)
 
     def render_for_prompt(self, max_chars: int) -> str:
         """The whole document when it fits; otherwise its opening (which names the period) and every table or passage

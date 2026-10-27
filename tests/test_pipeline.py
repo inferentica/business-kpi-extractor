@@ -1246,3 +1246,13 @@ def test_a_table_naming_a_listed_kpi_is_always_shown_to_the_reader():
     pipeline = _pipeline(FakeControl({}))
     found = pipeline._sections_naming_kpis(document, spec)
     assert len(found) == 1 and "10-nanometer" in document.tables[next(iter(found))].render()
+
+
+def test_a_reserved_section_fits_before_earlier_choices_fill_the_budget():
+    from kpi_extractor.document import parse_document
+    html = "".join(f"<p>{'filler ' * 40}{i}</p>" for i in range(30)) + "<table><tr><td>10-nanometer</td><td>40,853,554</td></tr></table>"
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    everything = set(document.order)
+    text = document.render_ids(everything, 2_000, first={table})
+    assert "40,853,554" in text and len(text) <= 2_100
