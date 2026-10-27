@@ -244,3 +244,12 @@ def test_a_6k_read_from_its_own_document_is_classified_from_the_report_after_its
             "By /s/ Lora Ho Lora Ho Senior Vice President & Chief Financial Officer TSMC Reports Third Quarter EPS of NT$3.44")
     assert text[_after_cover(text):].strip().startswith("TSMC Reports Third Quarter")
     assert _after_cover("A release with no cover") == 0
+
+
+def test_a_cover_written_with_html_spaces_is_still_skipped():
+    from types import SimpleNamespace
+    from kpi_extractor.sec import FilingRef, classification_excerpt
+    cover = "FORM&nbsp;6-K ... SIGNATURES ... By&nbsp;/s/&nbsp;Lora Ho Lora Ho Senior Vice President &amp; Chief Financial Officer"
+    exhibit = SimpleNamespace(document_type="6-K", document="d6k.htm", description="FORM 6-K", content=f"<p>{cover}</p><p>TSMC Reports Third Quarter EPS</p>")
+    ref = FilingRef(accession="a", form="6-K", filed=None, role="earnings_release", source_url="", exhibits=[exhibit])
+    assert classification_excerpt(ref).split("):", 1)[1].strip().startswith("TSMC Reports Third Quarter EPS")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import html
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -118,7 +119,7 @@ def classification_excerpt(ref: FilingRef, chars: int = 1_500) -> str:
     parts = []
     for exhibit in ref.exhibits[:4]:
         raw = exhibit_html(exhibit) or ""
-        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw[:200_000])).strip()
+        text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw[:200_000]))).strip()
         if is_own_document(exhibit):
             text = text[_after_cover(text):]  # the report, not the form's cover page and signature
         parts.append(f"{exhibit.document_type} {exhibit.document} ({getattr(exhibit, 'description', '') or ''}): {text[:chars]}")
