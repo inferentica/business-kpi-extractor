@@ -253,3 +253,10 @@ def test_a_cover_written_with_html_spaces_is_still_skipped():
     exhibit = SimpleNamespace(document_type="6-K", document="d6k.htm", description="FORM 6-K", content=f"<p>{cover}</p><p>TSMC Reports Third Quarter EPS</p>")
     ref = FilingRef(accession="a", form="6-K", filed=None, role="earnings_release", source_url="", exhibits=[exhibit])
     assert classification_excerpt(ref).split("):", 1)[1].strip().startswith("TSMC Reports Third Quarter EPS")
+
+
+def test_a_per_unit_row_in_a_table_in_millions_is_not_scaled():
+    from kpi_extractor.extract import _row_scale
+    assert _row_scale("Starlink consumer ARPU ($ per month) $69 $66") == 1.0
+    assert _row_scale("Starlink consumer subscribers (# in millions, as of period end) 13.6") == 1e6
+    assert _row_scale("Consumer revenues $3,121") is None

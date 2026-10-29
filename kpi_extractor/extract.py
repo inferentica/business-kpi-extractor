@@ -257,7 +257,13 @@ def row_key(label: str) -> str:
 _ROW_SCALE = re.compile(r"\((?:in\s+)?(?P<word>thousands|millions|billions)\)|\([^()]*\bin\s+(?P<within>thousands|millions|billions)\b[^()]*\)", re.I)
 
 
+# A row priced per unit ("Starlink consumer ARPU ($ per month)") in a table "in millions (except where noted)" is in units.
+_PER_UNIT = re.compile(r"\([^()]*\bper\s+(?:month|year|quarter|day|user|subscriber|member|customer|share|unit|system)\b[^()]*\)", re.I)
+
+
 def _row_scale(text: str) -> float | None:
+    if _PER_UNIT.search(text):
+        return 1.0
     match = _ROW_SCALE.search(text)
     return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(match.group("word") or match.group("within")).lower()] if match else None
 
