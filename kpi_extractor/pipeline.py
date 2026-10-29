@@ -741,8 +741,9 @@ class SymbolPipeline:
                 # The tag: one found before (kept on the figures it filled), else learned from the releases' readings,
                 # else, for a KPI the releases never state (Alphabet's revenue backlog), picked from the report's tags.
                 tag = next((found for v in held.values() if (found := tag_from_locator(v.get("locator") or {}))), None)
+                how = "tagged as in the quarters the release states it"
                 if tag is None and kpi.key in picked:
-                    tag = picked[kpi.key]
+                    tag, how = picked[kpi.key], "the releases do not state it"
                     if any(quarter in quarters and tag in facts_of(quarter) and not agrees(facts_of(quarter)[tag], value)
                            for quarter, value in readings.items()):
                         continue  # a release gave a different figure: not this tag
@@ -762,6 +763,18 @@ class SymbolPipeline:
                         if quarter in readings and tag in opened.get(quarter, {}) and not agrees(opened[quarter][tag], readings[quarter]):
                             break
                         gaps = 0
+                        # A release's rounded figure ("over $460 billion") gives way to the report's exact one.
+                        fact = ((facts_of(quarter) if quarter in newest_first[:4] else opened.get(quarter, {})).get(tag)
+                                if quarter in quarters else None)
+                        reading = held.get(quarter)
+                        if (fact is not None and quarter in readings and fact != readings[quarter] and reading
+                                and not reading.get("owner_decision")):
+                            ref, end = quarters[quarter]
+                            records.append({**reading, "value": fact, "source_accession": ref.accession, "source_url": ref.source_url,
+                                            "filed_at": ref.filed.isoformat(),
+                                            "notes": [f"the {ref.form}'s exact figure; the release gave {(reading.get('locator') or {}).get('value_text') or readings[quarter]}"],
+                                            "locator": {"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
+                                                        "instant": tag.instant}})
                         continue
                     fact = facts_of(quarter).get(tag)
                     if fact is None:
@@ -776,8 +789,7 @@ class SymbolPipeline:
                         group_order=template["group_order"], kpi_key=kpi.key, kpi_label=template["kpi_label"],
                         kpi_order=template["kpi_order"], unit=template["unit"], value=fact, currency=template.get("currency"),
                         method="ai", validation_status="verified", reconciliation_error_pct=None,
-                        notes=[f"from the {ref.form}'s XBRL, tagged as in the quarters the release states it" if readings
-                               else f"from the {ref.form}'s XBRL: the releases do not state it"],
+                        notes=[f"from the {ref.form}'s XBRL, {how}"],
                         ref=ref, fiscal_year=quarter[0], fiscal_period=quarter[1], period_end=end,
                         locator={"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
                                  "instant": tag.instant},
