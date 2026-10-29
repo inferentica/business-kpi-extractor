@@ -150,3 +150,16 @@ def test_a_pick_whose_unit_does_not_fit_is_refused_and_a_found_tag_needs_no_ai()
     stored.clear()
     pipeline._fill_tagged_metrics(reports, spec)  # each tag is kept on its figures: no question, nothing left to fill
     assert stored == []
+
+
+def test_a_timing_axis_reads_as_a_note_not_a_part():
+    from kpi_extractor.tagged_metrics import fact_lines
+    frame = pd.DataFrame([{"concept": "us-gaap:RevenueRemainingPerformanceObligation", "numeric_value": 496e9, "period_type": "instant",
+                           "period_instant": "2026-06-30", "period_start": None, "period_end": None, "label": "2026-07-01", "unit_ref": "usd",
+                           "dim_us-gaap_RevenueRemainingPerformanceObligationExpectedTimingOfSatisfactionStartDateAxis": "2026-07-01"}])
+    [(_tag, value, label, unit)] = fact_lines(frame, date(2026, 6, 30))
+    assert label == "Revenue Remaining Performance Obligation [RevenueRemainingPerformanceObligation]"  # the whole: no part
+    # The next quarter's figure is the same tag, though its timing date moved.
+    later = frame.assign(period_instant="2026-09-30", numeric_value=540e9, **{
+        "dim_us-gaap_RevenueRemainingPerformanceObligationExpectedTimingOfSatisfactionStartDateAxis": "2026-10-01"})
+    assert set(quarter_facts(later, date(2026, 9, 30))) == {_tag}

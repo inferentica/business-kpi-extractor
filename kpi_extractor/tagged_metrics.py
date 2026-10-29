@@ -32,6 +32,7 @@ def quarter_facts(facts: pd.DataFrame, period_end: date) -> dict[Tag, float]:
     starts = pd.to_datetime(frame["period_start"], errors="coerce").dt.date
     instants = pd.to_datetime(frame.get("period_instant", pd.Series(index=frame.index, dtype=object)), errors="coerce").dt.date
     found: dict[Tag, float] = {}
+    timed: set[Tag] = set()
     for index, fact in frame.iterrows():
         instant = fact["period_type"] == "instant"
         if instant:
@@ -40,8 +41,17 @@ def quarter_facts(facts: pd.DataFrame, period_end: date) -> dict[Tag, float]:
         elif ends[index] != period_end or starts[index] is None or pd.isna(starts[index]) \
                 or not 80 <= (period_end - starts[index]).days <= 100:
             continue
-        dimensions = tuple(sorted((column, str(fact[column])) for column in dimension_columns if pd.notna(fact[column])))
-        found.setdefault(Tag(str(fact["concept"]), dimensions, instant), float(fact["numeric_value"]))
+        every = [(column, str(fact[column])) for column in dimension_columns if pd.notna(fact[column])]
+        # A timing member (the date a backlog is expected from) changes every quarter and names no part: it is left
+        # out of the tag, which an untimed figure of the same concept takes first.
+        dimensions = tuple(sorted(item for item in every if not _TIMING.search(item[0])))
+        tag = Tag(str(fact["concept"]), dimensions, instant)
+        if tag not in found or (tag in timed and len(every) == len(dimensions)):
+            found[tag] = float(fact["numeric_value"])
+            if len(every) != len(dimensions):
+                timed.add(tag)
+            else:
+                timed.discard(tag)
     return found
 
 
@@ -70,6 +80,10 @@ def learn_tag(readings: dict[tuple[str, str], float], facts: dict[tuple[str, str
     return candidates[0] if len(candidates) == 1 else None
 
 
+_TIMING = re.compile(r"Timing|StartDate|ExpectedTiming", re.I)
+_DATE_LIKE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def _member_name(member: str) -> str:
     name = member.split(":")[-1]
     name = re.sub(r"Member$", "", name)
@@ -90,8 +104,11 @@ def fact_lines(facts: pd.DataFrame, period_end: date) -> list[tuple[Tag, float, 
             units[concept] = unit
     lines = []
     for tag, value in found.items():
+        # A timing axis (Amazon's backlog "expected from 2026-07-01") qualifies the whole figure; it names no part.
         members = " · ".join(_member_name(member) for _axis, member in tag.dimensions)
-        label = labels.get(tag.concept) or tag.concept.split(":")[-1]
+        label = labels.get(tag.concept)
+        if not label or _DATE_LIKE.match(label):
+            label = _member_name(tag.concept)
         name = tag.concept.split(":")[-1]
         lines.append((tag, value, f"{label} [{name}]{' | ' + members if members else ''}", units.get(tag.concept, "")))
     return lines
