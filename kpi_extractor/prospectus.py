@@ -149,3 +149,21 @@ def interim_quarters(document: Document) -> list[date]:
     newest first."""
     ends = {period.end for table in document.tables.values() for period in period_columns(table).values() if not period.annual}
     return sorted(ends, reverse=True)
+
+
+def quarter_sections(document: Document, labels: list[str], end: date) -> Document:
+    """The parts of a prospectus that can give a KPI for one quarter: a table or passage naming a listed KPI (by its
+    words) and that quarter ("March 31, 2026"). A prospectus names its KPIs in hundreds of places (risk factors, the
+    business), which would crowd its key-metrics section out of the reader's budget."""
+    month = [name for name, number in _MONTHS.items() if number == end.month][0].capitalize()
+    dated = re.compile(rf"{month}\s+{end.day},?\s+{end.year}|{month}\s+{end.day},?.{{0,80}}\b{end.year}\b", re.S)
+    words = [[word for word in re.findall(r"[a-z0-9]+", label.lower()) if len(word) > 2] for label in labels]
+    keep = []
+    for key in document.order:
+        item = document.tables.get(key) or document.blocks[key]
+        text = item.text if key in document.blocks else f"{item.context} {' '.join(' '.join(row) for row in item.rows)}"
+        lowered = text.lower()
+        if dated.search(text) and re.search(r"\d", text) and any(group and all(word in lowered for word in group) for group in words):
+            keep.append(key)
+    return Document(document.source_url, {key: document.tables[key] for key in keep if key in document.tables},
+                    {key: document.blocks[key] for key in keep if key in document.blocks}, keep)

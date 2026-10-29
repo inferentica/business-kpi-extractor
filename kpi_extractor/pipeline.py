@@ -35,7 +35,7 @@ from .fiscal import fiscal_label, learn_year_offset
 from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_growth_rates, read_titled_pie,
                      read_units,
                      titled_pie_slides, unit_region)
-from .prospectus import interim_quarters, prospectus_breakdowns
+from .prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from .release_breakdowns import line_key, release_breakdown
 from .tagged_metrics import agrees, learn_tag, quarter_facts
 from .release_statements import release_headline, release_statements, reported_units
@@ -854,7 +854,8 @@ class SymbolPipeline:
             quarter = replace(ref, accession=f"{ref.accession}-{year}{period}", period_end=end)
             if (self.filings.get(quarter.accession) or {}).get("status") in _DONE:
                 continue
-            self._documents["+".join([quarter.accession])] = document
+            labels = [kpi.label for group in spec.groups for kpi in group.kpis]
+            self._documents[quarter.accession] = quarter_sections(document, labels, end)
             self._process_release(quarter, spec, version)
 
     def _series_for(self, axis: str) -> str | None:
