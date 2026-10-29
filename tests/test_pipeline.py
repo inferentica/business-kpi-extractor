@@ -1261,3 +1261,30 @@ def test_a_reserved_section_fits_before_earlier_choices_fill_the_budget():
 def test_a_restated_figure_keeps_the_filed_one_exactly():
     # TSMC's Q3 2018 7nm: 25,336,977 thousand came back as 25,337,000 from a note written to six digits.
     assert f"{25_336_977_000.0:.15g}" == "25336977000"
+
+
+def test_a_listed_group_the_next_report_tags_goes_from_the_stored_list():
+    # Microsoft's FY27 Q1 release was read an hour before its 10-Q: the audit listed its two new segments as KPIs
+    # ("Agents and Infra Revenue"), which the 10-Q then tagged as "Agents and Infra". The next run drops the group.
+    def row(key, value):
+        return {"group_key": "kpi_segment_revenue", "group_kind": "metric", "group_label": "Segment Revenue",
+                "kpi_key": key, "kpi_label": key, "fiscal_year": "2027", "fiscal_period": "Q1", "period_end": "2026-09-30",
+                "method": "ai", "validation_status": "verified", "value": value, "locator": {}, "unit": "currency"}
+    control = FakeControl({})
+    pipeline = _pipeline(control, [row("agents_and_infra", 76_795.0), row("devices_and_consumer", 15_484.0)])
+    pipeline.profile = SimpleNamespace(name="Microsoft", fiscal_year_end="0630", foreign=False)
+    pipeline._current_xbrl_members = lambda: [{"agentsandinfra", "devicesandconsumer"}]
+    stored = []
+    pipeline._store_spec = lambda spec, names, version, accession: stored.append((spec, version))
+    groups = [{"key": "operating", "label": "Operating", "kind": "metric",
+               "kpis": [{"key": "microsoft_cloud_revenue", "label": "Microsoft Cloud Revenue", "unit": "currency"}]},
+              {"key": "segment_revenue", "label": "Segment Revenue", "kind": "metric", "kpis": [
+                  {"key": "agents_and_infra", "label": "Agents and Infra Revenue", "unit": "currency"},
+                  {"key": "devices_and_consumer", "label": "Devices and Consumer Revenue", "unit": "currency"}]}]
+    spec, version, proposed = pipeline._spec({"groups": groups, "version": 3, "source_accession": "a"}, [])
+    assert [group.key for group in spec.groups] == ["operating"] and version == 4 and not proposed
+    assert stored and stored[0][1] == 4
+    assert {v["validation_status"] for v in pipeline.values.values()} == {"rejected"}
+    # An owner's list keeps it.
+    spec, version, _ = pipeline._spec({"groups": groups, "version": 3, "owner_edited_at": "2026-10-01"}, [])
+    assert len(spec.groups) == 2 and version == 3

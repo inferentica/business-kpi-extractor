@@ -933,12 +933,19 @@ class SymbolPipeline:
         if row and (not self.force or row.get("owner_edited_at")):
             stored = Spec.model_validate({"groups": row["groups"], "names": row.get("names") or {}})
             spec, version = self._capped(stored), int(row["version"])
+            if not row.get("owner_edited_at"):
+                # A group the extractor listed from a release read before its report (Microsoft's new segments, listed
+                # an hour before the 10-Q tagged them) goes once the report's XBRL gives the same rows.
+                cleaned = without_xbrl_repeats(spec, [] if self.profile.foreign else self._current_xbrl_members())
+                if cleaned is not spec:
+                    self._set_aside_dropped(spec, cleaned)
+                    spec = cleaned
             if spec.model_dump() != stored.model_dump():
                 # A stored list that breaks the rules is repaired once; its filings are then read with the new version.
                 version += 1
                 self._store_spec(spec, row.get("names") or {}, version,
                                  row.get("source_accession") or (releases[-1].accession if releases else "normalized"))
-                self.log(f"{self.symbol}: KPI list v{version}: breakdowns that cannot reconcile became metrics")
+                self.log(f"{self.symbol}: KPI list v{version}: groups that repeat XBRL or cannot reconcile were changed")
             return spec, version, False
         if not releases:
             return None, 0, False
@@ -2647,14 +2654,18 @@ def only_adds(before: Spec, after: Spec) -> bool:
     return all((group.key, group.kind, kpi.key, kpi.unit) in kept for group in before.groups for kpi in group.kpis)
 
 
+_REVENUE_SUFFIX = re.compile(r"(?<=.)(netrevenues?|revenues?|netsales|sales)$")
+
+
 def repeats_xbrl(group, covered: list[set[str]]) -> bool:
     """Whether a group (of any kind) names the same rows as a breakdown the company still tags in XBRL (Meta's Family
     of Apps and Reality Labs, once added as "metrics"): read by code with its whole history, never again from
     releases."""
     # A subtotal row the release adds ("Total Optum" beside its three segments, UnitedHealth) does not make it new.
-    names = {_identity_text(kpi.label) for kpi in group.kpis
+    # "Agents and Infra Revenue" is the 10-Q's "Agents and Infra" (Microsoft's release names each line so).
+    names = {_REVENUE_SUFFIX.sub("", _identity_text(kpi.label)) for kpi in group.kpis
              if kpi.key != group.total_kpi and not _identity_text(kpi.label).startswith("total")}
-    return len(names) >= 2 and any(names <= members for members in covered)
+    return len(names) >= 2 and any(names <= {_REVENUE_SUFFIX.sub("", member) for member in members} for members in covered)
 
 
 def without_xbrl_repeats(spec: Spec, covered: list[set[str]], keep: Spec | None = None) -> Spec:
