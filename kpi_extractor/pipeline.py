@@ -636,11 +636,16 @@ class SymbolPipeline:
         is. Reports are read newest first, and a KPI's history ends where two reports in a row do not tag it."""
         quarters: dict[tuple[str, str], tuple[FilingRef, date]] = {}
         for ref in reports:
-            filing = self.filings.get(ref.accession) or {}
-            if not filing.get("period_end") or not filing.get("fiscal_year"):
+            # The stored filing knows its period end (not its fiscal label: the control plane does not return it).
+            end = (self.filings.get(ref.accession) or {}).get("period_end")
+            if not end:
                 continue
-            period = "Q4" if filing.get("fiscal_period") == "FY" else filing.get("fiscal_period")
-            quarters[(filing["fiscal_year"], period)] = (ref, date.fromisoformat(str(filing["period_end"])[:10]))
+            end = date.fromisoformat(str(end)[:10])
+            try:
+                year, period = fiscal_label(end, self.profile.fiscal_year_end, year_offset=self.offset)
+            except Exception:  # noqa: BLE001 - a period off the company's calendar is left out
+                continue
+            quarters[(year, period)] = (ref, end)
         if not quarters:
             return
         facts: dict[tuple[str, str], dict] = {}
