@@ -37,6 +37,7 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
                      titled_pie_slides, unit_region)
 from .prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from .release_breakdowns import line_key, release_breakdown
+from .release_columns import amount, earlier_quarters, release_grids, row_key
 from .tagged_metrics import agrees, learn_tag, quarter_facts
 from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
@@ -257,6 +258,8 @@ class SymbolPipeline:
             self._store_prospectus_breakdowns(prospectus)
             if spec is not None:
                 self._read_prospectus_quarters(prospectus, releases, spec, version)
+            # After the prospectus, whose audited figures stand where both give a quarter.
+            self._fill_release_columns(releases)
         if spec is not None:
             self._adopt_listed_keys(spec)
             self._fill_tagged_metrics(reports, spec)
@@ -836,6 +839,123 @@ class SymbolPipeline:
         if records:
             self._store(values=records)
             self.log(f"{self.symbol}: {len(records) // 2} values joined to the line they were renamed to")
+
+    def _fill_release_columns(self, releases: list[FilingRef]) -> None:
+        """A recent listing's releases show earlier quarters beside their own (see release_columns): each KPI read from a
+        release and each line of a breakdown its reports tag are taken from those columns for quarters held by nothing
+        else, at the scale of the release's own figure. A breakdown's quarter must add up to the revenue another source
+        gives for it (its year-ago comparative, the prospectus); one renamed line is the remainder, as in the prospectus."""
+        records: list[dict] = []
+        groups = self._xbrl_groups()
+        for ref in releases:
+            if ref.period_end is None:
+                continue
+            try:
+                document = self._document(ref)
+            except Exception:  # noqa: BLE001
+                continue
+            own = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
+            grids = release_grids(document)
+            rows = [(grid, label, cells, earlier_quarters(grid, cells, ref.period_end, additive=False),
+                     next((amount(cell) for column, cell in zip(grid.columns, cells)
+                           if column.months == 3 and abs((column.end - ref.period_end).days) <= 10), None))
+                    for grid in grids for label, cells in grid.rows]
+            records += self._release_column_kpis(ref, own, rows)
+            records += self._release_column_lines(ref, own, rows, groups)
+        if records:
+            self._store(values=records)
+            self.log(f"{self.symbol}: {len(records)} values from the earlier quarters the releases show")
+
+    def _quarter_of(self, end: date) -> tuple[str, str] | None:
+        try:
+            return fiscal_label(end, self.profile.fiscal_year_end, year_offset=self.offset)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _release_column_kpis(self, ref: FilingRef, own: tuple[str, str], rows) -> list[dict]:
+        records = []
+        for value in [v for v in self.values.values() if v["source_accession"] == ref.accession and v["method"] == "ai"
+                      and v["validation_status"] == "verified" and (v["fiscal_year"], v["fiscal_period"]) == own]:
+            locator = value.get("locator") or {}
+            label = None
+            if locator.get("table") in self._document(ref).tables and isinstance(locator.get("row"), int):
+                table = self._document(ref).tables[locator["table"]]
+                label = clean(table.rows[locator["row"]][0]) if locator["row"] < len(table.rows) else None
+            elif locator.get("quote"):
+                label = re.split(r"\s\$?\(?[\d,.]+\)?(?:\s|$)", clean(locator["quote"]), maxsplit=1)[0]
+            match = next(((grid, cells, earlier, mine) for grid, row_label, cells, earlier, mine in rows
+                          if label and row_label == label and mine), None)
+            if match is None:
+                continue
+            grid, cells, _, mine = match
+            factor = float(value["value"]) / mine
+            scale = next((item for item in (1, 1e3, 1e6, 1e9) if abs(factor / item - 1) < 0.01), None)
+            if scale is None:
+                continue
+            additive = value["unit"] == "currency" and not re.search(r"\bper\b|average", label, re.I)
+            for end, figure in earlier_quarters(grid, cells, ref.period_end, additive).items():
+                quarter = self._quarter_of(end)
+                if quarter is None or any(v["group_key"] == value["group_key"] and v["kpi_key"] == value["kpi_key"]
+                                          and (v["fiscal_year"], v["fiscal_period"]) == quarter and v["validation_status"] != "rejected"
+                                          for v in self.values.values()):
+                    continue
+                records.append({**value, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
+                                "value": figure * scale, "notes": [f"an earlier column of the release for {own[1]} {own[0]}"],
+                                "locator": {"release_column": end.isoformat(), "row": label, "source": grid.source}})
+        return records
+
+    def _release_column_lines(self, ref: FilingRef, own: tuple[str, str], rows, groups: dict[str, list[dict]]) -> list[dict]:
+        records = []
+        for group, lines in groups.items():
+            stored = {v["kpi_key"]: v for v in self.values.values() if v["group_key"] == group and v["method"] == "xbrl"
+                      and v["validation_status"] == "verified" and (v["fiscal_year"], v["fiscal_period"]) == own}
+            members = {line["kpi_key"]: line for line in lines}
+            found: dict[str, tuple] = {}
+            for grid, label, cells, _, mine in rows:
+                key = row_key(label)
+                member = next((m for m, line in members.items() if key in (m, row_key(line["kpi_label"]))), None)
+                if member and member not in found:
+                    found[member] = (grid, label, cells, mine)
+            # The scale: the release's own figure of a line against the report's.
+            scale = next((item for member, (_g, _l, _c, mine) in found.items() if mine and member in stored
+                          for item in (1, 1e3, 1e6, 1e9) if abs(float(stored[member]["value"]) / mine / item - 1) < 0.01), None)
+            if scale is None:
+                continue
+            additive = {member: earlier_quarters(grid, cells, ref.period_end, True) for member, (grid, _l, cells, _m) in found.items()}
+            ends = {end for quarters in additive.values() for end in quarters}
+            for end in sorted(ends):
+                quarter = self._quarter_of(end)
+                if quarter is None or self._held(group, quarter):
+                    continue
+                total = next((float(t) for v in self.values.values() if (v["fiscal_year"], v["fiscal_period"]) == quarter
+                              and v["validation_status"] == "verified" and v["method"] in ("xbrl", "derived")
+                              and isinstance(t := (v.get("locator") or {}).get("total"), (int, float))), None)
+                if total is None:
+                    continue
+                values = {member: quarters[end] * scale for member, quarters in additive.items() if end in quarters}
+                missing = [member for member in members if member not in values]
+                tolerance = 1.5 * scale * len(members)
+                if len(missing) == 1:
+                    # A renamed line (SpaceX's AI, SI by its next report): the one other row equal to the rest of revenue.
+                    rest = total - sum(values.values())
+                    candidates = {label: figure for grid, label, cells, _e, _m in rows if row_key(label) not in values
+                                  for figure in [earlier_quarters(grid, cells, ref.period_end, True).get(end, float("nan")) * scale]
+                                  if abs(figure - rest) <= tolerance}
+                    if len(candidates) != 1:
+                        continue
+                    values[missing[0]] = next(iter(candidates.values()))
+                elif missing:
+                    continue
+                if abs(sum(values.values()) - total) > tolerance:
+                    continue
+                for member, figure in values.items():
+                    line = members[member]
+                    records.append({**line, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
+                                    "value": round(figure, 2), "method": CHART_METHOD, "source_accession": ref.accession,
+                                    "source_url": ref.source_url, "filed_at": ref.filed.isoformat(), "reconciliation_error_pct": 0,
+                                    "notes": [f"an earlier column of the release for {own[1]} {own[0]}"],
+                                    "locator": {"release_table": "history", "total": total, "member": (line.get("locator") or {}).get("member")}})
+        return records
 
     def _read_prospectus_quarters(self, ref: FilingRef, releases: list[FilingRef], spec: Spec, version: int) -> None:
         """The KPI list read from the prospectus, as from a release, for its latest interim quarter and the year before
