@@ -35,6 +35,7 @@ from .fiscal import fiscal_label, learn_year_offset
 from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_growth_rates, read_titled_pie,
                      read_units,
                      titled_pie_slides, unit_region)
+from .release_breakdowns import release_breakdown
 from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
@@ -217,6 +218,7 @@ class SymbolPipeline:
         self._newest_release = max((ref.period_end for ref in releases if ref.period_end), default=None)
         self._store_release_statements(reports, releases)
         self._store_chart_breakdowns(releases)
+        self._store_release_breakdowns(releases)
         for ref in releases:
             if self.force or self._pending(ref):
                 for exhibit in ref.exhibits[:6]:
@@ -409,6 +411,15 @@ class SymbolPipeline:
                             **({"ytd": ytd, "ytd_total": group.year_to_date_total} if ytd is not None and group.year_to_date_total else {}),
                         },
                     ))
+            if records:
+                # The release's figures for this quarter give way to the report's; a line the report does not give
+                # (renamed, or not broken out) stops being served.
+                fresh = {value_key(record) for record in records}
+                records += [{**value, "validation_status": "rejected", "notes": ["replaced by the quarter's report"]}
+                            for value in self.values.values()
+                            if (value.get("locator") or {}).get("release_table") and value["validation_status"] != "rejected"
+                            and (value["fiscal_year"], value["fiscal_period"]) == (fiscal_year, fiscal_period)
+                            and value_key(value) not in fresh]
             status = "failed" if ai_pending else "processed" if records else "skipped"
             notes = [_XBRL_READER, *([_AI_PENDING] if ai_pending else [] if records
                                      else ["no revenue breakdown reconciles to reported revenue"])]
@@ -544,6 +555,77 @@ class SymbolPipeline:
                     self.log(f"{self.symbol}: {ref.form} {ref.filed} pie figures stored ({len(records)} values)")
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: pies of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+
+    def _store_release_breakdowns(self, releases: list[FilingRef]) -> None:
+        """The newest quarter's segment and product revenue from its earnings release, while its report is not filed
+        (Alphabet's 10-Q follows its release by days): each breakdown the reports gave last quarter, its lines found in
+        a table of the release by name and checked against the year-ago column and total revenue. The report's XBRL
+        replaces them; a breakdown the release does not give (Alphabet's regions) waits for the report."""
+        latest = max((ref for ref in releases if ref.period_end), key=lambda item: item.filed, default=None)
+        if latest is None:
+            return
+        try:
+            own = fiscal_label(latest.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
+            live = [value for value in self.values.values() if value["validation_status"] == "verified"
+                    and value["fiscal_period"] != "FY" and value["unit"] == "currency"]
+            if any(value["method"] == "xbrl" and (value["fiscal_year"], value["fiscal_period"]) == own for value in live):
+                return  # the report is in
+            stored = {value["group_key"] for value in live if (value["fiscal_year"], value["fiscal_period"]) == own
+                      and (value.get("locator") or {}).get("release_table") and value["source_accession"] == latest.accession}
+            reported = [value for value in live if value["method"] in ("xbrl", "derived")
+                        and (value["fiscal_year"], value["fiscal_period"]) < own]
+            if not reported:
+                return
+            before = max((value["fiscal_year"], value["fiscal_period"]) for value in reported)
+            year_ago = (str(int(own[0]) - 1), own[1])
+            groups: dict[str, list[dict]] = {}
+            for value in reported:
+                if (value["fiscal_year"], value["fiscal_period"]) == before:
+                    groups.setdefault(value["group_key"], []).append(value)
+            past = {(value["group_key"], value["kpi_key"]): float(value["value"]) for value in reported
+                    if (value["fiscal_year"], value["fiscal_period"]) == year_ago}
+            document = self._document(latest)
+            records: list[dict] = []
+            tables: dict[str, str] = {}
+            # Subtotal groups ("…_levels") last: their lines are looked for in the table their breakdown came from.
+            for key in sorted(groups, key=lambda item: item.endswith("_levels")):
+                if key in stored:
+                    continue
+                lines = groups[key]
+                levels = key.endswith("_levels")
+                within = [tables[key.removesuffix("_levels")]] if levels and key.removesuffix("_levels") in tables else None
+                if levels and within is None:
+                    continue
+                found = release_breakdown(document, {line["kpi_key"]: line["kpi_label"] for line in lines},
+                                          {line["kpi_key"]: past[(key, line["kpi_key"])] for line in lines
+                                           if (key, line["kpi_key"]) in past},
+                                          latest.period_end, tables=within, totalled=not levels)
+                if found is None:
+                    continue
+                tables[key] = found.table
+                total = None if levels else found.total
+                gap = round((sum(found.values.values()) - total) / total * 100, 4) if total else None
+                for line in lines:
+                    member = line["kpi_key"]
+                    parent = (line.get("locator") or {}).get("parent")
+                    records.append(self._record(
+                        group_key=key, group_label=line["group_label"], group_kind=line["group_kind"],
+                        group_order=line["group_order"], kpi_key=member, kpi_label=line["kpi_label"],
+                        kpi_order=line["kpi_order"], unit="currency", value=found.values[member],
+                        currency=line.get("currency"), method=CHART_METHOD, validation_status="verified",
+                        reconciliation_error_pct=gap, notes=["from the earnings release; the quarter's report replaces it"],
+                        ref=latest, fiscal_year=own[0], fiscal_period=own[1], period_end=latest.period_end,
+                        locator={"release_table": found.table, "row": found.rows[member],
+                                 **({"total": total} if total is not None else {}),
+                                 **({"subtotal": True} if levels else {}),
+                                 **({"parent": parent} if parent else {}),
+                                 **({"prior": found.prior[member]} if member in found.prior else {})},
+                    ))
+            if records:
+                self._store(values=records)
+                self.log(f"{self.symbol}: {latest.form} {latest.filed} release breakdowns stored ({len(records)} values)")
+        except Exception as error:  # noqa: BLE001
+            self.log(f"{self.symbol}: breakdowns of {latest.form} {latest.filed} not read ({type(error).__name__}: {error})"[:300])
 
     def _series_for(self, axis: str) -> str | None:
         """The quarterly revenue series whose members a pie names: the group labelled "Revenue by <axis>" ("Wafer Revenue
