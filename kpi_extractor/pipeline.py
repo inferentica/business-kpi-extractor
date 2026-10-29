@@ -38,7 +38,7 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
 from .prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from .release_breakdowns import line_key, release_breakdown
 from .release_columns import amount, earlier_quarters, release_grids, row_key
-from .tagged_metrics import agrees, learn_tag, quarter_facts
+from .tagged_metrics import agrees, fact_lines, learn_tag, quarter_facts, tag_from_locator, unit_fits
 from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
@@ -674,6 +674,57 @@ class SymbolPipeline:
 
         newest_first = sorted(quarters, reverse=True)
         records: list[dict] = []
+        unread: list[tuple] = []
+        picked: dict[str, object] = {}
+        for _pass in range(2):
+            records += self._tagged_records(spec, quarters, newest_first, facts_of, facts, unread, picked)
+            if _pass or not unread:
+                break
+            picked = self._pick_tags(unread, quarters, newest_first, facts_of)
+            if not picked:
+                break
+        if records:
+            self._store(values=records)
+            self.log(f"{self.symbol}: {len(records)} KPI values read from reports' XBRL where the releases do not give them")
+
+    def _kpi_template(self, group, kpi, key: str) -> dict:
+        """The stored shape of a KPI no release has given yet."""
+        return {"group_key": key, "group_label": group.label, "group_kind": group.kind, "kpi_label": kpi.label,
+                "kpi_order": group.kpis.index(kpi), "group_order": AI_GROUP_ORDER + self._group_index(key), "unit": kpi.unit,
+                "currency": self._default_currency() if kpi.unit == "currency" else None}
+
+    def _group_index(self, key: str) -> int:
+        return next((value["group_order"] - AI_GROUP_ORDER for value in self.values.values() if value["group_key"] == key), 0)
+
+    def _pick_tags(self, unread: list[tuple], quarters, newest_first, facts_of) -> dict[str, object]:
+        """The AI points to the tagged figure that is each KPI no release gives, in the latest report; code keeps a pick
+        only when its unit fits the KPI and the same tag is in the report before (a KPI the company reports)."""
+        latest = newest_first[0]
+        lines = fact_lines(self._xbrl(quarters[latest][0]).facts.to_dataframe(), quarters[latest][1])
+        ids = {f"F{index}": line for index, line in enumerate(lines)}
+        document = "\n".join(f"[{id_}] {label} | {value:,.15g} | {unit}" for id_, (_tag, value, label, unit) in ids.items())
+        wanted = "\n".join(f"- {kpi.key}: {kpi.label} ({kpi.unit})" for _group, kpi, _key in unread)
+        try:
+            answer = self._ask(ai.prompt(self.company, document, ai.TAG_TASK, f"KPIs:\n{wanted}"), "tags", ai.TagPicks,
+                               thinking_first=True, model="flash")
+        except (AiResponseError, ControlError) as error:
+            self.result.errors.append(f"KPI tags: {error}"[:300])
+            return {}
+        picked = {}
+        earlier = next((quarter for quarter in newest_first[1:] if facts_of(quarter)), None)
+        for _group, kpi, _key in unread:
+            line = ids.get(answer.picks.get(kpi.key) or "")
+            if line is None or not unit_fits(kpi.unit, line[3]) or earlier is None or line[0] not in facts_of(earlier):
+                continue
+            picked[kpi.key] = line[0]
+        if picked:
+            self.log(f"{self.symbol}: tags picked for {', '.join(sorted(picked))}")
+        return picked
+
+    def _tagged_records(self, spec: Spec, quarters, newest_first, facts_of, opened: dict, unread: list[tuple],
+                        picked: dict) -> list[dict]:
+        records: list[dict] = []
+        unread.clear()
         for group in spec.groups:
             if group.kind != "metric":
                 continue
@@ -685,18 +736,30 @@ class SymbolPipeline:
                             if v["validation_status"] == "verified" and not (v.get("locator") or {}).get("tagged")}
                 missing = [quarter for quarter in newest_first if quarter not in held
                            or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
-                if len(readings) < 2 or not missing:
+                if not missing:
                     continue
-                known = [quarter for quarter in newest_first if quarter in readings and quarter in quarters][:6]
-                tag = learn_tag({quarter: readings[quarter] for quarter in known}, {quarter: facts_of(quarter) for quarter in known})
+                # The tag: one found before (kept on the figures it filled), else learned from the releases' readings,
+                # else, for a KPI the releases never state (Alphabet's revenue backlog), picked from the report's tags.
+                tag = next((found for v in held.values() if (found := tag_from_locator(v.get("locator") or {}))), None)
+                if tag is None and kpi.key in picked:
+                    tag = picked[kpi.key]
+                    if any(quarter in quarters and tag in facts_of(quarter) and not agrees(facts_of(quarter)[tag], value)
+                           for quarter, value in readings.items()):
+                        continue  # a release gave a different figure: not this tag
+                elif tag is None and len(readings) >= 2:
+                    known = [quarter for quarter in newest_first if quarter in readings and quarter in quarters][:6]
+                    tag = learn_tag({quarter: readings[quarter] for quarter in known}, {quarter: facts_of(quarter) for quarter in known})
+                elif tag is None:
+                    unread.append((group, kpi, key))
+                    continue
                 if tag is None:
                     continue
-                template = next(v for v in held.values() if v["validation_status"] == "verified")
+                template = next((v for v in held.values() if v["validation_status"] == "verified"), None) or self._kpi_template(group, kpi, key)
                 gaps = 0
                 for quarter in newest_first:
                     if quarter not in missing:
                         # Never past a quarter whose report (when already opened) tags a different figure.
-                        if quarter in readings and tag in facts.get(quarter, {}) and not agrees(facts[quarter][tag], readings[quarter]):
+                        if quarter in readings and tag in opened.get(quarter, {}) and not agrees(opened[quarter][tag], readings[quarter]):
                             break
                         gaps = 0
                         continue
@@ -713,14 +776,13 @@ class SymbolPipeline:
                         group_order=template["group_order"], kpi_key=kpi.key, kpi_label=template["kpi_label"],
                         kpi_order=template["kpi_order"], unit=template["unit"], value=fact, currency=template.get("currency"),
                         method="ai", validation_status="verified", reconciliation_error_pct=None,
-                        notes=[f"from the {ref.form}'s XBRL, tagged as in the quarters the release states it"],
+                        notes=[f"from the {ref.form}'s XBRL, tagged as in the quarters the release states it" if readings
+                               else f"from the {ref.form}'s XBRL: the releases do not state it"],
                         ref=ref, fiscal_year=quarter[0], fiscal_period=quarter[1], period_end=end,
                         locator={"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
                                  "instant": tag.instant},
                     ))
-        if records:
-            self._store(values=records)
-            self.log(f"{self.symbol}: {len(records)} KPI values read from reports' XBRL where the releases do not give them")
+        return records
 
     # A recent listing's history: its first reports' year-ago figures and its IPO prospectus.
 

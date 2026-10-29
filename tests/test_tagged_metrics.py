@@ -74,3 +74,71 @@ def test_the_pipeline_fills_the_quarters_the_releases_skip():
                for a in ends]
     pipeline._fill_tagged_metrics(reports, spec)
     assert [(v["fiscal_period"], v["value"], v["method"], v["locator"]["tagged"]) for v in stored] == [("Q2", 625e9, "ai", True)]
+
+
+def _alphabet(picks):
+    """Alphabet's revenue backlog: in every 10-Q, in no release. Its Google Cloud part is tagged from Q1 2026."""
+    from datetime import date as day
+    from types import SimpleNamespace
+
+    from kpi_extractor import ai
+    from kpi_extractor.pipeline import SymbolPipeline
+
+    ends = {"r1": "2025-12-31", "r2": "2026-03-31", "r3": "2026-06-30"}
+    total = {"r1": 242.8e9, "r2": 467.6e9, "r3": 519.5e9}
+    cloud = {"r2": 462.3e9, "r3": 513.9e9}
+
+    def frame_of(accession):
+        rows = [{"concept": "us-gaap:RevenueRemainingPerformanceObligation", "numeric_value": total[accession], "period_type": "instant",
+                 "period_instant": ends[accession], "period_start": None, "period_end": None, "label": "Revenue not yet recognized",
+                 "unit_ref": "usd", "dim_srt_ProductOrServiceAxis": None}]
+        if accession in cloud:
+            rows.append({**rows[0], "numeric_value": cloud[accession], "dim_srt_ProductOrServiceAxis": "goog:GoogleCloudMember"})
+        rows.append({**rows[0], "concept": "dei:EntityNumberOfEmployees", "numeric_value": 190_000, "unit_ref": "number", "label": "Employees"})
+        return pd.DataFrame(rows)
+
+    pipeline = SymbolPipeline(None, "GOOGL", quarters=4, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(name="Alphabet", fiscal_year_end="1231", foreign=False)
+    pipeline.offset = 0
+    pipeline.filings = {a: {"accession": a, "period_end": e, "status": "processed"} for a, e in ends.items()}
+    pipeline.values = {}
+    pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
+    asked = []
+
+    def ask(text, purpose, schema, thinking_first, model="flash"):
+        asked.append(text)
+        lines = {line.split("] ", 1)[1]: line.split("]")[0][1:] for line in text.splitlines() if line.startswith("[F")}
+        return ai.TagPicks(picks={key: next((id_ for label, id_ in lines.items() if want and label.startswith(want)), None)
+                                  for key, want in picks.items()})
+    pipeline._ask = ask
+    stored = []
+    pipeline._store = lambda values: stored.extend(values)
+    spec = ai.Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "backlog", "label": "Revenue Backlog", "unit": "currency"},
+        {"key": "cloud_backlog", "label": "Google Cloud Backlog", "unit": "currency"}]}]})
+    reports = [SimpleNamespace(accession=a, form="10-Q", filed=day(2026, 1, 1), source_url="u") for a in ends]
+    pipeline._fill_tagged_metrics(reports, spec)
+    return stored, asked, pipeline, reports, spec
+
+
+def test_a_kpi_no_release_states_is_read_from_the_tag_the_ai_points_to():
+    stored, asked, *_ = _alphabet({
+        "backlog": "Revenue not yet recognized [RevenueRemainingPerformanceObligation] | 519",
+        "cloud_backlog": "Revenue not yet recognized [RevenueRemainingPerformanceObligation] | Google Cloud"})
+    by = {(v["kpi_key"], v["fiscal_period"], v["fiscal_year"]): v["value"] for v in stored}
+    assert by == {("backlog", "Q4", "2025"): 242.8e9, ("backlog", "Q1", "2026"): 467.6e9, ("backlog", "Q2", "2026"): 519.5e9,
+                  ("cloud_backlog", "Q1", "2026"): 462.3e9, ("cloud_backlog", "Q2", "2026"): 513.9e9}
+    assert len(asked) == 1 and all(v["locator"]["tagged"] for v in stored)
+
+
+def test_a_pick_whose_unit_does_not_fit_is_refused_and_a_found_tag_needs_no_ai():
+    stored, _, *_ = _alphabet({"backlog": "Employees"})  # a count for an amount
+    assert not [v for v in stored if v["kpi_key"] == "backlog"]
+    stored, asked, pipeline, reports, spec = _alphabet({
+        "backlog": "Revenue not yet recognized [RevenueRemainingPerformanceObligation] | 519",
+        "cloud_backlog": "Revenue not yet recognized [RevenueRemainingPerformanceObligation] | Google Cloud"})
+    pipeline.values = {(v["group_key"], v["kpi_key"], v["fiscal_year"], v["fiscal_period"]): v for v in stored}
+    pipeline._ask = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("asked again"))
+    stored.clear()
+    pipeline._fill_tagged_metrics(reports, spec)  # each tag is kept on its figures: no question, nothing left to fill
+    assert stored == []

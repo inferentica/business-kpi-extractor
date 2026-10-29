@@ -8,6 +8,7 @@ quarters are then read from that fact, no AI."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 
@@ -67,3 +68,45 @@ def learn_tag(readings: dict[tuple[str, str], float], facts: dict[tuple[str, str
     candidates = [tag for tag, count in matched.items() if count >= MIN_MATCHES and not any(
         tag in (facts.get(quarter) or {}) and not agrees(facts[quarter][tag], value) for quarter, value in readings.items())]
     return candidates[0] if len(candidates) == 1 else None
+
+
+def _member_name(member: str) -> str:
+    name = member.split(":")[-1]
+    name = re.sub(r"Member$", "", name)
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name)
+
+
+def fact_lines(facts: pd.DataFrame, period_end: date) -> list[tuple[Tag, float, str, str]]:
+    """The quarter's figures as a reader sees them: (tag, value, "concept label | member", unit)."""
+    found = quarter_facts(facts, period_end)
+    labels: dict[str, str] = {}
+    units: dict[str, str] = {}
+    for _, fact in facts.iterrows():
+        concept = str(fact["concept"])
+        if concept not in labels and isinstance(fact.get("label"), str):
+            labels[concept] = fact["label"]
+        unit = fact.get("unit_ref")
+        if concept not in units and isinstance(unit, str):
+            units[concept] = unit
+    lines = []
+    for tag, value in found.items():
+        members = " · ".join(_member_name(member) for _axis, member in tag.dimensions)
+        label = labels.get(tag.concept) or tag.concept.split(":")[-1]
+        name = tag.concept.split(":")[-1]
+        lines.append((tag, value, f"{label} [{name}]{' | ' + members if members else ''}", units.get(tag.concept, "")))
+    return lines
+
+
+def unit_fits(kpi_unit: str, fact_unit: str) -> bool:
+    """A currency KPI is a monetary figure; a count is shares or a pure number; a percentage or ratio is pure."""
+    fact = fact_unit.lower()
+    money = "iso4217" in fact or fact in ("usd", "eur", "jpy", "twd", "gbp", "cny") or fact.startswith("usd")
+    if kpi_unit == "currency":
+        return money
+    return not money
+
+
+def tag_from_locator(locator: dict) -> Tag | None:
+    if not locator.get("tagged") or not locator.get("concept"):
+        return None
+    return Tag(locator["concept"], tuple(sorted((locator.get("dimensions") or {}).items())), bool(locator.get("instant")))
