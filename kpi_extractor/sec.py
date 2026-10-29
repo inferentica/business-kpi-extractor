@@ -193,3 +193,29 @@ def _release_ref(filing, exhibits: list, profile: CompanyProfile) -> FilingRef:
         period_end=nominal_quarter_end_before(filing.filing_date, profile.fiscal_year_end),
         exhibits=exhibits, filing=filing,
     )
+
+
+# A listing's final prospectus: 424B4 for most IPOs, 424B1 for some.
+PROSPECTUS_FORMS = ("424B4", "424B1")
+# A company is a recent listing while its first periodic report is this young; its prospectus came at most a year before.
+_RECENT_LISTING = timedelta(days=730)
+_PROSPECTUS_BEFORE = timedelta(days=400)
+
+
+def ipo_prospectus(company: Company, first_report: date | None, today: date | None = None) -> FilingRef | None:
+    """The final prospectus of a recent listing (SpaceX's 424B4 of June 2026): its history before the first 10-Q.
+    None for a company listed longer, whose reports reach back on their own."""
+    if first_report is None or first_report < (today or date.today()) - _RECENT_LISTING:
+        return None
+    filings = company.get_filings(form=list(PROSPECTUS_FORMS),
+                                  filing_date=f"{(first_report - _PROSPECTUS_BEFORE).isoformat()}:{first_report.isoformat()}")
+    filings = sorted((filing for filing in filings if filing.form in PROSPECTUS_FORMS), key=lambda item: item.filing_date)
+    if not filings:
+        return None
+    filing = filings[-1]
+    document = next((attachment for attachment in filing.attachments
+                     if str(attachment.document_type or "").upper() == filing.form and attachment.is_html()), None)
+    if document is None:
+        return None
+    return FilingRef(accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="earnings_release",
+                     source_url=document.url, exhibits=[document], filing=filing)
