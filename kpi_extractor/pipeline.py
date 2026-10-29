@@ -2494,14 +2494,15 @@ class SymbolPipeline:
         10-Q for the same quarter, which restates it on the year's layout: only when that restated quarter has exactly
         the year's rows and adds up to the quarter's reported revenue. The year's Q4 then follows on one layout."""
         rows: dict[tuple[str, str, str], dict[str, dict]] = {}
-        revenue: dict[tuple[str, str], tuple[float, str]] = {}
+        revenue: dict[tuple[str, str, str], tuple[float, str]] = {}
         for v in self.values.values():
             if v["method"] != "xbrl" or v["validation_status"] != "verified" or v["group_key"].startswith(AI_GROUP_PREFIX):
                 continue
             rows.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
             total = (v.get("locator") or {}).get("total")
             if isinstance(total, (int, float)):
-                revenue.setdefault((v["fiscal_year"], v["fiscal_period"]), (float(total), v["period_end"]))
+                # Each group's own total: segment operating income does not add up to revenue.
+                revenue.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), (float(total), v["period_end"]))
         changed = []
         # A year with quarters but no figure of its own (Nvidia's FY2018 10-K tags no regions for the year) takes the
         # year as the following 10-K restates it, when that restatement adds up to the revenue it restates.
@@ -2543,7 +2544,7 @@ class SymbolPipeline:
                 # revenue the restating report gives for that quarter.
                 restated_total = next((float(t) for row in following.values()
                                        if isinstance(t := (row.get("locator") or {}).get("prior_total"), (int, float))), None)
-                reported = revenue.get((year, quarter))
+                reported = revenue.get((group, year, quarter))
                 if reported is None and restated_total is not None:
                     # The quarter's own report was read but kept nothing: its record still knows when the quarter ended.
                     end = next((f["period_end"] for f in self.filings.values() if f.get("document_role") == "periodic_report"
