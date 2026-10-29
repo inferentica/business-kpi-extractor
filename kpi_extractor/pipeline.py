@@ -37,6 +37,7 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
                      titled_pie_slides, unit_region)
 from .prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from .release_breakdowns import line_key, release_breakdown
+from .segment_income import GROUP_KEY as INCOME_GROUP, GROUP_LABEL as INCOME_LABEL, INCOME_CONCEPT, segment_income
 from .release_columns import amount, earlier_quarters, release_grids, row_key
 from .tagged_metrics import agrees, fact_lines, learn_tag, quarter_facts, tag_from_locator, unit_fits
 from .release_statements import release_headline, release_statements, reported_units
@@ -80,7 +81,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 20"
+_XBRL_READER = "xbrl reader 21"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -88,6 +89,9 @@ _XBRL_READER = "xbrl reader 20"
 _RELEASE_READER = "release reader 2"
 _RELEASE_READER_PREFIX = "release reader "
 _PROSPECTUS_READER = "prospectus reader 1"
+# Segment operating income sorts after the revenue breakdowns, and the revenue-only steps (release and prospectus
+# figures, the repeat guard) leave it out.
+INCOME_ORDER = 50
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
 _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
@@ -351,8 +355,9 @@ class SymbolPipeline:
                 # Judged by this reader: stamped, so later runs leave it (it was re-read every run until attempts ran out).
                 self._store_filing(ref, "skipped", notes=["no XBRL", _XBRL_READER])
                 return
-            breakdowns = extract_breakdowns(xbrl.facts.to_dataframe(), xbrl.entity_info or {}, ref.form,
-                                            official_labels(getattr(xbrl, "element_catalog", None)), member_children(xbrl))
+            facts = xbrl.facts.to_dataframe()
+            labels = official_labels(getattr(xbrl, "element_catalog", None))
+            breakdowns = extract_breakdowns(facts, xbrl.entity_info or {}, ref.form, labels, member_children(xbrl))
             if breakdowns is None:
                 self._store_filing(ref, "skipped", notes=["no document period", _XBRL_READER])
                 return
@@ -425,6 +430,7 @@ class SymbolPipeline:
                             **({"ytd": ytd, "ytd_total": group.year_to_date_total} if ytd is not None and group.year_to_date_total else {}),
                         },
                     ))
+            records += self._income_records(facts, labels, breakdowns, ref, fiscal_year, fiscal_period, groups)
             if records:
                 # The release's figures for this quarter give way to the report's; a line the report does not give
                 # (renamed, or not broken out) stops being served.
@@ -441,6 +447,35 @@ class SymbolPipeline:
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
+
+    def _income_records(self, facts, labels, breakdowns, ref: FilingRef, fiscal_year: str, fiscal_period: str,
+                        groups) -> list[dict]:
+        """Each segment's operating income, as tagged (see segment_income): its own breakdown, beside the revenue ones."""
+        try:
+            income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels)
+        except Exception as error:  # noqa: BLE001 - the revenue breakdowns stand without it
+            self.log(f"{self.symbol}: segment income of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+            return []
+        if income is None:
+            return []
+        currency = next((group.currency for group, _notes in groups if group.currency), None) or "USD"
+        named = self.names.get(INCOME_GROUP) or {}
+        ytd = {key: value for key, _name, _element, value in income.year_to_date.rows} if income.year_to_date else {}
+        prior = {key: value for key, _name, _element, value in income.prior.rows} if income.prior else {}
+        records = []
+        for order, (key, label, element, value) in enumerate(income.current.rows):
+            records.append(self._record(
+                group_key=INCOME_GROUP, group_label=named.get("label") or INCOME_LABEL, group_kind="revenue_breakdown",
+                group_order=INCOME_ORDER, kpi_key=key, kpi_label=(named.get("members") or {}).get(key) or label,
+                kpi_order=order, unit="currency", value=value, currency=currency, method="xbrl", validation_status="verified",
+                reconciliation_error_pct=0, notes=[], ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
+                period_end=breakdowns.period_end, locator={
+                    "concept": INCOME_CONCEPT, "total": income.current.total, "member": element,
+                    **({"prior": prior[key], "prior_total": income.prior.total} if key in prior else {}),
+                    **({"ytd": ytd[key], "ytd_total": income.year_to_date.total} if key in ytd else {}),
+                },
+            ))
+        return records
 
     def _store_statements(self, ref: FilingRef, xbrl, breakdowns, fiscal_year: str, fiscal_period: str) -> None:
         """The filing's three statements as presented; a statement that cannot be read never holds up its KPIs."""
@@ -586,7 +621,7 @@ class SymbolPipeline:
                 return  # the report is in
             stored = {value["group_key"] for value in live if (value["fiscal_year"], value["fiscal_period"]) == own
                       and (value.get("locator") or {}).get("release_table") and value["source_accession"] == latest.accession}
-            reported = [value for value in live if value["method"] in ("xbrl", "derived")
+            reported = [value for value in live if value["method"] in ("xbrl", "derived") and value["group_key"] != INCOME_GROUP
                         and (value["fiscal_year"], value["fiscal_period"]) < own]
             if not reported:
                 return
@@ -810,7 +845,7 @@ class SymbolPipeline:
         latest: dict[str, tuple[str, str]] = {}
         rows = [value for value in self.values.values() if value["method"] == "xbrl" and value["validation_status"] == "verified"
                 and value["fiscal_period"] != "FY" and not value["group_key"].endswith("_levels")
-                and not value["group_key"].startswith(AI_GROUP_PREFIX)]
+                and not value["group_key"].startswith(AI_GROUP_PREFIX) and value["group_key"] != INCOME_GROUP]
         for value in rows:
             latest[value["group_key"]] = max(latest.get(value["group_key"], ("", "")), (value["fiscal_year"], value["fiscal_period"]))
         groups: dict[str, list[dict]] = {}
@@ -1490,7 +1525,7 @@ class SymbolPipeline:
         """Each XBRL breakdown's latest title and members (key → label)."""
         latest: dict[str, str] = {}
         for value in self.values.values():
-            if value["method"] == "xbrl" and value["period_end"] >= latest.get(value["group_key"], ""):
+            if value["method"] == "xbrl" and value["group_key"] != INCOME_GROUP and value["period_end"] >= latest.get(value["group_key"], ""):
                 latest[value["group_key"]] = value["period_end"]
         breakdowns: dict[str, dict] = {}
         for value in sorted(self.values.values(), key=lambda item: item["kpi_order"]):
