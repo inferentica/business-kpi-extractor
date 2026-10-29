@@ -36,6 +36,7 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
                      read_units,
                      titled_pie_slides, unit_region)
 from .release_breakdowns import release_breakdown
+from .tagged_metrics import agrees, learn_tag, quarter_facts
 from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
@@ -249,6 +250,7 @@ class SymbolPipeline:
                         self._process_releases(releases, spec, version)
         if spec is not None:
             self._adopt_listed_keys(spec)
+            self._fill_tagged_metrics(reports, spec)
         self._refile_annuals()
         self._recheck_flagged()
         self._anchor_ai_breakdowns()
@@ -626,6 +628,82 @@ class SymbolPipeline:
                 self.log(f"{self.symbol}: {latest.form} {latest.filed} release breakdowns stored ({len(records)} values)")
         except Exception as error:  # noqa: BLE001
             self.log(f"{self.symbol}: breakdowns of {latest.form} {latest.filed} not read ({type(error).__name__}: {error})"[:300])
+
+    def _fill_tagged_metrics(self, reports: list[FilingRef], spec: Spec) -> None:
+        """Quarters of an operating KPI its releases do not state, from the reports' XBRL where the KPI is tagged
+        (Microsoft's commercial remaining performance obligation, in its releases only from FY2026). The tag is learned
+        from quarters both give (see tagged_metrics); a quarter the release states, or the owner decided, is left as it
+        is. Reports are read newest first, and a KPI's history ends where two reports in a row do not tag it."""
+        quarters: dict[tuple[str, str], tuple[FilingRef, date]] = {}
+        for ref in reports:
+            filing = self.filings.get(ref.accession) or {}
+            if not filing.get("period_end") or not filing.get("fiscal_year"):
+                continue
+            period = "Q4" if filing.get("fiscal_period") == "FY" else filing.get("fiscal_period")
+            quarters[(filing["fiscal_year"], period)] = (ref, date.fromisoformat(str(filing["period_end"])[:10]))
+        if not quarters:
+            return
+        facts: dict[tuple[str, str], dict] = {}
+
+        def facts_of(quarter: tuple[str, str]) -> dict:
+            if quarter not in facts:
+                ref, end = quarters[quarter]
+                try:
+                    xbrl = self._xbrl(ref)
+                    facts[quarter] = quarter_facts(xbrl.facts.to_dataframe(), end) if xbrl is not None else {}
+                except Exception:  # noqa: BLE001 - an unreadable report gives nothing
+                    facts[quarter] = {}
+            return facts[quarter]
+
+        newest_first = sorted(quarters, reverse=True)
+        records: list[dict] = []
+        for group in spec.groups:
+            if group.kind != "metric":
+                continue
+            key = f"{AI_GROUP_PREFIX}{group.key}"
+            for kpi in group.kpis:
+                held = {(v["fiscal_year"], v["fiscal_period"]): v for v in self.values.values()
+                        if v["group_key"] == key and v["kpi_key"] == kpi.key and v["fiscal_period"] != "FY"}
+                readings = {quarter: float(v["value"]) for quarter, v in held.items()
+                            if v["validation_status"] == "verified" and not (v.get("locator") or {}).get("tagged")}
+                missing = [quarter for quarter in newest_first if quarter not in held
+                           or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
+                if len(readings) < 2 or not missing:
+                    continue
+                known = [quarter for quarter in newest_first if quarter in readings and quarter in quarters][:6]
+                tag = learn_tag({quarter: readings[quarter] for quarter in known}, {quarter: facts_of(quarter) for quarter in known})
+                if tag is None:
+                    continue
+                template = next(v for v in held.values() if v["validation_status"] == "verified")
+                gaps = 0
+                for quarter in newest_first:
+                    if quarter not in missing:
+                        # Never past a quarter whose report (when already opened) tags a different figure.
+                        if quarter in readings and tag in facts.get(quarter, {}) and not agrees(facts[quarter][tag], readings[quarter]):
+                            break
+                        gaps = 0
+                        continue
+                    fact = facts_of(quarter).get(tag)
+                    if fact is None:
+                        gaps += 1
+                        if gaps >= 2:
+                            break  # older reports do not tag it
+                        continue
+                    gaps = 0
+                    ref, end = quarters[quarter]
+                    records.append(self._record(
+                        group_key=key, group_label=template["group_label"], group_kind=template["group_kind"],
+                        group_order=template["group_order"], kpi_key=kpi.key, kpi_label=template["kpi_label"],
+                        kpi_order=template["kpi_order"], unit=template["unit"], value=fact, currency=template.get("currency"),
+                        method="ai", validation_status="verified", reconciliation_error_pct=None,
+                        notes=[f"from the {ref.form}'s XBRL, tagged as in the quarters the release states it"],
+                        ref=ref, fiscal_year=quarter[0], fiscal_period=quarter[1], period_end=end,
+                        locator={"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
+                                 "instant": tag.instant},
+                    ))
+        if records:
+            self._store(values=records)
+            self.log(f"{self.symbol}: {len(records)} KPI values read from reports' XBRL where the releases do not give them")
 
     def _series_for(self, axis: str) -> str | None:
         """The quarterly revenue series whose members a pie names: the group labelled "Revenue by <axis>" ("Wafer Revenue
