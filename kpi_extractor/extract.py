@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from .ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
-from .document import Document, Table, TextBlock, clean, declared_currency, parse_number
+from .document import Document, Table, TextBlock, clean, declared_currency, parse_number, word_number
 from .xbrl import member_key, remove_subtotals
 
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
@@ -162,7 +162,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         raise LocateError("quote not found in the document")
     if value_text not in quote:
         raise LocateError("value_text is not inside the quote")
-    parsed = parse_number(value_text)
+    parsed = parse_number(value_text) or (word_number(value_text) if kpi.unit == "count" else None)
     if parsed is None:
         raise LocateError(f"no number in {value_text!r}")
     if kpi.unit == "percent" and not parsed.percent and not re.search(r"\bpercent\b", quote, re.I):

@@ -2004,6 +2004,13 @@ class SymbolPipeline:
         notes = (self.filings.get(accession or "") or {}).get("notes") or []
         reported = next((note for note in notes if note.startswith(_NOT_REPORTED)), _NOT_REPORTED)
         not_reported = set(reported.removeprefix(_NOT_REPORTED).split(", ")) if _READ_BY_AI in notes else set()
+        # In the newest release a KPI never read anywhere is always looked for: the audit listed it from that release, so
+        # another quarter not reporting it says nothing of this one (Amazon Now's cities, listed from the Q2 2026
+        # release, were taken as absent there because Q1 lacked them). Older quarters keep the every-other-quarter rule.
+        if expected == getattr(self, "_newest_release", None):
+            ever = {f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}" for value in self.values.values()
+                    if value["method"] == "ai" and value["validation_status"] != "rejected"}
+            not_reported = {key for key in not_reported if key in ever}
         items: list[ReadValue] = []
         kept_located, done = None, set()
         for group in spec.groups:

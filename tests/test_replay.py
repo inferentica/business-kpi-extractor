@@ -136,6 +136,12 @@ def test_kpis_missing_last_quarter_are_looked_for_by_the_ai_every_other_quarter(
     _pipeline(control, _history(first), notes=("read by replay", "not reported: operating.stores"))._read(
         lambda: "prompt", second, spec, Q2, version=1)
     assert ("locate", "flash") in control.calls
+    # In the newest release, a KPI never read anywhere (listed by the audit from that release) is looked for.
+    control = NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash})
+    pipeline = _pipeline(control, _history(first), notes=("read by AI", "not reported: operating.stores"))
+    pipeline._newest_release = Q2
+    pipeline._read(lambda: "prompt", second, spec, Q2, version=1)
+    assert ("locate", "flash") in control.calls
 
 
 def test_a_prior_year_column_is_never_replayed():

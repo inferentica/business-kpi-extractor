@@ -260,3 +260,10 @@ def test_a_per_unit_row_in_a_table_in_millions_is_not_scaled():
     assert _row_scale("Starlink consumer ARPU ($ per month) $69 $66") == 1.0
     assert _row_scale("Starlink consumer subscribers (# in millions, as of period end) 13.6") == 1e6
     assert _row_scale("Consumer revenues $3,121") is None
+
+
+def test_a_count_spelled_out_is_read():
+    from kpi_extractor.document import parse_number, word_number
+    assert word_number("nine countries").value == 9 and word_number("twenty-five").value == 25
+    assert word_number("two billion").value == 2e9
+    assert parse_number("Three Months Ended") is None  # tables keep reading digits only

@@ -193,6 +193,25 @@ def clean(text: str) -> str:
     return _WHITESPACE.sub(" ", text.replace("\xa0", " ")).strip()
 
 
+# A count a release spells out ("available in nine countries"), with any scale after it ("two billion").
+_WORDS = {word: index for index, word in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen "
+    "eighteen nineteen twenty".split())}
+_WORDS.update({"thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90})
+_WORD_NUMBER = re.compile(rf"\b({'|'.join(_WORDS)})\b(?:[- ]({'|'.join(word for word in _WORDS if _WORDS[word] < 10)})\b)?", re.I)
+
+
+def word_number(text: str) -> ParsedNumber | None:
+    """A count spelled out ("nine countries"); only for a figure a reader quoted as a count."""
+    match = _WORD_NUMBER.search(text)
+    if not match:
+        return None
+    value = float(_WORDS[match.group(1).lower()] + (_WORDS[match.group(2).lower()] if match.group(2) else 0))
+    scale = _SCALE_AFTER.match(text[match.end():])
+    word = scale.group("word").lower() if scale and scale.group("word") else None
+    return ParsedNumber(round(value * _SCALE_WORDS[word], 6) if word else value, False, word)
+
+
 def parse_number(text: str | None) -> ParsedNumber | None:
     """The first number in text, with its sign, percent sign and any scale word ("3.60 billion")."""
     if not text:

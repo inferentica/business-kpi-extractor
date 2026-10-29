@@ -1298,3 +1298,4 @@ def test_a_group_of_lines_beside_their_segment_total_repeats_xbrl():
     products = {"advertising", "sisolutionsinfrastructure", "consumer", "launchservices"}  # labels as _identity_text gives them
     assert repeats_xbrl(group, [products, {"space", "connectivity", "si"}])
     assert not repeats_xbrl(group, [products])
+
