@@ -2748,7 +2748,10 @@ def repeats_xbrl(group, covered: list[set[str]]) -> bool:
     # "Agents and Infra Revenue" is the 10-Q's "Agents and Infra" (Microsoft's release names each line so).
     names = {_REVENUE_SUFFIX.sub("", _identity_text(kpi.label)) for kpi in group.kpis
              if kpi.key != group.total_kpi and not _identity_text(kpi.label).startswith("total")}
-    return len(names) >= 2 and any(names <= {_REVENUE_SUFFIX.sub("", member) for member in members} for members in covered)
+    tagged = [{_REVENUE_SUFFIX.sub("", member) for member in members} for members in covered]
+    # Lines of one breakdown beside its segment's total from another (SpaceX's "SI revenues" beside its two lines).
+    return len(names) >= 2 and (any(names <= members for members in tagged)
+                                or (names <= set().union(*tagged) and any(len(names & members) >= 2 for members in tagged)))
 
 
 def without_xbrl_repeats(spec: Spec, covered: list[set[str]], keep: Spec | None = None) -> Spec:

@@ -1288,3 +1288,13 @@ def test_a_listed_group_the_next_report_tags_goes_from_the_stored_list():
     # An owner's list keeps it.
     spec, version, _ = pipeline._spec({"groups": groups, "version": 3, "owner_edited_at": "2026-10-01"}, [])
     assert len(spec.groups) == 2 and version == 3
+
+
+def test_a_group_of_lines_beside_their_segment_total_repeats_xbrl():
+    from kpi_extractor.pipeline import repeats_xbrl
+    group = ai.GroupSpec.model_validate({"key": "si", "label": "SI revenue", "kind": "revenue_breakdown", "kpis": [
+        {"key": k, "label": label, "unit": "currency"} for k, label in
+        [("ads", "Advertising revenues"), ("infra", "SI solutions & infrastructure revenues"), ("si", "SI revenues")]]})
+    products = {"advertising", "sisolutionsinfrastructure", "consumer", "launchservices"}  # labels as _identity_text gives them
+    assert repeats_xbrl(group, [products, {"space", "connectivity", "si"}])
+    assert not repeats_xbrl(group, [products])
