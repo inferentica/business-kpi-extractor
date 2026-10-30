@@ -27,12 +27,14 @@ def test_no_q4_when_segments_were_renamed_mid_year():
     assert derive_periods(values) == []
 
 
-def test_negative_q4_needs_review():
+def test_a_q4_with_a_line_below_zero_is_not_worked_out():
+    # TSMC's 2024: its annual report's "Others" (52.9 billion) is below its 10-Qs' nine months (72.3 billion).
     values = [_value("FY", "a", 50)]
     values += [_value(period, "a", 20) for period in ("Q1", "Q2", "Q3")]
     [q4] = derive_periods(values)
     assert q4["value"] == -10
-    assert q4["validation_status"] == "needs_review"
+    assert q4["validation_status"] == "rejected"
+    assert q4["notes"] == ["the year's report groups these lines differently from its quarters"]
 
 
 def test_full_year_from_four_release_quarters():

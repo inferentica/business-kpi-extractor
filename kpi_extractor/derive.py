@@ -50,6 +50,13 @@ def derive_periods(values: list[dict]) -> list[dict]:
             attempts = [_whole_rows(way()) for way in ways]
             chosen = next((rows for rows in attempts if rows and all(r["validation_status"] == "verified" for r in rows)),
                           attempts[0] if attempts else [])
+            if chosen and any("derived Q4 is negative" in r["notes"] for r in chosen) \
+                    and all(r["validation_status"] != "verified" for r in chosen if "derived Q4 is negative" in r["notes"]):
+                # A line that is never negative coming out below zero: the year's report groups the lines differently
+                # from its quarters (TSMC's 2024 annual report moved customers out of "Others" that its 10-Qs' nine
+                # months had in it), so no Q4 of them can be worked out. The quarters and the year stand; Q4 is left.
+                chosen = [{**r, "validation_status": "rejected",
+                           "notes": ["the year's report groups these lines differently from its quarters"]} for r in chosen]
             derived.extend(chosen)
         if not annual or _only_derived(annual):
             parts = [*quarters, fourth]
