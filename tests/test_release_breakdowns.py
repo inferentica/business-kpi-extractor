@@ -114,3 +114,29 @@ def test_a_segment_table_laid_out_by_column_with_its_year_ago_table():
                                           "unallocated": "Unallocated"},
                                {"dcai": 964e6, "unallocated": -754e6}, date(2026, 9, 27), measure="income")
     assert income.values["unallocated"] == -1_128e6 and income.total == 2_522e6
+
+
+def test_a_summary_table_with_each_lines_change_on_the_year_ago():
+    # Visa's Q4 FY2026 release: the quarter in USD beside "YoY Change", no year-ago amounts; its 10-K follows weeks later.
+    from kpi_extractor.document import parse_document
+    rows = [("Service revenue", "$5,255", "14%"), ("Data processing revenue", "6,245", "16%"),
+            ("International transaction revenue", "4,115", "8%"), ("Other revenue", "1,647", "40%"),
+            ("Client incentives", "(5,123)", "21%"), ("Net revenue", "$12,139", "13%")]
+
+    def release(growth_of_other: str) -> Document:
+        body = "".join(f"<tr><td>{label}</td><td>{usd}</td><td>{growth_of_other if label == 'Other revenue' else change}</td>"
+                       f"<td>1</td><td>1%</td></tr>" for label, usd, change in rows)
+        return parse_document(
+            "<table><tr><td></td><td>INCOME STATEMENT SUMMARY</td></tr>"
+            "<tr><td></td><td>Three Months Ended September 30, 2026</td><td></td><td>Twelve Months Ended September 30, 2026</td><td></td></tr>"
+            "<tr><td></td><td>USD</td><td>YoY Change</td><td>USD</td><td>YoY Change</td></tr>"
+            "<tr><td></td><td>(in millions, except percentages and per share data)</td></tr>"
+            f"<tr><td>Revenue</td><td></td><td></td><td></td><td></td></tr>{body}</table>", "https://www.sec.gov/x.htm")
+    members = {"service": "Service revenue", "data": "Data processing revenue", "international": "International transaction revenue",
+               "other": "Other revenue", "incentives": "Client incentives"}
+    year_ago = {"service": 4602e6, "data": 5394e6, "international": 3800e6, "other": 1176e6, "incentives": -4248e6}
+    found = release_breakdown(release("40%"), members, year_ago, date(2026, 9, 30))
+    assert found is not None and found.values["data"] == 6245e6 and found.values["incentives"] == -5123e6
+    assert found.total == 12139e6
+    # A change the year-ago figure does not give (1,647 on 1,176 is 40%, not 30%) is not this table's line.
+    assert release_breakdown(release("30%"), members, year_ago, date(2026, 9, 30)) is None

@@ -156,10 +156,64 @@ def _items(document: Document, table: Table, period_end: date, measure: str, sca
     """(label, the quarter's amount, the year-ago amount, is the total) for each line of the table, or None."""
     columns = _columns(table, period_end)
     if columns is None:
-        return _columned_items(document, table, period_end, measure, scale)
+        return _columned_items(document, table, period_end, measure, scale) or _growth_items(table, period_end, measure, scale)
     start, current, prior = columns
     return [(label, value, _amount(row, prior, scale), whole) for label, row, whole in _rows(table, start, current, measure)
             if (value := _amount(row, current, scale)) is not None]
+
+
+_CHANGE = re.compile(r"\byoy\b|year[- ]over[- ]year|%\s*change|\bchange\b", re.I)
+
+
+@dataclass(frozen=True)
+class Growth:
+    """A line's stated change on the year ago ("14%"), with the half-unit its rounding allows."""
+    rate: float
+    rounding: float
+
+
+def _growth_items(table: Table, period_end: date, measure: str, scale: float):
+    """A summary table that gives the quarter beside its change on the year ago instead of the year-ago amount (Visa's
+    "INCOME STATEMENT SUMMARY": "Three Months Ended September 30, 2026" over "USD | YoY Change"): (label, the quarter's
+    amount, its Growth, is the total) for each line, or None."""
+    for index, row in enumerate(table.rows[:5]):
+        changes = [col for col, cell in enumerate(row) if col and _CHANGE.search(cell or "")]
+        if not changes:
+            continue
+        heads = {col: " ".join(clean(above[col]) for above in table.rows[:index] if col < len(above)).lower()
+                 for col in range(1, len(row))}
+        current = next((col for col in range(1, len(row)) if col not in changes and col + 1 in changes
+                        and _QUARTER.search(heads[col].replace("ended", " ended ")) and str(period_end.year) in heads[col]
+                        and _MONTHS[period_end.month - 1] in heads[col]), None)
+        if current is None:
+            return None
+        items = []
+        # Lines under a "Revenue" heading, the total last ("Net revenue"): read as listed, not as a heading's measure.
+        for cells in table.rows[index + 1:] if measure == "revenue" else []:
+            label = clean(cells[0]) if cells else ""
+            whole = bool(_TOTAL.match(label))
+            value = _amount(cells, current, scale) if label else None
+            stated = parse_number(cells[current + 1] if current + 1 < len(cells) else None)
+            if value is None:
+                continue
+            growth = None
+            if stated is not None and stated.percent:
+                text = clean(cells[current + 1])
+                decimals = len(text.split(".")[1].rstrip("%) ")) if "." in text else 0
+                growth = Growth(stated.value / 100, 0.5 * 10 ** -decimals / 100)
+            items.append((label, value, growth, whole))
+        return items or None
+    return None
+
+
+def _matches_year_ago(prior, value: float, year_ago: float, tolerance: float) -> bool:
+    """The line's year-ago figure as the release gives it: the amount (to the table's rounding), or its stated change on
+    the report's year-ago figure (to the change's rounding and the amount's)."""
+    if isinstance(prior, Growth):
+        if not year_ago or (value < 0) != (year_ago < 0):
+            return False
+        return abs(value / year_ago - 1 - prior.rate) <= prior.rounding + tolerance / abs(year_ago)
+    return prior is not None and abs(prior - year_ago) <= tolerance
 
 
 def release_breakdown(document: Document, members: dict[str, str], year_ago: dict[str, float], period_end: date, *,
@@ -202,12 +256,12 @@ def release_breakdown(document: Document, members: dict[str, str], year_ago: dic
             continue
         tolerance = scale * 1.5
         compared = [member for member in members if member in year_ago]
-        if len(compared) < (0 if tables else 2) or any(found[member][2] is None or abs(found[member][2] - year_ago[member]) > tolerance
-                                    for member in compared):
+        if len(compared) < (0 if tables else 2) or not all(
+                _matches_year_ago(found[member][2], found[member][1], year_ago[member], tolerance) for member in compared):
             continue
         values = {member: found[member][1] for member in members}
         if totalled and (total is None or abs(sum(values.values()) - total) > tolerance * len(values)):
             continue
         return ReleaseBreakdown(table.id, values, {member: found[member][0] for member in members},
-                                {member: found[member][2] for member in members if found[member][2] is not None}, total)
+                                {member: found[member][2] for member in members if isinstance(found[member][2], float)}, total)
     return None
