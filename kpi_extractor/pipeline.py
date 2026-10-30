@@ -862,6 +862,18 @@ class SymbolPipeline:
                 refs.setdefault(quarter, []).append(ref)
         records = []
         loaded: dict[str, str] = {}
+
+        def text_of(ref: FilingRef) -> str:
+            if ref.accession not in loaded and len(loaded) < 80:
+                try:
+                    document = self._document(ref)
+                    loaded[ref.accession] = " ".join(
+                        " ".join(" ".join(row) for row in document.tables[key].rows) if key in document.tables
+                        else document.blocks[key].text for key in document.order)
+                except Exception:  # noqa: BLE001 - an unreadable release gives nothing
+                    loaded[ref.accession] = ""
+            return loaded.get(ref.accession, "")
+
         for kpi, rows in held.items():
             readings = []
             for quarter, v in rows.items():
@@ -902,18 +914,25 @@ class SymbolPipeline:
             # A quarter's own release first; a later release's column where its own does not give the row.
             found: dict[tuple[str, str], tuple[float, str, dict]] = {}
             gaps = sorted((quarter for quarter in refs if index(quarter) > first and quarter not in rows), key=index)
+            # A quarter held a quarter or a year after a gap: its release's earlier columns, when its own figure is the
+            # one held (TSMC's Q4 2023 report gives Q4 2022 a year back).
+            after = {label_of(index(gap) + lag) for gap in gaps for lag in set(layout.values())}
+            for quarter in sorted((quarter for quarter in after if quarter in refs and quarter in known), key=index):
+                for ref in refs[quarter][:12]:
+                    for label in labels:
+                        for numbers in row_numbers(text_of(ref), label):
+                            if abs(numbers[0] * scale - known[quarter]) > abs(known[quarter]) * 1e-6:
+                                continue
+                            source = {"source_accession": ref.accession, "source_url": ref.source_url, "filed_at": ref.filed.isoformat()}
+                            for column, lag in layout.items():
+                                earlier = label_of(index(quarter) - lag)
+                                if len(numbers) > column and earlier in gaps and earlier not in lagged:
+                                    lagged[earlier] = (numbers[column] * scale, f"the release for {quarter[1]} {quarter[0]}, its "
+                                                       f"column a {'quarter' if lag == 1 else 'year'} before", source)
             for quarter in gaps:
                 for ref in refs[quarter][:12]:
-                    if ref.accession not in loaded and len(loaded) < 80:
-                        try:
-                            document = self._document(ref)
-                            loaded[ref.accession] = " ".join(
-                                " ".join(" ".join(row) for row in document.tables[key].rows) if key in document.tables
-                                else document.blocks[key].text for key in document.order)
-                        except Exception:  # noqa: BLE001 - an unreadable release gives nothing
-                            loaded[ref.accession] = ""
                     for label in labels:
-                        for numbers in row_numbers(loaded.get(ref.accession, ""), label):
+                        for numbers in row_numbers(text_of(ref), label):
                             checks = [(numbers[column] * scale, label_of(index(quarter) - lag)) for column, lag in layout.items()
                                       if len(numbers) > column]
                             figure_of = lambda earlier: known.get(earlier, (found.get(earlier) or lagged.get(earlier) or (None,))[0])  # noqa: E731
