@@ -2995,7 +2995,11 @@ class SymbolPipeline:
                             note for note in v.get("notes") or [] if note not in (_EQUALS_XBRL, _ADDS_TO_XBRL)]}
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
-            if waiting and len(rows) >= 2 and whole(rows[0]) and reported(rows[0], sum(float(v["value"]) for v in rows), 1e-5):
+            # To the figures' own rounding: Unity's release gives its Q3 2024 lines to the million ($447 million in all),
+            # its XBRL revenue to the thousand ($446.5 million).
+            parts = sum(float(v["value"]) for v in rows)
+            rounding = sum(_rounding(float(v["value"])) for v in rows) / abs(parts) if parts else 0
+            if waiting and len(rows) >= 2 and whole(rows[0]) and reported(rows[0], parts, max(1e-5, min(rounding, 0.005))):
                 for v in waiting:
                     settle(v, _ADDS_TO_XBRL)
         # A split of part of a line (Adobe's customer groups of its subscription revenue, with their own total that XBRL

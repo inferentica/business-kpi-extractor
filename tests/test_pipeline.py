@@ -1513,3 +1513,20 @@ def test_a_metrics_missing_quarters_come_from_the_releases_quarterly_tables():
     pipeline._fill_quarter_tables(releases)
     assert {(v["fiscal_period"], v["value"], v["source_accession"]) for v in stored} == {
         ("Q2", 72, "q2"), ("Q3", 79, "q3"), ("Q4", 82, "q4")}
+
+
+def test_a_breakdown_adding_up_to_a_reported_figure_to_its_rounding_is_proven():
+    # Unity's Q3 2024: $298 + $132 + $17 million, $447 million in all; its XBRL revenue $446,523 thousand.
+    xbrl = {"group_key": "segments", "group_kind": "revenue_breakdown", "method": "xbrl", "validation_status": "verified",
+            "fiscal_year": "2024", "fiscal_period": "Q3", "period_end": "2024-09-30", "locator": {}}
+    group = {"group_key": "kpi_segment", "group_kind": "revenue_breakdown", "method": "ai", "validation_status": "needs_review",
+             "fiscal_year": "2024", "fiscal_period": "Q3", "period_end": "2024-09-30", "unit": "currency", "source_accession": "r",
+             "notes": ["total matches no figure the company reported in XBRL"], "locator": {"total": 447_000_000.0}}
+    lines = [{**group, "kpi_key": key, "value": value} for key, value in (("grow", 298e6), ("create", 132e6), ("other", 17e6))]
+    pipeline = _pipeline(FakeControl({}), [{**xbrl, "kpi_key": "total", "value": 446_523_000.0}, *lines])
+    pipeline._prove_flagged([])
+    assert pipeline.values[("kpi_segment", "grow", "2024", "Q3")]["validation_status"] == "verified"
+    # A real gap is not rounding.
+    off = _pipeline(FakeControl({}), [{**xbrl, "kpi_key": "total", "value": 440_000_000.0}, *lines])
+    off._prove_flagged([])
+    assert off.values[("kpi_segment", "grow", "2024", "Q3")]["validation_status"] == "needs_review"
