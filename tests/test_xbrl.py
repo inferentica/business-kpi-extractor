@@ -387,3 +387,23 @@ def test_lines_adding_up_to_one_segments_figure_are_a_split_of_it():
     ])
     group = next(g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups if g.key == "products")
     assert group.total == 1_180.0 and sum(value for *_rest, value in group.members) == 1_180.0
+
+
+def test_a_line_that_offsets_its_segment_level_twin_is_no_part_of_the_split():
+    # KKR's Q2 2022: "Investment" consolidated at −277 against the segments' +277; the fees add up to the segment's 615.
+    product, segment, items = "srt_ProductOrServiceAxis", "us-gaap_StatementBusinessSegmentsAxis", "srt_ConsolidationItemsAxis"
+    concept = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+    am = "kkr:AssetManagementSegmentMember"
+    facts = pd.DataFrame([
+        _kkr_fact("us-gaap:Revenues", 330.0),
+        _kkr_fact("us-gaap:Revenues", 638.0, **{segment: "kkr:InsuranceSegmentMember"}),
+        _kkr_fact("us-gaap:Revenues", -308.0, **{segment: am}),
+        _kkr_fact(concept, 615.0, **{segment: am}),
+        *(_kkr_fact(concept, value, **{segment: am, product: member})
+          for member, value in (("kkr:AssetManagement1Member", 418.0), ("kkr:TransactionFeeMember", 178.0),
+                                ("kkr:FeeCreditMember", 19.0), ("kkr:InvestmentMember", -277.0))),
+        _kkr_fact(concept, 277.0, **{segment: am, product: "kkr:InvestmentMember", items: "us-gaap:OperatingSegmentsMember"}),
+        _kkr_fact(concept, 655.0, **{segment: am, product: "kkr:ManagementFeesMember", items: "us-gaap:OperatingSegmentsMember"}),
+    ])
+    group = next(g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups if g.key == "products")
+    assert group.total == 615.0 and {key for key, *_rest in group.members} == {"assetmanagement1", "transactionfee", "feecredit"}

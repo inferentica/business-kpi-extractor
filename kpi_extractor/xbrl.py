@@ -358,6 +358,32 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         candidates.setdefault(axis, []).append((concept, members))
     for (concept, axes), items in paired.items():
         found = False
+        # Consolidated lines tagged under one segment that add up exactly to its figure (KKR's fees since 2021: Fees
+        # and Other of its Asset Management segment, beside segment-level figures under another member): a split of
+        # that figure, with it as the total.
+        segment_axis = next((axis for axis in axes if axis in _SEGMENT_AXES), None)
+        pure_items = paired_pure.get((concept, axes), [])
+        # Only beside segment-level figures: lines of one segment alone (Alphabet's Google Services) are completed by
+        # the other segments instead.
+        if segment_axis and pure_items and paired_levels.get((concept, axes)) == {False, True} \
+                and len({dimensions[segment_axis] for dimensions, _v in pure_items}) == 1:
+            member = pure_items[0][0][segment_axis]
+            other = next(axis for axis in axes if axis != segment_axis)
+            lines: dict[str, float] = {}
+            for dimensions, value in pure_items:
+                lines.setdefault(dimensions[other], value)
+            figure = single.get((concept, segment_axis), {}).get(member)
+            # A line that only offsets its segment-level twin (KKR's 2022 "Investment", −$277 million against the
+            # segments' +$277 million) is no part of the split.
+            twins = {key for key in lines if any(d[other] == key for d, v in items if (d, v) not in pure_items)}
+            if figure and abs(sum(lines.values()) - figure) > max(abs(figure) * 1e-6, 0.5) and twins:
+                lines = {key: value for key, value in lines.items() if key not in twins}
+            if figure and len(lines) >= 2 and abs(sum(lines.values()) - figure) <= max(abs(figure) * 1e-6, 0.5):
+                candidates.setdefault(other, []).append((concept, lines))
+                fixed_for.setdefault((other, concept), (segment_axis, member))
+                part_of[(concept, other)] = figure
+                pure_only.add((concept, other))
+                continue
         for fixed in axes:
             if len({dimensions[fixed] for dimensions, _value in items}) != 1:
                 continue
@@ -368,24 +394,6 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             candidates.setdefault(other, []).append((concept, members))
             fixed_for.setdefault((other, concept), (fixed, items[0][0][fixed]))
             found = True
-        # Consolidated lines tagged under one segment that add up exactly to its figure (KKR's fees since 2021: Fees
-        # and Other of its Asset Management segment, beside segment-level figures under another member): a split of
-        # that figure, with it as the total.
-        segment_axis = next((axis for axis in axes if axis in _SEGMENT_AXES), None)
-        pure_items = paired_pure.get((concept, axes), [])
-        if not found and segment_axis and pure_items and len({dimensions[segment_axis] for dimensions, _v in pure_items}) == 1:
-            member = pure_items[0][0][segment_axis]
-            other = next(axis for axis in axes if axis != segment_axis)
-            lines: dict[str, float] = {}
-            for dimensions, value in pure_items:
-                lines.setdefault(dimensions[other], value)
-            figure = single.get((concept, segment_axis), {}).get(member)
-            if figure and len(lines) >= 2 and abs(sum(lines.values()) - figure) <= max(abs(figure) * 1e-6, 0.5):
-                candidates.setdefault(other, []).append((concept, lines))
-                fixed_for.setdefault((other, concept), (segment_axis, member))
-                part_of[(concept, other)] = figure
-                pure_only.add((concept, other))
-                found = True
         # Products tagged under segments where the filer typed one segment wrong (AMD's FY2025 10-K files Gaming under a
         # "Gaming" segment, Client under "Client and Gaming"): the product lines alone, which _completed_by_segments
         # keeps only when they add up exactly to one real segment.
