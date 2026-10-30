@@ -267,3 +267,20 @@ def test_a_count_spelled_out_is_read():
     assert word_number("nine countries").value == 9 and word_number("twenty-five").value == 25
     assert word_number("two billion").value == 2e9
     assert parse_number("Three Months Ended") is None  # tables keep reading digits only
+
+
+def test_a_quote_takes_the_last_scale_heading_before_it_in_its_block():
+    # Apollo's highlights page: earnings "($ in millions …)", then AUM and business drivers "($ in billions)".
+    from kpi_extractor.ai import KpiSpec, Locator
+    from kpi_extractor.extract import _read_raw
+    document = parse_document(
+        "<p>($ in millions, except per share amounts) Fee Related Earnings $785 Assets Under Management ($ in billions) "
+        "Total Assets Under Management $1,047 Fee-Generating AUM $858 Business Drivers ($ in billions) Inflows $60</p>",
+        "https://www.sec.gov/x.htm")
+    block = document.order[0]
+    def read(quote, value_text):
+        return _read_raw(document, Locator(kpi="operating.x", block=block, quote=quote, value_text=value_text),
+                         KpiSpec(key="x", label="x", unit="currency"), "USD")[0]
+    assert read("Fee-Generating AUM $858", "$858") == 858e9
+    assert read("Inflows $60", "$60") == 60e9
+    assert read("Fee Related Earnings $785", "$785") == 785e6

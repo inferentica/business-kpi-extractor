@@ -175,7 +175,9 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         # A count takes its label's own scale, as a table row's does: "Starlink Subscribers (#, in millions) 12.0".
         value *= _row_scale(quote[:quote.find(value_text)]) or 1
     if kpi.unit == "currency" and parsed.scale_word is None:
-        declared = block.declared_scale() or document.default_scale()
+        # The last scale heading before the quote in its block: Apollo's highlights page heads its earnings "($ in
+        # millions …)" and, further on, its AUM and business drivers "($ in billions)".
+        declared = _preceding_scale(block.text, block.text.find(quote)) or block.declared_scale() or document.default_scale()
         if declared is None and locator.scale in (1, 1e3, 1e6, 1e9):
             declared = locator.scale
             notes.append("scale read by AI")
@@ -259,6 +261,16 @@ _ROW_SCALE = re.compile(r"\((?:in\s+)?(?P<word>thousands|millions|billions)\)|\(
 
 # A row priced per unit ("Starlink consumer ARPU ($ per month)") in a table "in millions (except where noted)" is in units.
 _PER_UNIT = re.compile(r"\([^()]*\bper\s+(?:month|year|quarter|day|user|subscriber|member|customer|share|unit|system)\b[^()]*\)", re.I)
+
+
+def _preceding_scale(text: str, at: int) -> float | None:
+    """The scale of the last heading like "($ in billions)" before position `at` of a text."""
+    # "($ in millions, except per share amounts)" is a scale heading too: a price per unit names no millions.
+    headings = list(_ROW_SCALE.finditer(text[:max(at, 0)]))
+    if not headings:
+        return None
+    last = headings[-1]
+    return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(last.group("word") or last.group("within")).lower()]
 
 
 def _row_scale(text: str) -> float | None:
