@@ -217,7 +217,10 @@ MAX_DERIVED_GAP = 0.001
 def _reconcile(rows: list[dict], total: float) -> None:
     """A derived period is verified only if its parts add up to its derived total, like any reported one, and it is
     published whole: one flagged part (a negative Q4) flags them all."""
-    error = (sum(row["value"] for row in rows) - total) / total
+    # Lines of another row of the period (Apollo's management fees by asset class) are counted in that row.
+    keys = {row["kpi_key"] for row in rows}
+    top = [row for row in rows if (row.get("locator") or {}).get("parent") not in keys]
+    error = (sum(row["value"] for row in top) - total) / total
     for row in rows:
         row["reconciliation_error_pct"] = error
         row["locator"] = {**(row.get("locator") or {}), "total": total}

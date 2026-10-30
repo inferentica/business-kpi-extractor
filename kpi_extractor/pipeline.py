@@ -299,7 +299,7 @@ class SymbolPipeline:
         self._unify_release_series(releases)
         self._adopt_restated_quarters()
         self._fix_mislabelled_quarters()
-        self._derive()
+        self._derive(spec)
         self._harmonize_labels()
         self.result.q4_gaps = self._q4_gaps()
         live = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] != "rejected"]
@@ -3667,9 +3667,16 @@ class SymbolPipeline:
 
     # Derived periods and storage.
 
-    def _derive(self) -> None:
+    def _derive(self, spec: Spec | None = None) -> None:
         changed = []
-        derived = derive_periods(list(self.values.values()))
+        # A template KPI that is a line of another (Apollo's Credit and Equity management fees, lines of its management
+        # fees) carries that parent, so a worked-out period is checked on its top level only.
+        parents = {(f"{AI_GROUP_PREFIX}{group.key}", kpi.key): kpi.parent for group in (spec.groups if spec else [])
+                   for kpi in group.kpis if kpi.parent}
+        values = [{**v, "locator": {**(v.get("locator") or {}), "parent": parents[(v["group_key"], v["kpi_key"])]}}
+                  if (v["group_key"], v["kpi_key"]) in parents else v for v in self.values.values()]
+        derived = [{**record, "locator": {k: v for k, v in (record.get("locator") or {}).items() if k != "parent"} or None}
+                   if (record["group_key"], record["kpi_key"]) in parents else record for record in derive_periods(values)]
         produced = {value_key(record) for record in derived}
         # Derived values whose inputs are gone or were replaced (e.g. a Q4 from a rejected reading) are withdrawn.
         changed.extend({**value, "validation_status": "rejected", "notes": ["inputs no longer available"]}

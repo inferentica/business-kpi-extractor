@@ -204,3 +204,17 @@ def test_a_segment_operating_loss_in_q4_is_not_held_for_review():
     quarters = [{"other": row(q, v)} for q, v in (("Q1", 103), ("Q2", 69), ("Q3", 100))]
     derived = _combine({"other": row("FY", 264)}, quarters, "Q4")
     assert derived[0]["value"] == -8 and derived[0]["validation_status"] == "verified"
+
+
+def test_a_derived_period_is_checked_on_its_top_level():
+    # Apollo's management fees with their Credit and Equity lines: the year's lines are inside its fees.
+    rows = []
+    for period, (fees, credit, equity, other) in {"Q1": (600, 440, 160, 140), "Q2": (650, 470, 180, 150),
+                                                   "Q3": (700, 500, 200, 160), "Q4": (720, 520, 200, 170)}.items():
+        for key, value, parent in (("fees", fees, None), ("credit", credit, "fees"), ("equity", equity, "fees"), ("other", other, None)):
+            row = _value(period, key, value, method="ai", group="kpi_am")
+            row["locator"] = {"total": fees + other, **({"parent": parent} if parent else {})}
+            rows.append(row)
+    [*annual] = [row for row in derive_periods(rows) if row["fiscal_period"] == "FY"]
+    assert {row["kpi_key"]: row["value"] for row in annual} == {"fees": 2670, "credit": 1930, "equity": 740, "other": 620}
+    assert all(row["validation_status"] == "verified" for row in annual)
