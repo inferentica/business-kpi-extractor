@@ -645,17 +645,24 @@ def _two_partitions(members: dict[str, float], total: float | None) -> tuple[dic
     tolerance = abs(total) * MAX_RECONCILIATION_ERROR
     keys = list(members)
     if abs(sum(members.values()) - 2 * total) > 2 * tolerance:
-        # One region beside the countries it is made of (Adobe's 10-K tags Americas beside United States and Other
-        # Americas; its 10-Qs give Americas only): the split with the region is the coarser one.
-        for parent in keys:
-            others = [key for key in keys if key != parent]
-            if members[parent] <= 0 or abs(sum(members[key] for key in others) - total) > tolerance:
-                continue
-            for size in (2, 3):
-                for combo in combinations(others, size):
-                    if len(others) - size >= 1 and abs(sum(members[key] for key in combo) - members[parent]) <= tolerance:
-                        coarse = {key: value for key, value in members.items() if key not in combo}
-                        return {key: members[key] for key in others}, coarse
+        # Regions beside the countries they are made of (Adobe's 10-K tags Americas beside United States and Other
+        # Americas, Asia beside Japan and Other Asia; its 10-Qs give the regions only): the split with the regions is
+        # the coarser one.
+        parents = [key for key in keys if members[key] > 0 and any(
+            abs(sum(members[other] for other in combo) - members[key]) <= tolerance
+            for size in (2, 3) for combo in combinations([other for other in keys if other != key], size))]
+        leaves = [key for key in keys if key not in parents]
+        if parents and abs(sum(members[key] for key in leaves) - total) <= tolerance:
+            used: set[str] = set()
+            for parent in sorted(parents, key=lambda key: -members[key]):
+                combo = next((combo for size in (2, 3) for combo in combinations([key for key in leaves if key not in used], size)
+                              if abs(sum(members[key] for key in combo) - members[parent]) <= tolerance), None)
+                if combo is None:
+                    return members, {}
+                used.update(combo)
+            coarse = {key: value for key, value in members.items() if key not in used}
+            if len(coarse) >= 2 and abs(sum(coarse.values()) - total) <= tolerance:
+                return {key: members[key] for key in leaves}, coarse
         return members, {}
     for size in (2, 3, 4):
         for combo in combinations(keys, size):

@@ -126,6 +126,11 @@ def test_a_region_beside_its_countries_is_the_coarser_split():
     members = {"us": 12529.0, "otheramericas": 1591.0, "americas": 14120.0, "emea": 6289.0, "apac": 3360.0}
     fine, coarse = _two_partitions(members, 23769.0)
     assert set(fine) == {"us", "otheramericas", "emea", "apac"} and set(coarse) == {"americas", "emea", "apac"}
+    # FY2020: Americas, EMEA and Asia each beside their countries.
+    members = {"americas": 7454.0, "asia": 2014.0, "emea": 3400.0, "gb": 880.0, "jp": 893.0, "otheramericas": 708.0,
+               "otherasia": 1121.0, "othereurope": 2520.0, "us": 6746.0}
+    fine, coarse = _two_partitions(members, 12868.0)
+    assert set(coarse) == {"americas", "asia", "emea"} and len(fine) == 6
 
 
 def test_products_against_services_is_published_beside_the_product_lines():
