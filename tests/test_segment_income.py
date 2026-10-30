@@ -78,3 +78,28 @@ def test_a_reconciling_item_on_the_segments_axis_keeps_its_name():
             fact(1_990e6, start, end)]
     income = segment_income(pd.DataFrame(rows), date(2026, 6, 27), False, {"amd:AllOtherMember": "All Other"}.get)
     assert income.current.rows[-1][1:] == ("All Other", "amd:AllOtherMember", -1_081e6)
+
+
+def test_a_companys_own_segment_measures_stand_in_for_operating_income():
+    # Brookfield Asset Management tags no operating income by segment; its "Segment Earnings" (fee-related earnings)
+    # and "Segment Revenue" are its own measures, beside its GAAP revenue by segment.
+    from kpi_extractor.segment_income import segment_revenue
+    start, end = "2026-04-01", "2026-06-30"
+    members = ("bam:CreditSegmentMember", "bam:InfrastructureMember", "bam:RealEstateSegmentMember",
+               "bam:EnergySegmentMember", "bam:PrivateEquityMember")
+
+    def measure(concept, values, total):
+        return [{**fact(value, start, end, member, "us-gaap:OperatingSegmentsMember"), "concept": concept}
+                for member, value in zip(members, values)] + [{**fact(total, start, end), "concept": concept}]
+    rows = measure("bam:SegmentEarnings", (208e6, 157e6, 125e6, 109e6, 41e6), 640e6) \
+        + measure("bam:SegmentRevenue", (400e6, 300e6, 260e6, 200e6, 157e6), 1_317e6) \
+        + [{**fact(919e6, start, end), "concept": "us-gaap:OperatingIncomeLoss"}]  # untagged by segment
+    earnings = segment_income(pd.DataFrame(rows), date(2026, 6, 30), False)
+    assert earnings.concept == "bam:SegmentEarnings" and earnings.label == "Earnings by Segment"
+    assert [value for *_rest, value in earnings.current.rows] == [208e6, 157e6, 125e6, 109e6, 41e6]
+    revenue = segment_revenue(pd.DataFrame(rows), date(2026, 6, 30), False)
+    assert revenue.label == "Segment Revenue" and revenue.current.total == 1_317e6
+    # Alphabet's tagged operating income is still what it reads, and it has no measure of its own.
+    alphabet = pd.DataFrame(quarter(39_157e6, 11_121e6, -2_047e6, -7_655e6, 40_576e6))
+    assert segment_income(alphabet, date(2026, 9, 30), False).concept == "us-gaap:OperatingIncomeLoss"
+    assert segment_revenue(alphabet, date(2026, 9, 30), False) is None

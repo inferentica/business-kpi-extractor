@@ -38,7 +38,8 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
                      titled_pie_slides, unit_region)
 from .prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from .release_breakdowns import line_key, release_breakdown
-from .segment_income import GROUP_KEY as INCOME_GROUP, GROUP_LABEL as INCOME_LABEL, INCOME_CONCEPT, LEFT_OVER_KEY, segment_income
+from .segment_income import (GROUP_KEY as INCOME_GROUP, LEFT_OVER_KEY, REVENUE_GROUP_KEY as OWN_REVENUE_GROUP, segment_income,
+                             segment_revenue)
 from .release_columns import amount, earlier_quarters, quarter_table_rows, release_grids, row_key, row_numbers
 from .tagged_metrics import (agrees, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits,
                              year_ago_facts)
@@ -86,7 +87,7 @@ _NOT_REPORTED = "not reported: "
 # Reports parsed ahead of the one being read, and parsed reports kept in memory.
 _READ_AHEAD = 3
 _XBRL_KEPT = 6
-_XBRL_READER = "xbrl reader 32"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 33"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -275,8 +276,10 @@ class SymbolPipeline:
                     else:
                         self._process_releases(releases, spec, version)
         prospectus = self._prospectus(company, reports)
+        # Each breakdown's year before its first report, from that report's comparatives (a recent listing; Brookfield
+        # Asset Management, filing 10-Qs since 2025).
+        self._year_ago_quarters()
         if prospectus is not None:
-            self._year_ago_quarters()
             self._store_prospectus_breakdowns(prospectus)
             if spec is not None:
                 self._read_prospectus_quarters(prospectus, releases, spec, version)
@@ -482,17 +485,18 @@ class SymbolPipeline:
 
     def _income_records(self, facts, labels, breakdowns, ref: FilingRef, fiscal_year: str, fiscal_period: str,
                         groups) -> list[dict]:
-        """Each segment's operating income, as tagged (see segment_income): its own breakdown, beside the revenue ones."""
+        """Each segment's operating income, as tagged (see segment_income): its own breakdown, beside the revenue ones; and
+        a company's own segment revenue measure, which its segment profit is measured against."""
         try:
             income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children)
+            own_revenue = segment_revenue(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children)
         except Exception as error:  # noqa: BLE001 - the revenue breakdowns stand without it
             self.log(f"{self.symbol}: segment income of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
             return []
+        records = self._measure_records(own_revenue, OWN_REVENUE_GROUP, INCOME_ORDER - 1, groups, ref, fiscal_year,
+                                        fiscal_period, breakdowns.period_end) if own_revenue else []
         if income is None:
-            return []
-        currency = next((group.currency for group, _notes in groups if group.currency), None) or "USD"
-        named = self.names.get(INCOME_GROUP) or {}
-        ytd = {key: value for key, _name, _element, value in income.year_to_date.rows} if income.year_to_date else {}
+            return records
         prior = {key: value for key, _name, _element, value in income.prior.rows} if income.prior else {}
         # A year whose worked-out remainder is the one line its quarters name (AMD's 10-K tags "All Other" with the sign
         # its 10-Qs give it reversed, so nothing tagged closes the gap) keeps that name.
@@ -507,17 +511,28 @@ class SymbolPipeline:
                                    else (key, label, element, value) for key, label, element, value in income.current.rows]
             if LEFT_OVER_KEY in prior:
                 prior[other] = prior.pop(LEFT_OVER_KEY)
+        return records + self._measure_records(income, INCOME_GROUP, INCOME_ORDER, groups, ref, fiscal_year, fiscal_period,
+                                               breakdowns.period_end, prior=prior)
+
+    def _measure_records(self, measure, group_key: str, group_order: int, groups, ref: FilingRef, fiscal_year: str,
+                         fiscal_period: str, period_end, prior: dict | None = None) -> list[dict]:
+        """A segment measure's rows (see segment_income), with the year before and the year to date in their locators."""
+        currency = next((group.currency for group, _notes in groups if group.currency), None) or "USD"
+        named = self.names.get(group_key) or {}
+        ytd = {key: value for key, _name, _element, value in measure.year_to_date.rows} if measure.year_to_date else {}
+        prior = prior if prior is not None else (
+            {key: value for key, _name, _element, value in measure.prior.rows} if measure.prior else {})
         records = []
-        for order, (key, label, element, value) in enumerate(income.current.rows):
+        for order, (key, label, element, value) in enumerate(measure.current.rows):
             records.append(self._record(
-                group_key=INCOME_GROUP, group_label=named.get("label") or INCOME_LABEL, group_kind="revenue_breakdown",
-                group_order=INCOME_ORDER, kpi_key=key, kpi_label=(named.get("members") or {}).get(key) or label,
+                group_key=group_key, group_label=named.get("label") or measure.label, group_kind="revenue_breakdown",
+                group_order=group_order, kpi_key=key, kpi_label=(named.get("members") or {}).get(key) or label,
                 kpi_order=order, unit="currency", value=value, currency=currency, method="xbrl", validation_status="verified",
                 reconciliation_error_pct=0, notes=[], ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
-                period_end=breakdowns.period_end, locator={
-                    "concept": INCOME_CONCEPT, "total": income.current.total, "member": element,
-                    **({"prior": prior[key], "prior_total": income.prior.total} if key in prior else {}),
-                    **({"ytd": ytd[key], "ytd_total": income.year_to_date.total} if key in ytd else {}),
+                period_end=period_end, locator={
+                    "concept": measure.concept, "total": measure.current.total, "member": element,
+                    **({"prior": prior[key], "prior_total": measure.prior.total} if key in prior else {}),
+                    **({"ytd": ytd[key], "ytd_total": measure.year_to_date.total} if key in ytd else {}),
                 },
             ))
         return records
@@ -1198,7 +1213,7 @@ class SymbolPipeline:
         latest: dict[str, tuple[str, str]] = {}
         rows = [value for value in self.values.values() if value["method"] == "xbrl" and value["validation_status"] == "verified"
                 and value["fiscal_period"] != "FY" and not value["group_key"].endswith("_levels")
-                and not value["group_key"].startswith(AI_GROUP_PREFIX) and value["group_key"] != INCOME_GROUP]
+                and not value["group_key"].startswith(AI_GROUP_PREFIX) and value["group_key"] not in (INCOME_GROUP, OWN_REVENUE_GROUP)]
         for value in rows:
             latest[value["group_key"]] = max(latest.get(value["group_key"], ("", "")), (value["fiscal_year"], value["fiscal_period"]))
         groups: dict[str, list[dict]] = {}
@@ -1212,12 +1227,13 @@ class SymbolPipeline:
                    and value["validation_status"] != "rejected" for value in self.values.values())
 
     def _year_ago_quarters(self) -> None:
-        """A recent listing's first reports give each breakdown's year-ago quarter (SpaceX's Q2 2026 10-Q, Q2 2025): kept
-        when every line has one and they add up to the year-ago revenue, for a quarter the company never reported."""
+        """A company's first reports give each breakdown's year-ago quarter (SpaceX's Q2 2026 10-Q, Q2 2025): kept when
+        every line has one and they add up to the year-ago total, for a quarter the company never reported."""
         records: list[dict] = []
         by_quarter: dict[tuple[str, str, str], list[dict]] = {}
         for value in self.values.values():
-            if (value["method"] == "xbrl" and value["validation_status"] == "verified" and value["fiscal_period"] != "FY"
+            # Years too: a first 10-K's comparative year lets the year before's Q4 be worked out from its quarters.
+            if (value["method"] == "xbrl" and value["validation_status"] == "verified"
                     and not value["group_key"].endswith("_levels") and not value["group_key"].startswith(AI_GROUP_PREFIX)):
                 by_quarter.setdefault((value["group_key"], value["fiscal_year"], value["fiscal_period"]), []).append(value)
         for (group, year, period), lines in by_quarter.items():
@@ -1901,7 +1917,7 @@ class SymbolPipeline:
         """Each XBRL breakdown's latest title and members (key → label)."""
         latest: dict[str, str] = {}
         for value in self.values.values():
-            if value["method"] == "xbrl" and value["group_key"] != INCOME_GROUP and value["period_end"] >= latest.get(value["group_key"], ""):
+            if value["method"] == "xbrl" and value["group_key"] not in (INCOME_GROUP, OWN_REVENUE_GROUP) and value["period_end"] >= latest.get(value["group_key"], ""):
                 latest[value["group_key"]] = value["period_end"]
         breakdowns: dict[str, dict] = {}
         for value in sorted(self.values.values(), key=lambda item: item["kpi_order"]):

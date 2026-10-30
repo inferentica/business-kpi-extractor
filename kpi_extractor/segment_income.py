@@ -8,6 +8,7 @@ operating income the report states."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Callable
@@ -26,6 +27,12 @@ _NEUTRAL = {("ConsolidationItemsAxis", "OperatingSegmentsMember")}
 _RECONCILING = {"CorporateNonSegmentMember": "Corporate", "MaterialReconcilingItemsMember": "Reconciling items",
                 "SegmentReconcilingItemsMember": "Reconciling items", "IntersegmentEliminationMember": "Eliminations"}
 _LEFT_OVER = "Unallocated"
+# A company's own segment measures, when it tags no operating income by segment (Brookfield Asset Management's
+# "Segment Earnings", its fee-related earnings, over its "Segment Revenue").
+_OWN_PROFIT = re.compile(r"^[\w-]+:Segment(?:Earnings|Profit|ProfitLoss|OperatingIncome(?:Loss)?)$")
+_OWN_REVENUE = re.compile(r"^[\w-]+:SegmentRevenues?$")
+REVENUE_GROUP_KEY = "segment_revenue"
+REVENUE_GROUP_LABEL = "Segment Revenue"
 LEFT_OVER_KEY = member_key(_LEFT_OVER)
 
 
@@ -42,6 +49,8 @@ class SegmentIncome:
     year_to_date: IncomeRows | None = None
     prior: IncomeRows | None = None
     elements: dict[str, str | None] = field(default_factory=dict)
+    concept: str = INCOME_CONCEPT
+    label: str = GROUP_LABEL
 
 
 def _period(frame: pd.DataFrame, end: date, low: int, high: int) -> pd.DataFrame:
@@ -102,12 +111,43 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
     return IncomeRows(rows, total)
 
 
+def _on_segments(facts: pd.DataFrame, concept: str) -> bool:
+    columns = [column for column in facts.columns if column.startswith("dim_") and _axis_name(column) in _SEGMENT_AXES]
+    frame = facts[facts["concept"] == concept]
+    return bool(columns) and bool(frame[columns].notna().any(axis=1).any())
+
+
+def _own_concept(facts: pd.DataFrame, pattern: re.Pattern) -> str | None:
+    return next((concept for concept in sorted(set(facts["concept"].astype(str))) if pattern.match(concept)
+                 and _on_segments(facts, concept)), None)
+
+
 def segment_income(facts: pd.DataFrame, period_end: date, annual: bool,
                    label: Callable[[str], str | None] = lambda _qname: None,
                    children: dict[str, set[str]] | None = None) -> SegmentIncome | None:
     """The period's segment operating income, with the year to date (for a Q4 worked out from the year) and the year
-    before (for a recent listing's history)."""
-    frame = facts[(facts["concept"] == INCOME_CONCEPT) & facts["numeric_value"].notna() & (facts["period_type"] == "duration")]
+    before (for a recent listing's history); else the company's own segment profit measure."""
+    if _on_segments(facts, INCOME_CONCEPT):
+        return _measure(facts, INCOME_CONCEPT, GROUP_LABEL, period_end, annual, label, children)
+    concept = _own_concept(facts, _OWN_PROFIT)
+    if concept is None:
+        return None
+    name = "Earnings by Segment" if "Earnings" in concept else "Profit by Segment"
+    return _measure(facts, concept, name, period_end, annual, label, children)
+
+
+def segment_revenue(facts: pd.DataFrame, period_end: date, annual: bool,
+                    label: Callable[[str], str | None] = lambda _qname: None,
+                    children: dict[str, set[str]] | None = None) -> SegmentIncome | None:
+    """A company's own segment revenue measure (Brookfield Asset Management's fee revenues by segment), which its
+    segment profit is measured against, beside its GAAP revenue by segment."""
+    concept = _own_concept(facts, _OWN_REVENUE)
+    return _measure(facts, concept, REVENUE_GROUP_LABEL, period_end, annual, label, children) if concept else None
+
+
+def _measure(facts: pd.DataFrame, concept: str, name: str, period_end: date, annual: bool,
+             label: Callable[[str], str | None], children: dict[str, set[str]] | None) -> SegmentIncome | None:
+    frame = facts[(facts["concept"] == concept) & facts["numeric_value"].notna() & (facts["period_type"] == "duration")]
     if frame.empty:
         return None
     labels = _member_labels(facts)
@@ -121,4 +161,4 @@ def segment_income(facts: pd.DataFrame, period_end: date, annual: bool,
     prior = next((rows for offset in range(-7, 8)
                   if (rows := _rows(_period(frame, year_ago + timedelta(days=offset), low, high), label, labels, children))), None)
     ytd = None if annual else _rows(_period(frame, period_end, 250, 290), label, labels, children)
-    return SegmentIncome(current, ytd, prior, {key: element for key, _name, element, _value in current.rows})
+    return SegmentIncome(current, ytd, prior, {key: element for key, _name, element, _value in current.rows}, concept, name)
