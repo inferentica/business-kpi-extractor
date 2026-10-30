@@ -174,8 +174,8 @@ def _label_pattern(label: str) -> re.Pattern:
 
 
 def quarter_table_rows(text: str, label: str) -> list[dict[tuple[int, int], float]]:
-    """A row's figures under each run of quarter headings in a text: {(year, quarter): figure}. A row with one more
-    figure than headings starts with its footnote mark ("Lithography systems sold (units) 1 91 86 106 100 113")."""
+    """A row's possible figures under each run of quarter headings in a text: {(year, quarter): figure}, read from its
+    first number and from its second (a footnote mark: "Lithography systems sold (units) 1 91 86 106 100 113")."""
     found = []
     pattern = _label_pattern(label)
     runs = list(_QUARTER_RUN.finditer(text))
@@ -189,11 +189,12 @@ def quarter_table_rows(text: str, label: str) -> list[dict[tuple[int, int], floa
         if not figures:
             continue
         cells = figures.group(0).split()
-        if len(cells) == len(quarters) + 1:
-            cells = cells[1:]
-        if len(cells) != len(quarters):
-            continue
-        row = {quarter: value for quarter, cell in zip(quarters, cells) if (value := amount(cell)) is not None}
-        if row:
-            found.append(row)
+        # The figures start at the first number or after a footnote mark, and a footnote mark may follow them ("Sale of
+        # lithography systems (in units) 1 72 102 79 91 121 1"): each reading is offered; the caller keeps the one that
+        # agrees with figures it holds.
+        for offset in (0, 1):
+            if offset + len(quarters) <= len(cells) <= len(quarters) + 2:
+                row = {quarter: value for quarter, cell in zip(quarters, cells[offset:]) if (value := amount(cell)) is not None}
+                if row:
+                    found.append(row)
     return found
