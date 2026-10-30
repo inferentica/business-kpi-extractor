@@ -1124,8 +1124,9 @@ class SymbolPipeline:
         return records
 
     def _exact_periods(self, group, key: str, quarters, facts_of, fresh: list[dict]) -> list[dict]:
-        """A flagged breakdown quarter whose every line is its report's exact tagged figure is settled: KKR tags each of
-        its asset management segment's five revenue lines to the thousand but not their total, so no total proves them.
+        """A flagged breakdown quarter whose every line is its report's exact tagged figure (for a Q4, the 10-K's year less
+        three settled quarters) is settled: KKR tags each of its asset management segment's five revenue lines to the
+        thousand but not their total, so no total proves them.
         A line's tags are those that equal its readings in at least two quarters and never differ; a total the group
         lists must be its lines added up, to its rounding."""
         rows = {value_key(v): v for v in self.values.values() if v["group_key"] == key and v["validation_status"] != "rejected"
@@ -1157,22 +1158,37 @@ class SymbolPipeline:
             tags[kpi.key] = [tag for tag, count in agree.items() if count >= 2 and count >= 2 * differ.get(tag, 0)]
         records = []
         settled = {"another part of this breakdown needs review", "confirmed by review", "settled by the checks", *_UNANCHORED}
+        def exact(quarter, kpi: str, value: float) -> bool:
+            if any(facts_of(quarter).get(tag) == value for tag in tags.get(kpi, [])):
+                return True
+            # A Q4 its 10-K tags only for the year: the year's exact figure less the three quarters before it.
+            nine = [by_period.get((quarter[0], period), {}).get(kpi) for period in ("Q1", "Q2", "Q3")]
+            if quarter[1] != "Q4" or any(v is None or v["validation_status"] != "verified" for v in nine):
+                return False
+            ref, end = quarters[quarter]
+            try:
+                annual = quarter_facts(self._xbrl(ref).facts.to_dataframe(), end, (330, 400))
+            except Exception:  # noqa: BLE001 - an unreadable report proves nothing
+                return False
+            return any(tag in annual and abs(annual[tag] - sum(float(v["value"]) for v in nine) - value) < 0.5
+                       for tag in tags.get(kpi, []))
+
         for quarter in waiting:
             lines = by_period[quarter]
             parts = {kpi: v for kpi, v in lines.items() if kpi != group.total_kpi}
-            facts = facts_of(quarter)
-            if len(parts) < 2 or not all(any(facts.get(tag) == float(v["value"]) for tag in tags.get(kpi, []))
-                                         for kpi, v in parts.items()):
+            if len(parts) < 2 or not all(exact(quarter, kpi, float(v["value"])) for kpi, v in parts.items()):
                 continue
             total = lines.get(group.total_kpi)
             whole = sum(float(v["value"]) for v in parts.values())
             if total and abs(float(total["value"]) - whole) > _rounding(float(total["value"])):
                 continue
             ref = quarters[quarter][0]
-            for v in lines.values():
+            for kpi, v in lines.items():
                 notes = [note for note in v.get("notes") or [] if note not in settled and not _is_jump(note)]
-                records.append({**v, "validation_status": "verified",
-                                "notes": [*notes, f"the {ref.form}'s exact figure; every line of the quarter is tagged"]})
+                record = {**v, "validation_status": "verified",
+                          "notes": [*notes, f"the {ref.form}'s exact figure; every line of the quarter is tagged"]}
+                records.append(record)
+                lines[kpi] = record  # the year's Q4 is worked out from it
         if records:
             self.log(f"{self.symbol}: {len(records)} breakdown values settled by their reports' exact tagged figures")
         return records
