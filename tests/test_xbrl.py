@@ -278,3 +278,23 @@ def test_regional_segments_read_as_regions_and_the_country_split_as_countries():
                                                             ("aws", "AWS", 30.0)], 170.0, 0.0, "USD", "c")]
     _name_regional_views(amazon)
     assert amazon[0].label == "Revenue by Segment"
+
+
+def test_every_segment_with_eliminations_beats_a_subset_that_comes_close():
+    # Intel's Q3 2025 10-Q: Foundry's revenue is nearly all intersegment, so the other segments alone come within 0.1%.
+    import pandas as pd
+    from kpi_extractor.xbrl import extract_breakdowns
+    start, end = "2025-06-29", "2025-09-27"
+    def fact(value, member=None, consolidation=None):
+        return {"concept": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", "numeric_value": value,
+                "period_type": "duration", "period_start": start, "period_end": end, "unit_ref": "usd",
+                "dim_us-gaap_StatementBusinessSegmentsAxis": member, "dim_srt_ConsolidationItemsAxis": consolidation}
+    rows = [fact(8_535e6, "intc:ClientComputingGroupMember", "us-gaap:OperatingSegmentsMember"),
+            fact(4_235e6, "intc:IntelFoundryMember", "us-gaap:OperatingSegmentsMember"),
+            fact(4_117e6, "intc:DatacenterAndAIMember", "us-gaap:OperatingSegmentsMember"),
+            fact(993e6, "us-gaap:AllOtherSegmentsMember", "us-gaap:OperatingSegmentsMember"),
+            fact(-4_227e6, None, "us-gaap:IntersegmentEliminationMember"), fact(13_653e6)]
+    breakdowns = extract_breakdowns(pd.DataFrame(rows), {"document_period_end_date": end, "fiscal_period": "Q3",
+                                                          "fiscal_year": 2025}, "10-Q", lambda _q: None, {})
+    segments = next(group for group in breakdowns.groups if group.key == "segments")
+    assert len(segments.members) == 5 and segments.reconciliation_error == 0.0

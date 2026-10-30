@@ -310,10 +310,15 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         members = drop_declared_parents(members, total, children or {})
         if axis not in _SEGMENT_AXES or not total or not eliminations.get(concept):
             return members
-        def adds_up(rows: dict[str, float]) -> bool:
-            leaves = drop_overlaps(remove_subtotals(rows, total), total)
+        def adds_up(rows: dict[str, float], overlaps: bool = True) -> bool:
+            leaves = remove_subtotals(rows, total)
+            leaves = drop_overlaps(leaves, total) if overlaps else leaves
             return abs(sum(leaves.values()) - total) <= abs(total) * MAX_RECONCILIATION_ERROR
         with_eliminations = {**members, **eliminations[concept]}
+        # Every segment with the eliminations beats the segments adding up only once one is dropped: Intel Foundry's
+        # revenue is nearly all intersegment, so without it the others came within 0.1% of revenue.
+        if not adds_up(members, overlaps=False) and adds_up(with_eliminations, overlaps=False):
+            return with_eliminations
         return with_eliminations if not adds_up(members) and adds_up(with_eliminations) else members
 
     def score(candidate: tuple[str, dict[str, float]], axis: str = ""):
