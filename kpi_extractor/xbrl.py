@@ -276,7 +276,23 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             single.setdefault((concept, axis), {}).setdefault(member, value)
         elif len(dimensions) == 2:
             paired.setdefault((concept, frozenset(dimensions)), []).append((dimensions, value))
+    # A member tagged only beside the one member of another axis it belongs to (Intel's 2021 "DCG platform", only with
+    # its Data Center Group) joins the axis's members with that figure; one tagged beside several is never added up.
+    beside: dict[tuple[str, str], dict[str, list[float]]] = {}
+    for (concept, _axes), items in paired.items():
+        for dimensions, value in items:
+            for axis, member in dimensions.items():
+                beside.setdefault((concept, axis), {}).setdefault(member, []).append(value)
+    def adds_up(rows: dict[str, float], total: float | None) -> bool:
+        leaves = drop_overlaps(remove_subtotals(rows, total), total)
+        return bool(total) and abs(sum(leaves.values()) - total) <= abs(total) * MAX_RECONCILIATION_ERROR
+
     for (concept, axis), members in single.items():
+        extra = {member: values[0] for member, values in beside.get((concept, axis), {}).items()
+                 if member not in members and len(values) == 1}
+        # Only when the axis's own members fall short of revenue and the extra ones complete it.
+        if extra and not adds_up(members, totals.get(concept)) and adds_up({**members, **extra}, totals.get(concept)):
+            members = {**members, **extra}
         candidates.setdefault(axis, []).append((concept, members))
     for (concept, axes), items in paired.items():
         found = False

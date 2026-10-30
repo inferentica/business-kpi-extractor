@@ -298,3 +298,24 @@ def test_every_segment_with_eliminations_beats_a_subset_that_comes_close():
                                                           "fiscal_year": 2025}, "10-Q", lambda _q: None, {})
     segments = next(group for group in breakdowns.groups if group.key == "segments")
     assert len(segments.members) == 5 and segments.reconciliation_error == 0.0
+
+
+def test_a_line_tagged_only_beside_its_segment_completes_the_split():
+    # Intel's Q2 2021 10-Q tags "DCG platform" only with its Data Center Group; the other platforms alone.
+    import pandas as pd
+    from kpi_extractor.xbrl import extract_breakdowns
+    def fact(value, product=None, segment=None):
+        return {"concept": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", "numeric_value": value,
+                "period_type": "duration", "period_start": "2021-03-28", "period_end": "2021-07-03", "unit_ref": "usd",
+                "dim_srt_ProductOrServiceAxis": product, "dim_us-gaap_StatementBusinessSegmentsAxis": segment}
+    rows = [fact(15_991e6, "intc:PlatformMember"), fact(3_640e6, "srt:OtherProductOrServiceMember"),
+            fact(2_635e6, "intc:DesktopPlatformMember"), fact(6_743e6, "intc:NotebookPlatformMember"),
+            fact(19e6, "intc:OtherPlatformMember"), fact(891e6, "intc:IOTGPlatformMember"),
+            fact(5_703e6, "intc:DCGPlatformMember", "intc:DataCenterGroupMember"),
+            fact(9_397e6, "intc:PlatformMember", "intc:ClientComputingGroupMember"),
+            fact(712e6, "srt:OtherProductOrServiceMember", "intc:ClientComputingGroupMember"),
+            fact(752e6, "srt:OtherProductOrServiceMember", "intc:DataCenterGroupMember"), fact(19_631e6)]
+    breakdowns = extract_breakdowns(pd.DataFrame(rows), {"document_period_end_date": "2021-07-03", "fiscal_period": "Q2",
+                                                          "fiscal_year": 2021}, "10-Q", lambda _q: None, {})
+    products = next(group for group in breakdowns.groups if group.key == "products")
+    assert len(products.members) == 6 and products.reconciliation_error == 0.0

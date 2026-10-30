@@ -1299,3 +1299,66 @@ def test_a_group_of_lines_beside_their_segment_total_repeats_xbrl():
     assert repeats_xbrl(group, [products, {"space", "connectivity", "si"}])
     assert not repeats_xbrl(group, [products])
 
+
+
+def test_a_relabelled_year_corrects_the_year_before_and_its_operating_income():
+    members = {"client": "amd:ClientMember", "datacenter": "amd:DataCenterMember", "gaming": "amd:GamingMember",
+               "embedded": "amd:EmbeddedMember", "unallocated": "us-gaap:MaterialReconcilingItemsMember"}
+
+    def row(group, year, period, end, key, value, prior=None):
+        return {"group_key": group, "kpi_key": key, "kpi_label": key, "fiscal_year": year, "fiscal_period": period,
+                "period_end": end, "method": "xbrl", "validation_status": "verified", "value": value,
+                "source_accession": f"{year}{period}", "group_label": group, "group_kind": "revenue_breakdown",
+                "locator": {"prior": prior, "member": members[key]}}
+    ends = {"2023": ("2023-04-01", "2023-07-01", "2023-09-30"), "2024": ("2024-03-30", "2024-06-29", "2024-09-28"),
+            "2025": ("2025-03-29", "2025-06-28", "2025-09-27")}
+    # True (datacenter, client, gaming, embedded); AMD tagged Data Center's as Client, Client's as Gaming, Gaming's as
+    # Data Center in 2023 and 2024, and its 2024 10-Qs restate 2023 the same way.
+    true = {"2023": [(1295, 739, 1757, 1562), (1321, 998, 1581, 1459), (1598, 1453, 1506, 1243)],
+            "2024": [(2337, 1368, 922, 846), (2834, 1492, 648, 861), (3549, 1881, 462, 927)]}
+    history = []
+    for year in ("2023", "2024"):
+        for index, period in enumerate(("Q1", "Q2", "Q3")):
+            dc, client, gaming, embedded = true[year][index]
+            before = true["2023"][index] if year == "2024" else None
+            tagged = {"client": (dc, before and before[0]), "gaming": (client, before and before[1]),
+                      "datacenter": (gaming, before and before[2]), "embedded": (embedded, before and before[3])}
+            history += [row("segments", year, period, ends[year][index], k, v, p) for k, (v, p) in tagged.items()]
+    history += [row("segments", "2023", "FY", "2023-12-30", k, v) for k, v in (("client", 4651), ("datacenter", 6496), ("gaming", 6212), ("embedded", 5321))]
+    history += [row("segments", "2024", "FY", "2024-12-28", k, v) for k, v in (("client", 7054), ("datacenter", 12579), ("gaming", 2595), ("embedded", 3557))]
+    for index, period in enumerate(("Q1", "Q2", "Q3")):
+        dc, _client, _gaming, embedded = true["2024"][index]
+        history += [row("segments", "2025", period, ends["2025"][index], "datacenter", 1, dc),
+                    row("segments", "2025", period, ends["2025"][index], "embedded", 1, embedded)]
+    # Operating income in Q1 2024, tagged the same way (Data Center 541, Client 86, Gaming 151), with 2025's comparatives.
+    for index, (period, income) in enumerate((("Q1", (541, 86, 151, 342)), ("Q2", (743, 89, 77, 345)), ("Q3", (1041, 276, 12, 372)))):
+        dc, client, gaming, embedded = income
+        end = ends["2024"][index]
+        history += [row("segment_income", "2024", period, end, "client", dc), row("segment_income", "2024", period, end, "gaming", client),
+                    row("segment_income", "2024", period, end, "datacenter", gaming), row("segment_income", "2024", period, end, "embedded", embedded),
+                    row("segment_income", "2024", period, end, "unallocated", -1000)]
+        history += [row("segment_income", "2025", period, ends["2025"][index], "datacenter", 1, dc),
+                    row("segment_income", "2025", period, ends["2025"][index], "embedded", 1, embedded)]
+    pipeline = _pipeline(FakeControl({}), history)
+    pipeline._fix_mislabelled_quarters()
+
+    def quarter(group, year):
+        return {k: v["value"] for (g, k, y, p), v in pipeline.values.items()
+                if g == group and y == year and p == "Q1" and v["validation_status"] == "verified"}
+    assert quarter("segments", "2023") == {"datacenter": 1295, "client": 739, "gaming": 1757, "embedded": 1562}
+    assert quarter("segment_income", "2024") == {"datacenter": 541, "client": 86, "gaming": 151, "embedded": 342, "unallocated": -1000}
+
+
+def test_a_quarter_moved_to_the_year_with_its_release_goes_back_to_q4():
+    # Apple's FY2019 Q4 release: its product-type table ("three months ended") was re-filed as the year.
+    base = {"group_key": "kpi_product_type", "group_label": "Revenue by Product Type", "group_kind": "revenue_breakdown",
+            "fiscal_year": "2019", "period_end": "2019-09-28", "method": "ai", "source_accession": "q4",
+            "validation_status": "verified", "locator": {"header": "three months ended @ # #", "total": 64_040e6}}
+    rows = [{**base, "kpi_key": "products", "kpi_label": "Products", "fiscal_period": "FY", "value": 51_529e6,
+             "notes": ["full-year figures, re-filed from Q4"]},
+            {**base, "kpi_key": "products", "kpi_label": "Products", "fiscal_period": "Q4", "value": 51_529e6,
+             "validation_status": "rejected", "notes": ["full-year figures filed as Q4; see FY"]}]
+    pipeline = _pipeline(FakeControl({}), rows)
+    pipeline._refile_annuals()
+    assert pipeline.values[("kpi_product_type", "products", "2019", "Q4")]["validation_status"] == "verified"
+    assert pipeline.values[("kpi_product_type", "products", "2019", "FY")]["validation_status"] == "rejected"

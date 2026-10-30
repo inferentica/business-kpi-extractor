@@ -81,7 +81,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 23"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 24"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -2346,7 +2346,10 @@ class SymbolPipeline:
 
     def _refile_annuals(self) -> None:
         """Repairs full-year figures stored as Q4 before these checks existed: every AI value from that filing moves
-        to FY, and the Q4 rows are rejected so Q4 is derived as FY − Q1 − Q2 − Q3."""
+        to FY, and the Q4 rows are rejected so Q4 is derived as FY − Q1 − Q2 − Q3. A reading from a column headed for
+        three months stays the quarter it is (Apple's FY2019 Q4 release: its product-type table was moved to FY with
+        the release's yearly readings, and Q4 came out at −$110.8 billion); one moved before is moved back."""
+        self._unfile_quarters()
         annual_totals = {v["period_end"]: float(v["locator"]["total"]) for v in self.values.values()
                          if v["method"] == "xbrl" and v["fiscal_period"] == "FY" and (v.get("locator") or {}).get("total")}
         misfiled = set()
@@ -2363,7 +2366,8 @@ class SymbolPipeline:
             return
         moved = []
         for v in list(self.values.values()):
-            if v["method"] == "ai" and v["fiscal_period"] == "Q4" and (v["source_accession"], v["fiscal_year"]) in misfiled:
+            if v["method"] == "ai" and v["fiscal_period"] == "Q4" and (v["source_accession"], v["fiscal_year"]) in misfiled \
+                    and not _quarter_column(v):
                 # A jump flagged while the year was mistaken for a quarter says nothing about the year.
                 notes = [note for note in (v.get("notes") or []) if not _is_jump(note)]
                 status = "verified" if v["validation_status"] == "needs_review" and not notes else v["validation_status"]
@@ -2373,6 +2377,25 @@ class SymbolPipeline:
         for start in range(0, len(moved), 400):
             self._store(values=moved[start:start + 400])
         self.log(f"{self.symbol}: re-filed {len(misfiled)} annual report(s) stored as Q4")
+
+    def _unfile_quarters(self) -> None:
+        """A quarter's figures moved to FY with their release's yearly readings go back to Q4, the year's derived rows
+        rejected so the year is worked out again."""
+        back = []
+        for v in list(self.values.values()):
+            if v["method"] != "ai" or v["fiscal_period"] != "FY" or v["validation_status"] == "rejected" \
+                    or "full-year figures, re-filed from Q4" not in (v.get("notes") or []) or not _quarter_column(v):
+                continue
+            notes = [note for note in v.get("notes") or [] if note != "full-year figures, re-filed from Q4"]
+            back.append({**v, "fiscal_period": "Q4", "validation_status": "verified", "notes": notes})
+            back.append({**v, "validation_status": "rejected", "notes": ["a quarter's figure, moved back to Q4"]})
+            derived = self.values.get((v["group_key"], v["kpi_key"], v["fiscal_year"], "Q4"))
+            if derived and derived["method"] == "derived":
+                self.values.pop(value_key(derived), None)
+        for start in range(0, len(back), 400):
+            self._store(values=back[start:start + 400])
+        if back:
+            self.log(f"{self.symbol}: {len(back) // 2} quarterly figures moved back from FY to Q4")
 
     def _adopt_listed_keys(self, spec: Spec) -> None:
         """Stored rows of a table read whole move to the key of the listed KPI they are ("3-nanometer" → nm3), the key a
@@ -2811,54 +2834,91 @@ class SymbolPipeline:
         self._release_held_breakdowns()
 
     def _fix_mislabelled_quarters(self) -> None:
-        """A filer's XBRL can attach figures to the wrong members (AMD's 2024 10-Qs tag Data Center's $2,337M as Client).
-        A later filing's comparatives then contradict them: the same member restated with a value another member of
-        that quarter holds. The quarters of that year are relabelled with the one mapping that every later comparative
-        and the year's own 10-K allow (no member's Q4 below zero); if the evidence allows none or several, they are
-        flagged instead, so swapped names are never served."""
-        rows = [v for v in self.values.values() if v["method"] == "xbrl" and v["validation_status"] == "verified"]
-        by_period: dict[tuple[str, str, str], dict[str, dict]] = {}
-        for v in rows:
-            by_period.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
-        # Later comparatives: (group, quarter end) → {key: restated value}.
-        restated: dict[tuple[str, str], dict[str, float]] = {}
-        for v in rows:
-            prior = (v.get("locator") or {}).get("prior")
-            if prior is not None and v["fiscal_period"] != "FY":
-                end = (date.fromisoformat(v["period_end"][:10]) - timedelta(days=365)).isoformat()
-                restated.setdefault((v["group_key"], end), {})[v["kpi_key"]] = float(prior)
-        changes = []
-        for (group, year), quarters in self._contradicted_years(by_period, restated).items():
+        """A filer's XBRL can attach figures to the wrong members (AMD's 2023 and 2024 10-Qs tag Data Center's $2,337M as
+        Client). A later filing's comparatives then contradict them: the same member restated with a value another member
+        of that quarter holds. The quarters of that year are relabelled with the one mapping that every later comparative
+        and the year's own 10-K allow (no member's Q4 revenue below zero); if the evidence allows none or several, the
+        mapping found for another group of the same filings (operating income takes revenue's) is used when it fits, else
+        they are flagged, so swapped names are never served. Years go newest first: a relabelled year's own comparatives
+        are the evidence for the year before (AMD's 2024 10-Qs restate 2023 with the same wrong tags)."""
+        held = "member labels contradict later filings"
+        done: set[tuple[str, str]] = set()
+        for _round in range(6):
+            rows = [v for v in self.values.values() if v["method"] == "xbrl" and (
+                v["validation_status"] == "verified" or held in (v.get("notes") or []))]
+            by_period: dict[tuple[str, str, str], dict[str, dict]] = {}
+            for v in rows:
+                by_period.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
+            # Later comparatives: (group, quarter end) → {key: restated value}.
+            restated: dict[tuple[str, str], dict[str, float]] = {}
+            for v in rows:
+                prior = (v.get("locator") or {}).get("prior")
+                if prior is not None and v["fiscal_period"] != "FY" and v["validation_status"] == "verified":
+                    end = (date.fromisoformat(v["period_end"][:10]) - timedelta(days=365)).isoformat()
+                    restated.setdefault((v["group_key"], end), {})[v["kpi_key"]] = float(prior)
+            contradicted = {item: quarters for item, quarters in self._contradicted_years(by_period, restated).items()
+                            if item not in done}
+            flagged = {(v["group_key"], v["fiscal_year"]) for v in rows if held in (v.get("notes") or [])
+                       and v["fiscal_period"] != "FY" and (v["group_key"], v["fiscal_year"]) not in done}
+            for group, year in flagged - set(contradicted):
+                quarters = [q for q in (by_period.get((group, year, p)) for p in ("Q1", "Q2", "Q3")) if q]
+                if quarters and len({frozenset(q) for q in quarters}) == 1:
+                    contradicted[(group, year)] = quarters
+            if not contradicted:
+                break
+            # Newest year first; revenue before operating income, whose mapping may be borrowed.
+            (group, year), quarters = max(contradicted.items(), key=lambda item: (item[0][1], item[0][0] != INCOME_GROUP))
+            done.add((group, year))
+            changes = []
             keys = sorted(quarters[0])
             annual = by_period.get((group, year, "FY"), {})
             evidence = [(quarter, {k: x for k, x in _restated_for(restated, group, quarter[keys[0]]["period_end"]).items()
                                    if k in keys}) for quarter in quarters]
-            fits = []
-            for order in permutations(keys):
-                mapping = dict(zip(keys, order))  # stored key → true key
+
+            def fits_evidence(mapping: dict[str, str]) -> bool:
                 relabelled = [{mapping[k]: float(q[k]["value"]) for k in keys} for q in quarters]
                 if any(any(not _same(relabelled[i][k], x) for k, x in found.items()) for i, (_q, found) in enumerate(evidence)):
-                    continue
-                if set(annual) == set(keys) and any(float(annual[k]["value"]) - sum(r[k] for r in relabelled) < 0 for k in keys):
-                    continue
-                fits.append(mapping)
+                    return False
+                # A segment's operating income may be a loss in Q4; its revenue may not.
+                return group == INCOME_GROUP or set(annual) != set(keys) or not any(
+                    float(annual[k]["value"]) - sum(r[k] for r in relabelled) < 0 for k in keys if not balancing(k))
+
+            fits = [mapping for order in permutations(keys) if fits_evidence(mapping := dict(zip(keys, order)))]
+            if len(fits) != 1:
+                # Another group of the same filings, already on its true names, says which segment each member is.
+                named: dict[tuple[str, str], str] = {}
+                for v in self.values.values():
+                    member = (v.get("locator") or {}).get("member")
+                    if v["group_key"] != group and member and v["method"] == "xbrl" and v["validation_status"] == "verified":
+                        named[(v.get("source_accession") or "", member)] = v["kpi_key"]
+                borrowed = set()
+                for quarter in quarters:
+                    mapping = {}
+                    for key, row in quarter.items():
+                        true = named.get((row.get("source_accession") or "", (row.get("locator") or {}).get("member") or ""))
+                        mapping[key] = true if true in keys else key
+                    borrowed.add(tuple(sorted(mapping.items())))
+                if len(borrowed) == 1 and sorted((mapping := dict(next(iter(borrowed)))).values()) == keys and fits_evidence(mapping):
+                    fits = [mapping]
             if len(fits) == 1 and any(k != t for k, t in fits[0].items()):
                 for quarter in quarters:
                     for key, row in quarter.items():
                         true = fits[0][key]
-                        if true != key:
-                            label = next((q[true]["kpi_label"] for q in quarters if true in q), true)
-                            changes.append({**row, "kpi_key": true, "kpi_label": label,
-                                            "notes": [*(row.get("notes") or []), "member labels corrected from later filings"]})
+                        label = next((q[true]["kpi_label"] for q in quarters if true in q), true)
+                        notes = [note for note in (row.get("notes") or []) if note != held]
+                        changes.append({**row, "kpi_key": true, "kpi_label": label, "validation_status": "verified",
+                                        "notes": [*notes, *([] if true == key else ["member labels corrected from later filings"])]})
+            elif len(fits) == 1:
+                changes += [{**row, "validation_status": "verified", "notes": [n for n in row.get("notes") or [] if n != held]}
+                            for quarter in quarters for row in quarter.values() if held in (row.get("notes") or [])]
             elif not any(all(_same(float(q[k]["value"]), x) for k, x in found.items()) for q, found in evidence):
-                for quarter in quarters:
-                    changes += [{**row, "validation_status": "needs_review",
-                                 "notes": [*(row.get("notes") or []), "member labels contradict later filings"]}
-                                for row in quarter.values()]
-        for start in range(0, len(changes), 400):
-            self._store(values=changes[start:start + 400])
-        if changes:
-            self.log(f"{self.symbol}: {len(changes)} XBRL values relabelled or held from later filings' comparatives")
+                changes += [{**row, "validation_status": "needs_review",
+                             "notes": [*(row.get("notes") or []), *([] if held in (row.get("notes") or []) else [held])]}
+                            for quarter in quarters for row in quarter.values()]
+            for start in range(0, len(changes), 400):
+                self._store(values=changes[start:start + 400])
+            if changes:
+                self.log(f"{self.symbol}: {len(changes)} XBRL values of {group} {year} relabelled or held from later filings' comparatives")
 
     @staticmethod
     def _contradicted_years(by_period: dict, restated: dict) -> dict[tuple[str, str], list[dict]]:
@@ -3195,6 +3255,13 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance, covered: list[set[str]
 
 _ANNUAL_HEADER = re.compile(r"twelve months|<12 months>|<5[23] weeks>|fifty-(two|three) weeks|years? ended|fiscal years?|full year")
 _QUARTER_HEADER = re.compile(r"three months|<3 months>|thirteen weeks|<1[34] weeks>|quarter|\bq[1-4]\b|\b[1-4]q\b")
+
+
+def _quarter_column(value: dict) -> bool:
+    """Whether a value was read from a column headed for three months, which no yearly total contradicts."""
+    locator = value.get("locator") or {}
+    header = str(locator.get("header") or "")
+    return bool(_QUARTER_HEADER.search(header)) and not _ANNUAL_HEADER.search(header)
 
 
 def _annual_header(header: str) -> bool:
