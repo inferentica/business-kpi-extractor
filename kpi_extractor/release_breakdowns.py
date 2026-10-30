@@ -129,7 +129,9 @@ def _columned(table: Table, measure: str) -> tuple[list[str], list[str]] | None:
 def _columned_items(document: Document, table: Table, period_end: date, measure: str, scale: float):
     """A columned table of the quarter, with the same table of a year before as its year-ago column."""
     header = f"{table.context[-200:]} {' '.join(' '.join(cells) for cells in table.rows[:3])}".lower()
-    if _table_date(table) != period_end or (_LONGER.search(header) and not _QUARTER.search(header)):
+    # Within a week: a release's quarter is named by its nominal end (Intel's Sep 27), the table by its own (Sep 26).
+    own = _table_date(table)
+    if own is None or abs((own - period_end).days) > 7 or (_LONGER.search(header) and not _QUARTER.search(header)):
         return None
     layout = _columned(table, measure)
     if layout is None:
@@ -138,7 +140,7 @@ def _columned_items(document: Document, table: Table, period_end: date, measure:
     prior_row = None
     for other in document.tables.values():
         when = _table_date(other) if other is not table else None
-        if when and 357 <= (period_end - when).days <= 371 and (found := _columned(other, measure)) and found[0] == names:
+        if when and 357 <= (own - when).days <= 371 and (found := _columned(other, measure)) and found[0] == names:
             prior_row = found[1]
             break
     items = []

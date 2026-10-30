@@ -112,5 +112,5 @@ def test_a_segment_table_laid_out_by_column_with_its_year_ago_table():
     assert revenue.table == "T7" and revenue.values["ccpg"] == 8_097e6 and revenue.total == 16_513e6
     income = release_breakdown(document, {"ccpg": "CCPG", "dcai": "DCAI", "all_other": "All Other", "intel_foundry": "Intel Foundry",
                                           "unallocated": "Unallocated"},
-                               {"dcai": 964e6, "unallocated": -754e6}, date(2026, 9, 26), measure="income")
+                               {"dcai": 964e6, "unallocated": -754e6}, date(2026, 9, 27), measure="income")
     assert income.values["unallocated"] == -1_128e6 and income.total == 2_522e6
