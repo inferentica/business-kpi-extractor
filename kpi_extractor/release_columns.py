@@ -168,9 +168,11 @@ _FIGURES = re.compile(r"(?:\s+(?:\(?-?[\d,]*\.?\d+\)?|[—–-]))+")
 
 
 def _label_pattern(label: str) -> re.Pattern:
-    words = [re.escape(word) for word in clean(label).split()]
-    # Not the end of a longer label ("New lithography systems sold" for "Lithography systems sold").
-    return re.compile(r"(?<![A-Za-z])(?<![A-Za-z]\s)" + r"\s+".join(words), re.I)
+    label = clean(label)
+    # A row starts with its label's own capital; the end of a longer label does not ("New lithography systems sold" for
+    # "Lithography systems sold"). A row after another's figures ("… -16.2 ppts Shipment (Kpcs, …)") still matches.
+    rest = r"\s+".join(re.escape(word) for word in label[1:].split(" "))
+    return re.compile(r"(?<![A-Za-z])" + re.escape(label[:1]) + "(?i:" + rest + ")")
 
 
 def quarter_table_rows(text: str, label: str) -> list[dict[tuple[int, int], float]]:
