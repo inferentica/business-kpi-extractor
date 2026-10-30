@@ -257,3 +257,46 @@ def test_a_breakdowns_year_before_comes_from_the_reports_comparative_columns():
     q1 = next(v for v in stored if v["fiscal_period"] == "Q1")
     assert q1["period_end"] == "2024-03-01" and q1["source_accession"] == "q1" and q1["locator"]["year_ago"]
     assert q1["notes"] == ["the 10-Q's exact figure; its column for Q1 2024"]
+
+
+def test_a_flagged_breakdown_quarter_whose_lines_are_all_tagged_exactly_is_settled():
+    # KKR tags each asset management revenue line to the thousand but not their total.
+    from datetime import date as day
+    from types import SimpleNamespace
+
+    from kpi_extractor import ai
+    from kpi_extractor.pipeline import SymbolPipeline
+    ends = {"q1": "2026-03-31", "q2": "2026-06-30", "q3": "2026-09-30"}
+    starts = {"q1": "2026-01-01", "q2": "2026-04-01", "q3": "2026-07-01"}
+    figures = {"q1": (1_192_504e3, 252_709e3), "q2": (1_249_964e3, 221_269e3), "q3": (1_300_000e3, 230_000e3)}
+    members = {"fees": "kkr:ManagementFeesMember", "transaction": "kkr:TransactionAndMonitoringFeesMember"}
+
+    def frame_of(accession):
+        return pd.DataFrame([{"concept": "us-gaap:Revenues", "numeric_value": value, "period_type": "duration",
+                              "period_start": starts[accession], "period_end": ends[accession], "dim_srt_ProductOrServiceAxis": member}
+                             for member, value in zip(members.values(), figures[accession])])
+    pipeline = SymbolPipeline(None, "KKR", quarters=4, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(name="KKR", fiscal_year_end="1231", foreign=False)
+    pipeline.offset = 0
+    pipeline.filings = {a: {"accession": a, "period_end": e, "status": "processed"} for a, e in ends.items()}
+    pipeline.values = {}
+    read = {"Q1": (1_192_504e3, 252_709e3, 1_445_213e3), "Q2": (1_249_964e3, 221_269e3, 1_471_233e3),
+            "Q3": (1_300_000e3, 230_001e3, 1_530_001e3)}  # Q3's second line is a thousand off its tag
+    for period, (fees, transaction, total) in read.items():
+        for kpi, value in (("fees", fees), ("transaction", transaction), ("total", total)):
+            pipeline.values[("kpi_am", kpi, "2026", period)] = {
+                "group_key": "kpi_am", "group_label": "AM", "group_kind": "revenue_breakdown", "group_order": 20, "kpi_key": kpi,
+                "kpi_label": kpi, "kpi_order": 0, "unit": "currency", "currency": "USD", "fiscal_year": "2026", "fiscal_period": period,
+                "period_end": ends[f"q{period[1]}"], "method": "ai", "validation_status": "needs_review", "source_accession": "release",
+                "value": value, "notes": ["total matches no figure the company reported in XBRL"], "locator": {"total": total}}
+    pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
+    stored = []
+    pipeline._store = lambda values: stored.extend(values)
+    spec = ai.Spec.model_validate({"groups": [{"key": "am", "label": "AM", "kind": "revenue_breakdown", "total_kpi": "total", "kpis": [
+        {"key": "total", "label": "Total", "unit": "currency"}, {"key": "fees", "label": "Fees", "unit": "currency"},
+        {"key": "transaction", "label": "Transaction", "unit": "currency"}]}]})
+    reports = [SimpleNamespace(accession=a, form="10-Q", filed=day(2026, 11, 1), source_url="u") for a in ends]
+    pipeline._fill_tagged_metrics(reports, spec)
+    settled = {(v["fiscal_period"], v["kpi_key"]) for v in stored if v["validation_status"] == "verified"}
+    assert settled == {(p, k) for p in ("Q1", "Q2") for k in ("fees", "transaction", "total")}
+    assert all(v["notes"] == ["the 10-Q's exact figure; every line of the quarter is tagged"] for v in stored)

@@ -1120,6 +1120,61 @@ class SymbolPipeline:
                     ))
             if split:
                 records += self._year_ago_lines(group, key, quarters, records)
+                records += self._exact_periods(group, key, quarters, facts_of, records)
+        return records
+
+    def _exact_periods(self, group, key: str, quarters, facts_of, fresh: list[dict]) -> list[dict]:
+        """A flagged breakdown quarter whose every line is its report's exact tagged figure is settled: KKR tags each of
+        its asset management segment's five revenue lines to the thousand but not their total, so no total proves them.
+        A line's tags are those that equal its readings in at least two quarters and never differ; a total the group
+        lists must be its lines added up, to its rounding."""
+        rows = {value_key(v): v for v in self.values.values() if v["group_key"] == key and v["validation_status"] != "rejected"
+                and v["fiscal_period"] != "FY"}
+        rows.update({value_key(v): v for v in fresh if v["group_key"] == key})
+        by_period: dict[tuple[str, str], dict[str, dict]] = {}
+        for v in rows.values():
+            by_period.setdefault((v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
+        waiting = sorted(quarter for quarter, lines in by_period.items() if quarter in quarters and any(
+            v["validation_status"] == "needs_review" and not v.get("owner_decision") for v in lines.values()))
+        if not waiting:
+            return []
+        tags = {}
+        for kpi in group.kpis:
+            if kpi.key == group.total_kpi:
+                continue
+            readings = {quarter: float(lines[kpi.key]["value"]) for quarter, lines in by_period.items()
+                        if quarter in quarters and kpi.key in lines}
+            # A tag that equals the readings in two quarters at least, and twice as often as it differs: one misread
+            # quarter must not keep the others from being settled.
+            agree: dict = {}
+            differ: dict = {}
+            for quarter in sorted(readings, reverse=True)[:12]:
+                for tag, fact in facts_of(quarter).items():
+                    if fact == readings[quarter]:
+                        agree[tag] = agree.get(tag, 0) + 1
+                    elif readings[quarter] and abs(fact / readings[quarter] - 1) < 0.2:  # the same series, another figure
+                        differ[tag] = differ.get(tag, 0) + 1
+            tags[kpi.key] = [tag for tag, count in agree.items() if count >= 2 and count >= 2 * differ.get(tag, 0)]
+        records = []
+        settled = {"another part of this breakdown needs review", "confirmed by review", "settled by the checks", *_UNANCHORED}
+        for quarter in waiting:
+            lines = by_period[quarter]
+            parts = {kpi: v for kpi, v in lines.items() if kpi != group.total_kpi}
+            facts = facts_of(quarter)
+            if len(parts) < 2 or not all(any(facts.get(tag) == float(v["value"]) for tag in tags.get(kpi, []))
+                                         for kpi, v in parts.items()):
+                continue
+            total = lines.get(group.total_kpi)
+            whole = sum(float(v["value"]) for v in parts.values())
+            if total and abs(float(total["value"]) - whole) > _rounding(float(total["value"])):
+                continue
+            ref = quarters[quarter][0]
+            for v in lines.values():
+                notes = [note for note in v.get("notes") or [] if note not in settled and not _is_jump(note)]
+                records.append({**v, "validation_status": "verified",
+                                "notes": [*notes, f"the {ref.form}'s exact figure; every line of the quarter is tagged"]})
+        if records:
+            self.log(f"{self.symbol}: {len(records)} breakdown values settled by their reports' exact tagged figures")
         return records
 
     def _year_ago_lines(self, group, key: str, quarters, fresh: list[dict]) -> list[dict]:
