@@ -271,6 +271,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     single_by_level: dict[bool, dict[tuple[str, str], dict[str, float]]] = {False: {}, True: {}}
     paired_levels: dict[tuple[str, frozenset], set[bool]] = {}
     paired_pure: dict[tuple[str, frozenset], list[tuple[dict[str, str], float]]] = {}
+    paired_segment: dict[tuple[str, frozenset], list[tuple[dict[str, str], float]]] = {}
     # (axis, concept) → the one (axis, member) its facts are also tagged with (Alphabet's products, all "Google
     # Services"), so the year-ago and to-date figures are read from facts tagged the same way.
     fixed_for: dict[tuple[str, str], tuple[str, str]] = {}
@@ -288,8 +289,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         elif len(dimensions) == 2:
             paired.setdefault((concept, frozenset(dimensions)), []).append((dimensions, value))
             paired_levels.setdefault((concept, frozenset(dimensions)), set()).add(level)
-            if not level:
-                paired_pure.setdefault((concept, frozenset(dimensions)), []).append((dimensions, value))
+            (paired_segment if level else paired_pure).setdefault((concept, frozenset(dimensions)), []).append((dimensions, value))
     # The segments' own measure on an axis no consolidated fact uses (KKR's 2018 business lines) is checked against
     # its own total; consolidated members that add up to their own total stand alone, without the segment-level facts
     # beside them (KKR's GAAP fees beside its segment revenues).
@@ -365,20 +365,26 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         pure_items = paired_pure.get((concept, axes), [])
         # Only beside segment-level figures: lines of one segment alone (Alphabet's Google Services) are completed by
         # the other segments instead.
-        if segment_axis and pure_items and paired_levels.get((concept, axes)) == {False, True} \
-                and len({dimensions[segment_axis] for dimensions, _v in pure_items}) == 1:
-            member = pure_items[0][0][segment_axis]
+        if segment_axis and pure_items and paired_levels.get((concept, axes)) == {False, True}:
             other = next(axis for axis in axes if axis != segment_axis)
-            lines: dict[str, float] = {}
-            for dimensions, value in pure_items:
-                lines.setdefault(dimensions[other], value)
-            figure = single.get((concept, segment_axis), {}).get(member)
-            # A line that only offsets its segment-level twin (KKR's 2022 "Investment", −$277 million against the
-            # segments' +$277 million) is no part of the split.
-            twins = {key for key in lines if any(d[other] == key for d, v in items if (d, v) not in pure_items)}
-            if figure and abs(sum(lines.values()) - figure) > max(abs(figure) * 1e-6, 0.5) and twins:
-                lines = {key: value for key, value in lines.items() if key not in twins}
-            if figure and len(lines) >= 2 and abs(sum(lines.values()) - figure) <= max(abs(figure) * 1e-6, 0.5):
+            split = None
+            # Each segment's consolidated lines on their own (KKR's Q1 2024 tags two stray lines under another member).
+            for member in sorted({dimensions[segment_axis] for dimensions, _v in pure_items}):
+                lines: dict[str, float] = {}
+                for dimensions, value in pure_items:
+                    if dimensions[segment_axis] == member:
+                        lines.setdefault(dimensions[other], value)
+                figure = single.get((concept, segment_axis), {}).get(member)
+                # A line beside its segment-level twin (KKR's "Investment": −$277 million against the segments' +$277
+                # million in 2022, the same $198 million in 2023) is no part of the split.
+                twins = {key for key in lines if any(d[other] == key for d, _v in paired_segment.get((concept, axes), []))}
+                if figure and abs(sum(lines.values()) - figure) > max(abs(figure) * 1e-6, 0.5) and twins:
+                    lines = {key: value for key, value in lines.items() if key not in twins}
+                if figure and len(lines) >= 2 and abs(sum(lines.values()) - figure) <= max(abs(figure) * 1e-6, 0.5):
+                    split = (member, lines, figure)
+                    break
+            if split:
+                member, lines, figure = split
                 candidates.setdefault(other, []).append((concept, lines))
                 fixed_for.setdefault((other, concept), (segment_axis, member))
                 part_of[(concept, other)] = figure

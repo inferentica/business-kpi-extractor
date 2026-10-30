@@ -87,7 +87,7 @@ _NOT_REPORTED = "not reported: "
 # Reports parsed ahead of the one being read, and parsed reports kept in memory.
 _READ_AHEAD = 3
 _XBRL_KEPT = 6
-_XBRL_READER = "xbrl reader 38"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 39"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
