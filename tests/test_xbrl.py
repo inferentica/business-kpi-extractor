@@ -332,3 +332,58 @@ def test_a_line_tagged_only_beside_its_segment_completes_the_split():
                                                           "fiscal_year": 2021}, "10-Q", lambda _q: None, {})
     products = next(group for group in breakdowns.groups if group.key == "products")
     assert len(products.members) == 6 and products.reconciliation_error == 0.0
+
+
+def _kkr_fact(concept, value, **dims):
+    return {"concept": concept, "period_type": "duration", "period_start": "2026-04-01", "period_end": "2026-06-30",
+            "numeric_value": value, "currency": "USD", "unit_ref": "USD", **{f"dim_{axis}": member for axis, member in dims.items()}}
+
+
+def test_segment_level_lines_beside_the_consolidated_ones_are_another_table():
+    # KKR's 2018 10-Q: its fees consolidated, and again by segment ("operating segments"), sharing members; the
+    # consolidated fees add up to their own figure, the segment ones to the segments' total.
+    product, segments = "srt_ProductOrServiceAxis", "srt_ConsolidationItemsAxis"
+    concept = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+    facts = pd.DataFrame([
+        _kkr_fact(concept, 100.0),
+        _kkr_fact(concept, 60.0, **{product: "kkr:ManagementMember"}), _kkr_fact(concept, 40.0, **{product: "kkr:TransactionMember"}),
+        _kkr_fact(concept, 90.0, **{product: "kkr:ManagementMember", segments: "us-gaap:OperatingSegmentsMember"}),
+        _kkr_fact(concept, 30.0, **{product: "kkr:CreditsMember", segments: "us-gaap:OperatingSegmentsMember"}),
+    ])
+    group = next(g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups if g.key == "products")
+    assert {key: value for key, _label, value in group.members} == {"management": 60.0, "transaction": 40.0}
+
+
+def test_a_companys_own_axis_tagged_operating_segments_is_its_segments():
+    # KKR's 2018 business lines: segment revenues on its own axis, beside GAAP revenue the segments do not add up to.
+    line, segments = "kkr_BusinessLineAxis", "srt_ConsolidationItemsAxis"
+    facts = pd.DataFrame([
+        _kkr_fact("us-gaap:Revenues", 971.0),
+        _kkr_fact("us-gaap:Revenues", 926.0, **{segments: "us-gaap:OperatingSegmentsMember"}),
+        *(_kkr_fact("us-gaap:Revenues", value, **{line: member, segments: "us-gaap:OperatingSegmentsMember"})
+          for member, value in (("kkr:PrivateMarketsBusinessLineMember", 529.0), ("kkr:PublicMarketsBusinessLineMember", 124.0),
+                                ("kkr:CapitalMarketsBusinessLineMember", 105.0), ("kkr:PrincipalActivitiesBusinessLineMember", 168.0))),
+    ])
+    labels = {"kkr:BusinessLineAxis": "Business Line"}
+    group = extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q", labels.get).groups[0]
+    assert group.key == "segments" and group.total == 926.0
+    assert {label for _key, label, _value in group.members} == {"Private Markets", "Public Markets", "Capital Markets", "Principal Activities"}
+
+
+def test_lines_adding_up_to_one_segments_figure_are_a_split_of_it():
+    # KKR since 2021: its fee lines add up to its Asset Management segment's Fees and Other, beside segment-level
+    # figures under another member, and the insurer's revenue makes up the rest of the company's.
+    product, segment, items = "srt_ProductOrServiceAxis", "us-gaap_StatementBusinessSegmentsAxis", "srt_ConsolidationItemsAxis"
+    concept = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+    facts = pd.DataFrame([
+        _kkr_fact("us-gaap:Revenues", 5_726.0),
+        _kkr_fact("us-gaap:Revenues", 3_523.0, **{segment: "kkr:InsuranceSegmentMember"}),
+        _kkr_fact("us-gaap:Revenues", 2_203.0, **{segment: "kkr:AssetManagementAndStrategicHoldingsSegmentsMember"}),
+        _kkr_fact(concept, 1_180.0, **{segment: "kkr:AssetManagementAndStrategicHoldingsSegmentsMember"}),
+        *(_kkr_fact(concept, value, **{segment: "kkr:AssetManagementAndStrategicHoldingsSegmentsMember", product: member})
+          for member, value in (("kkr:AssetManagement1Member", 830.0), ("kkr:TransactionFeeMember", 371.0), ("kkr:FeeCreditMember", -21.0))),
+        _kkr_fact(concept, 1_250.0, **{segment: "kkr:AssetManagementSegmentMember", product: "kkr:ManagementFeesMember",
+                                       items: "us-gaap:OperatingSegmentsMember"}),
+    ])
+    group = next(g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups if g.key == "products")
+    assert group.total == 1_180.0 and sum(value for *_rest, value in group.members) == 1_180.0

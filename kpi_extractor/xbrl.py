@@ -240,32 +240,42 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     axis_qnames = {_axis_name(column): column[4:].replace("_", ":", 1) for column in dimension_columns}
     labels = _member_labels(facts)
 
-    totals: dict[str, float] = {}
+    # Facts tagged "operating segments" on the consolidation axis are the segments' own measure: alone, they are the
+    # consolidated figures (a filer that tags every line so); beside consolidated facts of the same concept and axis,
+    # they are another table (KKR's segment revenues beside its GAAP fees), read only where no consolidated one is.
+    pure_totals: dict[str, float] = {}
+    segment_totals: dict[str, float] = {}
     currencies: dict[str, str] = {}
-    tagged: list[tuple[str, dict[str, str], float]] = []
+    tagged: list[tuple[str, dict[str, str], float, bool]] = []
     for _, fact in frame.iterrows():
         dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
-        dimensions = {axis: member for axis, member in dimensions.items() if (axis, local_name(member)) not in _NEUTRAL_MEMBERS}
+        kept = {axis: member for axis, member in dimensions.items() if (axis, local_name(member)) not in _NEUTRAL_MEMBERS}
+        segment_level = len(kept) != len(dimensions)
+        dimensions = kept
         concept = fact["concept"]
         value = float(fact["numeric_value"])
         currency = fact.get("currency") or fact.get("unit_ref")
         if isinstance(currency, str) and currency:
             currencies[concept] = currency.upper().replace("ISO4217:", "")
         if not dimensions:
-            totals.setdefault(concept, value)
+            (segment_totals if segment_level else pure_totals).setdefault(concept, value)
         else:
-            tagged.append((concept, dimensions, value))
+            tagged.append((concept, dimensions, value, segment_level))
+    totals = {**segment_totals, **pure_totals}
 
     # Candidate breakdowns per axis: facts tagged with that axis alone, and facts tagged with it plus an axis that only
     # ever takes one value alongside it (Netflix tags every region "Streaming"), which then adds nothing.
     candidates: dict[str, list[tuple[str, dict[str, float]]]] = {}
     single: dict[tuple[str, str], dict[str, float]] = {}
     paired: dict[tuple[str, frozenset], list[tuple[dict[str, str], float]]] = {}
+    single_by_level: dict[bool, dict[tuple[str, str], dict[str, float]]] = {False: {}, True: {}}
+    paired_levels: dict[tuple[str, frozenset], set[bool]] = {}
+    paired_pure: dict[tuple[str, frozenset], list[tuple[dict[str, str], float]]] = {}
     # (axis, concept) → the one (axis, member) its facts are also tagged with (Alphabet's products, all "Google
     # Services"), so the year-ago and to-date figures are read from facts tagged the same way.
     fixed_for: dict[tuple[str, str], tuple[str, str]] = {}
     eliminations: dict[str, dict[str, float]] = {}
-    for concept, dimensions, value in tagged:
+    for concept, dimensions, value, level in tagged:
         if set(dimensions) == {"ConsolidationItemsAxis"} and value:
             items = eliminations.setdefault(concept, {})
             items[dimensions["ConsolidationItemsAxis"]] = items.get(dimensions["ConsolidationItemsAxis"], 0.0) + value
@@ -274,8 +284,60 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         if len(dimensions) == 1:
             axis, member = next(iter(dimensions.items()))
             single.setdefault((concept, axis), {}).setdefault(member, value)
+            single_by_level[level].setdefault((concept, axis), {}).setdefault(member, value)
         elif len(dimensions) == 2:
             paired.setdefault((concept, frozenset(dimensions)), []).append((dimensions, value))
+            paired_levels.setdefault((concept, frozenset(dimensions)), set()).add(level)
+            if not level:
+                paired_pure.setdefault((concept, frozenset(dimensions)), []).append((dimensions, value))
+    # The segments' own measure on an axis no consolidated fact uses (KKR's 2018 business lines) is checked against
+    # its own total; consolidated members that add up to their own total stand alone, without the segment-level facts
+    # beside them (KKR's GAAP fees beside its segment revenues).
+    segment_level: set[tuple[str, str]] = set()
+    pure_only: set[tuple[str, str]] = set()
+    part_of: dict[tuple[str, str], float] = {}
+    for key in list(single):
+        pure, own = single_by_level[False].get(key), single_by_level[True].get(key)
+        if own and not pure:
+            segment_level.add(key)
+            continue
+        if not (pure and own):
+            continue
+        if key[1] in _SEGMENT_AXES:
+            # The segments' own measure over the GAAP split of revenue by segment, when it covers every segment and
+            # adds up to its own total (Apollo's Principal Investing, which earns no GAAP revenue); as a company's own
+            # segment revenue is its revenue by segment.
+            whole = segment_totals.get(key[0])
+            leaves = drop_overlaps(remove_subtotals(own, whole), whole) if whole else {}
+            if whole and len(leaves) >= len(pure) and abs(sum(leaves.values()) - whole) <= abs(whole) * MAX_RECONCILIATION_ERROR:
+                single[key] = own
+                segment_level.add(key)
+            continue
+        # The consolidated lines alone, when they share members with the segments' own (KKR's fees: each line
+        # consolidated and again by segment, two tables) or add up exactly to the concept's figure for one segment
+        # (KKR's fees since 2021: Fees and Other of its Asset Management segment, its insurer's revenue beside it),
+        # which is then their total; else one split (UnitedHealth's segments beside one consolidated line).
+        figures = {**single_by_level[True].get((key[0], "StatementBusinessSegmentsAxis"), {}),
+                   **single_by_level[False].get((key[0], "StatementBusinessSegmentsAxis"), {})}
+        whole = sum(pure.values())
+        part = next((value for value in figures.values() if value and abs(whole - value) <= max(abs(value) * 1e-6, 0.5)), None)
+        if part is not None or set(pure) & set(own):
+            single[key] = pure
+            pure_only.add(key)
+            if part is not None:
+                part_of[key] = part
+    for key, levels in paired_levels.items():
+        if levels == {True}:
+            segment_level.update((key[0], axis) for axis in key[1] if (key[0], axis) not in single_by_level[False])
+
+    def total_for(concept: str, axis: str | None = None) -> float | None:
+        if (concept, axis) in part_of:
+            return part_of[(concept, axis)]
+        if (concept, axis) in segment_level and segment_totals.get(concept):
+            return segment_totals[concept]
+        among = pure_totals if (concept, axis) in pure_only else totals
+        return among.get(concept) or next((among[other] for other in REVENUE_CONCEPTS if other in among), None)
+
     # A member tagged only beside the one member of another axis it belongs to (Intel's 2021 "DCG platform", only with
     # its Data Center Group) joins the axis's members with that figure; one tagged beside several is never added up.
     beside: dict[tuple[str, str], dict[str, list[float]]] = {}
@@ -291,7 +353,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         extra = {member: values[0] for member, values in beside.get((concept, axis), {}).items()
                  if member not in members and len(values) == 1}
         # Only when the axis's own members fall short of revenue and the extra ones complete it.
-        if extra and not adds_up(members, totals.get(concept)) and adds_up({**members, **extra}, totals.get(concept)):
+        if extra and not adds_up(members, total_for(concept, axis)) and adds_up({**members, **extra}, total_for(concept, axis)):
             members = {**members, **extra}
         candidates.setdefault(axis, []).append((concept, members))
     for (concept, axes), items in paired.items():
@@ -306,6 +368,24 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             candidates.setdefault(other, []).append((concept, members))
             fixed_for.setdefault((other, concept), (fixed, items[0][0][fixed]))
             found = True
+        # Consolidated lines tagged under one segment that add up exactly to its figure (KKR's fees since 2021: Fees
+        # and Other of its Asset Management segment, beside segment-level figures under another member): a split of
+        # that figure, with it as the total.
+        segment_axis = next((axis for axis in axes if axis in _SEGMENT_AXES), None)
+        pure_items = paired_pure.get((concept, axes), [])
+        if not found and segment_axis and pure_items and len({dimensions[segment_axis] for dimensions, _v in pure_items}) == 1:
+            member = pure_items[0][0][segment_axis]
+            other = next(axis for axis in axes if axis != segment_axis)
+            lines: dict[str, float] = {}
+            for dimensions, value in pure_items:
+                lines.setdefault(dimensions[other], value)
+            figure = single.get((concept, segment_axis), {}).get(member)
+            if figure and len(lines) >= 2 and abs(sum(lines.values()) - figure) <= max(abs(figure) * 1e-6, 0.5):
+                candidates.setdefault(other, []).append((concept, lines))
+                fixed_for.setdefault((other, concept), (segment_axis, member))
+                part_of[(concept, other)] = figure
+                pure_only.add((concept, other))
+                found = True
         # Products tagged under segments where the filer typed one segment wrong (AMD's FY2025 10-K files Gaming under a
         # "Gaming" segment, Client under "Client and Gaming"): the product lines alone, which _completed_by_segments
         # keeps only when they add up exactly to one real segment.
@@ -317,12 +397,9 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             if len(members) == len(items):
                 candidates.setdefault(part, []).append((concept, members))
 
-    def total_for(concept: str) -> float | None:
-        return totals.get(concept) or next((totals[other] for other in REVENUE_CONCEPTS if other in totals), None)
-
     def reconciled(axis: str, concept: str, members: dict[str, float]) -> dict[str, float]:
         """A segment split with its eliminations as one more row, when only that makes it add up to revenue."""
-        total = total_for(concept)
+        total = total_for(concept, axis)
         members = drop_declared_parents(members, total, children or {})
         if axis not in _SEGMENT_AXES or not total or not eliminations.get(concept):
             return members
@@ -340,25 +417,26 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     def score(candidate: tuple[str, dict[str, float]], axis: str = ""):
         concept, members = candidate
         members = reconciled(axis, concept, members)
-        total = total_for(concept)
+        total = total_for(concept, axis)
         leaves = drop_overlaps(remove_subtotals(members, total), total)
         reconciles = bool(total) and abs(sum(leaves.values()) - total) <= abs(total) * MAX_RECONCILIATION_ERROR
-        return (reconciles, len(leaves), concept in totals)
+        # Lines with a figure: a line tagged at zero (KKR's Principal Activities fees) is no part of the split.
+        return (reconciles, sum(1 for value in leaves.values() if value), concept in totals)
 
     best_by_axis = {axis: max(options, key=lambda option, axis=axis: score(option, axis)) for axis, options in candidates.items()}
 
     def leaf_sum(axis: str, concept: str, members: dict[str, float]) -> float:
-        total = total_for(concept)
+        total = total_for(concept, axis)
         return sum(drop_overlaps(remove_subtotals(reconciled(axis, concept, members), total), total).values())
 
     sums_by_concept: dict[str, list[float]] = {}
     for axis, (concept, members) in best_by_axis.items():
-        if len(members) >= 2 and total_for(concept):
+        if len(members) >= 2 and total_for(concept, axis):
             sums_by_concept.setdefault(concept, []).append(leaf_sum(axis, concept, members))
 
     def unallocated(axis: str, concept: str, members: dict[str, float]) -> float | None:
         """Revenue outside the split, when the split falls short and another split of the same figure agrees."""
-        total = total_for(concept)
+        total = total_for(concept, axis)
         if not total:
             return None
         own = leaf_sum(axis, concept, members)
@@ -369,9 +447,11 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         agreeing = [other for other in sums_by_concept.get(concept, []) if abs(other - own) <= abs(own) * 1e-5]
         return gap if len(agreeing) >= 2 else None  # itself and at least one other split
 
-    def frame_total(source: pd.DataFrame, concept: str) -> float | None:
+    def frame_total(source: pd.DataFrame, concept: str, level: bool = False) -> float | None:
         if not dimension_columns:
             return None
+        if level and (own := _plain_total(source, concept, dimension_columns, True)) is not None:
+            return own
         plain = source[source[dimension_columns].isna().all(axis=1)]
         for name in (concept, *REVENUE_CONCEPTS):
             values = plain[plain["concept"] == name]["numeric_value"]
@@ -393,12 +473,21 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         if len(members) < 2:
             continue
         # Every breakdown must add up to reported revenue; one that cannot be checked is not kept.
-        total = total_for(concept)
+        total = total_for(concept, axis)
         if not total:
             continue
         standard = _STANDARD_AXES.get(axis)
         axis_label = label(axis_qnames.get(axis, axis)) or humanize(axis)
+        own_level = True if (concept, axis) in segment_level else False if (concept, axis) in pure_only else None
+        # A company's own axis tagged "operating segments" is its segments (KKR's 2018 business lines, its segments
+        # before and after), named without the axis's words ("Private Markets Business Line" is Private Markets).
+        suffix = None
+        if standard is None and own_level and not any(other in _SEGMENT_AXES for other in best_by_axis):
+            standard, suffix = _STANDARD_AXES["StatementBusinessSegmentsAxis"], _title(axis_label)
         key, title, order = standard or (f"x_{_snake(axis)}", f"Revenue by {_title(axis_label)}", 10)
+
+        def bare(name: str) -> str:
+            return name[:-len(suffix)].rstrip(" -–,") if suffix and name.lower().endswith(suffix.lower()) and len(name) > len(suffix) else name
 
         def consolidation_name(member: str) -> str | None:
             """The filing's own name for a consolidation item, unless it only has the taxonomy's long one."""
@@ -416,11 +505,12 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             for member, value in sorted(rows.items(), key=lambda item: -item[1]):
                 name = (outside_label or "Unallocated") if member == _UNALLOCATED else consolidation_name(member) \
                     or label(member) or labels.get(member) or humanize(member)
+                name = bare(name)
                 out.append((member_key(name), name, value))
             return out
 
         def elements(rows: dict[str, float]) -> dict[str, str]:
-            return {member_key(consolidation_name(member) or label(member) or labels.get(member) or humanize(member)): member
+            return {member_key(bare(consolidation_name(member) or label(member) or labels.get(member) or humanize(member))): member
                     for member in rows}
 
         outside = unallocated(axis, concept, members)
@@ -432,11 +522,11 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             members = {**members, _UNALLOCATED: outside}
 
         def frame_members(source: pd.DataFrame) -> dict[str, float]:
-            rows = _single_axis_members(source, concept, axis, dimension_columns, fixed_for.get((axis, concept)))
+            rows = _single_axis_members(source, concept, axis, dimension_columns, fixed_for.get((axis, concept)), own_level)
             if consolidation and rows:
                 items = _consolidation_items(source, concept, dimension_columns)
                 rows.update({member: items[member] for member in consolidation if member in items})
-            if outside is not None and rows and (whole := frame_total(source, concept)) is not None:
+            if outside is not None and rows and (whole := frame_total(source, concept, own_level)) is not None:
                 rows[_UNALLOCATED] = whole - sum(value for member, value in rows.items() if member in leaf_members)
             return rows
 
@@ -445,19 +535,14 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         error = (sum(leaves.values()) - total) / total if len(leaves) >= 2 else None
         prior = _by_key(named(frame_members(prior_frame)))
         ytd = _by_key(named(frame_members(ytd_frame)))
-        ytd_totals = ytd_frame[(ytd_frame["concept"] == concept)
-                               & ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] if dimension_columns else []
-        ytd_total = float(ytd_totals.iloc[0]) if len(ytd_totals) else None
+        ytd_total = _plain_total(ytd_frame, concept, dimension_columns, own_level) if dimension_columns else None
         if outside is not None:
-            ytd_total = frame_total(ytd_frame, concept)
+            ytd_total = frame_total(ytd_frame, concept, own_level)
         prior_ytd = _by_key(named(frame_members(prior_ytd_frame)))
-        prior_ytd_totals = prior_ytd_frame[(prior_ytd_frame["concept"] == concept)
-                                           & prior_ytd_frame[dimension_columns].isna().all(axis=1)]["numeric_value"] \
-            if dimension_columns else []
-        prior_ytd_total = float(prior_ytd_totals.iloc[0]) if len(prior_ytd_totals) else None
+        prior_ytd_total = _plain_total(prior_ytd_frame, concept, dimension_columns, own_level) if dimension_columns else None
         if outside is not None:
-            prior_ytd_total = frame_total(prior_ytd_frame, concept)
-        prior_total = frame_total(prior_frame, concept)
+            prior_ytd_total = frame_total(prior_ytd_frame, concept, own_level)
+        prior_total = frame_total(prior_frame, concept, own_level)
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
             # Products against services (Amazon, Microsoft) is a view of its own beside the product lines, not a
             # coarser version of them: both are published, so neither depends on the AI listing it.
@@ -620,18 +705,29 @@ def _plain_revenue_figures(facts: pd.DataFrame, period_end, annual: bool, label:
 
 
 def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str],
-                         fixed: tuple[str, str] | None = None) -> dict[str, float]:
+                         fixed: tuple[str, str] | None = None, segment_level: bool | None = None) -> dict[str, float]:
     """Members of one axis for one concept, from facts tagged with that axis alone, or with it and the one member of
-    another axis its period's facts all carry (fixed)."""
+    another axis its period's facts all carry (fixed); only the consolidated facts (segment_level False), only the
+    segments' own (True), or both (None)."""
     members: dict[str, float] = {}
     for _, fact in frame[frame["concept"] == concept].iterrows():
         dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
-        dimensions = {a: m for a, m in dimensions.items() if (a, local_name(m)) not in _NEUTRAL_MEMBERS}
-        if axis not in dimensions:
+        kept = {a: m for a, m in dimensions.items() if (a, local_name(m)) not in _NEUTRAL_MEMBERS}
+        if (segment_level is not None and (len(kept) != len(dimensions)) != segment_level) or axis not in kept:
             continue
-        if len(dimensions) == 1 or (fixed and len(dimensions) == 2 and dimensions.get(fixed[0]) == fixed[1]):
-            members.setdefault(dimensions[axis], float(fact["numeric_value"]))
+        if len(kept) == 1 or (fixed and len(kept) == 2 and kept.get(fixed[0]) == fixed[1]):
+            members.setdefault(kept[axis], float(fact["numeric_value"]))
     return members
+
+
+def _plain_total(frame: pd.DataFrame, concept: str, dimension_columns: list[str], segment_level: bool | None = False) -> float | None:
+    """The concept's figure with no axis but, for the segments' own measure, "operating segments"."""
+    rows = frame[frame["concept"] == concept]
+    for _, fact in rows.iterrows():
+        dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
+        if all((a, local_name(m)) in _NEUTRAL_MEMBERS for a, m in dimensions.items()) and bool(dimensions) == bool(segment_level):
+            return float(fact["numeric_value"])
+    return None
 
 
 _PRODUCT_OR_SERVICE = re.compile(r"^(?:net)?(?:products?|services?(?:andother)?)(?:sales|revenues?)?$")
