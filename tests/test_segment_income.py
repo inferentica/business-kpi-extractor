@@ -98,7 +98,7 @@ def test_a_companys_own_segment_measures_stand_in_for_operating_income():
     assert earnings.concept == "bam:SegmentEarnings" and earnings.label == "Earnings by Segment"
     assert [value for *_rest, value in earnings.current.rows] == [208e6, 157e6, 125e6, 109e6, 41e6]
     revenue = segment_revenue(pd.DataFrame(rows), date(2026, 6, 30), False)
-    assert revenue.label == "Segment Revenue" and revenue.current.total == 1_317e6
+    assert revenue.label == "Revenue by Segment" and revenue.current.total == 1_317e6
     # Alphabet's tagged operating income is still what it reads, and it has no measure of its own.
     alphabet = pd.DataFrame(quarter(39_157e6, 11_121e6, -2_047e6, -7_655e6, 40_576e6))
     assert segment_income(alphabet, date(2026, 9, 30), False).concept == "us-gaap:OperatingIncomeLoss"

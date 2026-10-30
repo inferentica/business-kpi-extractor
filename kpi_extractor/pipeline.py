@@ -87,7 +87,7 @@ _NOT_REPORTED = "not reported: "
 # Reports parsed ahead of the one being read, and parsed reports kept in memory.
 _READ_AHEAD = 3
 _XBRL_KEPT = 6
-_XBRL_READER = "xbrl reader 35"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 36"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -399,8 +399,13 @@ class SymbolPipeline:
             fiscal_year, fiscal_period = fiscal_label(breakdowns.period_end, self.profile.fiscal_year_end,
                                                       annual=breakdowns.annual, year_offset=self.offset)
             self._store_statements(ref, xbrl, breakdowns, fiscal_year, fiscal_period)
-            groups = [(group, []) for group in breakdowns.groups]
-            taken = {group.key for group in breakdowns.groups}
+            # A company's own segment revenue measure is its revenue by segment, in place of the GAAP split of it.
+            try:
+                own_revenue = segment_revenue(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children)
+            except Exception:  # noqa: BLE001 - the GAAP split stands
+                own_revenue = None
+            groups = [(group, []) for group in breakdowns.groups if not (own_revenue and group.key == OWN_REVENUE_GROUP)]
+            taken = {group.key for group, _notes in groups} | ({OWN_REVENUE_GROUP} if own_revenue else set())
             ai_pending = False
             for candidate in breakdowns.rejected:
                 if candidate.key in taken:
@@ -466,7 +471,7 @@ class SymbolPipeline:
                             **({"ytd": ytd, "ytd_total": group.year_to_date_total} if ytd is not None and group.year_to_date_total else {}),
                         },
                     ))
-            records += self._income_records(facts, labels, breakdowns, ref, fiscal_year, fiscal_period, groups)
+            records += self._income_records(facts, labels, breakdowns, ref, fiscal_year, fiscal_period, groups, own_revenue)
             if records:
                 # The release's figures for this quarter give way to the report's; a line the report does not give
                 # (renamed, or not broken out) stops being served.
@@ -505,16 +510,15 @@ class SymbolPipeline:
                 for record in records]
 
     def _income_records(self, facts, labels, breakdowns, ref: FilingRef, fiscal_year: str, fiscal_period: str,
-                        groups) -> list[dict]:
+                        groups, own_revenue=None) -> list[dict]:
         """Each segment's operating income, as tagged (see segment_income): its own breakdown, beside the revenue ones; and
         a company's own segment revenue measure, which its segment profit is measured against."""
         try:
             income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children)
-            own_revenue = segment_revenue(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children)
         except Exception as error:  # noqa: BLE001 - the revenue breakdowns stand without it
             self.log(f"{self.symbol}: segment income of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
             return []
-        records = self._measure_records(own_revenue, OWN_REVENUE_GROUP, INCOME_ORDER - 1, groups, ref, fiscal_year,
+        records = self._measure_records(own_revenue, OWN_REVENUE_GROUP, 0, groups, ref, fiscal_year,
                                         fiscal_period, breakdowns.period_end) if own_revenue else []
         if income is None:
             return records
@@ -1234,7 +1238,7 @@ class SymbolPipeline:
         latest: dict[str, tuple[str, str]] = {}
         rows = [value for value in self.values.values() if value["method"] == "xbrl" and value["validation_status"] == "verified"
                 and value["fiscal_period"] != "FY" and not value["group_key"].endswith("_levels")
-                and not value["group_key"].startswith(AI_GROUP_PREFIX) and value["group_key"] not in (INCOME_GROUP, OWN_REVENUE_GROUP)]
+                and not value["group_key"].startswith(AI_GROUP_PREFIX) and value["group_key"] != INCOME_GROUP]
         for value in rows:
             latest[value["group_key"]] = max(latest.get(value["group_key"], ("", "")), (value["fiscal_year"], value["fiscal_period"]))
         groups: dict[str, list[dict]] = {}
@@ -1938,7 +1942,7 @@ class SymbolPipeline:
         """Each XBRL breakdown's latest title and members (key → label)."""
         latest: dict[str, str] = {}
         for value in self.values.values():
-            if value["method"] == "xbrl" and value["group_key"] not in (INCOME_GROUP, OWN_REVENUE_GROUP) and value["period_end"] >= latest.get(value["group_key"], ""):
+            if value["method"] == "xbrl" and value["group_key"] != INCOME_GROUP and value["period_end"] >= latest.get(value["group_key"], ""):
                 latest[value["group_key"]] = value["period_end"]
         breakdowns: dict[str, dict] = {}
         for value in sorted(self.values.values(), key=lambda item: item["kpi_order"]):

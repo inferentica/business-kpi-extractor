@@ -31,8 +31,10 @@ _LEFT_OVER = "Unallocated"
 # "Segment Earnings", its fee-related earnings, over its "Segment Revenue").
 _OWN_PROFIT = re.compile(r"^[\w-]+:Segment(?:Earnings|Profit|ProfitLoss|OperatingIncome(?:Loss)?)$")
 _OWN_REVENUE = re.compile(r"^[\w-]+:SegmentRevenues?$")
-REVENUE_GROUP_KEY = "segment_revenue"
-REVENUE_GROUP_LABEL = "Segment Revenue"
+# A company's own segment revenue is its revenue by segment: it stands in for the GAAP revenue its notes split by
+# segment (Brookfield's leaves out its share of the managers it does not consolidate).
+REVENUE_GROUP_KEY = "segments"
+REVENUE_GROUP_LABEL = "Revenue by Segment"
 LEFT_OVER_KEY = member_key(_LEFT_OVER)
 
 
