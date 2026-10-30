@@ -14,7 +14,7 @@ from typing import Callable
 
 import pandas as pd
 
-from .xbrl import _axis_name, _member_labels, humanize, local_name, member_key
+from .xbrl import _axis_name, _member_labels, humanize, local_name, member_key, remove_subtotals
 
 INCOME_CONCEPT = "us-gaap:OperatingIncomeLoss"
 GROUP_KEY = "segment_income"
@@ -49,7 +49,8 @@ def _period(frame: pd.DataFrame, end: date, low: int, high: int) -> pd.DataFrame
     return frame[(ends.dt.date == end) & days.between(low, high)]
 
 
-def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[str, str]) -> IncomeRows | None:
+def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[str, str],
+          children: dict[str, set[str]]) -> IncomeRows | None:
     columns = [column for column in frame.columns if column.startswith("dim_")]
     total = None
     segments: dict[str, float] = {}
@@ -66,6 +67,11 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
             segments.setdefault(next(iter(dims.values())), value)
         elif set(dims) == {"ConsolidationItemsAxis"} and local_name(dims["ConsolidationItemsAxis"]) in _RECONCILING:
             reconciling.setdefault(dims["ConsolidationItemsAxis"], value)
+    # A segment that is others added up (Intel's "Total Intel Products" over CCPG and DCAI), declared or by its figures,
+    # would count them twice: only the leaves stay.
+    segments = {member: value for member, value in segments.items()
+                if not (children.get(member, set()) & (set(segments) - {member}))}
+    segments = remove_subtotals(segments, total)
     if total is None or len(segments) < 2:
         return None
 
@@ -90,20 +96,22 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
 
 
 def segment_income(facts: pd.DataFrame, period_end: date, annual: bool,
-                   label: Callable[[str], str | None] = lambda _qname: None) -> SegmentIncome | None:
+                   label: Callable[[str], str | None] = lambda _qname: None,
+                   children: dict[str, set[str]] | None = None) -> SegmentIncome | None:
     """The period's segment operating income, with the year to date (for a Q4 worked out from the year) and the year
     before (for a recent listing's history)."""
     frame = facts[(facts["concept"] == INCOME_CONCEPT) & facts["numeric_value"].notna() & (facts["period_type"] == "duration")]
     if frame.empty:
         return None
     labels = _member_labels(facts)
+    children = children or {}
     low, high = (330, 400) if annual else (80, 100)
-    current = _rows(_period(frame, period_end, low, high), label, labels)
+    current = _rows(_period(frame, period_end, low, high), label, labels, children)
     if current is None:
         return None
     # A year before, within a week (52/53-week years end on a different day).
     year_ago = period_end - timedelta(days=364)
     prior = next((rows for offset in range(-7, 8)
-                  if (rows := _rows(_period(frame, year_ago + timedelta(days=offset), low, high), label, labels))), None)
-    ytd = None if annual else _rows(_period(frame, period_end, 250, 290), label, labels)
+                  if (rows := _rows(_period(frame, year_ago + timedelta(days=offset), low, high), label, labels, children))), None)
+    ytd = None if annual else _rows(_period(frame, period_end, 250, 290), label, labels, children)
     return SegmentIncome(current, ytd, prior, {key: element for key, _name, element, _value in current.rows})

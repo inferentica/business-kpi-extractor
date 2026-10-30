@@ -357,7 +357,8 @@ class SymbolPipeline:
                 return
             facts = xbrl.facts.to_dataframe()
             labels = official_labels(getattr(xbrl, "element_catalog", None))
-            breakdowns = extract_breakdowns(facts, xbrl.entity_info or {}, ref.form, labels, member_children(xbrl))
+            self._member_children = member_children(xbrl)
+            breakdowns = extract_breakdowns(facts, xbrl.entity_info or {}, ref.form, labels, self._member_children)
             if breakdowns is None:
                 self._store_filing(ref, "skipped", notes=["no document period", _XBRL_READER])
                 return
@@ -452,7 +453,7 @@ class SymbolPipeline:
                         groups) -> list[dict]:
         """Each segment's operating income, as tagged (see segment_income): its own breakdown, beside the revenue ones."""
         try:
-            income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels)
+            income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children)
         except Exception as error:  # noqa: BLE001 - the revenue breakdowns stand without it
             self.log(f"{self.symbol}: segment income of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
             return []

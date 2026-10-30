@@ -50,3 +50,19 @@ def test_a_tagged_item_that_does_not_close_the_gap_gives_way_to_the_gap_itself()
 def test_one_segment_is_no_breakdown():
     rows = [fact(5e9, "2026-07-01", "2026-09-30", "x:OnlyMember", "us-gaap:OperatingSegmentsMember"), fact(5e9, "2026-07-01", "2026-09-30")]
     assert segment_income(pd.DataFrame(rows), date(2026, 9, 30), False) is None
+
+
+def test_a_segment_that_adds_up_others_is_left_out():
+    # Intel tags "Total Intel Products" beside CCPG and DCAI on the same axis.
+    start, end = "2026-01-01", "2026-03-28"
+    rows = [fact(4_060e6, start, end, "intc:TotalIntelProductsMember", "us-gaap:OperatingSegmentsMember"),
+            fact(2_520e6, start, end, "intc:CCPGMember", "us-gaap:OperatingSegmentsMember"),
+            fact(1_540e6, start, end, "intc:DCAIMember", "us-gaap:OperatingSegmentsMember"),
+            fact(-2_440e6, start, end, "intc:IntelFoundryMember", "us-gaap:OperatingSegmentsMember"),
+            fact(-3_140e6, start, end)]
+    income = segment_income(pd.DataFrame(rows), date(2026, 3, 28), False, {}.get)
+    names = [name for _key, name, _element, _value in income.current.rows]
+    assert "Total Intel Products" not in names and sum(value for *_rest, value in income.current.rows) == -3_140e6
+    declared = segment_income(pd.DataFrame(rows), date(2026, 3, 28), False, {}.get,
+                              {"intc:TotalIntelProductsMember": {"intc:CCPGMember", "intc:DCAIMember"}})
+    assert len(declared.current.rows) == len(income.current.rows)
