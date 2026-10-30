@@ -1469,3 +1469,16 @@ def test_flags_todays_checks_no_longer_raise_are_cleared():
     cleared = {(v["kpi_key"], v["validation_status"]) for v in _pipeline(None, values)._outdated_flags()}
     # A count of 200 to 60 is still a jump; parts still off their total stay flagged.
     assert cleared == {("used", "verified"), ("systems", "verified"), ("service", "verified")}
+
+
+def test_a_note_is_stored_once():
+    # JPM: a part confirmed by the next year's release each run, held back with its breakdown, gained the note every run.
+    control = FakeControl({})
+    stored = []
+    control.call = lambda operation, **payload: stored.extend(payload.get("values") or [])
+    pipeline = _pipeline(control)
+    pipeline.result = SimpleNamespace(values=0)
+    note = "confirmed by the next year's release"
+    pipeline._store(values=[{"group_key": "kpi_x", "kpi_key": "a", "fiscal_year": "2020", "fiscal_period": "Q4", "value": 1,
+                             "validation_status": "needs_review", "notes": ["total matches no figure", note, note, note]}])
+    assert stored[0]["notes"] == ["total matches no figure", note]

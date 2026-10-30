@@ -3374,6 +3374,9 @@ class SymbolPipeline:
 
     def _store(self, *, filings: list[dict] | None = None, values: list[dict] | None = None) -> None:
         values = list({value_key(value): value for value in values or []}.values())  # one row per key per write
+        # A note once: a check that settles a part each run, which the whole breakdown then holds back, added its note
+        # again every run until JPM's reached the control plane's 40 and its run failed.
+        values = [{**value, "notes": list(dict.fromkeys(value["notes"]))} if value.get("notes") else value for value in values]
         self.control.call("store", symbol=self.symbol, filings=filings or [], values=values)
         for value in values:
             existing = self.values.get(value_key(value))
