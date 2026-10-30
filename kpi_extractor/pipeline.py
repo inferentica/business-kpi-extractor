@@ -868,7 +868,7 @@ class SymbolPipeline:
         loaded: dict[str, str] = {}
 
         def text_of(ref: FilingRef) -> str:
-            if ref.accession not in loaded and len(loaded) < 80:
+            if ref.accession not in loaded and len(loaded) < 250:
                 try:
                     document = self._document(ref)
                     loaded[ref.accession] = " ".join(
