@@ -643,9 +643,20 @@ def _two_partitions(members: dict[str, float], total: float | None) -> tuple[dic
     if not total or len(members) < 4:
         return members, {}
     tolerance = abs(total) * MAX_RECONCILIATION_ERROR
-    if abs(sum(members.values()) - 2 * total) > 2 * tolerance:
-        return members, {}
     keys = list(members)
+    if abs(sum(members.values()) - 2 * total) > 2 * tolerance:
+        # One region beside the countries it is made of (Adobe's 10-K tags Americas beside United States and Other
+        # Americas; its 10-Qs give Americas only): the split with the region is the coarser one.
+        for parent in keys:
+            others = [key for key in keys if key != parent]
+            if members[parent] <= 0 or abs(sum(members[key] for key in others) - total) > tolerance:
+                continue
+            for size in (2, 3):
+                for combo in combinations(others, size):
+                    if len(others) - size >= 1 and abs(sum(members[key] for key in combo) - members[parent]) <= tolerance:
+                        coarse = {key: value for key, value in members.items() if key not in combo}
+                        return {key: members[key] for key in others}, coarse
+        return members, {}
     for size in (2, 3, 4):
         for combo in combinations(keys, size):
             if len(keys) - size >= size and abs(sum(members[key] for key in combo) - total) <= tolerance:

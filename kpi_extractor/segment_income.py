@@ -67,6 +67,11 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
             segments.setdefault(next(iter(dims.values())), value)
         elif set(dims) == {"ConsolidationItemsAxis"} and local_name(dims["ConsolidationItemsAxis"]) in _RECONCILING:
             reconciling.setdefault(dims["ConsolidationItemsAxis"], value)
+        elif len(dims) == 2 and "ConsolidationItemsAxis" in dims and local_name(dims["ConsolidationItemsAxis"]) in _RECONCILING \
+                and (segment_axis := next((axis for axis in dims if axis in _SEGMENT_AXES), None)):
+            # A reconciling item tagged with a member of the segments axis takes that member's name (AMD's "All Other",
+            # a corporate item on the segments axis since 2025).
+            reconciling.setdefault(dims[segment_axis], value)
     # A segment that is others added up (Intel's "Total Intel Products" over CCPG and DCAI), declared or by its figures,
     # would count them twice: only the leaves stay.
     segments = {member: value for member, value in segments.items()
@@ -77,7 +82,8 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
 
     def name(member: str) -> str:
         own = label(member) or labels.get(member)
-        if member in reconciling and (not own or len(own) > 40 or own.lower().startswith("segment")):
+        if member in reconciling and local_name(member) in _RECONCILING \
+                and (not own or len(own) > 40 or own.lower().startswith("segment")):
             return _RECONCILING[local_name(member)]
         return own or humanize(member)
 

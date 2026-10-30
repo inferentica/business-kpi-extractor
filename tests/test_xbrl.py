@@ -120,6 +120,14 @@ def test_two_complete_splits_on_one_axis_keep_the_finer():
     assert set(fine) == {"server", "office", "gaming", "linkedin", "other"} and set(coarse) == {"product", "service"}
 
 
+def test_a_region_beside_its_countries_is_the_coarser_split():
+    # Adobe's FY2025 10-K: Americas beside United States and Other Americas.
+    from kpi_extractor.xbrl import _two_partitions
+    members = {"us": 12529.0, "otheramericas": 1591.0, "americas": 14120.0, "emea": 6289.0, "apac": 3360.0}
+    fine, coarse = _two_partitions(members, 23769.0)
+    assert set(fine) == {"us", "otheramericas", "emea", "apac"} and set(coarse) == {"americas", "emea", "apac"}
+
+
 def test_products_against_services_is_published_beside_the_product_lines():
     facts = pd.DataFrame([
         _fact("us-gaap:Revenues", 100.0),

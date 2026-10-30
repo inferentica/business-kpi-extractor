@@ -478,6 +478,24 @@ def test_the_split_the_quarters_use_is_kept():
     assert [key for key, _l, _v in chosen.members] == ["americas", "asiapacific", "emea"]
 
 
+def test_a_region_keeps_its_quarters_name():
+    from kpi_extractor.xbrl import XbrlGroup
+    base = {"group_key": "geography", "fiscal_year": "2025", "fiscal_period": "Q3", "period_end": "2025-08-29",
+            "method": "xbrl", "validation_status": "verified", "value": 1.0, "source_accession": "q3"}
+    pipeline = _pipeline(FakeControl({}), [{**base, "kpi_key": k, "kpi_label": l, "locator": {"member": m}} for k, l, m in (
+        ("americas", "Americas", "srt:AmericasMember"), ("emea", "EMEA", "us-gaap:EMEAMember"),
+        ("apac", "APAC", "srt:AsiaPacificMember"))])
+    group = XbrlGroup("geography", "Revenue by Geography", 2,
+                      [("unitedstates", "United States", 12529.0), ("emea", "EMEA", 6289.0), ("apac", "APAC", 3360.0),
+                       ("other", "Other Americas", 1591.0)], 23769.0, 0.0, "USD", "c",
+                      prior={"totalamericas": 12891.0},
+                      elements={"totalamericas": "srt:AmericasMember", "emea": "us-gaap:EMEAMember",
+                                "apac": "srt:AsiaPacificMember"},
+                      alternative=[("totalamericas", "Total Americas", 14120.0), ("emea", "EMEA", 6289.0), ("apac", "APAC", 3360.0)])
+    chosen = pipeline._continuing_split(group, date(2025, 11, 28))
+    assert chosen.members[0] == ("americas", "Americas", 14120.0) and chosen.prior == {"americas": 12891.0}
+
+
 def test_an_ai_breakdown_must_total_a_reported_figure():
     base = {"fiscal_year": "2026", "fiscal_period": "Q2", "period_end": "2026-06-27", "group_label": "x", "kpi_label": "x",
             "group_kind": "revenue_breakdown", "source_accession": "a"}
@@ -639,6 +657,25 @@ def test_a_flagged_value_equal_to_an_official_figure_is_proven_only_when_precise
     pipeline._prove_flagged([])
     assert pipeline.values[("kpi_product", "datacenter", "2025", "Q2")]["validation_status"] == "verified"
     assert pipeline.values[("kpi_other", "round", "2025", "Q2")]["validation_status"] == "needs_review"
+
+
+def test_a_split_of_part_of_a_reported_line_is_proven_by_nearly_filling_it():
+    # Adobe's Q4 FY2025 customer groups: $1.72 + $4.25 billion, "Total Customer Group subscription revenue" $5.96 billion,
+    # of $5,989 million subscription revenue.
+    xbrl = {"group_key": "products", "group_kind": "revenue_breakdown", "method": "xbrl", "validation_status": "verified",
+            "fiscal_year": "2025", "fiscal_period": "Q4", "period_end": "2025-11-28", "locator": {}}
+    group = {"group_key": "kpi_customer", "group_kind": "revenue_breakdown", "method": "ai", "validation_status": "needs_review",
+             "fiscal_year": "2025", "fiscal_period": "Q4", "period_end": "2025-11-28", "unit": "currency",
+             "source_accession": "r", "notes": ["total matches no figure the company reported in XBRL"],
+             "locator": {"total": 5_960_000_000.0}}
+    rows = [{**xbrl, "kpi_key": "subscription", "value": 5_989_000_000.0},
+            {**group, "kpi_key": "business", "value": 1_720_000_000.0}, {**group, "kpi_key": "creative", "value": 4_250_000_000.0}]
+    pipeline = _pipeline(FakeControl({}), rows)
+    pipeline._prove_flagged([])
+    assert pipeline.values[("kpi_customer", "business", "2025", "Q4")]["validation_status"] == "verified"
+    short = _pipeline(FakeControl({}), [rows[0], {**rows[1], "value": 1_500_000_000.0}, rows[2]])
+    short._prove_flagged([])
+    assert short.values[("kpi_customer", "business", "2025", "Q4")]["validation_status"] == "needs_review"
 
 
 def test_reports_reach_ten_years_while_releases_keep_the_runs_window():

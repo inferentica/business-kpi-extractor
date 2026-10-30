@@ -66,3 +66,15 @@ def test_a_segment_that_adds_up_others_is_left_out():
     declared = segment_income(pd.DataFrame(rows), date(2026, 3, 28), False, {}.get,
                               {"intc:TotalIntelProductsMember": {"intc:CCPGMember", "intc:DCAIMember"}})
     assert len(declared.current.rows) == len(income.current.rows)
+
+
+def test_a_reconciling_item_on_the_segments_axis_keeps_its_name():
+    # AMD's Q2 2026 10-Q tags "All Other" as a corporate item on the segments axis.
+    start, end = "2026-03-29", "2026-06-27"
+    rows = [fact(2_103e6, start, end, "amd:DataCenterMember", "us-gaap:OperatingSegmentsMember"),
+            fact(582e6, start, end, "amd:ClientAndGamingMember", "us-gaap:OperatingSegmentsMember"),
+            fact(386e6, start, end, "amd:EmbeddedMember", "us-gaap:OperatingSegmentsMember"),
+            fact(-1_081e6, start, end, "amd:AllOtherMember", "us-gaap:CorporateNonSegmentMember"),
+            fact(1_990e6, start, end)]
+    income = segment_income(pd.DataFrame(rows), date(2026, 6, 27), False, {"amd:AllOtherMember": "All Other"}.get)
+    assert income.current.rows[-1][1:] == ("All Other", "amd:AllOtherMember", -1_081e6)

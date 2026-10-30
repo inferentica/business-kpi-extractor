@@ -81,7 +81,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 24"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 25"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -97,7 +97,12 @@ _EQUALS_XBRL = "equals a figure reported in XBRL"
 _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
 _CONFIRMED_LATER = "confirmed by the next year's release"
 _RESTATED_LATER = "restated in the next year's release"
-_PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER)
+_WITHIN_XBRL = "parts make up nearly all of a figure reported in XBRL"
+_PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER, _WITHIN_XBRL)
+# A split of part of a reported line (Adobe's two customer groups: 99.5% of its subscription revenue, the rest its
+# advertising business's) covers at least this share of it.
+_MIN_COVERAGE = 0.99
+_UNANCHORED = {"total matches no figure the company reported in XBRL", "no total revenue to reconcile against"}
 # Restatements move a figure a little (a reclassification); a jump beyond this is a different column, not a restatement.
 MAX_RESTATEMENT = 0.10
 # Releases a company's run reads at once, after its newest (see _process_releases).
@@ -1343,12 +1348,23 @@ class SymbolPipeline:
         if not group.alternative:
             return group
         window = (period_end - timedelta(days=370)).isoformat()
-        recent = {v["kpi_key"] for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
-                  and v["validation_status"] == "verified" and window <= v["period_end"] < period_end.isoformat()}
+        rows = [v for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
+                and v["validation_status"] == "verified" and window <= v["period_end"] < period_end.isoformat()]
+        recent = {v["kpi_key"] for v in rows}
+        # The same element under another label ("Total Americas" in Adobe's 10-K, "Americas" in its 10-Qs) is one line.
+        stored = {member: v for v in rows if (member := (v.get("locator") or {}).get("member"))}
+        renamed = {key: stored[element] for key, _label, _value in group.alternative
+                   if (element := group.elements.get(key)) in stored and stored[element]["kpi_key"] != key}
         current = {key for key, _label, _value in group.members}
-        other = {key for key, _label, _value in group.alternative}
+        other = {renamed[key]["kpi_key"] if key in renamed else key for key, _label, _value in group.alternative}
         if recent and len(other & recent) > len(current & recent):
-            return replace(group, members=group.alternative, alternative=group.members)
+            def rekey(values: dict) -> dict:
+                return {renamed[key]["kpi_key"] if key in renamed else key: value for key, value in values.items()}
+            members = [(renamed[key]["kpi_key"], renamed[key]["kpi_label"], value) if key in renamed else (key, label, value)
+                       for key, label, value in group.alternative]
+            return replace(group, members=members, alternative=group.members, elements=rekey(group.elements),
+                           prior=rekey(group.prior), year_to_date=rekey(group.year_to_date),
+                           prior_year_to_date=rekey(group.prior_year_to_date))
         return group
 
     def _curate(self, candidate: XbrlCandidate):
@@ -2749,6 +2765,21 @@ class SymbolPipeline:
             if waiting and len(rows) >= 2 and whole(rows[0]) and reported(rows[0], sum(float(v["value"]) for v in rows), 1e-5):
                 for v in waiting:
                     settle(v, _ADDS_TO_XBRL)
+        # A split of part of a line (Adobe's customer groups of its subscription revenue, with their own total that XBRL
+        # never tags) is proven by a reported figure it nearly fills, when its parts add up to its stated total to their
+        # rounding and nothing else is wrong with it.
+        for rows in groups.values():
+            waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
+            if len(rows) < 2 or not waiting or any(not set(v.get("notes") or []) <= _UNANCHORED for v in waiting):
+                continue
+            parts = [float(v["value"]) for v in rows]
+            stated = float((rows[0].get("locator") or {}).get("total") or 0) or sum(parts)
+            if abs(sum(parts) - stated) > sum(_rounding(value) for value in [*parts, stated]):
+                continue
+            if any(abs(_days(end, rows[0]["period_end"])) <= 12 and _MIN_COVERAGE * other <= stated <= other
+                   for end, other in official.get(rows[0]["fiscal_period"] == "FY", [])):
+                for v in waiting:
+                    settle(v, _WITHIN_XBRL)
         # A breakdown period takes the next year's restated figures whole or not at all: a part the next release no longer
         # shows (TSMC's 16/20nm, split in two from 2019) left beside restated parts made Q3 2018 add up to neither total.
         restatements: dict[tuple, list[tuple[dict, float, str]]] = {}
@@ -3338,6 +3369,14 @@ def _identity_text(text: str) -> str:
 
 def _proven(value: dict) -> bool:
     return any(note.startswith(_PROOFS) for note in value.get("notes") or [])
+
+
+def _rounding(value: float) -> float:
+    """Half the step a stated figure is rounded to ($5.96 billion: 5 million)."""
+    whole, step = abs(int(round(value))), 1
+    while whole and whole % (step * 10) == 0 and step < 10 ** 12:
+        step *= 10
+    return step / 2
 
 
 def _significant(value: float) -> bool:
