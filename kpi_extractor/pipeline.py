@@ -87,7 +87,7 @@ _NOT_REPORTED = "not reported: "
 # Reports parsed ahead of the one being read, and parsed reports kept in memory.
 _READ_AHEAD = 3
 _XBRL_KEPT = 6
-_XBRL_READER = "xbrl reader 34"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 35"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -447,6 +447,7 @@ class SymbolPipeline:
                                if prior_ytd is not None and group.prior_year_to_date_total else {}),
                         },
                     ))
+            records = self._name_remainders(ref, records)
             # A split's subtotals (Alphabet's Google properties, Google advertising) in a group of their own: placed in the
             # tree by their parents, never added into a breakdown's sum.
             for group, extra_notes in groups:
@@ -482,6 +483,26 @@ class SymbolPipeline:
                                fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             self._fail_filing(ref, error)
+
+    def _name_remainders(self, ref: FilingRef, records: list[dict]) -> list[dict]:
+        """A breakdown's worked-out remainder under the name the report's own table gives it: Salesforce's Q2 FY2027
+        10-Q tags no "Hedging gains", which its tables list beside its regions and its service offerings. The row must
+        sit in a table with at least two of the breakdown's other lines and equal the remainder to the table's rounding."""
+        left = [record for record in records if record["kpi_key"] == LEFT_OVER_KEY]
+        if not left:
+            return records
+        try:
+            document = parse_document(ref.filing.html(), ref.source_url)
+        except Exception:  # noqa: BLE001 - the remainder keeps its worked-out name
+            return records
+        names: dict[int, str] = {}
+        for row in left:
+            others = {line_key(record["kpi_label"]) for record in records if record["group_key"] == row["group_key"]
+                      and record is not row}
+            if name := _row_named(document, float(row["value"]), others):
+                names[id(row)] = name
+        return [{**record, "kpi_key": member_key(name), "kpi_label": name} if (name := names.get(id(record))) else record
+                for record in records]
 
     def _income_records(self, facts, labels, breakdowns, ref: FilingRef, fiscal_year: str, fiscal_period: str,
                         groups) -> list[dict]:
@@ -3968,3 +3989,19 @@ def _row_label(locator: dict) -> str | None:
 def own_label(ref: FilingRef, own: dict) -> str:
     quarter = next((quarter for quarter, other in own.items() if other is ref), None)
     return f"{quarter[1]} {quarter[0]}" if quarter else ref.accession
+
+
+def _row_named(document: Document, value: float, others: set[str]) -> str | None:
+    """The label of a table row whose first amount is `value`, in a table that lists at least two of `others`."""
+    for table in document.tables.values():
+        scale = table.declared_scale() or document.default_scale()
+        labels = [clean(row[0]) if row else "" for row in table.rows]
+        if not scale or len({line_key(label) for label in labels if label} & others) < 2:
+            continue
+        for row, label in zip(table.rows, labels):
+            if not label or line_key(label) in others:
+                continue
+            amount = next((parsed for cell in row[1:] if (parsed := parse_number(cell)) is not None), None)
+            if amount is not None and not amount.percent and abs(amount.value * scale - value) <= scale / 2:
+                return label
+    return None

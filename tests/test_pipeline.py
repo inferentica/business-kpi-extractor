@@ -1590,3 +1590,20 @@ def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
     assert _pipeline(None, [row("2018", "Q1", 10), row("2018", "Q2", 25), row("2018", "Q3", 60)])._scale_runs() == []
     kept = _pipeline(None, [*values[:2], {**values[2], "owner_decision": "corrected"}, *values[5:]])._scale_runs()
     assert ("2018", "Q2") not in {(v["fiscal_year"], v["fiscal_period"]) for v in kept}
+
+
+def test_a_worked_out_remainder_takes_the_name_the_reports_table_gives_it():
+    # Salesforce's Q2 FY2027 10-Q tags no "Hedging gains", which its table lists beside its regions.
+    from kpi_extractor.document import parse_document
+    from kpi_extractor.pipeline import _row_named
+    from kpi_extractor.release_breakdowns import line_key
+    document = parse_document(
+        "<p>Revenues by geographical region consisted of the following (in millions):</p><table>"
+        "<tr><td></td><td>2026</td><td>2025</td></tr><tr><td>Americas</td><td>$ 7,404</td><td>$ 6,736</td></tr>"
+        "<tr><td>Europe</td><td>2,764</td><td>2,429</td></tr><tr><td>Asia Pacific</td><td>1,168</td><td>1,071</td></tr>"
+        "<tr><td>Hedging gains</td><td>9</td><td>0</td></tr><tr><td>Total Revenue</td><td>$ 11,345</td><td>$ 10,236</td></tr></table>",
+        "https://www.sec.gov/x.htm")
+    regions = {line_key(name) for name in ("Americas", "Europe", "Asia Pacific")}
+    assert _row_named(document, 9e6, regions) == "Hedging gains"
+    assert _row_named(document, 10e6, regions) is None  # no row of that amount
+    assert _row_named(document, 9e6, {line_key("Americas"), line_key("Japan")}) is None  # not this breakdown's table
