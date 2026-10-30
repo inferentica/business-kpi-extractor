@@ -82,6 +82,9 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
+# Reports parsed ahead of the one being read, and parsed reports kept in memory.
+_READ_AHEAD = 3
+_XBRL_KEPT = 6
 _XBRL_READER = "xbrl reader 32"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
@@ -155,6 +158,7 @@ class SymbolPipeline:
         self.values: dict[tuple, dict] = {}
         self.names: dict = {}
         self._xbrl_cache: dict[str, Future] = {}
+        self._xbrl_used: set[str] = set()
         self._archiving: list[Future] = []
         # Releases are read several at a time: state changes one reader at a time under this lock, and a reader lets go
         # of it only while it waits on the AI or a download (see _waiting).
@@ -215,17 +219,23 @@ class SymbolPipeline:
         self.archive._listing()  # once, before the download threads start
         self.archive.label(self.symbol, self.profile.name)
         reports = sorted(periodic_reports(company, self.reports_since), key=lambda ref: ref.filed)
+        pending = [ref for ref in reports if self.force or self._pending(ref)]
         for ref in reversed(reports):
-            if self.force or self._pending(ref):
-                self._xbrl_cache[ref.accession] = self._prefetch.submit(self._load_xbrl, ref)
-            elif not self.archive.has(_folder(ref), "xbrl.json"):
+            if ref not in pending and not self.archive.has(_folder(ref), "xbrl.json"):
                 # Read before the archive existed: stored now, once, without parsing it.
                 self._archiving.append(self._prefetch.submit(self._archive_xbrl, ref))
+        # The newest first (it gives the fiscal year's offset), then the rest a few ahead of the one being read: all at
+        # once, a full re-read held every parsed report (about 2 GB a company; six companies took the runner down).
+        for ref in pending[-1:] + pending[:_READ_AHEAD]:
+            self._read_ahead(ref)
         # The earnings releases are listed while the reports are read: the listing waits only on SEC and the archive.
         passed: list[FilingRef] = []
         listing = self._prefetch.submit(earnings_releases, company, self.profile, self.since, self.archive, passed)
         self.offset = self._year_offset(reports)
         for ref in reports:
+            later = [other for other in pending if other.filed > ref.filed or (other.filed == ref.filed and other is not ref)]
+            for other in later[:_READ_AHEAD]:
+                self._read_ahead(other)
             self._process_report(ref)
         releases = [ref for ref in sorted(listing.result(), key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
         for ref in passed:
@@ -306,10 +316,21 @@ class SymbolPipeline:
         return not previous or (previous["status"] not in _DONE and previous.get("attempts", 0) < _MAX_ATTEMPTS) or (
             ref.role == "periodic_report" and _XBRL_READER not in (previous.get("notes") or []))
 
-    def _xbrl(self, ref: FilingRef):
+    def _read_ahead(self, ref: FilingRef) -> None:
         if ref.accession not in self._xbrl_cache:
             self._xbrl_cache[ref.accession] = self._prefetch.submit(self._load_xbrl, ref)
-        return self._xbrl_cache[ref.accession].result()
+
+    def _xbrl(self, ref: FilingRef):
+        # The most recently used last; beyond a few, the least recently used are dropped (read again from the archive
+        # if needed). One parsed ahead and not yet used is never dropped.
+        future = self._xbrl_cache.pop(ref.accession, None) or self._prefetch.submit(self._load_xbrl, ref)
+        self._xbrl_cache[ref.accession] = future
+        self._xbrl_used.add(ref.accession)
+        used = [accession for accession in self._xbrl_cache if accession in self._xbrl_used]
+        for accession in used[:max(0, len(used) - _XBRL_KEPT)]:
+            del self._xbrl_cache[accession]
+            self._xbrl_used.discard(accession)
+        return future.result()
 
     def _archive_xbrl(self, ref: FilingRef) -> None:
         # A filing without an XBRL instance is marked, so it is not downloaded again on every run.
