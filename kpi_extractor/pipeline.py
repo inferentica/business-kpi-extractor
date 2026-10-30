@@ -903,8 +903,8 @@ class SymbolPipeline:
             found: dict[tuple[str, str], tuple[float, str, dict]] = {}
             gaps = sorted((quarter for quarter in refs if index(quarter) > first and quarter not in rows), key=index)
             for quarter in gaps:
-                for ref in refs[quarter][:6]:
-                    if ref.accession not in loaded and len(loaded) < 60:
+                for ref in refs[quarter][:12]:
+                    if ref.accession not in loaded and len(loaded) < 80:
                         try:
                             document = self._document(ref)
                             loaded[ref.accession] = " ".join(
@@ -920,9 +920,14 @@ class SymbolPipeline:
                             proven = [(figure, earlier) for figure, earlier in checks if figure_of(earlier) is not None]
                             target = figure_of
                             if proven and all(abs(figure - target(earlier)) <= abs(target(earlier)) * 1e-6 for figure, earlier in proven):
-                                found.setdefault(quarter, (numbers[0] * scale, f"the release for {quarter[1]} {quarter[0]}",
-                                                           {"source_accession": ref.accession, "source_url": ref.source_url,
-                                                            "filed_at": ref.filed.isoformat()}))
+                                source = {"source_accession": ref.accession, "source_url": ref.source_url,
+                                          "filed_at": ref.filed.isoformat()}
+                                found.setdefault(quarter, (numbers[0] * scale, f"the release for {quarter[1]} {quarter[0]}", source))
+                                # Its own earlier columns fill gaps behind it too (Q1 2023's report gives Q4 2022).
+                                for figure, earlier in checks:
+                                    if earlier not in rows and index(earlier) > first and earlier not in lagged:
+                                        lagged[earlier] = (figure, f"the release for {quarter[1]} {quarter[0]}, its column "
+                                                                   f"for {earlier[1]} {earlier[0]}", source)
                     if quarter in found:
                         break
             found = {**lagged, **found}
