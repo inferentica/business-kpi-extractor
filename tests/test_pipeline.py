@@ -690,6 +690,10 @@ def test_a_split_of_part_of_a_reported_line_is_proven_by_nearly_filling_it():
     pipeline = _pipeline(FakeControl({}), rows)
     pipeline._prove_flagged([])
     assert pipeline.values[("kpi_customer", "business", "2025", "Q4")]["validation_status"] == "verified"
+    exact = _pipeline(FakeControl({}), [rows[0], *({**row, "notes": ["the 10-Q's exact figure; the release gave $1.72 billion",
+                                                                      *row["notes"]]} for row in rows[1:])])
+    exact._prove_flagged([])
+    assert exact.values[("kpi_customer", "creative", "2025", "Q4")]["validation_status"] == "verified"
     short = _pipeline(FakeControl({}), [rows[0], {**rows[1], "value": 1_500_000_000.0}, rows[2]])
     short._prove_flagged([])
     assert short.values[("kpi_customer", "business", "2025", "Q4")]["validation_status"] == "needs_review"

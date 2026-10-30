@@ -102,6 +102,7 @@ _PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER, _WITH
 # A split of part of a reported line (Adobe's two customer groups: 99.5% of its subscription revenue, the rest its
 # advertising business's) covers at least this share of it.
 _MIN_COVERAGE = 0.99
+_EXACT_NOTE = re.compile(r"^the [\w-]+'s exact (?:figure|year less its three quarters);")
 _UNANCHORED = {"total matches no figure the company reported in XBRL", "no total revenue to reconcile against"}
 # Restatements move a figure a little (a reclassification); a jump beyond this is a different column, not a restatement.
 MAX_RESTATEMENT = 0.10
@@ -2850,7 +2851,8 @@ class SymbolPipeline:
         # rounding and nothing else is wrong with it.
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
-            if len(rows) < 2 or not waiting or any(not set(v.get("notes") or []) <= _UNANCHORED for v in waiting):
+            if len(rows) < 2 or not waiting or any(not {n for n in v.get("notes") or [] if not _EXACT_NOTE.match(n)} <= _UNANCHORED
+                                                   for v in waiting):
                 continue
             parts = [float(v["value"]) for v in rows]
             stated = float((rows[0].get("locator") or {}).get("total") or 0) or sum(parts)
@@ -3448,7 +3450,8 @@ def _identity_text(text: str) -> str:
 
 
 def _proven(value: dict) -> bool:
-    return any(note.startswith(_PROOFS) for note in value.get("notes") or [])
+    # A line replaced by its report's exact tagged figure (Adobe's customer groups) is a figure reported in XBRL.
+    return any(note.startswith(_PROOFS) or _EXACT_NOTE.match(note) for note in value.get("notes") or [])
 
 
 def _rounding(value: float) -> float:
