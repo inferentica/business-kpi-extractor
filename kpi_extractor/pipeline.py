@@ -782,7 +782,10 @@ class SymbolPipeline:
         records: list[dict] = []
         unread.clear()
         for group in spec.groups:
-            if group.kind != "metric":
+            # A breakdown's lines only take the report's exact figure (Adobe's customer groups, rounded to $10 million
+            # in its releases, tagged to the dollar in its 10-Qs); a quarter is never filled one line at a time.
+            split = group.kind == "revenue_breakdown"
+            if group.kind != "metric" and not split:
                 continue
             key = f"{AI_GROUP_PREFIX}{group.key}"
             for kpi in group.kpis:
@@ -790,9 +793,10 @@ class SymbolPipeline:
                         if v["group_key"] == key and v["kpi_key"] == kpi.key and v["fiscal_period"] != "FY"}
                 readings = {quarter: float(v["value"]) for quarter, v in held.items()
                             if v["validation_status"] == "verified" and not (v.get("locator") or {}).get("tagged")}
-                missing = [quarter for quarter in newest_first if quarter not in held
-                           or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
-                if not missing:
+                missing = [] if split else [
+                    quarter for quarter in newest_first if quarter not in held
+                    or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
+                if not missing and not split:
                     continue
                 # The tag: one found before (kept on the figures it filled), else learned from the releases' readings,
                 # else, for a KPI the releases never state (Alphabet's revenue backlog), picked from the report's tags.
@@ -807,7 +811,8 @@ class SymbolPipeline:
                     known = [quarter for quarter in newest_first if quarter in readings and quarter in quarters][:6]
                     tag = learn_tag({quarter: readings[quarter] for quarter in known}, {quarter: facts_of(quarter) for quarter in known})
                 elif tag is None:
-                    unread.append((group, kpi, key))
+                    if not split:
+                        unread.append((group, kpi, key))
                     continue
                 if tag is None:
                     continue
@@ -826,11 +831,13 @@ class SymbolPipeline:
                         if (fact is not None and quarter in readings and fact != readings[quarter] and reading
                                 and not reading.get("owner_decision")):
                             ref, end = quarters[quarter]
+                            exact = f"the {ref.form}'s exact figure; the release gave {(reading.get('locator') or {}).get('value_text') or readings[quarter]}"
+                            tagged = {"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions), "instant": tag.instant}
+                            # A breakdown line keeps its breakdown's total and the evidence that settled it.
                             records.append({**reading, "value": fact, "source_accession": ref.accession, "source_url": ref.source_url,
                                             "filed_at": ref.filed.isoformat(),
-                                            "notes": [f"the {ref.form}'s exact figure; the release gave {(reading.get('locator') or {}).get('value_text') or readings[quarter]}"],
-                                            "locator": {"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
-                                                        "instant": tag.instant}})
+                                            "notes": [*(reading.get("notes") or []), exact] if split else [exact],
+                                            "locator": {**(reading.get("locator") or {}), **tagged} if split else tagged})
                         continue
                     fact = facts_of(quarter).get(tag)
                     if fact is None:
