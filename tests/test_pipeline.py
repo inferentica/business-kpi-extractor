@@ -507,7 +507,7 @@ def test_a_year_before_any_regional_quarter_follows_the_latest_quarters():
     group = XbrlGroup("geography", "Revenue by Geography", 2,
                       [("unitedstates", "United States", 4632.0), ("emea", "EMEA", 2550.0), ("otherasia", "Other Asia", 754.0),
                        ("japan", "Japan", 609.0), ("otheramericas", "Other Americas", 484.0)], 9030.0, 0.0, "USD", "c",
-                      elements={"america": "srt:AmericasMember", "emea": "us-gaap:EMEAMember", "asia": "srt:AsiaMember"},
+                      elements={"america": "us-gaap:AmericasMember", "emea": "us-gaap:EMEAMember", "asia": "us-gaap:AsiaMember"},
                       alternative=[("america", "America", 5117.0), ("emea", "EMEA", 2550.0), ("asia", "Asia", 1363.0)])
     chosen = pipeline._continuing_split(group, date(2018, 11, 30))
     assert [key for key, _l, _v in chosen.members] == ["americas", "emea", "apac"]

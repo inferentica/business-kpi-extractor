@@ -81,7 +81,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 31"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 32"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -1372,10 +1372,14 @@ class SymbolPipeline:
         recent = {v["kpi_key"] for v in rows}
         # The same element under another label ("Total Americas" in Adobe's 10-K, "Americas" in its 10-Qs) is one line,
         # whichever quarter names it.
-        stored = {member: v for v in sorted(quarters, key=lambda v: v["period_end"])
+        # The 2018 taxonomy moved members such as AmericasMember from us-gaap to srt: one element either way.
+        def standard(member: str | None) -> str | None:
+            return re.sub(r"^(?:us-gaap|srt):", "std:", member) if member else None
+
+        stored = {standard(member): v for v in sorted(quarters, key=lambda v: v["period_end"])
                   if (member := (v.get("locator") or {}).get("member"))}
         renamed = {key: stored[element] for key, _label, _value in group.alternative
-                   if (element := group.elements.get(key)) in stored and stored[element]["kpi_key"] != key}
+                   if (element := standard(group.elements.get(key))) in stored and stored[element]["kpi_key"] != key}
         current = {key for key, _label, _value in group.members}
         other = {renamed[key]["kpi_key"] if key in renamed else key for key, _label, _value in group.alternative}
         if recent and len(other & recent) > len(current & recent):
