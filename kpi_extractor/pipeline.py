@@ -39,7 +39,8 @@ from .prospectus import interim_quarters, prospectus_breakdowns, quarter_section
 from .release_breakdowns import line_key, release_breakdown
 from .segment_income import GROUP_KEY as INCOME_GROUP, GROUP_LABEL as INCOME_LABEL, INCOME_CONCEPT, LEFT_OVER_KEY, segment_income
 from .release_columns import amount, earlier_quarters, release_grids, row_key
-from .tagged_metrics import agrees, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits
+from .tagged_metrics import (agrees, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits,
+                             year_ago_facts)
 from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
@@ -857,6 +858,61 @@ class SymbolPipeline:
                         locator={"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
                                  "instant": tag.instant},
                     ))
+            if split:
+                records += self._year_ago_lines(group, key, quarters, records)
+        return records
+
+    def _year_ago_lines(self, group, key: str, quarters, fresh: list[dict]) -> list[dict]:
+        """A breakdown's periods before its first release, from the reports' comparative columns: Adobe's FY2025 10-Qs
+        tag FY2024's customer groups beside their own, its 10-K the two years before. A period is filled only when every
+        line's tag (the one its own quarter's figure carries; a 10-K's, its Q3's) has a figure in it, and never over one
+        held; a Q4 is then worked out from its year."""
+        rows = {value_key(v): v for v in self.values.values() if v["group_key"] == key and v["validation_status"] != "rejected"}
+        rows.update({value_key(v): v for v in fresh if v["group_key"] == key})
+        by_period: dict[tuple[str, str], dict[str, dict]] = {}
+        for v in rows.values():
+            by_period.setdefault((v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
+        lines = {kpi.key for kpi in group.kpis}
+        records: list[dict] = []
+        for quarter in sorted(by_period):
+            if quarter not in quarters or quarter[1] == "FY":
+                continue
+            annual = quarter[1] == "Q4"
+            source = by_period.get((quarter[0], "Q3") if annual else quarter) or {}
+            tags = {kpi: tag for kpi, v in source.items() if (tag := tag_from_locator(v.get("locator") or {}))}
+            if set(tags) != lines:
+                continue
+            ref, end = quarters[quarter]
+            try:
+                frame = self._xbrl(ref).facts.to_dataframe()
+            except Exception:  # noqa: BLE001 - an unreadable report gives nothing
+                continue
+            year = int(quarter[0])
+            for _back in range(2 if annual else 1):
+                found = year_ago_facts(frame, end, (330, 400) if annual else (80, 100))
+                if found is None:
+                    break
+                end, facts = found
+                year -= 1
+                target = (str(year), "FY" if annual else quarter[1])
+                if not all(tag in facts for tag in tags.values()):
+                    break
+                if target in by_period:
+                    continue
+                by_period[target] = {}
+                for kpi, tag in tags.items():
+                    record = {**source[kpi], "fiscal_year": target[0], "fiscal_period": target[1], "period_end": end.isoformat(),
+                              "value": facts[tag], "method": "ai", "validation_status": "verified",
+                              "reconciliation_error_pct": None, "source_accession": ref.accession, "source_url": ref.source_url,
+                              "filed_at": ref.filed.isoformat(),
+                              "notes": [f"the {ref.form}'s exact figure; its column for {target[1]} {target[0]}"],
+                              "locator": {"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
+                                          "instant": tag.instant, "year_ago": True}}
+                    record.pop("owner_decision", None)
+                    by_period[target][kpi] = record
+                    records.append(record)
+        if records:
+            self.log(f"{self.symbol}: {len(records)} breakdown values from the reports' year-ago columns")
         return records
 
     def _exact_lines(self, held: dict, readings: dict, quarters, facts_of) -> list[dict]:

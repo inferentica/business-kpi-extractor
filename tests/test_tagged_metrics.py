@@ -200,3 +200,59 @@ def test_a_breakdowns_rounded_lines_take_the_reports_exact_figures():
     pipeline._fill_tagged_metrics(reports, spec)
     assert {v["fiscal_period"]: v["value"] for v in stored} == {"Q1": 1_534e6, "Q2": 1_595e6, "Q3": 1_648e6, "Q4": 1_718e6}
     assert all(v["locator"]["total"] == 6e9 and v["notes"][0].startswith("parts make up") for v in stored)
+
+
+def test_a_breakdowns_year_before_comes_from_the_reports_comparative_columns():
+    # Adobe's FY2025 10-Qs tag FY2024's customer groups beside their own; its 10-K gives FY2023-25's years.
+    from datetime import date as day
+    from types import SimpleNamespace
+
+    from kpi_extractor import ai
+    from kpi_extractor.pipeline import SymbolPipeline
+    from kpi_extractor.tagged_metrics import year_ago_facts
+    ends = {"q1": "2025-02-28", "q2": "2025-05-30", "q3": "2025-08-29", "k": "2025-11-28"}
+    columns = {"q1": [("2024-12-02", "2025-02-28", 1_534e6, 3_922e6), ("2023-12-02", "2024-03-01", 1_339e6, 3_550e6)],
+               "q2": [("2025-03-01", "2025-05-30", 1_595e6, 4_019e6), ("2024-03-02", "2024-05-31", 1_380e6, 3_650e6)],
+               "q3": [("2025-05-31", "2025-08-29", 1_648e6, 4_117e6), ("2024-06-01", "2024-08-30", 1_437e6, 3_715e6)],
+               "k": [("2024-11-30", "2025-11-28", 6_495e6, 16_303e6), ("2023-12-02", "2024-11-29", 5_662e6, 14_749e6),
+                     ("2022-12-03", "2023-12-01", 4_744e6, 13_425e6)]}
+    members = {"business": "adbe:BusinessMember", "creative": "adbe:CreativeMember"}
+
+    def frame_of(accession):
+        return pd.DataFrame([{"concept": "us-gaap:Revenues", "numeric_value": value, "period_type": "duration",
+                              "period_start": start, "period_end": end, "dim_srt_MajorCustomersAxis": members[kpi]}
+                             for start, end, business, creative in columns[accession]
+                             for kpi, value in (("business", business), ("creative", creative))])
+    assert year_ago_facts(frame_of("q1"), day(2025, 2, 28))[0] == day(2024, 3, 1)
+    pipeline = SymbolPipeline(None, "ADBE", quarters=4, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(name="Adobe", fiscal_year_end="1128", foreign=False)
+    pipeline.offset = 0
+    pipeline.filings = {a: {"accession": a, "period_end": e, "status": "processed"} for a, e in ends.items()}
+    pipeline.values = {}
+    for kpi, index in (("business", 2), ("creative", 3)):
+        for p, a in (("Q1", "q1"), ("Q2", "q2"), ("Q3", "q3"), ("Q4", "k")):
+            exact = columns[a][0][index] if a != "k" else 1_718e6
+            tagged = a != "k"
+            pipeline.values[("kpi_customers", kpi, "2025", p)] = {
+                "group_key": "kpi_customers", "group_label": "Customers", "group_kind": "revenue_breakdown", "group_order": 20,
+                "kpi_key": kpi, "kpi_label": kpi.title(), "kpi_order": 0, "unit": "currency", "currency": "USD",
+                "fiscal_year": "2025", "fiscal_period": p, "period_end": ends[a], "method": "ai", "validation_status": "verified",
+                "source_accession": a, "value": exact, "notes": ["the 10-Q's exact figure; the release gave x"],
+                "locator": {"tagged": True, **({"concept": "us-gaap:Revenues", "instant": False,
+                                                "dimensions": {"dim_srt_MajorCustomersAxis": members[kpi]}} if tagged else {})}}
+    pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
+    stored = []
+    pipeline._store = lambda values: stored.extend(values)
+    spec = ai.Spec.model_validate({"groups": [{"key": "customers", "label": "Customers", "kind": "revenue_breakdown", "kpis": [
+        {"key": "business", "label": "Business", "unit": "currency"}, {"key": "creative", "label": "Creative", "unit": "currency"}]}]})
+    reports = [SimpleNamespace(accession=a, form="10-K" if a == "k" else "10-Q", filed=day(2026, 1, 1), source_url="u")
+               for a in ends]
+    pipeline._fill_tagged_metrics(reports, spec)
+    by = {(v["kpi_key"], v["fiscal_year"], v["fiscal_period"]): v["value"] for v in stored}
+    assert by == {("business", "2024", "Q1"): 1_339e6, ("business", "2024", "Q2"): 1_380e6, ("business", "2024", "Q3"): 1_437e6,
+                  ("creative", "2024", "Q1"): 3_550e6, ("creative", "2024", "Q2"): 3_650e6, ("creative", "2024", "Q3"): 3_715e6,
+                  ("business", "2024", "FY"): 5_662e6, ("creative", "2024", "FY"): 14_749e6,
+                  ("business", "2023", "FY"): 4_744e6, ("creative", "2023", "FY"): 13_425e6}
+    q1 = next(v for v in stored if v["fiscal_period"] == "Q1")
+    assert q1["period_end"] == "2024-03-01" and q1["source_accession"] == "q1" and q1["locator"]["year_ago"]
+    assert q1["notes"] == ["the 10-Q's exact figure; its column for Q1 2024"]

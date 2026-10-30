@@ -56,6 +56,17 @@ def quarter_facts(facts: pd.DataFrame, period_end: date, days: tuple[int, int] =
     return found
 
 
+def year_ago_facts(facts: pd.DataFrame, period_end: date, days: tuple[int, int] = (80, 100)) -> tuple[date, dict[Tag, float]] | None:
+    """A report's comparative column: the facts of the period ending about a year before its own (a 52/53-week year
+    ends within a week of the date a year back), with its end."""
+    ends = {end for end in pd.to_datetime(facts["period_end"], errors="coerce").dt.date if isinstance(end, date)}
+    earlier = [end for end in ends if 357 <= (period_end - end).days <= 371]
+    if not earlier:
+        return None
+    end = min(earlier, key=lambda found: abs((period_end - found).days - 364))
+    return end, quarter_facts(facts, end, days)
+
+
 def _tolerance(value: float) -> float:
     """Half a unit of the figure's own rounding ("$677 billion" is 676.5 to 677.5 billion), at least one unit."""
     whole = abs(int(round(value)))
