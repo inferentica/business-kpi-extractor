@@ -64,8 +64,35 @@ def _amount(row: list[str], col: int, scale: float) -> float | None:
     return None if parsed is None or parsed.percent else round(parsed.value * scale, 2)
 
 
+# A segment table laid out by heading (Amazon's "North America" over its "Net sales" and "Operating income" rows): the
+# row of the measure under each heading is that segment's, and under "Consolidated" (or "Total") the company's.
+_MEASURES = {
+    "revenue": re.compile(r"^(total )?(net )?(sales|revenues?)$", re.I),
+    "income": re.compile(r"^(operating income( \(loss\))?|operating (loss|profit)|income( \(loss\))? from operations)$", re.I),
+}
+_WHOLE = re.compile(r"^(consolidated|total)$", re.I)
+
+
+def _rows(table: Table, start: int, current: int, measure: str) -> list[tuple[str, list[str], bool]]:
+    """(label, row, is the total) for each figure row: a measure row under a heading takes the heading's name."""
+    rows, heading = [], None
+    for row in table.rows[start:]:
+        label = clean(row[0]) if row else ""
+        if not label:
+            continue
+        figures = any(parse_number(cell) is not None for cell in row[1:])
+        if not figures:
+            heading = label.rstrip(":")
+            continue
+        if heading and _MEASURES[measure].match(label):
+            rows.append((heading, row, bool(_WHOLE.match(heading))))
+        elif measure == "revenue":
+            rows.append((label, row, bool(_TOTAL.match(label))))
+    return rows
+
+
 def release_breakdown(document: Document, members: dict[str, str], year_ago: dict[str, float], period_end: date, *,
-                      tables: list[str] | None = None, totalled: bool = True) -> ReleaseBreakdown | None:
+                      tables: list[str] | None = None, totalled: bool = True, measure: str = "revenue") -> ReleaseBreakdown | None:
     """The quarter's figure for every line in `members` (key → label) from one table of the release.
 
     `year_ago` holds the report's figures for the same quarter a year before; every one of them must be the table's
@@ -83,15 +110,12 @@ def release_breakdown(document: Document, members: dict[str, str], year_ago: dic
         start, current, prior = columns
         found: dict[str, tuple[str, float, float | None]] = {}
         total: float | None = None
-        for row in table.rows[start:]:
-            label = clean(row[0]) if row else ""
-            if not label:
-                continue
+        for label, row, whole in _rows(table, start, current, measure):
             value = _amount(row, current, scale)
             if value is None:
                 continue
-            if total is None and _TOTAL.match(label):
-                total = value
+            if whole:
+                total = value if total is None else total
                 continue
             key = line_key(label)
             for member, names in wanted.items():

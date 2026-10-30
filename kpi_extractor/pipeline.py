@@ -621,7 +621,7 @@ class SymbolPipeline:
                 return  # the report is in
             stored = {value["group_key"] for value in live if (value["fiscal_year"], value["fiscal_period"]) == own
                       and (value.get("locator") or {}).get("release_table") and value["source_accession"] == latest.accession}
-            reported = [value for value in live if value["method"] in ("xbrl", "derived") and value["group_key"] != INCOME_GROUP
+            reported = [value for value in live if value["method"] in ("xbrl", "derived")
                         and (value["fiscal_year"], value["fiscal_period"]) < own]
             if not reported:
                 return
@@ -648,7 +648,9 @@ class SymbolPipeline:
                 found = release_breakdown(document, {line["kpi_key"]: line["kpi_label"] for line in lines},
                                           {line["kpi_key"]: past[(key, line["kpi_key"])] for line in lines
                                            if (key, line["kpi_key"]) in past},
-                                          latest.period_end, tables=within, totalled=not levels)
+                                          latest.period_end, tables=within, totalled=not levels,
+                                          # Segment operating income from the same table's "Operating income" rows.
+                                          measure="income" if key == INCOME_GROUP else "revenue")
                 if found is None:
                     continue
                 tables[key] = found.table

@@ -73,3 +73,19 @@ def test_a_restated_year_ago_or_a_missing_line_is_left_for_the_report():
     assert release_breakdown(DOCUMENT, SEGMENTS, {**SEGMENTS_YEAR_AGO, "googlecloud": 15_000 * M}, END) is None
     assert release_breakdown(DOCUMENT, {**SEGMENTS, "unitedstates": "United States"}, SEGMENTS_YEAR_AGO, END) is None
     assert release_breakdown(DOCUMENT, SEGMENTS, SEGMENTS_YEAR_AGO, date(2026, 6, 30)) is None  # another quarter's table
+
+
+def test_a_segment_table_laid_out_by_heading_gives_revenue_and_operating_income():
+    # Amazon's Q3 2026 release: each segment a heading over its net sales and operating income.
+    from kpi_extractor.document import Table
+    rows = [["", "Three Months Ended September 30,", "", "Nine Months Ended September 30,", ""], ["", "2025", "2026", "2025", "2026"]]
+    for name, sales, income in (("North America", ("$106,267", "$112,852"), ("$4,789", "$8,723")), ("International", ("$40,896", "$43,108"), ("$1,199", "$1,580")),
+                                ("AWS", ("$33,006", "$45,984"), ("$11,434", "$17,773")), ("Consolidated", ("$180,169", "$201,944"), ("$17,422", "$28,076"))):
+        rows += [[name, "", "", "", ""], ["Net sales", *sales, "", ""], ["Operating expenses", "1", "1", "", ""], ["Operating income", *income, "", ""]]
+    table = Table("T3", "AMAZON.COM, INC. Segment Information (in millions) (unaudited)", rows)
+    document = Document("x", {"T3": table}, {}, ["T3"])
+    members = {"northamerica": "North America", "international": "International", "aws": "AWS"}
+    revenue = release_breakdown(document, members, {"northamerica": 106_267e6, "aws": 33_006e6}, date(2026, 9, 30))
+    assert revenue.values == {"northamerica": 112_852e6, "international": 43_108e6, "aws": 45_984e6} and revenue.total == 201_944e6
+    income = release_breakdown(document, members, {"northamerica": 4_789e6, "aws": 11_434e6}, date(2026, 9, 30), measure="income")
+    assert income.values == {"northamerica": 8_723e6, "international": 1_580e6, "aws": 17_773e6} and income.total == 28_076e6
