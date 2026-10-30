@@ -103,3 +103,16 @@ def test_a_companys_own_segment_measures_stand_in_for_operating_income():
     alphabet = pd.DataFrame(quarter(39_157e6, 11_121e6, -2_047e6, -7_655e6, 40_576e6))
     assert segment_income(alphabet, date(2026, 9, 30), False).concept == "us-gaap:OperatingIncomeLoss"
     assert segment_revenue(alphabet, date(2026, 9, 30), False) is None
+
+
+def test_a_companys_own_measure_without_its_total_is_its_segments_added_up():
+    # Brookfield's Q1 2026 10-Q tags each segment's earnings for the quarter, but not their sum.
+    start, end = "2026-01-01", "2026-03-31"
+    members = ("bam:CreditSegmentMember", "bam:InfrastructureMember", "bam:RealEstateSegmentMember")
+    rows = [{**fact(value, start, end, member, "us-gaap:OperatingSegmentsMember"), "concept": "bam:SegmentEarnings"}
+            for member, value in zip(members, (183e6, 174e6, 121e6))]
+    earnings = segment_income(pd.DataFrame(rows), date(2026, 3, 31), False)
+    assert earnings.current.total == 478e6 and len(earnings.current.rows) == 3
+    # Operating income still needs its own total.
+    tagged = [{**row, "concept": "us-gaap:OperatingIncomeLoss"} for row in rows]
+    assert segment_income(pd.DataFrame(tagged), date(2026, 3, 31), False) is None

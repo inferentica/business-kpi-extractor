@@ -60,7 +60,7 @@ def _period(frame: pd.DataFrame, end: date, low: int, high: int) -> pd.DataFrame
 
 
 def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[str, str],
-          children: dict[str, set[str]]) -> IncomeRows | None:
+          children: dict[str, set[str]], summed: bool = False) -> IncomeRows | None:
     columns = [column for column in frame.columns if column.startswith("dim_")]
     total = None
     segments: dict[str, float] = {}
@@ -87,6 +87,10 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
     segments = {member: value for member, value in segments.items()
                 if not (children.get(member, set()) & (set(segments) - {member}))}
     segments = remove_subtotals(segments, total)
+    if total is None and summed and len(segments) >= 2:
+        # A company's own measure is its segments added up (Brookfield's Q1 2026 10-Q tags each segment's earnings,
+        # not their sum).
+        total = sum(segments.values())
     if total is None or len(segments) < 2:
         return None
 
@@ -148,17 +152,18 @@ def segment_revenue(facts: pd.DataFrame, period_end: date, annual: bool,
 def _measure(facts: pd.DataFrame, concept: str, name: str, period_end: date, annual: bool,
              label: Callable[[str], str | None], children: dict[str, set[str]] | None) -> SegmentIncome | None:
     frame = facts[(facts["concept"] == concept) & facts["numeric_value"].notna() & (facts["period_type"] == "duration")]
+    own = concept != INCOME_CONCEPT
     if frame.empty:
         return None
     labels = _member_labels(facts)
     children = children or {}
     low, high = (330, 400) if annual else (80, 100)
-    current = _rows(_period(frame, period_end, low, high), label, labels, children)
+    current = _rows(_period(frame, period_end, low, high), label, labels, children, own)
     if current is None:
         return None
     # A year before, within a week (52/53-week years end on a different day).
     year_ago = period_end - timedelta(days=364)
     prior = next((rows for offset in range(-7, 8)
-                  if (rows := _rows(_period(frame, year_ago + timedelta(days=offset), low, high), label, labels, children))), None)
-    ytd = None if annual else _rows(_period(frame, period_end, 250, 290), label, labels, children)
+                  if (rows := _rows(_period(frame, year_ago + timedelta(days=offset), low, high), label, labels, children, own))), None)
+    ytd = None if annual else _rows(_period(frame, period_end, 250, 290), label, labels, children, own)
     return SegmentIncome(current, ytd, prior, {key: element for key, _name, element, _value in current.rows}, concept, name)
