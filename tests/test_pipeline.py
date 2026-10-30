@@ -1446,3 +1446,26 @@ def test_a_years_remainder_takes_the_name_its_quarters_give_it():
     records = pipeline._income_records(facts, {}.get, SimpleNamespace(period_end=date(2024, 12, 28), annual=True),
                                        ref, "2024", "FY", [])
     assert [(r["kpi_key"], r["kpi_label"], r["value"]) for r in records][-1] == ("other", "All Other", -4_190e6)
+
+
+def test_flags_todays_checks_no_longer_raise_are_cleared():
+    # ASML: used systems sold 10 then 3 (flagged as a 0.3x jump before small counts moved by units); its Q1 2023 product
+    # lines once flagged 100% off the total (each line read twice under two keys), now adding up to the stated total.
+    def row(group, kpi, period, end, value, status, notes, unit="count", kind="metric", total=None):
+        return {"group_key": group, "kpi_key": kpi, "fiscal_year": end[:4], "fiscal_period": period, "period_end": end,
+                "method": "ai", "validation_status": status, "value": value, "unit": unit, "group_kind": kind,
+                "source_accession": f"r{end}", "notes": notes, "locator": {"total": total} if total else {}}
+    values = [
+        row("kpi_operating", "used", "Q4", "2021-12-31", 10, "verified", []),
+        row("kpi_operating", "used", "Q1", "2022-03-31", 3, "needs_review", ["changed 0.3x in a quarter", "checked against r2023"]),
+        row("kpi_operating", "new", "Q4", "2021-12-31", 200, "verified", []),
+        row("kpi_operating", "new", "Q1", "2022-03-31", 60, "needs_review", ["changed 0.3x in a quarter"]),
+        *(row("kpi_product", kpi, "Q1", "2023-03-31", value, "needs_review",
+              ["confirmed by review", "parts differ from the total by 100.0%", "checked against r2024"], "currency",
+              "revenue_breakdown", 6_746.2e6) for kpi, value in (("systems", 5_341.8e6), ("service", 1_404.4e6))),
+        *(row("kpi_other", kpi, "Q1", "2023-03-31", value, "needs_review", ["parts differ from the total by 30.0%"], "currency",
+              "revenue_breakdown", 10e6) for kpi, value in (("a", 5e6), ("b", 8e6))),
+    ]
+    cleared = {(v["kpi_key"], v["validation_status"]) for v in _pipeline(None, values)._outdated_flags()}
+    # A count of 200 to 60 is still a jump; parts still off their total stay flagged.
+    assert cleared == {("used", "verified"), ("systems", "verified"), ("service", "verified")}

@@ -3189,9 +3189,51 @@ class SymbolPipeline:
                     cleared += [{**m, "validation_status": "verified", "locator": {**m["locator"], "total": parts},
                                  "reconciliation_error_pct": 0, "notes": ["reconciled to another figure in the same report"]}
                                 for m in members]
+        cleared += self._outdated_flags()
         for start in range(0, len(cleared), 400):
             self._store(values=cleared[start:start + 400])
         self._release_held_breakdowns()
+
+    def _outdated_flags(self) -> list[dict]:
+        """Flags set by a check that today's checks no longer raise, cleared from the stored figures alone:
+        - a small count's ratio jump (ASML's used systems sold, 10 to 3), flagged before small counts moved by units;
+        - a breakdown's parts off their total (ASML's 2023 quarters, read twice over while two keys named each line),
+          now that its parts add up to the release's stated total."""
+        aside = ("confirmed by review", "checked against ")
+        cleared = []
+        series: dict[tuple[str, str], list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["validation_status"] == "verified" and v["fiscal_period"] != "FY":
+                series.setdefault((v["group_key"], v["kpi_key"]), []).append(v)
+        groups: dict[tuple, list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["group_kind"] == "revenue_breakdown" and v["validation_status"] != "rejected":
+                groups.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"], v.get("source_accession")), []).append(v)
+        for v in self.values.values():
+            if v["method"] != "ai" or v["validation_status"] != "needs_review" or v["fiscal_period"] == "FY":
+                continue
+            reasons = [note for note in v.get("notes") or [] if not note.startswith(aside)]
+            if v["unit"] != "count" or not reasons or not all(note.startswith("changed ") for note in reasons):
+                continue
+            before = max((o for o in series.get((v["group_key"], v["kpi_key"]), [])
+                          if 0 < _days(v["period_end"], o["period_end"]) <= 120), key=lambda o: o["period_end"], default=None)
+            if before is not None and count_jump(v["unit"], float(before["value"]), float(v["value"])) == "":
+                cleared.append({**v, "validation_status": "verified",
+                                "notes": [*(v.get("notes") or []), "a small count's move, within the rule for small counts"]})
+        for rows in groups.values():
+            waiting = [v for v in rows if v["validation_status"] == "needs_review"]
+            stated = float((rows[0].get("locator") or {}).get("total") or 0)
+            if not waiting or len(rows) < 2 or not stated or len(waiting) != len(rows):
+                continue
+            if not all([note for note in v.get("notes") or [] if not note.startswith(aside)]
+                       and all(note.startswith("parts differ from the total by") for note in v.get("notes") or []
+                               if not note.startswith(aside)) for v in waiting):
+                continue
+            parts = [float(v["value"]) for v in rows]
+            if abs(sum(parts) - stated) <= abs(stated) * 0.001:
+                cleared += [{**v, "validation_status": "verified", "reconciliation_error_pct": (sum(parts) - stated) / stated,
+                             "notes": [*(v.get("notes") or []), "the parts add up to the release's total"]} for v in rows]
+        return cleared
 
     def _release_held_breakdowns(self) -> None:
         """Parts flagged only because another part of their breakdown was, released once that part is cleared: TSMC's
