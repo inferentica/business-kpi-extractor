@@ -192,3 +192,13 @@ def test_a_row_a_complete_quarter_does_not_list_was_nothing_then():
     # A quarter that does not add up to its own total does not stand in for zeros: no Q4.
     values[2] = v("Q1", "n16", 25, 40)
     assert not [row for row in derive_periods(values) if row["fiscal_period"] == "Q4" and row["validation_status"] == "verified"]
+
+
+def test_a_segment_operating_loss_in_q4_is_not_held_for_review():
+    from kpi_extractor.derive import _combine
+    def row(period, value):
+        return {"group_key": "segment_income", "fiscal_year": "2025", "fiscal_period": period, "period_end": "2025-12-27",
+                "value": value, "validation_status": "verified", "locator": {}}
+    quarters = [{"other": row(q, v)} for q, v in (("Q1", 103), ("Q2", 69), ("Q3", 100))]
+    derived = _combine({"other": row("FY", 264)}, quarters, "Q4")
+    assert derived[0]["value"] == -8 and derived[0]["validation_status"] == "verified"

@@ -1,6 +1,8 @@
 """Periods no document reports on its own: Q4 from the annual report, and full years from four reported quarters."""
 from __future__ import annotations
 
+from .segment_income import GROUP_KEY as INCOME_GROUP
+
 QUARTERS = ("Q1", "Q2", "Q3")
 # Rows that balance a split to revenue (intersegment eliminations, corporate and reconciling items, revenue outside every
 # split). A period without one had nothing to balance: the row is zero there, not a business that is missing; and
@@ -56,6 +58,12 @@ def derive_periods(values: list[dict]) -> list[dict]:
     return derived
 
 
+def _signed(row: dict) -> bool:
+    """A figure that may be a loss in any quarter: a segment's operating income (Intel's All Other, −$8 million in
+    Q4 2025 after three profitable quarters)."""
+    return row.get("group_key") == INCOME_GROUP
+
+
 def _kept(row: dict) -> dict | None:
     """What a derived figure keeps of its source's locator: the segment it is a line of (AMD's Client under Client and
     Gaming), so a worked-out Q4 nests where its quarters do."""
@@ -75,7 +83,7 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
         sources = [*parts, *([annual[key]] if annual else [])]
         verified = all(source["validation_status"] == "verified" for source in sources)
         notes = [] if verified else ["derived from values that need review"]
-        if annual and value < 0 <= annual[key]["value"] and not balancing(key):
+        if annual and value < 0 <= annual[key]["value"] and not balancing(key) and not _signed(annual[key]):
             verified, notes = False, [*notes, "derived Q4 is negative"]
         rows.append({
             **base,
@@ -182,7 +190,8 @@ def _combine_year_to_date(annual: dict, nine: dict, nine_total: float, sources: 
         source = sources.get(key) or next(iter(sources.values()))  # a balancing row the nine months left implicit
         verified = year["validation_status"] == "verified" and source["validation_status"] == "verified"
         notes = [] if verified else ["derived from values that need review"]
-        if value < 0 <= year["value"] and not balancing(key):  # hedging or eliminations may turn either way
+        # Hedging or eliminations may turn either way, as may a segment's operating income.
+        if value < 0 <= year["value"] and not balancing(key) and not _signed(year):
             verified, notes = False, [*notes, "derived Q4 is negative"]
         rows.append({**year, "fiscal_period": "Q4", "value": value, "method": "derived",
                      "validation_status": "verified" if verified else "needs_review",
