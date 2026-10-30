@@ -1399,3 +1399,29 @@ def test_a_quarter_moved_to_the_year_with_its_release_goes_back_to_q4():
     pipeline._refile_annuals()
     assert pipeline.values[("kpi_product_type", "products", "2019", "Q4")]["validation_status"] == "verified"
     assert pipeline.values[("kpi_product_type", "products", "2019", "FY")]["validation_status"] == "rejected"
+
+
+def test_a_years_remainder_takes_the_name_its_quarters_give_it():
+    # AMD's FY2024 10-K tags "All Other" so that nothing tagged closes the gap; its 10-Qs name the line.
+    import pandas as pd
+    from kpi_extractor.sec import FilingRef
+    seg, cons = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_ConsolidationItemsAxis"
+    start, end = "2023-12-31", "2024-12-28"
+
+    def fact(value, segment=None, item=None):
+        return {"concept": "us-gaap:OperatingIncomeLoss", "numeric_value": value, "period_type": "duration",
+                "period_start": start, "period_end": end, seg: segment, cons: item}
+    facts = pd.DataFrame([fact(3_482e6, "amd:DataCenterMember", "us-gaap:OperatingSegmentsMember"),
+                          fact(2_608e6, "amd:ClientMember", "us-gaap:OperatingSegmentsMember"),
+                          fact(-4_190e6, None, "us-gaap:OperatingSegmentsMember"),
+                          fact(4_190e6, None, "us-gaap:MaterialReconcilingItemsMember"), fact(1_900e6)])
+    quarter = {"group_key": "segment_income", "kpi_key": "other", "kpi_label": "All Other", "fiscal_year": "2024",
+               "method": "xbrl", "validation_status": "verified", "value": -1e9}
+    pipeline = _pipeline(FakeControl({}), [{**quarter, "kpi_key": k, "kpi_label": l, "fiscal_period": p, "period_end": e}
+                                           for p, e in (("Q1", "2024-03-30"), ("Q2", "2024-06-29"), ("Q3", "2024-09-28"))
+                                           for k, l in (("datacenter", "Data Center"), ("client", "Client"), ("other", "All Other"))])
+    pipeline._member_children = {}
+    ref = FilingRef("k", "10-K", date(2025, 2, 5), "periodic_report", "https://www.sec.gov/k.htm")
+    records = pipeline._income_records(facts, {}.get, SimpleNamespace(period_end=date(2024, 12, 28), annual=True),
+                                       ref, "2024", "FY", [])
+    assert [(r["kpi_key"], r["kpi_label"], r["value"]) for r in records][-1] == ("other", "All Other", -4_190e6)

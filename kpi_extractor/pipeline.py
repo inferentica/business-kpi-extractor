@@ -37,7 +37,7 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
                      titled_pie_slides, unit_region)
 from .prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from .release_breakdowns import line_key, release_breakdown
-from .segment_income import GROUP_KEY as INCOME_GROUP, GROUP_LABEL as INCOME_LABEL, INCOME_CONCEPT, segment_income
+from .segment_income import GROUP_KEY as INCOME_GROUP, GROUP_LABEL as INCOME_LABEL, INCOME_CONCEPT, LEFT_OVER_KEY, segment_income
 from .release_columns import amount, earlier_quarters, release_grids, row_key
 from .tagged_metrics import agrees, fact_lines, learn_tag, quarter_facts, tag_from_locator, unit_fits
 from .release_statements import release_headline, release_statements, reported_units
@@ -81,7 +81,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 25"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 26"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -468,6 +468,19 @@ class SymbolPipeline:
         named = self.names.get(INCOME_GROUP) or {}
         ytd = {key: value for key, _name, _element, value in income.year_to_date.rows} if income.year_to_date else {}
         prior = {key: value for key, _name, _element, value in income.prior.rows} if income.prior else {}
+        # A year whose worked-out remainder is the one line its quarters name (AMD's 10-K tags "All Other" with the sign
+        # its 10-Qs give it reversed, so nothing tagged closes the gap) keeps that name.
+        keys = {key for key, *_rest in income.current.rows}
+        quarters = [v for v in self.values.values() if v["group_key"] == INCOME_GROUP and v["validation_status"] == "verified"
+                    and v["fiscal_year"] == fiscal_year and v["fiscal_period"] in ("Q1", "Q2", "Q3")]
+        quarter_names = {v["kpi_key"]: v["kpi_label"] for v in quarters}
+        if breakdowns.annual and len({v["fiscal_period"] for v in quarters}) == 3 \
+                and keys - set(quarter_names) == {LEFT_OVER_KEY} and len(set(quarter_names) - keys) == 1:
+            other = next(iter(set(quarter_names) - keys))
+            income.current.rows = [(other, quarter_names[other], element, value) if key == LEFT_OVER_KEY
+                                   else (key, label, element, value) for key, label, element, value in income.current.rows]
+            if LEFT_OVER_KEY in prior:
+                prior[other] = prior.pop(LEFT_OVER_KEY)
         records = []
         for order, (key, label, element, value) in enumerate(income.current.rows):
             records.append(self._record(

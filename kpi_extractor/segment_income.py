@@ -26,6 +26,7 @@ _NEUTRAL = {("ConsolidationItemsAxis", "OperatingSegmentsMember")}
 _RECONCILING = {"CorporateNonSegmentMember": "Corporate", "MaterialReconcilingItemsMember": "Reconciling items",
                 "SegmentReconcilingItemsMember": "Reconciling items", "IntersegmentEliminationMember": "Eliminations"}
 _LEFT_OVER = "Unallocated"
+LEFT_OVER_KEY = member_key(_LEFT_OVER)
 
 
 @dataclass
