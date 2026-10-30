@@ -872,7 +872,6 @@ class SymbolPipeline:
         by_period: dict[tuple[str, str], dict[str, dict]] = {}
         for v in rows.values():
             by_period.setdefault((v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
-        lines = {kpi.key for kpi in group.kpis}
         records: list[dict] = []
         for quarter in sorted(by_period):
             if quarter not in quarters or quarter[1] == "FY":
@@ -880,7 +879,8 @@ class SymbolPipeline:
             annual = quarter[1] == "Q4"
             source = by_period.get((quarter[0], "Q3") if annual else quarter) or {}
             tags = {kpi: tag for kpi, v in source.items() if (tag := tag_from_locator(v.get("locator") or {}))}
-            if set(tags) != lines:
+            # The lines the period has (a listed total no release gives, Adobe's, is not one), every one tagged.
+            if len(tags) < 2 or set(tags) != set(source):
                 continue
             ref, end = quarters[quarter]
             try:

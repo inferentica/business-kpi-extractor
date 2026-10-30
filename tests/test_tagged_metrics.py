@@ -244,6 +244,7 @@ def test_a_breakdowns_year_before_comes_from_the_reports_comparative_columns():
     stored = []
     pipeline._store = lambda values: stored.extend(values)
     spec = ai.Spec.model_validate({"groups": [{"key": "customers", "label": "Customers", "kind": "revenue_breakdown", "kpis": [
+        {"key": "total", "label": "Total", "unit": "currency"},  # listed, never given by a release
         {"key": "business", "label": "Business", "unit": "currency"}, {"key": "creative", "label": "Creative", "unit": "currency"}]}]})
     reports = [SimpleNamespace(accession=a, form="10-K" if a == "k" else "10-Q", filed=day(2026, 1, 1), source_url="u")
                for a in ends]

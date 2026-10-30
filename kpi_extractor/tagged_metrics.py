@@ -59,7 +59,7 @@ def quarter_facts(facts: pd.DataFrame, period_end: date, days: tuple[int, int] =
 def year_ago_facts(facts: pd.DataFrame, period_end: date, days: tuple[int, int] = (80, 100)) -> tuple[date, dict[Tag, float]] | None:
     """A report's comparative column: the facts of the period ending about a year before its own (a 52/53-week year
     ends within a week of the date a year back), with its end."""
-    ends = {end for end in pd.to_datetime(facts["period_end"], errors="coerce").dt.date if isinstance(end, date)}
+    ends = {end for end in pd.to_datetime(facts["period_end"], errors="coerce").dt.date if pd.notna(end)}
     earlier = [end for end in ends if 357 <= (period_end - end).days <= 371]
     if not earlier:
         return None
