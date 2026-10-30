@@ -796,7 +796,7 @@ class SymbolPipeline:
         reach = {quarter for _labels, gaps in wanted.values() for gap in gaps for quarter in own
                  if 0 <= index(quarter) - index(gap) <= 4}
         texts: dict[str, list[str]] = {}
-        for quarter in sorted(reach)[:24]:
+        for quarter in sorted(reach)[-40:]:
             ref = own[quarter]
             try:
                 document = self._document(ref)
