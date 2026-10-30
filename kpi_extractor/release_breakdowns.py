@@ -91,36 +91,111 @@ def _rows(table: Table, start: int, current: int, measure: str) -> list[tuple[st
     return rows
 
 
+_DATE = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+((?:19|20)\d{2})\b", re.I)
+_WHOLE_COLUMN = re.compile(r"^(total )?consolidated$|^total$", re.I)
+_LEFT_OVER = "unallocated"
+_FIGURE = re.compile(r"^[$€£¥(]*\s*[\d.,]+\)?%?$|^[—–-]$")
+
+
+def _table_date(table: Table) -> date | None:
+    for row in table.rows[:4]:
+        for cell in row:
+            if match := _DATE.search(cell or ""):
+                try:
+                    return date(int(match.group(3)), _MONTHS.index(next(m for m in _MONTHS if m.startswith(match.group(1).lower()))) + 1,
+                                int(match.group(2)))
+                except ValueError:
+                    return None
+    return None
+
+
+def _columned(table: Table, measure: str) -> tuple[list[str], list[str]] | None:
+    """(column names, the measure's row) of a table laid out with its segments as columns (Intel's supplemental
+    segment results: "CCPG", "DCAI", … across, "Revenue" and "Operating income (loss)" down)."""
+    names = None
+    for index, row in enumerate(table.rows[:6]):
+        texts = [clean(cell) for cell in row[1:]]
+        if sum(1 for text in texts if re.search(r"[a-z]{2}", text, re.I)) >= 3 and not any(_FIGURE.match(text) for text in texts):
+            names = ["", *texts]
+        elif names and _MEASURES[measure].match(clean(row[0]) if row else ""):
+            return names, row
+    if names:
+        for row in table.rows:
+            if row and _MEASURES[measure].match(clean(row[0])):
+                return names, row
+    return None
+
+
+def _columned_items(document: Document, table: Table, period_end: date, measure: str, scale: float):
+    """A columned table of the quarter, with the same table of a year before as its year-ago column."""
+    header = f"{table.context[-200:]} {' '.join(' '.join(cells) for cells in table.rows[:3])}".lower()
+    if _table_date(table) != period_end or (_LONGER.search(header) and not _QUARTER.search(header)):
+        return None
+    layout = _columned(table, measure)
+    if layout is None:
+        return None
+    names, row = layout
+    prior_row = None
+    for other in document.tables.values():
+        when = _table_date(other) if other is not table else None
+        if when and 357 <= (period_end - when).days <= 371 and (found := _columned(other, measure)) and found[0] == names:
+            prior_row = found[1]
+            break
+    items = []
+    for col, name in enumerate(names):
+        if col and name:
+            current = _amount(row, col, scale)
+            if current is not None:
+                items.append((name, current, _amount(prior_row, col, scale) if prior_row else None, bool(_WHOLE_COLUMN.match(name))))
+    return items
+
+
+def _items(document: Document, table: Table, period_end: date, measure: str, scale: float):
+    """(label, the quarter's amount, the year-ago amount, is the total) for each line of the table, or None."""
+    columns = _columns(table, period_end)
+    if columns is None:
+        return _columned_items(document, table, period_end, measure, scale)
+    start, current, prior = columns
+    return [(label, value, _amount(row, prior, scale), whole) for label, row, whole in _rows(table, start, current, measure)
+            if (value := _amount(row, current, scale)) is not None]
+
+
 def release_breakdown(document: Document, members: dict[str, str], year_ago: dict[str, float], period_end: date, *,
                       tables: list[str] | None = None, totalled: bool = True, measure: str = "revenue") -> ReleaseBreakdown | None:
     """The quarter's figure for every line in `members` (key → label) from one table of the release.
 
     `year_ago` holds the report's figures for the same quarter a year before; every one of them must be the table's
     year-ago figure (to its rounding), and at least two must be compared unless the table was already proven by a
-    breakdown read from it (`tables`). With `totalled`, the lines must add up to the table's total revenue."""
+    breakdown read from it (`tables`). With `totalled`, the lines must add up to the table's total revenue. An
+    "Unallocated" line of operating income, which the report works out, is what the table's segments leave of its
+    total."""
     wanted = {key: {key, line_key(label)} for key, label in members.items()}
     for table_id in tables or list(document.tables):
         table = document.tables.get(table_id)
         if table is None:
             continue
         scale = table.declared_scale() or document.default_scale()
-        columns = _columns(table, period_end) if scale else None
-        if columns is None:
+        items = _items(document, table, period_end, measure, scale) if scale else None
+        if not items:
             continue
-        start, current, prior = columns
         found: dict[str, tuple[str, float, float | None]] = {}
         total: float | None = None
-        for label, row, whole in _rows(table, start, current, measure):
-            value = _amount(row, current, scale)
-            if value is None:
-                continue
+        prior_total: float | None = None
+        for label, value, prior_value, whole in items:
             if whole:
-                total = value if total is None else total
+                if total is None:
+                    total, prior_total = value, prior_value
                 continue
             key = line_key(label)
             for member, names in wanted.items():
                 if member not in found and key in names:
-                    found[member] = (label, value, _amount(row, prior, scale))
+                    found[member] = (label, value, prior_value)
+        left = [member for member in members if member not in found]
+        if measure == "income" and total is not None and len(left) == 1 and _LEFT_OVER in wanted[left[0]]:
+            rest = [found[member] for member in members if member in found]
+            prior = None if prior_total is None or any(item[2] is None for item in rest) else \
+                round(prior_total - sum(item[2] for item in rest), 2)
+            found[left[0]] = ("Unallocated", round(total - sum(item[1] for item in rest), 2), prior)
         if set(found) != set(members):
             continue
         tolerance = scale * 1.5

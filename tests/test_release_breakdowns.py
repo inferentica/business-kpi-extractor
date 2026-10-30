@@ -89,3 +89,28 @@ def test_a_segment_table_laid_out_by_heading_gives_revenue_and_operating_income(
     assert revenue.values == {"northamerica": 112_852e6, "international": 43_108e6, "aws": 45_984e6} and revenue.total == 201_944e6
     income = release_breakdown(document, members, {"northamerica": 4_789e6, "aws": 11_434e6}, date(2026, 9, 30), measure="income")
     assert income.values == {"northamerica": 8_723e6, "international": 1_580e6, "aws": 17_773e6} and income.total == 28_076e6
+
+
+def test_a_segment_table_laid_out_by_column_with_its_year_ago_table():
+    # Intel's Q3 2026 release: segments across, revenue and operating income down, one table per quarter.
+    def quarter(table_id, day, revenue, income):
+        rows = [["", "Three Months Ended", "", "", "", "", "", ""], ["(In Millions; Unaudited)", day, "", "", "", "", "", ""],
+                ["", "CCPG1", "DCAI", "Total Intel Products", "Intel Foundry", "All Other2", "Intersegment Eliminations", "Total Consolidated"],
+                ["Revenue", *revenue], ["Cost of sales and operating expenses", "1", "1", "1", "1", "1", "1", "1"],
+                ["Operating income (loss)", *income, ""]]
+        return Table(table_id, "Intel Corporation Supplemental Operating Segment Results", rows)
+    now = quarter("T7", "Sep 26, 2026", ["$8,097", "$7,318", "$15,415", "$6,697", "$692", "$(6,291)", "$16,513"],
+                  ["$2,285", "$3,039", "$5,324", "$(1,853)", "$179", "$(70)"])
+    now.rows[-1][-1] = "$2,522"
+    before = quarter("T8", "Sep 27, 2025", ["$8,535", "$4,117", "$12,652", "$4,235", "$993", "$(4,227)", "$13,653"],
+                     ["$2,694", "$964", "$3,658", "$(2,321)", "$100", "$28"])
+    before.rows[-1][-1] = "$683"
+    document = Document("x", {"T7": now, "T8": before}, {}, ["T7", "T8"])
+    segments = {"ccpg": "CCPG", "dcai": "DCAI", "intel_foundry": "Intel Foundry", "all_other": "All Other",
+                "intersegment_eliminations": "Intersegment Eliminations"}
+    revenue = release_breakdown(document, segments, {"dcai": 4_117e6, "intel_foundry": 4_235e6}, date(2026, 9, 26))
+    assert revenue.table == "T7" and revenue.values["ccpg"] == 8_097e6 and revenue.total == 16_513e6
+    income = release_breakdown(document, {"ccpg": "CCPG", "dcai": "DCAI", "all_other": "All Other", "intel_foundry": "Intel Foundry",
+                                          "unallocated": "Unallocated"},
+                               {"dcai": 964e6, "unallocated": -754e6}, date(2026, 9, 26), measure="income")
+    assert income.values["unallocated"] == -1_128e6 and income.total == 2_522e6
