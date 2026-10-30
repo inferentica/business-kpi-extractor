@@ -198,3 +198,33 @@ def quarter_table_rows(text: str, label: str) -> list[dict[tuple[int, int], floa
                 if row:
                     found.append(row)
     return found
+
+
+_QUOTES = str.maketrans({"“": '"', "”": '"', "″": '"', "‘": "'", "’": "'"})
+_ROW_NUMBER = re.compile(r"\(?-?[\d,]*\.?\d+\)?%?")
+
+
+def row_numbers(text: str, label: str) -> list[list[float]]:
+    """The figures straight after each mention of a row label, percentages left out ("Shipment (Kpcs, 12"-equiv. Wafer)
+    2,916 3,227 3,799 -9.6% -23.2%" is [2916, 3227, 3799]); figures run together ("2,6992,744") give nothing."""
+    text, label = text.translate(_QUOTES), label.translate(_QUOTES)
+    found = []
+    for match in _label_pattern(label).finditer(text):
+        figures = _FIGURES.match(text, match.end())
+        if not figures:
+            continue
+        cells = figures.group(0).split()
+        numbers = []
+        for cell in cells:
+            if cell.endswith("%") or cell.endswith("%)"):
+                break
+            if re.search(r"\d,\d{3}\d", cell):
+                numbers = []
+                break
+            value = amount(cell)
+            if value is None:
+                break
+            numbers.append(value)
+        if numbers:
+            found.append(numbers)
+    return found

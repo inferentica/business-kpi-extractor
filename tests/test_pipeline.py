@@ -1530,3 +1530,63 @@ def test_a_breakdown_adding_up_to_a_reported_figure_to_its_rounding_is_proven():
     off = _pipeline(FakeControl({}), [{**xbrl, "kpi_key": "total", "value": 440_000_000.0}, *lines])
     off._prove_flagged([])
     assert off.values[("kpi_segment", "grow", "2024", "Q3")]["validation_status"] == "needs_review"
+
+
+def test_a_metrics_gaps_come_from_rows_the_releases_repeat_in_a_learned_layout():
+    # TSMC's management report: "Shipment (Kpcs, 12"-equiv. Wafer) <quarter> <quarter before> <year before> <QoQ> <YoY>".
+    from datetime import date as day
+
+    from kpi_extractor.document import parse_document
+    label = 'Shipment (Kpcs, 12"-equiv. Wafer)'
+
+    def reading(year, period, end, value, quote):
+        return {"group_key": "kpi_operating", "kpi_key": "wafers", "group_kind": "metric", "fiscal_year": year, "fiscal_period": period,
+                "period_end": end, "method": "ai", "validation_status": "verified", "value": value, "unit": "count",
+                "source_accession": f"r{year}{period}", "locator": {"quote": quote, "value_text": f"{value:,}"}}
+    values = [
+        reading("2022", "Q2", "2022-06-30", 3799, f"{label} 3,799 3,580 3,323 +6.1% +14.3%"),
+        reading("2022", "Q3", "2022-09-30", 3974, f"{label} 3,974 3,799 3,580 +4.6% +11.0%"),
+        reading("2022", "Q4", "2022-12-31", 3702, f"{label} 3,702 3,974 3,522 -6.8% +5.1%"),
+        reading("2023", "Q2", "2023-06-30", 2916, f"{label} 2,916 3,227 3,799 -9.6% -23.2%"),
+        reading("2023", "Q3", "2023-09-30", 2902, f"{label} 2,902 2,916 3,974 -0.5% -27.0%"),
+        reading("2024", "Q1", "2024-03-31", 3030, f"{label} 3,030 2,957 3,227 +2.5% -6.1%"),
+    ]
+    slides = {"r2023Q4": f"EPS 9.21 {label} 2,957 2,902 3,702 +1.9% -20.1% Average Exchange Rate 31.44",
+              "x2023Q4": f"{label} 9,999 1 1 +0% +0%"}  # a row whose earlier columns match nothing held: not used
+    ends = {"2022Q2": day(2022, 6, 30), "2022Q3": day(2022, 9, 30), "2022Q4": day(2022, 12, 31), "2023Q1": day(2023, 3, 31), "2023Q2": day(2023, 6, 30), "2023Q3": day(2023, 9, 30),
+            "2023Q4": day(2023, 12, 31), "2024Q1": day(2024, 3, 31)}
+    releases = [SimpleNamespace(accession=f"{prefix}{q}", period_end=end, source_url=f"https://www.sec.gov/{prefix}{q}.htm", filed=end)
+                for q, end in ends.items() for prefix in ("x", "r")]
+    pipeline = _pipeline(None, values)
+    pipeline.profile = SimpleNamespace(name="TSMC", fiscal_year_end="1231", foreign=True)
+    pipeline.offset = 0
+    pipeline._document = lambda ref: parse_document(f"<p>{slides.get(ref.accession, '')}</p>", ref.source_url)
+    stored = []
+    pipeline._store = lambda values: stored.extend(values)
+    pipeline.log = lambda *_: None
+    pipeline._fill_quoted_rows(releases)
+    by = {(v["fiscal_year"], v["fiscal_period"]): (v["value"], v["source_accession"]) for v in stored}
+    # Q1 2023 from Q2 2023's column a quarter before (and Q1 2024's a year before); Q4 2023 from its own release.
+    assert by == {("2023", "Q1"): (3227, "r2023Q2"), ("2023", "Q4"): (2957, "r2023Q4")}
+
+
+def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
+    # Visa's processed transactions: in billions as stated in text, in millions from its "(millions)" table without the
+    # scale for Q2 2018 to Q3 2020; only the run's two edges jump.
+    def row(year, period, value, notes=(), owner=None):
+        return {"group_key": "kpi_operating", "kpi_key": "transactions", "group_kind": "metric", "fiscal_year": year,
+                "fiscal_period": period, "period_end": f"{year}-{ {'Q1': '03', 'Q2': '06', 'Q3': '09', 'Q4': '12'}[period]}-28",
+                "method": "ai", "validation_status": "needs_review" if notes else "verified", "value": value, "unit": "count",
+                "notes": list(notes), **({"owner_decision": owner} if owner else {})}
+    values = [row("2017", "Q4", 29180e6), row("2018", "Q1", 30508e6), row("2018", "Q2", 29321, ["changed 0.0x in a quarter"]),
+              row("2018", "Q3", 31728), row("2018", "Q4", 32763), row("2019", "Q1", 37400e6, ["changed 1141535.2x in a quarter"]),
+              row("2019", "Q2", 39200e6), row("2019", "Q3", 42600e6)]
+    fixed = {(v["fiscal_year"], v["fiscal_period"]): v for v in _pipeline(None, values)._scale_runs()}
+    assert {quarter: v["value"] for quarter, v in fixed.items()} == {("2018", "Q2"): 29321e6, ("2018", "Q3"): 31728e6,
+                                                                     ("2018", "Q4"): 32763e6, ("2019", "Q1"): 37400e6}
+    assert fixed[("2019", "Q1")]["validation_status"] == "verified"
+    assert fixed[("2018", "Q2")]["validation_status"] == "verified"
+    # A series that only grows has no run; an owner's figure is never changed.
+    assert _pipeline(None, [row("2018", "Q1", 10), row("2018", "Q2", 25), row("2018", "Q3", 60)])._scale_runs() == []
+    kept = _pipeline(None, [*values[:2], {**values[2], "owner_decision": "corrected"}, *values[5:]])._scale_runs()
+    assert ("2018", "Q2") not in {(v["fiscal_year"], v["fiscal_period"]) for v in kept}

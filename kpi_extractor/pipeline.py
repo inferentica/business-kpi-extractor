@@ -11,6 +11,7 @@ AI decides and points; code reads and proves. Every AI answer is checked before 
 from __future__ import annotations
 
 import copy
+import math
 import os
 import re
 import time
@@ -38,7 +39,7 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
 from .prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from .release_breakdowns import line_key, release_breakdown
 from .segment_income import GROUP_KEY as INCOME_GROUP, GROUP_LABEL as INCOME_LABEL, INCOME_CONCEPT, LEFT_OVER_KEY, segment_income
-from .release_columns import amount, earlier_quarters, quarter_table_rows, release_grids, row_key
+from .release_columns import amount, earlier_quarters, quarter_table_rows, release_grids, row_key, row_numbers
 from .tagged_metrics import (agrees, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits,
                              year_ago_facts)
 from .release_statements import release_headline, release_statements, reported_units
@@ -285,6 +286,7 @@ class SymbolPipeline:
             self._adopt_listed_keys(spec)
             self._fill_tagged_metrics(reports, spec)
             self._fill_quarter_tables(releases)
+            self._fill_quoted_rows(releases)
         self._refile_annuals()
         self._recheck_flagged()
         self._anchor_ai_breakdowns()
@@ -840,6 +842,102 @@ class SymbolPipeline:
         if records:
             self._store(values=records)
             self.log(f"{self.symbol}: {len(records)} KPI values from the releases' quarterly tables")
+
+    def _fill_quoted_rows(self, releases: list[FilingRef]) -> None:
+        """A metric's missing quarters from rows its releases repeat in a fixed layout: TSMC's management report gives
+        "Shipment (Kpcs, 12"-equiv. Wafer) 2,916 3,227 3,799" (the quarter, the one before, the year before). The layout
+        is learned from the KPI's own readings, a column for a lag only when at least two readings agree with figures
+        held and none contradicts. A gap is then filled from a reading's lagged column, or from its own quarter's release
+        where that row's lagged columns equal figures held (each quarter filled vouches for the next)."""
+        held: dict[tuple[str, str], dict[tuple[str, str], dict]] = {}
+        for v in self.values.values():
+            if v["group_kind"] == "metric" and v["validation_status"] != "rejected" and v["fiscal_period"] != "FY":
+                held.setdefault((v["group_key"], v["kpi_key"]), {})[(v["fiscal_year"], v["fiscal_period"])] = v
+        index = lambda quarter: int(quarter[0]) * 4 + int(quarter[1][1]) - 1  # noqa: E731
+        label_of = lambda number: (str(number // 4), f"Q{number % 4 + 1}")  # noqa: E731
+        refs: dict[tuple[str, str], list[FilingRef]] = {}
+        for ref in sorted(releases, key=lambda item: item.filed):
+            quarter = self._quarter_of(ref.period_end) if ref.period_end else None
+            if quarter and quarter[1] != "FY":
+                refs.setdefault(quarter, []).append(ref)
+        records = []
+        loaded: dict[str, str] = {}
+        for kpi, rows in held.items():
+            readings = []
+            for quarter, v in rows.items():
+                label = _row_label(v.get("locator") or {})
+                quote = (v.get("locator") or {}).get("quote")
+                if v["validation_status"] != "verified" or v["method"] != "ai" or not label or not quote:
+                    continue
+                numbers = next((found for found in row_numbers(quote, label) if found), None)
+                scale = next((item for item in (1, 1e3, 1e6, 1e9) if numbers and numbers[0]
+                              and abs(float(v["value"]) / (numbers[0] * item) - 1) < 1e-6), None) if numbers else None
+                if scale:
+                    readings.append((quarter, label, [n * scale for n in numbers], scale, v))
+            known = {quarter: float(v["value"]) for quarter, v in rows.items() if v["validation_status"] == "verified"}
+            layout = {}
+            for column in (1, 2, 3):
+                for lag in (1, 4):
+                    agree = contradict = 0
+                    for quarter, _label, numbers, _scale, _v in readings:
+                        earlier = label_of(index(quarter) - lag)
+                        if len(numbers) > column and earlier in known:
+                            same = abs(numbers[column] - known[earlier]) <= abs(known[earlier]) * 1e-6
+                            agree, contradict = agree + same, contradict + (not same)
+                    if agree >= 2 and not contradict:
+                        layout[column] = lag
+            if not layout:
+                continue
+            first = min(index(quarter) for quarter in rows)
+            lagged: dict[tuple[str, str], tuple[float, str, dict]] = {}
+            for quarter, _label, numbers, _scale, reading in readings:
+                source = {field: reading.get(field) for field in ("source_accession", "source_url", "filed_at")}
+                for column, lag in layout.items():
+                    earlier = label_of(index(quarter) - lag)
+                    if len(numbers) > column and earlier not in rows and index(earlier) > first and earlier not in lagged:
+                        lagged[earlier] = (numbers[column], f"the release for {quarter[1]} {quarter[0]}, its column a "
+                                                           f"{'quarter' if lag == 1 else 'year'} before", source)
+            labels = sorted({label for _quarter, label, _numbers, _scale, _v in readings})
+            scale = readings[0][3] if readings else 1
+            # A quarter's own release first; a later release's column where its own does not give the row.
+            found: dict[tuple[str, str], tuple[float, str, dict]] = {}
+            gaps = sorted((quarter for quarter in refs if index(quarter) > first and quarter not in rows), key=index)
+            for quarter in gaps:
+                for ref in refs[quarter][:6]:
+                    if ref.accession not in loaded and len(loaded) < 60:
+                        try:
+                            document = self._document(ref)
+                            loaded[ref.accession] = " ".join(
+                                " ".join(" ".join(row) for row in document.tables[key].rows) if key in document.tables
+                                else document.blocks[key].text for key in document.order)
+                        except Exception:  # noqa: BLE001 - an unreadable release gives nothing
+                            loaded[ref.accession] = ""
+                    for label in labels:
+                        for numbers in row_numbers(loaded.get(ref.accession, ""), label):
+                            checks = [(numbers[column] * scale, label_of(index(quarter) - lag)) for column, lag in layout.items()
+                                      if len(numbers) > column]
+                            figure_of = lambda earlier: known.get(earlier, (found.get(earlier) or lagged.get(earlier) or (None,))[0])  # noqa: E731
+                            proven = [(figure, earlier) for figure, earlier in checks if figure_of(earlier) is not None]
+                            target = figure_of
+                            if proven and all(abs(figure - target(earlier)) <= abs(target(earlier)) * 1e-6 for figure, earlier in proven):
+                                found.setdefault(quarter, (numbers[0] * scale, f"the release for {quarter[1]} {quarter[0]}",
+                                                           {"source_accession": ref.accession, "source_url": ref.source_url,
+                                                            "filed_at": ref.filed.isoformat()}))
+                    if quarter in found:
+                        break
+            found = {**lagged, **found}
+            template = max((v for v in rows.values() if v["validation_status"] == "verified"), key=lambda v: v["period_end"])
+            for quarter, (value, where, source) in sorted(found.items()):
+                own = (refs.get(quarter) or [None])[0]
+                end = own.period_end if own else None
+                if end is None:
+                    continue
+                records.append({**template, **source, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
+                                "value": value, "method": "ai", "validation_status": "verified", "reconciliation_error_pct": None,
+                                "notes": [f"from {where}"], "locator": {"quoted_row": True, "row": labels[0]}})
+        if records:
+            self._store(values=records)
+            self.log(f"{self.symbol}: {len(records)} KPI values from rows the releases repeat")
 
     def _kpi_template(self, group, kpi, key: str) -> dict:
         """The stored shape of a KPI no release has given yet."""
@@ -3268,10 +3366,55 @@ class SymbolPipeline:
                     cleared += [{**m, "validation_status": "verified", "locator": {**m["locator"], "total": parts},
                                  "reconciliation_error_pct": 0, "notes": ["reconciled to another figure in the same report"]}
                                 for m in members]
+        cleared += self._scale_runs()
         cleared += self._outdated_flags()
         for start in range(0, len(cleared), 400):
             self._store(values=cleared[start:start + 400])
         self._release_held_breakdowns()
+
+    def _scale_runs(self) -> list[dict]:
+        """A run of a metric's figures read without their table's scale (Visa's "Processed Transactions (millions)",
+        29,321 for 29.3 billion from Q2 2018 to Q3 2020): the series steps by almost exactly a thousand, a million or a
+        billion where the run starts and ends, so it splits into stretches by those steps, and the stretches off the
+        scale most of its figures share are put back on it. Only the run's edges jump, so a jump check alone flags two
+        quarters and leaves the run between them; an owner's figure is never changed, and percentages have no scale."""
+        series: dict[tuple, list[dict]] = {}
+        for v in self.values.values():
+            if (v["method"] == "ai" and v["group_kind"] == "metric" and v["validation_status"] != "rejected"
+                    and v["unit"] != "percent" and float(v["value"]) > 0):
+                series.setdefault((v["group_key"], v["kpi_key"], v["fiscal_period"] == "FY"), []).append(v)
+        records = []
+        for rows in series.values():
+            rows.sort(key=lambda v: (v["period_end"], v["fiscal_period"]))
+            levels, level = [], 0
+            for previous, current in zip([None, *rows], rows):
+                if previous is not None:
+                    step = math.log10(float(current["value"]) / float(previous["value"]))
+                    thousands = round(step / 3)
+                    if thousands and abs(step - 3 * thousands) < 0.3:
+                        level += thousands
+                levels.append(level)
+            counts = {item: levels.count(item) for item in set(levels)}
+            if len(counts) < 2:
+                continue
+            main = max(counts, key=lambda item: (counts[item], -abs(item)))
+            if counts[main] * 2 <= len(rows):
+                continue  # no scale most figures share
+            for index, (v, at) in enumerate(zip(rows, levels)):
+                if at == main and v["validation_status"] == "needs_review" and index and levels[index - 1] != main \
+                        and all(_is_jump(note) or note == "confirmed by review" for note in v.get("notes") or []):
+                    # Its jump was from the run before it.
+                    records.append({**v, "validation_status": "verified", "notes": ["the figure before it was off its scale"]})
+                if at == main or v.get("owner_decision"):
+                    continue
+                factor = 10 ** (3 * (main - at))
+                notes = [note for note in v.get("notes") or [] if not _is_jump(note) and note != "confirmed by review"]
+                records.append({**v, "value": round(float(v["value"]) * factor, 6),
+                                "validation_status": "verified" if not notes else v["validation_status"],
+                                "notes": [*notes, f"read without its table's scale: {factor:g}× to match the series"]})
+        if records:
+            self.log(f"{self.symbol}: {len(records)} figures put back on their series' scale")
+        return records
 
     def _outdated_flags(self) -> list[dict]:
         """Flags set by a check that today's checks no longer raise, cleared from the stored figures alone:
