@@ -484,7 +484,9 @@ def test_a_region_keeps_its_quarters_name():
             "method": "xbrl", "validation_status": "verified", "value": 1.0, "source_accession": "q3"}
     pipeline = _pipeline(FakeControl({}), [{**base, "kpi_key": k, "kpi_label": l, "locator": {"member": m}} for k, l, m in (
         ("americas", "Americas", "srt:AmericasMember"), ("emea", "EMEA", "us-gaap:EMEAMember"),
-        ("apac", "APAC", "srt:AsiaPacificMember"))])
+        ("apac", "APAC", "srt:AsiaPacificMember"))] + [
+        {**base, "fiscal_year": "2024", "fiscal_period": "FY", "period_end": "2024-11-29", "kpi_key": k, "kpi_label": k,
+         "locator": {"member": k}} for k in ("unitedstates", "emea", "apac", "other")])
     group = XbrlGroup("geography", "Revenue by Geography", 2,
                       [("unitedstates", "United States", 12529.0), ("emea", "EMEA", 6289.0), ("apac", "APAC", 3360.0),
                        ("other", "Other Americas", 1591.0)], 23769.0, 0.0, "USD", "c",

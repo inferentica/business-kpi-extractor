@@ -81,7 +81,7 @@ _READ_BY_REPLAY = "read by replay"
 _NOT_REPORTED = "not reported: "
 # Stamped on every periodic report read; a report read by an older reader is read again (from the archive, no AI)
 # so a fix to the XBRL reader reaches the whole history.
-_XBRL_READER = "xbrl reader 29"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 30"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -1358,13 +1358,13 @@ class SymbolPipeline:
     def _continuing_split(self, group, period_end: date):
         """Of two complete splits on one axis, the one the company's stored periods of the past year use, so the year
         and its quarters line up (Broadcom's regions, not its 10-K's countries); the finer one when there is none."""
-        if group.key == "geography":
-            self.log(f"DEBUG alt {period_end} members={[k for k, *_ in group.members]} alt={[k for k, *_ in group.alternative]}")
         if not group.alternative:
             return group
         window = (period_end - timedelta(days=370)).isoformat()
+        # The quarters only: the year before may be on the 10-K's other split (Adobe's FY2018 countries).
         rows = [v for v in self.values.values() if v["method"] == "xbrl" and v["group_key"] == group.key
-                and v["validation_status"] == "verified" and window <= v["period_end"] < period_end.isoformat()]
+                and v["validation_status"] == "verified" and v["fiscal_period"] != "FY"
+                and window <= v["period_end"] < period_end.isoformat()]
         recent = {v["kpi_key"] for v in rows}
         # The same element under another label ("Total Americas" in Adobe's 10-K, "Americas" in its 10-Qs) is one line.
         stored = {member: v for v in rows if (member := (v.get("locator") or {}).get("member"))}
@@ -1372,7 +1372,6 @@ class SymbolPipeline:
                    if (element := group.elements.get(key)) in stored and stored[element]["kpi_key"] != key}
         current = {key for key, _label, _value in group.members}
         other = {renamed[key]["kpi_key"] if key in renamed else key for key, _label, _value in group.alternative}
-        self.log(f"DEBUG split {group.key} {period_end} current={sorted(current)} other={sorted(other)} recent={sorted(recent)}")
         if recent and len(other & recent) > len(current & recent):
             def rekey(values: dict) -> dict:
                 return {renamed[key]["kpi_key"] if key in renamed else key: value for key, value in values.items()}
