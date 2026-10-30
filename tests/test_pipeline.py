@@ -498,6 +498,21 @@ def test_a_region_keeps_its_quarters_name():
     assert chosen.members[0] == ("americas", "Americas", 14120.0) and chosen.prior == {"americas": 12891.0}
 
 
+def test_a_year_before_any_regional_quarter_follows_the_latest_quarters():
+    from kpi_extractor.xbrl import XbrlGroup
+    base = {"group_key": "geography", "fiscal_year": "2019", "fiscal_period": "Q1", "period_end": "2019-03-01",
+            "method": "xbrl", "validation_status": "verified", "value": 1.0, "source_accession": "q"}
+    pipeline = _pipeline(FakeControl({}), [{**base, "kpi_key": k, "kpi_label": l, "locator": {"member": m}} for k, l, m in (
+        ("americas", "Americas", "srt:AmericasMember"), ("emea", "EMEA", "us-gaap:EMEAMember"), ("apac", "APAC", "srt:AsiaMember"))])
+    group = XbrlGroup("geography", "Revenue by Geography", 2,
+                      [("unitedstates", "United States", 4632.0), ("emea", "EMEA", 2550.0), ("otherasia", "Other Asia", 754.0),
+                       ("japan", "Japan", 609.0), ("otheramericas", "Other Americas", 484.0)], 9030.0, 0.0, "USD", "c",
+                      elements={"america": "srt:AmericasMember", "emea": "us-gaap:EMEAMember", "asia": "srt:AsiaMember"},
+                      alternative=[("america", "America", 5117.0), ("emea", "EMEA", 2550.0), ("asia", "Asia", 1363.0)])
+    chosen = pipeline._continuing_split(group, date(2018, 11, 30))
+    assert [key for key, _l, _v in chosen.members] == ["americas", "emea", "apac"]
+
+
 def test_an_ai_breakdown_must_total_a_reported_figure():
     base = {"fiscal_year": "2026", "fiscal_period": "Q2", "period_end": "2026-06-27", "group_label": "x", "kpi_label": "x",
             "group_kind": "revenue_breakdown", "source_accession": "a"}
