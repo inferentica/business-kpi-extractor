@@ -166,35 +166,37 @@ def test_a_timing_axis_reads_as_a_note_not_a_part():
 
 
 def test_a_breakdowns_rounded_lines_take_the_reports_exact_figures():
-    # Adobe's releases give its customer groups to $10 million; its 10-Qs tag them exactly.
+    # Adobe's releases give its customer groups to $10 million; its 10-Qs tag them exactly, its 10-K for the year only.
     from datetime import date as day
     from types import SimpleNamespace
 
     from kpi_extractor import ai
     from kpi_extractor.pipeline import SymbolPipeline
-    ends = {"q1": "2026-02-27", "q2": "2026-05-29"}
-    exact = {"q1": 1_782e6, "q2": 1_853e6}
+    ends = {"q1": "2025-02-28", "q2": "2025-05-30", "q3": "2025-08-29", "k": "2025-11-28"}
+    starts = {"q1": "2024-11-30", "q2": "2025-03-01", "q3": "2025-05-31", "k": "2024-11-30"}
+    exact = {"q1": 1_534e6, "q2": 1_595e6, "q3": 1_648e6, "k": 6_495e6}
 
     def frame_of(accession):
         return pd.DataFrame([{"concept": "us-gaap:Revenues", "numeric_value": exact[accession], "period_type": "duration",
-                              "period_start": {"q1": "2025-11-29", "q2": "2026-02-28"}[accession], "period_end": ends[accession],
-                              "label": "Revenue", "unit_ref": "usd", "dim_srt_MajorCustomersAxis": "adbe:BusinessMember"}])
+                              "period_start": starts[accession], "period_end": ends[accession], "label": "Revenue",
+                              "unit_ref": "usd", "dim_srt_MajorCustomersAxis": "adbe:BusinessMember"}])
     pipeline = SymbolPipeline(None, "ADBE", quarters=4, force=False, log=lambda *_: None)
     pipeline.profile = SimpleNamespace(name="Adobe", fiscal_year_end="1128", foreign=False)
     pipeline.offset = 0
     pipeline.filings = {a: {"accession": a, "period_end": e, "status": "processed"} for a, e in ends.items()}
     base = {"group_key": "kpi_customers", "group_label": "Customers", "group_kind": "revenue_breakdown", "group_order": 20,
             "kpi_key": "business", "kpi_label": "Business", "kpi_order": 0, "unit": "currency", "currency": "USD",
-            "fiscal_year": "2026", "method": "ai", "validation_status": "verified", "source_accession": "release",
-            "notes": ["parts make up nearly all of a figure reported in XBRL"], "locator": {"total": 6.17e9}}
-    pipeline.values = {("kpi_customers", "business", "2026", p): {**base, "fiscal_period": p, "period_end": ends[a], "value": v}
-                       for p, a, v in (("Q1", "q1", 1.78e9), ("Q2", "q2", 1.85e9))}
+            "fiscal_year": "2025", "method": "ai", "validation_status": "verified", "source_accession": "release",
+            "notes": ["parts make up nearly all of a figure reported in XBRL"], "locator": {"total": 6e9}}
+    pipeline.values = {("kpi_customers", "business", "2025", p): {**base, "fiscal_period": p, "period_end": ends[a], "value": v}
+                       for p, a, v in (("Q1", "q1", 1.53e9), ("Q2", "q2", 1.60e9), ("Q3", "q3", 1.65e9), ("Q4", "k", 1.72e9))}
     pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
     stored = []
     pipeline._store = lambda values: stored.extend(values)
     spec = ai.Spec.model_validate({"groups": [{"key": "customers", "label": "Customers", "kind": "revenue_breakdown",
                                                "kpis": [{"key": "business", "label": "Business", "unit": "currency"}]}]})
-    reports = [SimpleNamespace(accession=a, form="10-Q", filed=day(2026, 1, 1), source_url="u") for a in ends]
+    reports = [SimpleNamespace(accession=a, form="10-K" if a == "k" else "10-Q", filed=day(2026, 1, 1), source_url="u")
+               for a in ends]
     pipeline._fill_tagged_metrics(reports, spec)
-    assert sorted(v["value"] for v in stored) == [1_782e6, 1_853e6]
-    assert all(v["locator"]["total"] == 6.17e9 and v["notes"][0].startswith("parts make up") for v in stored)
+    assert {v["fiscal_period"]: v["value"] for v in stored} == {"Q1": 1_534e6, "Q2": 1_595e6, "Q3": 1_648e6, "Q4": 1_718e6}
+    assert all(v["locator"]["total"] == 6e9 and v["notes"][0].startswith("parts make up") for v in stored)

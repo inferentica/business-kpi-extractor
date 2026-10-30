@@ -24,8 +24,9 @@ class Tag:
     instant: bool
 
 
-def quarter_facts(facts: pd.DataFrame, period_end: date) -> dict[Tag, float]:
-    """Each numeric fact of the quarter: an instant at its end, or a three-month duration ending then."""
+def quarter_facts(facts: pd.DataFrame, period_end: date, days: tuple[int, int] = (80, 100)) -> dict[Tag, float]:
+    """Each numeric fact of the quarter: an instant at its end, or a three-month duration ending then (a year's, with
+    days of 330 to 400)."""
     frame = facts[facts["numeric_value"].notna()]
     dimension_columns = [column for column in frame.columns if column.startswith("dim_")]
     ends = pd.to_datetime(frame["period_end"], errors="coerce").dt.date
@@ -39,7 +40,7 @@ def quarter_facts(facts: pd.DataFrame, period_end: date) -> dict[Tag, float]:
             if instants[index] != period_end:
                 continue
         elif ends[index] != period_end or starts[index] is None or pd.isna(starts[index]) \
-                or not 80 <= (period_end - starts[index]).days <= 100:
+                or not days[0] <= (period_end - starts[index]).days <= days[1]:
             continue
         every = [(column, str(fact[column])) for column in dimension_columns if pd.notna(fact[column])]
         # A timing member (the date a backlog is expected from) changes every quarter and names no part: it is left
@@ -70,14 +71,20 @@ def agrees(fact: float, value: float) -> bool:
 
 def learn_tag(readings: dict[tuple[str, str], float], facts: dict[tuple[str, str], dict[Tag, float]]) -> Tag | None:
     """The one tag whose fact equals the KPI's reading in at least two quarters and never differs from one."""
+    candidates = learn_tags(readings, facts)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def learn_tags(readings: dict[tuple[str, str], float], facts: dict[tuple[str, str], dict[Tag, float]]) -> list[Tag]:
+    """Every tag whose fact equals the KPI's reading in at least two quarters and never differs from one: a company
+    that retags a line (Adobe's customer groups, by segment in FY2025 and on their own since) gives one per layout."""
     matched: dict[Tag, int] = {}
     for quarter, value in readings.items():
         for tag, fact in (facts.get(quarter) or {}).items():
             if fact and agrees(fact, value):
                 matched[tag] = matched.get(tag, 0) + 1
-    candidates = [tag for tag, count in matched.items() if count >= MIN_MATCHES and not any(
+    return [tag for tag, count in matched.items() if count >= MIN_MATCHES and not any(
         tag in (facts.get(quarter) or {}) and not agrees(facts[quarter][tag], value) for quarter, value in readings.items())]
-    return candidates[0] if len(candidates) == 1 else None
 
 
 _TIMING = re.compile(r"Timing|StartDate|ExpectedTiming", re.I)

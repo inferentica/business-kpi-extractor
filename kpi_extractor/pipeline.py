@@ -39,7 +39,7 @@ from .prospectus import interim_quarters, prospectus_breakdowns, quarter_section
 from .release_breakdowns import line_key, release_breakdown
 from .segment_income import GROUP_KEY as INCOME_GROUP, GROUP_LABEL as INCOME_LABEL, INCOME_CONCEPT, LEFT_OVER_KEY, segment_income
 from .release_columns import amount, earlier_quarters, release_grids, row_key
-from .tagged_metrics import agrees, fact_lines, learn_tag, quarter_facts, tag_from_locator, unit_fits
+from .tagged_metrics import agrees, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits
 from .release_statements import release_headline, release_statements, reported_units
 from .statements import statement_lines
 from .replay import replay
@@ -793,10 +793,12 @@ class SymbolPipeline:
                         if v["group_key"] == key and v["kpi_key"] == kpi.key and v["fiscal_period"] != "FY"}
                 readings = {quarter: float(v["value"]) for quarter, v in held.items()
                             if v["validation_status"] == "verified" and not (v.get("locator") or {}).get("tagged")}
-                missing = [] if split else [
-                    quarter for quarter in newest_first if quarter not in held
-                    or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
-                if not missing and not split:
+                if split:
+                    records += self._exact_lines(held, readings, quarters, facts_of)
+                    continue
+                missing = [quarter for quarter in newest_first if quarter not in held
+                           or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
+                if not missing:
                     continue
                 # The tag: one found before (kept on the figures it filled), else learned from the releases' readings,
                 # else, for a KPI the releases never state (Alphabet's revenue backlog), picked from the report's tags.
@@ -811,8 +813,7 @@ class SymbolPipeline:
                     known = [quarter for quarter in newest_first if quarter in readings and quarter in quarters][:6]
                     tag = learn_tag({quarter: readings[quarter] for quarter in known}, {quarter: facts_of(quarter) for quarter in known})
                 elif tag is None:
-                    if not split:
-                        unread.append((group, kpi, key))
+                    unread.append((group, kpi, key))
                     continue
                 if tag is None:
                     continue
@@ -831,13 +832,11 @@ class SymbolPipeline:
                         if (fact is not None and quarter in readings and fact != readings[quarter] and reading
                                 and not reading.get("owner_decision")):
                             ref, end = quarters[quarter]
-                            exact = f"the {ref.form}'s exact figure; the release gave {(reading.get('locator') or {}).get('value_text') or readings[quarter]}"
-                            tagged = {"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions), "instant": tag.instant}
-                            # A breakdown line keeps its breakdown's total and the evidence that settled it.
                             records.append({**reading, "value": fact, "source_accession": ref.accession, "source_url": ref.source_url,
                                             "filed_at": ref.filed.isoformat(),
-                                            "notes": [*(reading.get("notes") or []), exact] if split else [exact],
-                                            "locator": {**(reading.get("locator") or {}), **tagged} if split else tagged})
+                                            "notes": [f"the {ref.form}'s exact figure; the release gave {(reading.get('locator') or {}).get('value_text') or readings[quarter]}"],
+                                            "locator": {"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
+                                                        "instant": tag.instant}})
                         continue
                     fact = facts_of(quarter).get(tag)
                     if fact is None:
@@ -857,6 +856,55 @@ class SymbolPipeline:
                         locator={"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
                                  "instant": tag.instant},
                     ))
+        return records
+
+    def _exact_lines(self, held: dict, readings: dict, quarters, facts_of) -> list[dict]:
+        """A release breakdown's rounded lines, each replaced by its report's exact tagged figure (Adobe's customer
+        groups, to $10 million in its releases, to the dollar in its 10-Qs). Each quarter takes the one learned tag its
+        own report carries, so a line the company retagged is followed across layouts. The line keeps its breakdown's
+        total and the evidence that settled it."""
+        known = [quarter for quarter in readings if quarter in quarters]
+        tags = learn_tags({quarter: readings[quarter] for quarter in known}, {quarter: facts_of(quarter) for quarter in known})
+        tags += [found for v in held.values() if (found := tag_from_locator(v.get("locator") or {})) and found not in tags]
+        records = []
+        for quarter in known:
+            present = [tag for tag in tags if tag in facts_of(quarter)]
+            reading = held[quarter]
+            if len(present) != 1 or reading.get("owner_decision"):
+                continue
+            fact = facts_of(quarter)[present[0]]
+            if fact == readings[quarter] or not agrees(fact, readings[quarter]):
+                continue
+            ref, _end = quarters[quarter]
+            tag = present[0]
+            records.append({**reading, "value": fact, "source_accession": ref.accession, "source_url": ref.source_url,
+                            "filed_at": ref.filed.isoformat(),
+                            "notes": [*(reading.get("notes") or []), f"the {ref.form}'s exact figure; the release gave "
+                                      f"{(reading.get('locator') or {}).get('value_text') or readings[quarter]}"],
+                            "locator": {**(reading.get("locator") or {}), "tagged": True, "concept": tag.concept,
+                                        "dimensions": dict(tag.dimensions), "instant": tag.instant}})
+        # A Q4 the 10-K tags only for the year (Adobe's FY2025): the year's exact figure less the three exact quarters,
+        # when exactly one of the year's figures leaves the release's rounded Q4.
+        exact = {(v["fiscal_year"], v["fiscal_period"]): float(v["value"]) for v in [*held.values(), *records]
+                 if (v.get("locator") or {}).get("tagged") and v["validation_status"] == "verified"}
+        for quarter in known:
+            year = quarter[0]
+            nine = [exact.get((year, period)) for period in ("Q1", "Q2", "Q3")]
+            if quarter[1] != "Q4" or quarter in exact or None in nine or held[quarter].get("owner_decision"):
+                continue
+            ref, end = quarters[quarter]
+            try:
+                annual = quarter_facts(self._xbrl(ref).facts.to_dataframe(), end, (330, 400))
+            except Exception:  # noqa: BLE001 - an unreadable report gives nothing
+                continue
+            fits = {fact - sum(nine) for fact in annual.values() if agrees(fact - sum(nine), readings[quarter])}
+            if len(fits) != 1:
+                continue
+            reading, value = held[quarter], fits.pop()
+            records.append({**reading, "value": value, "notes": [*(reading.get("notes") or []),
+                            f"the {ref.form}'s exact year less its three quarters; the release gave "
+                            f"{(reading.get('locator') or {}).get('value_text') or readings[quarter]}"],
+                            "locator": {**(reading.get("locator") or {}), "tagged": True}})
         return records
 
     # A recent listing's history: its first reports' year-ago figures and its IPO prospectus.
