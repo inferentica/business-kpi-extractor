@@ -158,3 +158,42 @@ def earlier_quarters(grid: Grid, cells: list[str], own_end: date, additive: bool
             year = column.end.year - (1 if month > column.end.month else 0)
             found.setdefault(date(year, month, calendar.monthrange(year, month)[1]), half - quarter)
     return found
+
+
+# A table headed by quarter names rather than dates (ASML's slides: "Q2 2022 Q3 2022 Q4 2022 Q1 2023 Q2 2023 Net sales
+# 5,431 5,778 …"), as its slide text runs.
+_QUARTER_RUN = re.compile(r"(?:\bQ[1-4]\s+(?:19|20)\d{2}\s+){1,7}Q[1-4]\s+(?:19|20)\d{2}\b")
+_QUARTER = re.compile(r"\bQ([1-4])\s+((?:19|20)\d{2})\b")
+_FIGURES = re.compile(r"(?:\s+(?:\(?-?[\d,]*\.?\d+\)?|[—–-]))+")
+
+
+def _label_pattern(label: str) -> re.Pattern:
+    words = [re.escape(word) for word in clean(label).split()]
+    # Not the end of a longer label ("New lithography systems sold" for "Lithography systems sold").
+    return re.compile(r"(?<![A-Za-z])(?<![A-Za-z]\s)" + r"\s+".join(words), re.I)
+
+
+def quarter_table_rows(text: str, label: str) -> list[dict[tuple[int, int], float]]:
+    """A row's figures under each run of quarter headings in a text: {(year, quarter): figure}. A row with one more
+    figure than headings starts with its footnote mark ("Lithography systems sold (units) 1 91 86 106 100 113")."""
+    found = []
+    pattern = _label_pattern(label)
+    runs = list(_QUARTER_RUN.finditer(text))
+    for index, run in enumerate(runs):
+        quarters = [(int(year), int(quarter)) for quarter, year in _QUARTER.findall(run.group(0))]
+        if len(set(quarters)) != len(quarters):
+            continue
+        section = text[run.end():runs[index + 1].start() if index + 1 < len(runs) else len(text)]
+        match = pattern.search(section)
+        figures = _FIGURES.match(section, match.end()) if match else None
+        if not figures:
+            continue
+        cells = figures.group(0).split()
+        if len(cells) == len(quarters) + 1:
+            cells = cells[1:]
+        if len(cells) != len(quarters):
+            continue
+        row = {quarter: value for quarter, cell in zip(quarters, cells) if (value := amount(cell)) is not None}
+        if row:
+            found.append(row)
+    return found

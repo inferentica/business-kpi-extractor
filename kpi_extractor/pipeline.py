@@ -38,7 +38,7 @@ from .charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, re
 from .prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from .release_breakdowns import line_key, release_breakdown
 from .segment_income import GROUP_KEY as INCOME_GROUP, GROUP_LABEL as INCOME_LABEL, INCOME_CONCEPT, LEFT_OVER_KEY, segment_income
-from .release_columns import amount, earlier_quarters, release_grids, row_key
+from .release_columns import amount, earlier_quarters, quarter_table_rows, release_grids, row_key
 from .tagged_metrics import (agrees, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits,
                              year_ago_facts)
 from .release_statements import release_headline, release_statements, reported_units
@@ -284,6 +284,7 @@ class SymbolPipeline:
         if spec is not None:
             self._adopt_listed_keys(spec)
             self._fill_tagged_metrics(reports, spec)
+            self._fill_quarter_tables(releases)
         self._refile_annuals()
         self._recheck_flagged()
         self._anchor_ai_breakdowns()
@@ -765,6 +766,80 @@ class SymbolPipeline:
         if records:
             self._store(values=records)
             self.log(f"{self.symbol}: {len(records)} KPI values read from reports' XBRL where the releases do not give them")
+
+    def _fill_quarter_tables(self, releases: list[FilingRef]) -> None:
+        """A metric's missing quarters from the quarter-headed tables releases carry (ASML's slides give five quarters of
+        lithography systems sold; its KPI, added later, was read only from the latest releases). A row is found by the
+        names the KPI's readings give it and taken only when another of its columns equals a figure already held, which
+        also gives its scale; each quarter filled this way vouches for the next table. A quarter's own release is
+        preferred; one held in any way is never replaced, and quarters before the KPI's first are not looked for."""
+        held: dict[tuple[str, str], dict[tuple[str, str], dict]] = {}
+        for v in self.values.values():
+            if v["group_kind"] == "metric" and v["validation_status"] != "rejected" and v["fiscal_period"] != "FY":
+                held.setdefault((v["group_key"], v["kpi_key"]), {})[(v["fiscal_year"], v["fiscal_period"])] = v
+        own = {}
+        for ref in releases:
+            quarter = self._quarter_of(ref.period_end) if ref.period_end else None
+            if quarter and quarter[1] != "FY":
+                own.setdefault(quarter, ref)
+        index = lambda quarter: int(quarter[0]) * 4 + int(quarter[1][1])  # noqa: E731
+        wanted: dict[tuple[str, str], tuple[list[str], set[tuple[str, str]]]] = {}
+        for kpi, rows in held.items():
+            verified = [v for v in rows.values() if v["validation_status"] == "verified" and v["method"] == "ai"]
+            labels = {label for v in verified if (label := _row_label(v.get("locator") or {}))}
+            first = min((index(quarter) for quarter in rows), default=None)
+            gaps = {quarter for quarter in own if first is not None and index(quarter) > first and quarter not in rows}
+            if labels and gaps:
+                wanted[kpi] = (sorted(labels), gaps)
+        if not wanted:
+            return
+        reach = {quarter for _labels, gaps in wanted.values() for gap in gaps for quarter in own
+                 if 0 <= index(quarter) - index(gap) <= 4}
+        texts: dict[str, list[str]] = {}
+        for quarter in sorted(reach)[:24]:
+            ref = own[quarter]
+            try:
+                document = self._document(ref)
+            except Exception:  # noqa: BLE001 - an unreadable release gives nothing
+                continue
+            texts[ref.accession] = [" ".join(" ".join(row) for row in document.tables[key].rows) if key in document.tables
+                                    else document.blocks[key].text for key in document.order]
+        records = []
+        for kpi, (labels, gaps) in wanted.items():
+            known = {quarter: float(v["value"]) for quarter, v in held[kpi].items() if v["validation_status"] == "verified"}
+            found: dict[tuple[str, str], tuple[float, FilingRef]] = {}
+            for _pass in range(3):  # a gap a table fills proves the next table
+                before = len(found)
+                for quarter in sorted(reach):
+                    ref = own[quarter]
+                    for text in texts.get(ref.accession, []):
+                        for label in labels:
+                            for row in quarter_table_rows(text, label):
+                                figures = {(str(year), f"Q{number}"): value for (year, number), value in row.items()}
+                                overlap = {q: known.get(q) or (found[q][0] if q in found else None) for q in figures}
+                                overlap = {q: value for q, value in overlap.items() if value is not None}
+                                scales = {next((scale for scale in (1, 1e3, 1e6, 1e9)
+                                                if figures[q] and abs(value / (figures[q] * scale) - 1) < 1e-4), None)
+                                          for q, value in overlap.items()}
+                                if len(scales) != 1 or None in scales:
+                                    continue
+                                scale = scales.pop()
+                                for gap in gaps & set(figures):
+                                    if gap not in found or own.get(gap) is ref:
+                                        found[gap] = (figures[gap] * scale, ref)
+                if len(found) == before:
+                    break
+            template = max((v for v in held[kpi].values() if v["validation_status"] == "verified"), key=lambda v: v["period_end"])
+            for quarter, (value, ref) in sorted(found.items()):
+                end = own[quarter].period_end
+                records.append({**template, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
+                                "value": value, "method": "ai", "validation_status": "verified", "reconciliation_error_pct": None,
+                                "source_accession": ref.accession, "source_url": ref.source_url, "filed_at": ref.filed.isoformat(),
+                                "notes": [f"from the quarterly table of the release for {own_label(ref, own)}"],
+                                "locator": {"quarter_table": True, "row": labels[0]}})
+        if records:
+            self._store(values=records)
+            self.log(f"{self.symbol}: {len(records)} KPI values from the releases' quarterly tables")
 
     def _kpi_template(self, group, kpi, key: str) -> dict:
         """The stored shape of a KPI no release has given yet."""
@@ -3690,3 +3765,17 @@ def _document_text(document: Document) -> str:
 
 def _days(left: str, right: str) -> int:
     return (date.fromisoformat(left[:10]) - date.fromisoformat(right[:10])).days
+
+
+def _row_label(locator: dict) -> str | None:
+    """The name a reading's row goes by, its footnote mark dropped: "Lithography systems sold (units) 1 132 77 …" is
+    "Lithography systems sold (units)"."""
+    label = locator.get("row_label") or (re.split(r"\s\$?\(?[\d,.]+\)?(?:\s|$)", clean(locator["quote"]), maxsplit=1)[0]
+                                         if locator.get("quote") else None)
+    label = re.sub(r"(?:\s+\d{1,2})+$", "", clean(label or ""))
+    return label if len(label) >= 8 else None
+
+
+def own_label(ref: FilingRef, own: dict) -> str:
+    quarter = next((quarter for quarter, other in own.items() if other is ref), None)
+    return f"{quarter[1]} {quarter[0]}" if quarter else ref.accession

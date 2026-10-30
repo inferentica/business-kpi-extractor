@@ -1482,3 +1482,33 @@ def test_a_note_is_stored_once():
     pipeline._store(values=[{"group_key": "kpi_x", "kpi_key": "a", "fiscal_year": "2020", "fiscal_period": "Q4", "value": 1,
                              "validation_status": "needs_review", "notes": ["total matches no figure", note, note, note]}])
     assert stored[0]["notes"] == ["total matches no figure", note]
+
+
+def test_a_metrics_missing_quarters_come_from_the_releases_quarterly_tables():
+    # ASML's slides give five quarters of lithography systems sold; the KPI was read only from its first and latest
+    # releases. Each table is taken only where another column equals a figure held, and a filled quarter proves the next.
+    from datetime import date as day
+
+    from kpi_extractor.document import parse_document
+    slides = {
+        "q2": "Q4 2020 Q1 2021 Q2 2021 Net sales 1 2 3 Lithography systems sold (units) 1 80 76 72 Net bookings 2 9 9 9",
+        "q3": "Q1 2021 Q2 2021 Q3 2021 New lithography systems sold (units) 70 66 75 Lithography systems sold (units) 1 76 72 79",
+        "q4": "Q2 2021 Q3 2021 Q4 2021 Lithography systems sold (units) 1 72 79 82",
+        "x": "Q2 2021 Q3 2021 Q4 2021 Lithography systems sold (units) 1 5 6 7",  # matches nothing held: never used
+    }
+    ends = {"q1": day(2021, 3, 31), "q2": day(2021, 6, 30), "q3": day(2021, 9, 30), "q4": day(2021, 12, 31), "x": day(2021, 12, 31)}
+    releases = [SimpleNamespace(accession=a, period_end=ends[a], source_url=f"https://www.sec.gov/{a}.htm", filed=ends[a])
+                for a in ("q1", "q2", "q3", "q4")]
+    held = {"group_key": "kpi_operating", "kpi_key": "systems", "group_kind": "metric", "fiscal_year": "2021", "fiscal_period": "Q1",
+            "period_end": "2021-03-31", "method": "ai", "validation_status": "verified", "value": 76, "unit": "count",
+            "locator": {"quote": "Lithography systems sold (units) 1 57 61 60 80 76", "value_text": "76"}}
+    pipeline = _pipeline(None, [held, {**held, "fiscal_year": "2020", "fiscal_period": "Q4", "period_end": "2020-12-31", "value": 80}])
+    pipeline.profile = SimpleNamespace(name="ASML", fiscal_year_end="1231", foreign=True)
+    pipeline.offset = 0
+    pipeline._document = lambda ref: parse_document(f"<p>{slides.get(ref.accession, '')}</p>", ref.source_url)
+    stored = []
+    pipeline._store = lambda values: stored.extend(values)
+    pipeline.log = lambda *_: None
+    pipeline._fill_quarter_tables(releases)
+    assert {(v["fiscal_period"], v["value"], v["source_accession"]) for v in stored} == {
+        ("Q2", 72, "q2"), ("Q3", 79, "q3"), ("Q4", 82, "q4")}
