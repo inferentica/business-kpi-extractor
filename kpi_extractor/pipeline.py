@@ -860,6 +860,10 @@ class SymbolPipeline:
             quarter = self._quarter_of(ref.period_end) if ref.period_end else None
             if quarter and quarter[1] != "FY":
                 refs.setdefault(quarter, []).append(ref)
+        # Each quarter's end as stored figures give it: a quarter with no release of its own (TSMC's Q4 2022) still has one.
+        ends = {(v["fiscal_year"], v["fiscal_period"]): str(v["period_end"])[:10] for v in self.values.values()
+                if v["fiscal_period"] != "FY" and v.get("period_end")}
+        ends.update({quarter: own[0].period_end.isoformat() for quarter, own in refs.items()})
         records = []
         loaded: dict[str, str] = {}
 
@@ -913,7 +917,7 @@ class SymbolPipeline:
             scale = readings[0][3] if readings else 1
             # A quarter's own release first; a later release's column where its own does not give the row.
             found: dict[tuple[str, str], tuple[float, str, dict]] = {}
-            gaps = sorted((quarter for quarter in refs if index(quarter) > first and quarter not in rows), key=index)
+            gaps = sorted((quarter for quarter in ends if index(quarter) > first and quarter not in rows), key=index)
             # A quarter held a quarter or a year after a gap: its release's earlier columns, when its own figure is the
             # one held (TSMC's Q4 2023 report gives Q4 2022 a year back).
             after = {label_of(index(gap) + lag) for gap in gaps for lag in set(layout.values())}
@@ -930,7 +934,7 @@ class SymbolPipeline:
                                     lagged[earlier] = (numbers[column] * scale, f"the release for {quarter[1]} {quarter[0]}, its "
                                                        f"column a {'quarter' if lag == 1 else 'year'} before", source)
             for quarter in gaps:
-                for ref in refs[quarter][:12]:
+                for ref in refs.get(quarter, [])[:12]:
                     for label in labels:
                         for numbers in row_numbers(text_of(ref), label):
                             checks = [(numbers[column] * scale, label_of(index(quarter) - lag)) for column, lag in layout.items()
@@ -952,11 +956,9 @@ class SymbolPipeline:
             found = {**lagged, **found}
             template = max((v for v in rows.values() if v["validation_status"] == "verified"), key=lambda v: v["period_end"])
             for quarter, (value, where, source) in sorted(found.items()):
-                own = (refs.get(quarter) or [None])[0]
-                end = own.period_end if own else None
-                if end is None:
+                if quarter not in ends:
                     continue
-                records.append({**template, **source, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
+                records.append({**template, **source, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": ends[quarter],
                                 "value": value, "method": "ai", "validation_status": "verified", "reconciliation_error_pct": None,
                                 "notes": [f"from {where}"], "locator": {"quoted_row": True, "row": labels[0]}})
         if records:
