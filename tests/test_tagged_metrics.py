@@ -300,3 +300,52 @@ def test_a_flagged_breakdown_quarter_whose_lines_are_all_tagged_exactly_is_settl
     settled = {(v["fiscal_period"], v["kpi_key"]) for v in stored if v["validation_status"] == "verified"}
     assert settled == {(p, k) for p in ("Q1", "Q2") for k in ("fees", "transaction", "total")}
     assert all(v["notes"] == ["the 10-Q's exact figure; every line of the quarter is tagged"] for v in stored)
+
+
+def test_a_breakdown_quarter_missing_lines_its_report_tags_is_completed_when_it_then_adds_up():
+    # JPMorgan's revenue: fee lines inside noninterest revenue, beside net interest income; a quarter's reading missed a
+    # fee line and the subtotal, both in its 10-Q.
+    from datetime import date as day
+    from types import SimpleNamespace
+
+    from kpi_extractor import ai
+    from kpi_extractor.pipeline import SymbolPipeline
+    ends = {"q1": "2026-03-31", "q2": "2026-06-30", "q3": "2026-09-30"}
+    starts = {"q1": "2026-01-01", "q2": "2026-04-01", "q3": "2026-07-01"}
+    concepts = {"fees": "us-gaap:InvestmentBankingRevenue", "card": "us-gaap:FeesAndCommissionsCreditAndDebitCards",
+                "nr": "us-gaap:NoninterestIncome", "nii": "us-gaap:InterestIncomeExpenseNet"}
+    tagged = {"q1": {"fees": 3e9, "card": 1e9, "nr": 4e9, "nii": 5e9}, "q2": {"fees": 3.2e9, "card": 1.1e9, "nr": 4.3e9, "nii": 5.1e9},
+              "q3": {"fees": 2.9e9, "card": 1.4e9, "nr": 4.3e9, "nii": 5.2e9}}
+
+    def frame_of(accession):
+        return pd.DataFrame([{"concept": concepts[kpi], "numeric_value": value, "period_type": "duration",
+                              "period_start": starts[accession], "period_end": ends[accession]}
+                             for kpi, value in tagged[accession].items()])
+    pipeline = SymbolPipeline(None, "JPM", quarters=4, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(name="JPM", fiscal_year_end="1231", foreign=False)
+    pipeline.offset = 0
+    pipeline.filings = {a: {"accession": a, "period_end": e, "status": "processed"} for a, e in ends.items()}
+    pipeline.values = {}
+    read = {"Q1": tagged["q1"], "Q2": tagged["q2"], "Q3": {"fees": 2.9e9, "nii": 5.2e9}}
+    for period, lines in read.items():
+        total = sum(tagged[f"q{period[1]}"][kpi] for kpi in ("nr", "nii"))
+        for kpi, value in lines.items():
+            pipeline.values[("kpi_rev", kpi, "2026", period)] = {
+                "group_key": "kpi_rev", "group_label": "Revenue", "group_kind": "revenue_breakdown", "group_order": 20,
+                "kpi_key": kpi, "kpi_label": kpi, "kpi_order": 0, "unit": "currency", "currency": "USD", "fiscal_year": "2026",
+                "fiscal_period": period, "period_end": ends[f"q{period[1]}"], "method": "ai",
+                "validation_status": "needs_review", "source_accession": "release", "value": value,
+                "notes": ["parts differ from the total by 40%"], "locator": {"total": total}}
+    pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
+    stored = []
+    pipeline._store = lambda values: stored.extend(values)
+    spec = ai.Spec.model_validate({"groups": [{"key": "rev", "label": "Revenue", "kind": "revenue_breakdown", "total_kpi": "total", "kpis": [
+        {"key": "fees", "label": "Fees", "unit": "currency", "parent": "nr"},
+        {"key": "card", "label": "Card", "unit": "currency", "parent": "nr"},
+        {"key": "nr", "label": "Noninterest revenue", "unit": "currency"}, {"key": "nii", "label": "NII", "unit": "currency"},
+        {"key": "total", "label": "Total", "unit": "currency"}]}]})
+    reports = [SimpleNamespace(accession=a, form="10-Q", filed=day(2026, 11, 1), source_url="u") for a in ends]
+    pipeline._fill_tagged_metrics(reports, spec)
+    q3 = {v["kpi_key"]: v["value"] for v in stored if v["fiscal_period"] == "Q3" and v["validation_status"] == "verified"}
+    assert q3 == {"fees": 2.9e9, "nii": 5.2e9, "card": 1.4e9, "nr": 4.3e9}
+    assert {(v["fiscal_period"], v["kpi_key"]) for v in stored} >= {(p, k) for p in ("Q1", "Q2") for k in ("fees", "card", "nr", "nii")}

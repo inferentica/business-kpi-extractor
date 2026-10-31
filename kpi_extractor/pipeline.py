@@ -1126,7 +1126,8 @@ class SymbolPipeline:
     def _exact_periods(self, group, key: str, quarters, facts_of, fresh: list[dict]) -> list[dict]:
         """A flagged breakdown quarter whose every line is its report's exact tagged figure (for a Q4, the 10-K's year less
         three settled quarters) is settled: KKR tags each of its asset management segment's five revenue lines to the
-        thousand but not their total, so no total proves them.
+        thousand but not their total, so no total proves them. A quarter whose lines, with those its report tags and its
+        reading missed or misread, then add up (each parent to its lines, the top lines to the total) takes them all.
         A line's tags are those that equal its readings in at least two quarters and never differ; a total the group
         lists must be its lines added up, to its rounding."""
         rows = {value_key(v): v for v in self.values.values() if v["group_key"] == key and v["validation_status"] != "rejected"
@@ -1158,37 +1159,80 @@ class SymbolPipeline:
             tags[kpi.key] = [tag for tag, count in agree.items() if count >= 2 and count >= 2 * differ.get(tag, 0)]
         records = []
         settled = {"another part of this breakdown needs review", "confirmed by review", "settled by the checks", *_UNANCHORED}
-        def exact(quarter, kpi: str, value: float) -> bool:
-            if any(facts_of(quarter).get(tag) == value for tag in tags.get(kpi, [])):
-                return True
-            # A Q4 its 10-K tags only for the year: the year's exact figure less the three quarters before it.
+        parents = {kpi.key: kpi.parent for kpi in group.kpis if kpi.parent}
+
+        def tagged(quarter, kpi: str) -> float | None:
+            """The quarter's exact figure of a line: its learned tag in the report, or for a Q4 its 10-K's year less three
+            verified quarters."""
+            facts = facts_of(quarter)
+            found = next((facts[tag] for tag in tags.get(kpi, []) if tag in facts), None)
+            if found is not None or quarter[1] != "Q4":
+                return found
             nine = [by_period.get((quarter[0], period), {}).get(kpi) for period in ("Q1", "Q2", "Q3")]
-            if quarter[1] != "Q4" or any(v is None or v["validation_status"] != "verified" for v in nine):
-                return False
+            if any(v is None or v["validation_status"] != "verified" for v in nine):
+                return None
             ref, end = quarters[quarter]
             try:
                 annual = quarter_facts(self._xbrl(ref).facts.to_dataframe(), end, (330, 400))
             except Exception:  # noqa: BLE001 - an unreadable report proves nothing
-                return False
-            return any(tag in annual and abs(annual[tag] - sum(float(v["value"]) for v in nine) - value) < 0.5
-                       for tag in tags.get(kpi, []))
+                return None
+            return next((annual[tag] - sum(float(v["value"]) for v in nine) for tag in tags.get(kpi, []) if tag in annual), None)
 
+        def whole(figures: dict[str, float], total: float | None) -> bool:
+            """Each parent is its lines added up, and the lines not inside another add up to the total."""
+            for parent in {parents[kpi] for kpi in figures if parents.get(kpi) in figures}:
+                lines = sum(value for kpi, value in figures.items() if parents.get(kpi) == parent)
+                if abs(figures[parent] - lines) > _rounding(figures[parent]):
+                    return False
+            top = sum(value for kpi, value in figures.items() if kpi != group.total_kpi and parents.get(kpi) not in figures)
+            return total is None or abs(total - top) <= _rounding(total)
+
+        # A quarter missing a line its report tags is completed (Revenue by Product at JPMorgan, read from a 3 MB
+        # supplement whose segment pages repeat each row's name).
+        listed = [kpi.key for kpi in group.kpis if kpi.key != group.total_kpi and tags.get(kpi.key)]
+        waiting = sorted(set(waiting) | {quarter for quarter, lines in by_period.items() if quarter in quarters
+                                         and quarter[1] != "FY" and len(lines) >= 2 and any(kpi not in lines for kpi in listed)})
         for quarter in waiting:
             lines = by_period[quarter]
             parts = {kpi: v for kpi, v in lines.items() if kpi != group.total_kpi}
-            if len(parts) < 2 or not all(exact(quarter, kpi, float(v["value"])) for kpi, v in parts.items()):
+            if len(parts) < 2:
                 continue
-            total = lines.get(group.total_kpi)
-            whole = sum(float(v["value"]) for v in parts.values())
-            if total and abs(float(total["value"]) - whole) > _rounding(float(total["value"])):
+            total_row = lines.get(group.total_kpi)
+            total = float(total_row["value"]) if total_row else next(
+                (float(t) for v in parts.values() if isinstance(t := (v.get("locator") or {}).get("total"), (int, float))), None)
+            figures = {kpi: tagged(quarter, kpi) for kpi in parts}
+            if any(value is None for value in figures.values()):
                 continue
-            ref = quarters[quarter][0]
+            added = {kpi: value for kpi in listed if kpi not in parts and (value := tagged(quarter, kpi)) is not None}
+            changed = {kpi for kpi, value in figures.items() if value != float(parts[kpi]["value"])}
+            if not whole({**figures, **added}, total):
+                # The lines as read, when each is its report's figure and they add up (KKR's asset management lines).
+                if changed or not whole(figures, total):
+                    continue
+                added = {}
+            if not changed and not added and all(v["validation_status"] == "verified" for v in parts.values()):
+                continue
+            ref, end = quarters[quarter]
             for kpi, v in lines.items():
                 notes = [note for note in v.get("notes") or [] if note not in settled and not _is_jump(note)]
-                record = {**v, "validation_status": "verified",
-                          "notes": [*notes, f"the {ref.form}'s exact figure; every line of the quarter is tagged"]}
+                note = (f"the {ref.form}'s exact figure; the release gave {float(v['value']):,.15g}" if kpi in changed
+                        else f"the {ref.form}'s exact figure; every line of the quarter is tagged")
+                record = {**v, "validation_status": "verified", "notes": [*notes, note],
+                          **({"value": figures[kpi]} if kpi in changed else {})}
                 records.append(record)
                 lines[kpi] = record  # the year's Q4 is worked out from it
+            for kpi_key, value in added.items():
+                kpi = next(item for item in group.kpis if item.key == kpi_key)
+                shape = next((v for v in rows.values() if v["kpi_key"] == kpi_key), None) or self._kpi_template(group, kpi, key)
+                record = self._record(
+                    group_key=key, group_label=shape["group_label"], group_kind=shape["group_kind"],
+                    group_order=shape["group_order"], kpi_key=kpi_key, kpi_label=shape["kpi_label"],
+                    kpi_order=shape["kpi_order"], unit=shape["unit"], value=value, currency=shape.get("currency"),
+                    method="ai", validation_status="verified", reconciliation_error_pct=None,
+                    notes=[f"from the {ref.form}'s XBRL; the release's reading missed it"],
+                    ref=ref, fiscal_year=quarter[0], fiscal_period=quarter[1], period_end=end, locator={"tagged": True})
+                records.append(record)
+                lines[kpi_key] = record
         if records:
             self.log(f"{self.symbol}: {len(records)} breakdown values settled by their reports' exact tagged figures")
         return records
