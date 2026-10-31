@@ -1607,3 +1607,26 @@ def test_a_worked_out_remainder_takes_the_name_the_reports_table_gives_it():
     assert _row_named(document, 9e6, regions) == "Hedging gains"
     assert _row_named(document, 10e6, regions) is None  # no row of that amount
     assert _row_named(document, 9e6, {line_key("Americas"), line_key("Japan")}) is None  # not this breakdown's table
+
+
+def test_a_figure_from_outside_sec_filings_is_never_rewritten():
+    # Unity's segment figures entered from its investor site's spreadsheet: the control plane takes only SEC sources.
+    from types import SimpleNamespace
+
+    from kpi_extractor.pipeline import SymbolPipeline
+    pipeline = SymbolPipeline(None, "U", quarters=4, force=False, log=lambda *_: None)
+    calls = []
+    pipeline.control = SimpleNamespace(call=lambda name, **payload: calls.append(payload))
+    pipeline.values = {}
+    pipeline.result = SimpleNamespace(values=0)
+    base = {"symbol": "U", "group_key": "kpi_seg", "kpi_key": "grow", "fiscal_year": "2025", "fiscal_period": "Q1",
+            "value": 1.0, "notes": [], "validation_status": "verified"}
+    owner = {**base, "method": "ai", "source_url": "https://s205.q4cdn.com/x.xlsx"}
+    derived = {**base, "fiscal_period": "FY", "method": "derived", "source_url": "https://s205.q4cdn.com/x.xlsx"}
+    filed = {**base, "kpi_key": "create", "method": "xbrl", "source_url": "https://www.sec.gov/Archives/x.htm"}
+    pipeline._store(values=[owner, derived, filed])
+    stored = calls[0]["values"]
+    assert [(v["kpi_key"], v["fiscal_period"], v["source_url"]) for v in stored] == [
+        ("grow", "FY", None), ("create", "Q1", "https://www.sec.gov/Archives/x.htm")]
+    pipeline._store(values=[owner])
+    assert len(calls) == 1  # nothing left to write

@@ -3788,6 +3788,13 @@ class SymbolPipeline:
         # A note once: a check that settles a part each run, which the whole breakdown then holds back, added its note
         # again every run until JPM's reached the control plane's 40 and its run failed.
         values = [{**value, "notes": list(dict.fromkeys(value["notes"]))} if value.get("notes") else value for value in values]
+        # A figure from outside SEC filings (Unity's segment spreadsheet on its investor site) was entered by the owner:
+        # the extractor never rewrites it, and the control plane takes only SEC sources, so carrying one in a write
+        # failed the whole run. A figure worked out from one keeps it out of its source.
+        values = [value if _sec_source(value) else {**value, "source_url": None}
+                  for value in values if _sec_source(value) or value.get("method") == "derived"]
+        if not values and not filings:
+            return
         self.control.call("store", symbol=self.symbol, filings=filings or [], values=values)
         for value in values:
             existing = self.values.get(value_key(value))
@@ -3795,6 +3802,11 @@ class SymbolPipeline:
                 continue  # as store_business_kpis does: another filing's unchecked reading never replaces a verified one
             self.values[value_key(value)] = value
         self.result.values += len(values)
+
+
+def _sec_source(value: dict) -> bool:
+    url = value.get("source_url")
+    return url is None or str(url).startswith("https://www.sec.gov/")
 
 
 def keep_current_groups(proposed: Spec, current: Spec) -> Spec:
