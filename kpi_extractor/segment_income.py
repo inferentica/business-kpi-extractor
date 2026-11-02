@@ -31,6 +31,10 @@ _LEFT_OVER = "Unallocated"
 # "Segment Earnings", its fee-related earnings, over its "Segment Revenue").
 _OWN_PROFIT = re.compile(r"^[\w-]+:Segment(?:Earnings|Profit|ProfitLoss|OperatingIncome(?:Loss)?)$")
 _OWN_REVENUE = re.compile(r"^[\w-]+:SegmentRevenues?$")
+# A company's own segment contribution (Palantir's "pltr:Contribution", each segment's revenue less its own costs, since
+# its first inline-XBRL 10-Q): its filing reconciles it to operating income, so the rows do too, with the costs it
+# leaves out as "Unallocated".
+_CONTRIBUTION = re.compile(r"^[\w-]+:(?:Segment)?Contribution$")
 # A company's own segment revenue is its revenue by segment: it stands in for the GAAP revenue its notes split by
 # segment (Brookfield's leaves out its share of the managers it does not consolidate).
 REVENUE_GROUP_KEY = "segments"
@@ -137,7 +141,9 @@ def segment_income(facts: pd.DataFrame, period_end: date, annual: bool,
         return _measure(facts, INCOME_CONCEPT, GROUP_LABEL, period_end, annual, label, children)
     concept = _own_concept(facts, _OWN_PROFIT)
     if concept is None:
-        return None
+        contribution = _own_concept(facts, _CONTRIBUTION)
+        return _measure(facts, contribution, GROUP_LABEL, period_end, annual, label, children, INCOME_CONCEPT) \
+            if contribution else None
     name = "Earnings by Segment" if "Earnings" in concept else "Profit by Segment"
     return _measure(facts, concept, name, period_end, annual, label, children)
 
@@ -152,9 +158,16 @@ def segment_revenue(facts: pd.DataFrame, period_end: date, annual: bool,
 
 
 def _measure(facts: pd.DataFrame, concept: str, name: str, period_end: date, annual: bool,
-             label: Callable[[str], str | None], children: dict[str, set[str]] | None) -> SegmentIncome | None:
-    frame = facts[(facts["concept"] == concept) & facts["numeric_value"].notna() & (facts["period_type"] == "duration")]
-    own = concept != INCOME_CONCEPT
+             label: Callable[[str], str | None], children: dict[str, set[str]] | None,
+             reconciled_to: str | None = None) -> SegmentIncome | None:
+    """reconciled_to: the concept whose untagged figure the rows add up to, in place of the measure's own total."""
+    selected = facts["concept"] == concept
+    if reconciled_to:
+        dims = [column for column in facts.columns if column.startswith("dim_")]
+        untagged = facts[dims].isna().all(axis=1) if dims else pd.Series(True, index=facts.index)
+        selected = (facts["concept"] == concept) & ~untagged | (facts["concept"] == reconciled_to) & untagged
+    frame = facts[selected & facts["numeric_value"].notna() & (facts["period_type"] == "duration")]
+    own = concept != INCOME_CONCEPT and not reconciled_to
     if frame.empty:
         return None
     labels = _member_labels(facts)

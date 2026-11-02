@@ -116,3 +116,26 @@ def test_a_companys_own_measure_without_its_total_is_its_segments_added_up():
     # Operating income still needs its own total.
     tagged = [{**row, "concept": "us-gaap:OperatingIncomeLoss"} for row in rows]
     assert segment_income(pd.DataFrame(tagged), date(2026, 3, 31), False) is None
+
+
+def test_a_companys_own_contribution_adds_up_to_operating_income():
+    # Palantir's Q2 2026 10-Q tags each segment's contribution (pltr:Contribution, beside its margin) but no operating
+    # income by segment; its untagged operating income is what the segments and the costs they leave out add up to.
+    rows = []
+    for (start, end), (government, commercial, total) in {("2026-04-01", "2026-06-30"): (701_106e3, 734_944e3, 912_004e3),
+                                                          ("2025-04-01", "2025-06-30"): (350_412e3, 287_576e3, 269_317e3)}.items():
+        for member, value in (("pltr:GovernmentOperatingSegmentMember", government),
+                              ("pltr:CommercialOperatingSegmentMember", commercial)):
+            rows.append({**fact(value, start, end, member, "us-gaap:OperatingSegmentsMember"), "concept": "pltr:Contribution"})
+            rows.append({**fact(70, start, end, member, "us-gaap:OperatingSegmentsMember"), "concept": "pltr:ContributionMargin"})
+        rows.append(fact(total, start, end))
+    names = {"pltr:GovernmentOperatingSegmentMember": "Government", "pltr:CommercialOperatingSegmentMember": "Commercial"}
+    income = segment_income(pd.DataFrame(rows), date(2026, 6, 30), False, names.get)
+    assert income.concept == "pltr:Contribution" and income.label == "Operating Income by Segment"
+    assert income.current.total == 912_004e3
+    assert [(key, value) for key, _name, _element, value in income.current.rows] == [
+        ("commercial", 734_944e3), ("government", 701_106e3), ("unallocated", -524_046e3)]
+    assert income.prior.total == 269_317e3
+    # Without the operating income it reconciles to, a contribution is no breakdown.
+    assert segment_income(pd.DataFrame([row for row in rows if row["concept"] != "us-gaap:OperatingIncomeLoss"]),
+                          date(2026, 6, 30), False) is None
