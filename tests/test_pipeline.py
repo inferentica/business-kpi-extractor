@@ -1669,3 +1669,18 @@ def test_lines_confirmed_one_by_one_do_not_prove_a_breakdown_missing_a_line():
     assert whole._prove_flagged([]) == []
     entered = _pipeline(FakeControl({}), [row("a", 60e6, [_CONFIRMED_LATER]), row("b", 40e6, ["entered by the owner"], source_accession="q", locator={}, owner_decision="corrected")])
     assert entered._prove_flagged([]) == []
+
+
+def test_a_figure_the_owner_rejected_still_ties_a_series_together():
+    # Microsoft: the quarters tying "Search advertising" to the element it moved to were rejected for a later recast.
+    def row(key, member, year, value):
+        return {"group_key": "products", "group_kind": "revenue_breakdown", "group_label": "Products", "kpi_key": key, "kpi_label": key,
+                "unit": "currency", "value": value, "method": "xbrl", "validation_status": "verified", "fiscal_year": year, "fiscal_period": "FY",
+                "period_end": f"{year}-06-30", "source_accession": "a", "locator": {"member": member}, "notes": []}
+    values = [row("search", "SearchMember", "2021", 1.0), row("searchnews", "SearchNewsMember", "2024", 2.0)]
+    apart = _pipeline(FakeControl({}), values)
+    assert apart._unify_series() == []
+    joined = _pipeline(FakeControl({}), values)
+    joined.store.owner_rejected = [row("search", "SearchNewsMember", "2026", 3.0), row("search", "SearchMember", "2020", 4.0)]
+    written = joined._unify_series()
+    assert {(v["kpi_key"], v["fiscal_year"], v["validation_status"]) for v in written} == {("search", "2024", "verified"), ("searchnews", "2024", "rejected")}

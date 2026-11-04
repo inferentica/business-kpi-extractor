@@ -53,6 +53,7 @@ class CompanyStore:
         self.log = log
         self._values: dict[tuple, MappingProxyType] = {}
         self._filings: dict[str, dict] = {}
+        self.owner_rejected: list[dict] = []
         self._owner_rejected: set[tuple] = set()
         self.values = MappingProxyType(self._values)
         self.filings = MappingProxyType(self._filings)
@@ -60,6 +61,7 @@ class CompanyStore:
     def load(self, values: list[dict] = (), filings: list[dict] = (), owner_rejected: list[dict] = ()) -> None:
         """What the control plane holds for the company, in place of anything held before. It does not send rejected rows;
         `owner_rejected` names those the owner rejected, which no reading may bring back."""
+        self.owner_rejected = list(owner_rejected)
         self._owner_rejected = {value_key(row) for row in owner_rejected}
         self._values.clear()
         self._values.update({value_key(value): MappingProxyType(dict(value)) for value in values})

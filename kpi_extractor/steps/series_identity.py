@@ -139,6 +139,9 @@ class SeriesIdentity:
         two of its keys in one period is two businesses after all and is left alone. The series takes its latest key,
         so it carries the latest name."""
         rows = [v for v in self.values.values() if v["method"] == "xbrl" and v["validation_status"] != "rejected"]
+        # A figure the owner rejected is not served, but it still says which series its key belongs to: Microsoft's
+        # recast FY2025-26, the only quarters tying "Search advertising" to the element it moved to.
+        rejected = [v for v in self.store.owner_rejected if v.get("method") == "xbrl"]
         parent: dict[tuple[str, str], tuple[str, str]] = {}
 
         def find(node):
@@ -153,7 +156,7 @@ class SeriesIdentity:
 
         by_element: dict[tuple[str, str], tuple[str, str]] = {}
         index: dict[tuple[str, bool], list[dict]] = {}
-        for v in rows:
+        for v in [*rows, *rejected]:
             node = (v["group_key"], v["kpi_key"])
             find(node)
             element = (v.get("locator") or {}).get("member")
@@ -162,6 +165,7 @@ class SeriesIdentity:
                     union(node, by_element[(v["group_key"], element)])
                 else:
                     by_element[(v["group_key"], element)] = node
+        for v in rows:
             index.setdefault((v["group_key"], v["fiscal_period"] == "FY"), []).append(v)
         for v in rows:
             prior = (v.get("locator") or {}).get("prior")
@@ -175,15 +179,19 @@ class SeriesIdentity:
         components: dict[tuple[str, str], list[dict]] = {}
         for v in rows:
             components.setdefault(find((v["group_key"], v["kpi_key"])), []).append(v)
+        evidence: dict[tuple[str, str], list[dict]] = {}
+        for v in rejected:
+            evidence.setdefault(find((v["group_key"], v["kpi_key"])), []).append(v)
         rekeyed = []
-        for members in components.values():
+        for root, members in components.items():
             keys = {v["kpi_key"] for v in members}
-            if len(keys) < 2:
+            latest = [*members, *evidence.get(root, [])]
+            canonical = max(latest, key=lambda v: (v["period_end"], v["fiscal_period"] == "FY"))["kpi_key"]
+            if keys == {canonical}:
                 continue
             periods = [(v["fiscal_year"], v["fiscal_period"]) for v in members]
             if len(periods) != len(set(periods)):
                 continue  # two of its keys in one period: different businesses after all
-            canonical = max(members, key=lambda v: (v["period_end"], v["fiscal_period"] == "FY"))["kpi_key"]
             for v in members:
                 if v["kpi_key"] != canonical:
                     rekeyed.append({**v, "kpi_key": canonical})
