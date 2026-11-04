@@ -8,11 +8,11 @@ from datetime import date, timedelta
 from ..ai import Spec
 from ..derive import derive_periods
 from ..document import Document, parse_number
-from ..checks import count_jump, reported_matches
+from ..checks import count_jump, parts_add_up, reported_matches
 from ..extract import ReadValue, column_header
 from ..sec import FilingRef
 from .shared import (AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
-                     _year_ago_cells, value_key)
+                     _year_ago_cells, list_parents, value_key)
 
 MAX_YEAR_RATIO = 3.0
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
@@ -92,7 +92,7 @@ class SeriesChecks:
                     flagged.append({**v, "group_label": f"{member} {v['group_label']}"[:80]})
         return flagged
 
-    def _prove_flagged(self, releases: list[FilingRef]) -> list[dict]:
+    def _prove_flagged(self, releases: list[FilingRef], parents: dict[tuple[str, str], str] | None = None) -> list[dict]:
         """Settles flagged release values by evidence, with no AI and no one reviewing them:
         - a value equal to a figure the company reported in XBRL for the same period is proven;
         - a breakdown whose parts add up to such a figure is proven whole;
@@ -244,6 +244,20 @@ class SeriesChecks:
                 # Kept as filed; recorded as checked so the next release is not read for it again.
                 for row, _figure, checked in items:
                     settled[value_key(row)] = {**row, "notes": [*(row.get("notes") or []), checked]}
+        # Every line confirmed by the next year's release says nothing of the lines the reading missed: Goldman's Q3 2024
+        # Global Banking & Markets, its Equities intermediation unread, stood $2.2 billion short of its total.
+        periods: dict[tuple, list[dict]] = {}
+        for rows in groups.values():
+            periods.setdefault(period_of(rows[0]), []).extend(rows)  # an owner's entry cites another filing of the quarter
+        for rows in periods.values():
+            period = [row for row in (settled.get(value_key(v)) or v for v in rows) if row["validation_status"] != "rejected"]
+            if not any(_CONFIRMED_LATER in (row.get("notes") or []) for row in period) or parts_add_up(period, parents):
+                continue
+            for row in period:
+                if row["validation_status"] == "verified" and not row.get("owner_decision"):
+                    settled[value_key(row)] = {**row, "validation_status": "needs_review", "notes": (
+                        row.get("notes") or [] if _CONFIRMED_LATER in (row.get("notes") or [])
+                        else [*(row.get("notes") or []), "another part of this breakdown needs review"])}
         # A breakdown or mix is proven whole or not at all: a part confirmed on its own, beside parts still flagged, stays
         # flagged with them (its confirmation note kept for when the rest is settled).
         for key, row in list(settled.items()):
@@ -479,8 +493,7 @@ class SeriesChecks:
         changed = []
         # A template KPI that is a line of another (Apollo's Credit and Equity management fees, lines of its management
         # fees) carries that parent, so a worked-out period is checked on its top level only.
-        parents = {(f"{AI_GROUP_PREFIX}{group.key}", kpi.key): kpi.parent for group in (spec.groups if spec else [])
-                   for kpi in group.kpis if kpi.parent}
+        parents = list_parents(spec)
         values = [{**v, "locator": {**(v.get("locator") or {}), "parent": parents[(v["group_key"], v["kpi_key"])]}}
                   if (v["group_key"], v["kpi_key"]) in parents else v for v in self.values.values()]
         derived = [{**record, "locator": {k: v for k, v in (record.get("locator") or {}).items() if k != "parent"} or None}

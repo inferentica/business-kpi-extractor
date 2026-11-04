@@ -95,6 +95,12 @@ def _document_text(document: Document) -> str:
     return clean(" ".join([*(block.text for block in document.blocks.values()), *cells]))
 
 
+def list_parents(spec: Spec | None) -> dict[tuple[str, str], str]:
+    """(stored group, KPI) → the KPI of its own group it is a line of."""
+    return {(f"{AI_GROUP_PREFIX}{group.key}", kpi.key): kpi.parent for group in (spec.groups if spec else [])
+            for kpi in group.kpis if kpi.parent}
+
+
 class RecordBuilding:
     def _record(self, *, ref: FilingRef, period_end: date, source_url: str | None = None, **fields) -> dict:
         return {

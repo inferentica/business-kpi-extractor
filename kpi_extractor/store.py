@@ -53,11 +53,14 @@ class CompanyStore:
         self.log = log
         self._values: dict[tuple, MappingProxyType] = {}
         self._filings: dict[str, dict] = {}
+        self._owner_rejected: set[tuple] = set()
         self.values = MappingProxyType(self._values)
         self.filings = MappingProxyType(self._filings)
 
-    def load(self, values: list[dict] = (), filings: list[dict] = ()) -> None:
-        """What the control plane holds for the company, in place of anything held before."""
+    def load(self, values: list[dict] = (), filings: list[dict] = (), owner_rejected: list[dict] = ()) -> None:
+        """What the control plane holds for the company, in place of anything held before. It does not send rejected rows;
+        `owner_rejected` names those the owner rejected, which no reading may bring back."""
+        self._owner_rejected = {value_key(row) for row in owner_rejected}
         self._values.clear()
         self._values.update({value_key(value): MappingProxyType(dict(value)) for value in values})
         self._filings.clear()
@@ -128,6 +131,8 @@ class CompanyStore:
     def _send(self, *, filings: list[dict] | None = None, values: list | None = None) -> None:
         # Stored rows are read-only, so a step may hand one back as it is: it goes out as a plain record.
         values = list({value_key(value): dict(value) for value in values or []}.values())  # one row per key per write
+        # The owner's mark is the control plane's to keep: it clears it itself when a row may change.
+        values = [{key: item for key, item in value.items() if key != "owner_decision"} for value in values]
         # A note once: a check that settles a part each run, which the whole breakdown then holds back, added its note
         # again every run until JPM's reached the control plane's 40 and its run failed.
         values = [{**value, "notes": list(dict.fromkeys(value["notes"]))} if value.get("notes") else value for value in values]
@@ -143,5 +148,9 @@ class CompanyStore:
             existing = self._values.get(value_key(value))
             if existing and _keeps_verified(existing, value):
                 continue  # as store_business_kpis does: another filing's unchecked reading never replaces a verified one
+            # As it does for what the owner decided. A re-read of a report once withdrew SpaceX's confirmed Q2 2025 here but
+            # not there, so its year-ago quarter looked empty and came back beside them under the segment's old name.
+            if (existing and existing.get("owner_decision")) or value_key(value) in self._owner_rejected:
+                continue
             self._values[value_key(value)] = MappingProxyType(value)
         self.result.values += len(values)

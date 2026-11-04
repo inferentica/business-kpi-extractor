@@ -21,7 +21,7 @@ from .archive import Archive
 from .control import ControlError
 from .document import Document
 from .sec import FilingRef, company_profile, earnings_releases, periodic_reports
-from .steps.shared import RecordBuilding, _folder, only_adds
+from .steps.shared import RecordBuilding, _folder, list_parents, only_adds
 from .steps.loading import FilingLoading
 from .steps.reports import ReportReading
 from .steps.financial_statements import StatementReading
@@ -142,7 +142,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             return self.result
         self._curations = {(row["group_key"], row["members_key"]): list(row["chosen"])
                            for row in state.get("curations") or []}
-        self.store.load(state.get("values") or [], state.get("filings") or [])
+        self.store.load(state.get("values") or [], state.get("filings") or [], state.get("ownerRejected") or [])
         self.names = (state.get("spec") or {}).get("names") or {}
         # Which filing gave each stored statement period: a quarter read from releases belongs to the newest release
         # that presents it.
@@ -237,7 +237,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.write(self._recheck_flagged())
         self.store.write(self._release_held_breakdowns())
         self.store.write(self._anchor_ai_breakdowns())
-        self.store.write(self._prove_flagged(releases))
+        self.store.write(self._prove_flagged(releases, list_parents(spec)))
         self.store.write(self._release_held_breakdowns())
         self.store.write(self._join_custom_axes())
         self.store.write(self._unify_series())

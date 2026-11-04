@@ -113,3 +113,21 @@ def test_steps_hand_their_rows_back_instead_of_writing_them():
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _ROW_WRITES
                     and isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "store"):
                 assert False, f"{path}:{node.lineno} writes rows itself"
+
+
+def test_what_the_owner_decided_stands_here_as_it_does_in_the_control_plane():
+    store = _store()
+    store.load([_row("kept", owner_decision="confirmed")], [], [{"group_key": "kpi_x", "kpi_key": "gone", "fiscal_year": "2026", "fiscal_period": "Q2"}])
+    store.write([{**_row("kept"), "validation_status": "rejected"}, _row("gone"), _row("new")])
+    assert store.values[("kpi_x", "kept", "2026", "Q2")]["validation_status"] == "verified"
+    assert ("kpi_x", "gone", "2026", "Q2") not in store.values and ("kpi_x", "new", "2026", "Q2") in store.values
+    assert all("owner_decision" not in row for row in store.control.calls[0][1]["values"])
+
+
+def test_a_re_read_keeps_a_period_the_owner_confirmed_held():
+    # SpaceX: its Q2 2026 report re-read must not empty Q2 2025, or its year-ago lines come back under an old name.
+    store = _store()
+    store.load([_row("si", owner_decision="confirmed", method="xbrl", accession="f1")], [{"accession": "f1", "status": "processed"}])
+    reading = FilingReading(FilingRef("f1", "10-Q", date(2026, 8, 4), "periodic_report", "https://www.sec.gov/x.htm"), "processed", records=[])
+    store.record(reading)
+    assert store.values[("kpi_x", "si", "2026", "Q2")]["validation_status"] == "verified"

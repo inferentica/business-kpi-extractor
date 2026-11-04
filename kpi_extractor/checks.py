@@ -188,9 +188,10 @@ def _no_sharp_change(figures: list[Figure], previous: dict[str, float], **_conte
 
 _READ = frozenset({"ai"})
 _BREAKDOWN = frozenset({"revenue_breakdown"})
+_ADDS_UP = (Check("breakdown_adds_up", _breakdown_adds_up, _BREAKDOWN, _READ),)
 READING_CHECKS = (
     Check("mix_adds_up", _mix_adds_up, frozenset({"mix"}), _READ),
-    Check("breakdown_adds_up", _breakdown_adds_up, _BREAKDOWN, _READ),
+    *_ADDS_UP,
     Check("lines_add_up", _lines_add_up, frozenset({"revenue_breakdown", "mix"}), _READ),
     Check("no_sharp_change", _no_sharp_change, None, _READ),
 )
@@ -270,7 +271,7 @@ def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of:
     for rows in series.values():
         rows.sort(key=lambda v: v["period_end"])
         for previous, current in zip(rows, rows[1:]):
-            if not judged(current) or _days(previous["period_end"], current["period_end"]) > _SERIES_GAP_DAYS:
+            if not judged(current) or _days(current["period_end"], previous["period_end"]) > _SERIES_GAP_DAYS:
                 continue
             before, now = float(previous["value"]), float(current["value"])
             jump = _row_jump(current, before, now)
@@ -324,6 +325,12 @@ def row_figures(rows: list[dict], parents: dict[tuple[str, str], str] | None = N
         figures.append(Figure(group=rows[0]["group_key"], kind=rows[0]["group_kind"], key="", unit=rows[0]["unit"], value=float(total),
                               is_total=True, method=rows[0]["method"]))
     return figures
+
+
+def parts_add_up(rows: list[dict], parents: dict[tuple[str, str], str] | None = None) -> bool:
+    """Whether a stored breakdown period's parts make its stated total. One with no stated total has nothing to miss."""
+    return not any(finding.note.startswith("parts differ")
+                   for finding in findings(_ADDS_UP, row_figures(rows, parents), widened=True))
 
 
 # Run on what is already stored: "no total" and "fewer than two parts" only mean a reading is incomplete.

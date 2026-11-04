@@ -1,6 +1,6 @@
 from types import SimpleNamespace as NS
 
-from kpi_extractor.checks import READING_CHECKS, Figure, audit_stored, date_order_findings, findings, row_path
+from kpi_extractor.checks import READING_CHECKS, Figure, audit_stored, date_order_findings, findings, parts_add_up, row_path
 
 
 def _key(row):
@@ -71,3 +71,15 @@ def test_date_order_judges_only_what_it_declares_unless_widened():
 def test_a_figure_says_how_it_was_read():
     assert row_path(_row("a", 1.0, locator={"tagged": True})) == "XBRL tag"
     assert row_path(_row("a", 1.0, method="chart")) == "chart"
+
+
+def test_two_quarters_apart_is_not_a_change_in_a_quarter():
+    rows = [_row("a", 100e6, end="2025-12-31", period="Q4", year="2025"), _row("a", 900e6)]
+    assert date_order_findings(rows, None, _key, methods=None) == {}
+
+
+def test_parts_add_up_counts_a_parent_once_and_needs_a_stated_total():
+    rows = [_row("fees", 50.0, total=100.0), _row("fee_a", 50.0, total=100.0), _row("interest", 50.0, total=100.0)]
+    assert not parts_add_up(rows)
+    assert parts_add_up(rows, {("kpi_rev", "fee_a"): "fees"})
+    assert parts_add_up([_row("a", 1.0), _row("b", 2.0)])

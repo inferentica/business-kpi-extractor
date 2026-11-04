@@ -1652,3 +1652,20 @@ def test_a_figure_from_outside_sec_filings_is_never_rewritten():
         ("grow", "FY", None), ("create", "Q1", "https://www.sec.gov/Archives/x.htm")]
     pipeline.store.write([owner])
     assert len(calls) == 1  # nothing left to write
+
+
+def test_lines_confirmed_one_by_one_do_not_prove_a_breakdown_missing_a_line():
+    # Goldman's Q3 2024: every line read repeats in the next year's release, but a line it missed leaves it far short.
+    from kpi_extractor.steps.series_checks import _CONFIRMED_LATER
+    def row(key, value, notes, year="2024", **fields):
+        return {"group_key": "kpi_product", "group_kind": "revenue_breakdown", "group_label": "Revenue", "kpi_key": key, "kpi_label": key,
+                "unit": "currency", "value": value, "method": "ai", "validation_status": "verified", "fiscal_year": year, "fiscal_period": "Q3",
+                "period_end": f"{year}-09-30", "source_accession": "a", "locator": {"total": 100e6}, "notes": notes, **fields}
+    short = _pipeline(FakeControl({}), [row("a", 40e6, [_CONFIRMED_LATER]), row("b", 30e6, []), row("c", 10e6, [_CONFIRMED_LATER], owner_decision="confirmed")])
+    changed = {v["kpi_key"]: v for v in short._prove_flagged([])}
+    assert changed["a"]["validation_status"] == "needs_review" and _CONFIRMED_LATER in changed["a"]["notes"]
+    assert changed["b"]["notes"] == ["another part of this breakdown needs review"] and "c" not in changed
+    whole = _pipeline(FakeControl({}), [row("a", 60e6, [_CONFIRMED_LATER]), row("b", 40e6, [])])
+    assert whole._prove_flagged([]) == []
+    entered = _pipeline(FakeControl({}), [row("a", 60e6, [_CONFIRMED_LATER]), row("b", 40e6, ["entered by the owner"], source_accession="q", locator={}, owner_decision="corrected")])
+    assert entered._prove_flagged([]) == []
