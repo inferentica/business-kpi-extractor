@@ -19,7 +19,7 @@ _DONE = {"processed", "needs_review", "skipped"}
 _MAX_ATTEMPTS = 3
 _READ_BY_AI = "read by AI"
 _NOT_REPORTED = "not reported: "
-_XBRL_READER = "xbrl reader 44"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 45"  # 21: segment operating income
 _UNANCHORED = {"total matches no figure the company reported in XBRL", "no total revenue to reconcile against"}
 
 def value_key(value: dict) -> tuple[str, str, str, str]:

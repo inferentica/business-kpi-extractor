@@ -10,6 +10,7 @@ import traceback
 from concurrent.futures import ProcessPoolExecutor
 
 from .control import ControlError, ControlPlane, DryRunControl
+from .memory import MemoryWatch, peak_gb
 from .pipeline import SymbolPipeline, SymbolResult
 from .sec import configure_identity
 
@@ -51,6 +52,8 @@ def process_symbol(control, symbol: str, quarters: int, force: bool, wait_for_lo
     except Exception as error:  # noqa: BLE001 - one company must not stop the run
         traceback.print_exc()
         return SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
+    finally:
+        print(f"{symbol}: this process has held at most {peak_gb():.1f} GB", flush=True)
 
 
 def company_pool(workers: int) -> ProcessPoolExecutor:
@@ -78,8 +81,9 @@ def main(argv: list[str] | None = None) -> int:
         with company_pool(workers) as pool:
             # A Refresh (or a newly watched company) waits for a run already on its company; scheduled runs move on.
             waits = args.trigger in ("manual", "watchlist_add")
-            results = list(pool.map(process_symbol, [control] * len(symbols), symbols,
-                                    [quarters] * len(symbols), [force] * len(symbols), [waits] * len(symbols)))
+            with MemoryWatch(pool, log=lambda line: print(line, flush=True)) as memory:
+                results = list(pool.map(process_symbol, [control] * len(symbols), symbols,
+                                        [quarters] * len(symbols), [force] * len(symbols), [waits] * len(symbols)))
         summary = {
             "companies": len(results),
             "filings": sum(result.filings for result in results),
@@ -97,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
             "skippedCompanies": [result.symbol for result in results if result.skipped],
             "trimmedKpis": {result.symbol: result.trimmed_kpis for result in results if result.trimmed_kpis},
             "errors": {result.symbol: result.errors[:5] for result in results if result.errors},
+            "lowestAvailableMemoryGb": round(memory.lowest_available_gb, 1) if memory.lowest_available_gb is not None else None,
         }
         print(f"Summary: {summary}")
         control.call("finish", summary=summary)
