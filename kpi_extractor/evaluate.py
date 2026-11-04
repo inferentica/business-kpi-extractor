@@ -85,7 +85,7 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
         if item.get("absent"):
             # A figure that must not be served: rows a reading once produced that were wrong (a segment's old name
             # beside its new one, a segment taken for a line of a breakdown).
-            results.append({**item, "outcome": "wrong" if candidates else "correct", "methods": sorted({v["method"] for v in candidates}),
+            results.append({**item, "outcome": "wrong" if candidates else "correct", "methods": sorted({str(v.get("method")) for v in candidates}),
                             "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates]})
             continue
         expected = float(item["value"])
@@ -98,7 +98,7 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
             outcome = "wrong"
         else:
             outcome = "optional" if item.get("optional") else "missing"
-        results.append({**item, "outcome": outcome, "methods": sorted({v["method"] for v in candidates}),
+        results.append({**item, "outcome": outcome, "methods": sorted({str(v.get("method")) for v in candidates}),
                         "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates][:3]})
     counted = [result for result in results if result["outcome"] != "optional"]
     correct = sum(1 for result in counted if result["outcome"] == "correct")
