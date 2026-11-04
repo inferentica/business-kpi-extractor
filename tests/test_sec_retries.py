@@ -1,4 +1,5 @@
 from datetime import date
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -79,7 +80,7 @@ def test_a_bad_reply_is_read_again_past_the_cache(waits, monkeypatch):
         fetched.append(url)
         return httpx.Response(200, text=SUBMISSION, request=httpx.Request("GET", url))
     monkeypatch.setattr(sec.httpx, "get", get)
-    sec._load_submission(filing)
+    sec.load_submission(filing)
     assert fetched == [filing.text_url]
     assert filing._sgml.accession_number == "0000000001-26-000001"
     assert [attachment.document for attachment in filing._sgml.attachments] == ["report.htm"]
@@ -93,7 +94,7 @@ def test_an_error_page_on_the_fresh_read_is_tried_again(waits, monkeypatch):
     def get(url, **kwargs):
         return httpx.Response(200, text=replies.pop(0), request=httpx.Request("GET", url))
     monkeypatch.setattr(sec.httpx, "get", get)
-    sec._load_submission(filing)
+    sec.load_submission(filing)
     assert filing._sgml.accession_number == "0000000001-26-000001"
     assert waits == list(sec._SEC_WAITS[:2])
 
@@ -117,3 +118,38 @@ def test_listing_reports_survives_a_bad_reply(waits, monkeypatch):
     refs = sec.periodic_reports(Listed(), date(2025, 1, 1))
     assert [ref.accession for ref in refs] == ["0000000001-26-000001"]
     assert refs[0].source_url.endswith("report.htm")
+
+
+def test_a_recorded_report_is_listed_without_its_submission(monkeypatch):
+    filing = _filing()
+
+    def sgml(self):
+        raise AssertionError("downloaded")
+    monkeypatch.setattr(type(filing), "sgml", sgml)
+
+    class Listed:
+        def get_filings(self, **kwargs):
+            return [filing]
+    known = {filing.accession_no: "https://www.sec.gov/Archives/edgar/data/1/1/report.htm"}
+    refs = sec.periodic_reports(Listed(), date(2025, 1, 1), known)
+    assert refs[0].source_url == known[filing.accession_no] and refs[0].filing is filing
+
+
+def test_a_report_read_from_edgar_rides_out_a_bad_reply(waits, monkeypatch):
+    # Listed without its submission (it was recorded), then read: the read gets the retries listing no longer gives it.
+    from kpi_extractor.pipeline import SymbolPipeline
+    filing = _filing()
+    real = type(filing).sgml
+    state = {"failed": False}
+
+    def sgml(self):
+        if not state["failed"]:
+            state["failed"] = True
+            raise SECHTMLResponseError("error page")
+        return real(self)
+    monkeypatch.setattr(type(filing), "sgml", sgml)
+    monkeypatch.setattr(type(filing), "xbrl", lambda self: "read")
+    monkeypatch.setattr(sec.httpx, "get", lambda url, **kwargs: httpx.Response(200, text=SUBMISSION, request=httpx.Request("GET", url)))
+    pipeline = SymbolPipeline(None, "X", quarters=4, force=False, log=lambda *_: None)
+    assert pipeline._load_xbrl(SimpleNamespace(filing=filing)) == "read"
+    assert filing._sgml.accession_number == "0000000001-26-000001" and waits == [sec._SEC_WAITS[0]]

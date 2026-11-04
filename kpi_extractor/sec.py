@@ -105,10 +105,20 @@ def _read_submission_afresh(filing) -> None:
     filing._sgml = submission
 
 
-def _load_submission(filing) -> None:
-    """Holds a filing's full submission on it. Its URL and attachments are read from the submission, so reading those
-    afterwards cannot fail."""
+def load_submission(filing) -> None:
+    """Holds a filing's full submission on it. Its URL, attachments and documents are read from the submission, so reading
+    those afterwards cannot fail."""
     _with_retries(filing.sgml, lambda: _read_submission_afresh(filing))
+
+
+def _document_url(filing, known_urls: dict[str, str] | None) -> str:
+    """A filing's main document. Asking edgartools downloads the whole submission, so a filing already recorded keeps the
+    address recorded: a run used to download every report of the last ten years to list them."""
+    known = (known_urls or {}).get(filing.accession_no)
+    if known:
+        return known
+    load_submission(filing)
+    return filing.filing_url if hasattr(filing, "filing_url") else filing.url
 
 
 def company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
@@ -128,22 +138,21 @@ def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
     return profile, company
 
 
-def periodic_reports(company: Company, since: date) -> list[FilingRef]:
+def periodic_reports(company: Company, since: date, known_urls: dict[str, str] | None = None) -> list[FilingRef]:
     filings = _with_retries(lambda: company.get_filings(form=list(PERIODIC_FORMS), filing_date=f"{since.isoformat()}:"))
     refs = []
     for filing in filings:
         if filing.form not in PERIODIC_FORMS:
             continue  # amendments restate a subset; the original report is the complete one
-        _load_submission(filing)
         refs.append(FilingRef(
             accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="periodic_report",
-            source_url=filing.filing_url if hasattr(filing, "filing_url") else filing.url, filing=filing,
+            source_url=_document_url(filing, known_urls), filing=filing,
         ))
     return refs
 
 
 def earnings_releases(company: Company, profile: CompanyProfile, since: date, archive=None,
-                      passed: list[FilingRef] | None = None) -> list[FilingRef]:
+                      passed: list[FilingRef] | None = None, known_urls: dict[str, str] | None = None) -> list[FilingRef]:
     """Earnings documents and candidates. 8-K Item 2.02 exhibits are confirmed earnings releases. Other filings with
     exhibits furnished within 75 days of a quarter end are candidates for the AI to classify: a U.S. filer's 8-K when
     that quarter has no Item 2.02 release (results furnished under another item), and every foreign filer's 6-K (the
@@ -164,14 +173,14 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date, ar
         if item_202 or in_window:
             candidates.append((filing, item_202))
         elif passed is not None and profile.foreign and filing.filing_date >= date.today() - PASSED_OVER_DAYS:
-            passed.append(_passed_ref(filing))
+            passed.append(_passed_ref(filing, known_urls))
     # Each candidate's exhibits come from the archive (or SEC), a few at a time rather than one after another.
     with ThreadPoolExecutor(max_workers=_LISTING_READERS) as pool:
         found = list(pool.map(lambda candidate: _archived_exhibits(candidate[0], archive), candidates))
     for (filing, item_202), exhibits in zip(candidates, found):
         if not exhibits:
             if passed is not None and profile.foreign and filing.filing_date >= date.today() - PASSED_OVER_DAYS:
-                passed.append(_passed_ref(filing))
+                passed.append(_passed_ref(filing, known_urls))
             continue
         ref = _release_ref(filing, exhibits, profile)
         ref.confirmed = item_202
@@ -237,7 +246,7 @@ def _archived_exhibits(filing, archive) -> list:
 def _html_exhibits(filing) -> list:
     """A filing's HTML exhibits. A 6-K with none carries its content in its own document (TSMC's until October 2019:
     its results and quarterly financial statements, by technology from 2018), which then stands in for them."""
-    _load_submission(filing)
+    load_submission(filing)
     attachments = list(filing.attachments)
     exhibits = [attachment for attachment in attachments
                 if str(attachment.document_type or "").upper().startswith("EX-99") and attachment.is_html()]
@@ -247,10 +256,10 @@ def _html_exhibits(filing) -> list:
             if str(attachment.document_type or "").upper() == "6-K" and attachment.is_html()][:1]
 
 
-def _passed_ref(filing) -> FilingRef:
+def _passed_ref(filing, known_urls: dict[str, str] | None = None) -> FilingRef:
     return FilingRef(
         accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="earnings_release",
-        source_url=filing.filing_url if hasattr(filing, "filing_url") else filing.url, filing=filing, confirmed=False,
+        source_url=_document_url(filing, known_urls), filing=filing, confirmed=False,
     )
 
 
@@ -281,7 +290,7 @@ def ipo_prospectus(company: Company, first_report: date | None, today: date | No
     if not filings:
         return None
     filing = filings[-1]
-    _load_submission(filing)
+    load_submission(filing)
     document = next((attachment for attachment in filing.attachments
                      if str(attachment.document_type or "").upper() == filing.form and attachment.is_html()), None)
     if document is None:

@@ -153,7 +153,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.archive = Archive(self.control, self.symbol, self.profile.cik, self.log)
         self.archive._listing()  # once, before the download threads start
         self.archive.label(self.symbol, self.profile.name)
-        reports = sorted(periodic_reports(company, self.reports_since), key=lambda ref: ref.filed)
+        known_urls = {filing["accession"]: filing["source_url"] for filing in self.filings.values() if filing.get("source_url")}
+        reports = sorted(periodic_reports(company, self.reports_since, known_urls), key=lambda ref: ref.filed)
         pending = [ref for ref in reports if self.force or self._pending(ref)]
         for ref in reversed(reports):
             if ref not in pending and not self.archive.has(_folder(ref), "xbrl.json"):
@@ -165,7 +166,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self._read_ahead(ref)
         # The earnings releases are listed while the reports are read: the listing waits only on SEC and the archive.
         passed: list[FilingRef] = []
-        listing = self._prefetch.submit(earnings_releases, company, self.profile, self.since, self.archive, passed)
+        listing = self._prefetch.submit(earnings_releases, company, self.profile, self.since, self.archive, passed, known_urls)
         self.offset = self._year_offset(reports)
         for ref in reports:
             later = [other for other in pending if other.filed > ref.filed or (other.filed == ref.filed and other is not ref)]

@@ -6,7 +6,7 @@ from ..control import ControlError
 from ..document import Document, clean, parse_document, parse_number
 from ..fiscal import fiscal_label
 from ..release_breakdowns import line_key
-from ..sec import FilingRef
+from ..sec import FilingRef, load_submission
 from ..store import FilingReading, failed_reading
 from ..segment_income import (GROUP_KEY as INCOME_GROUP, LEFT_OVER_KEY, REVENUE_GROUP_KEY as OWN_REVENUE_GROUP,
                               segment_income, segment_revenue)
@@ -154,6 +154,7 @@ class ReportReading:
         if not left:
             return records
         try:
+            load_submission(ref.filing)
             document = parse_document(ref.filing.html(), ref.source_url)
         except Exception:  # noqa: BLE001 - the remainder keeps its worked-out name
             return records

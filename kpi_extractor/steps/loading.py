@@ -8,7 +8,7 @@ from datetime import date
 from ..archive import xbrl_from_parts, xbrl_parts
 from ..document import Document, parse_document
 from ..fiscal import learn_year_offset
-from ..sec import FilingRef, exhibit_html
+from ..sec import FilingRef, exhibit_html, load_submission
 from .shared import _DONE, _MAX_ATTEMPTS, _XBRL_READER, _folder
 
 _XBRL_KEPT = 6
@@ -42,15 +42,18 @@ class FilingLoading:
 
     def _archive_xbrl(self, ref: FilingRef) -> None:
         # A filing without an XBRL instance is marked, so it is not downloaded again on every run.
+        load_submission(ref.filing)
         self.archive.write_json(_folder(ref), "xbrl.json", xbrl_parts(ref.filing) or _NO_XBRL)
 
     def _load_xbrl(self, ref: FilingRef):
         """A filing's XBRL from the archive, else from EDGAR and then archived."""
         if self.archive is None:
+            load_submission(ref.filing)
             return ref.filing.xbrl()
         stored = self.archive.read_json(_folder(ref), "xbrl.json")
         if stored and stored.get("parts"):
             return xbrl_from_parts(stored)
+        load_submission(ref.filing)
         if stored is not None:
             return ref.filing.xbrl()  # marked as having no instance to archive: EDGAR's own reading, as before
         parts = xbrl_parts(ref.filing)

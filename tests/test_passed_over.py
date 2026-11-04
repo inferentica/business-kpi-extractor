@@ -6,7 +6,7 @@ from kpi_extractor.sec import CompanyProfile, earnings_releases
 
 
 def _filing(accession, filed):
-    return SimpleNamespace(accession_no=accession, form="6-K", filing_date=filed, filing_url=f"https://sec.gov/{accession}")
+    return SimpleNamespace(accession_no=accession, form="6-K", filing_date=filed, filing_url=f"https://sec.gov/{accession}", sgml=lambda: None)
 
 
 def test_recent_6ks_that_are_not_candidates_are_passed_over(monkeypatch):
