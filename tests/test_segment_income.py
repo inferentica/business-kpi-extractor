@@ -139,3 +139,58 @@ def test_a_companys_own_contribution_adds_up_to_operating_income():
     # Without the operating income it reconciles to, a contribution is no breakdown.
     assert segment_income(pd.DataFrame([row for row in rows if row["concept"] != "us-gaap:OperatingIncomeLoss"]),
                           date(2026, 6, 30), False) is None
+
+
+def test_a_reconciliations_tagged_lines_keep_the_filings_names():
+    # Palantir's Q3 2026 10-Q: its costs between total contribution and income from operations are tagged on the
+    # consolidation axis, and they add up to exactly what the segments leave.
+    start, end = "2026-07-01", "2026-09-30"
+    item = "us-gaap:MaterialReconcilingItemsMember"
+    rows = []
+    for member, value in (("pltr:GovernmentOperatingSegmentMember", 797_258e3), ("pltr:CommercialOperatingSegmentMember", 897_525e3)):
+        rows.append({**fact(value, start, end, member, "us-gaap:OperatingSegmentsMember"), "concept": "pltr:Contribution"})
+    rows.append(fact(1_084_845e3, start, end))
+    rows.append(fact(1_084_845e3, start, end, None, item))
+    costs = {"pltr:ResearchAndDevelopment": 154_506e3, "pltr:GeneralAndAdministrative": 136_543e3, "us-gaap:AllocatedShareBasedCompensationExpense": 318_889e3}
+    for concept, value in costs.items():
+        rows.append({**fact(value, start, end, None, item), "concept": concept})
+    names = {"pltr:GovernmentOperatingSegmentMember": "Government", "pltr:CommercialOperatingSegmentMember": "Commercial"}
+    shown = {"pltr:ResearchAndDevelopment": "Research and development expenses", "pltr:GeneralAndAdministrative": "General and administrative expenses",
+             "us-gaap:AllocatedShareBasedCompensationExpense": "Total stock-based compensation expense"}
+    income = segment_income(pd.DataFrame(rows), date(2026, 9, 30), False, names.get, None, shown.get)
+    assert [(key, name, value) for key, name, _element, value in income.current.rows] == [
+        ("commercial", "Commercial", 897_525e3), ("government", "Government", 797_258e3),
+        ("stockbasedcompensationexpense", "Total stock-based compensation expense", -318_889e3),
+        ("researchanddevelopmentexpenses", "Research and development expenses", -154_506e3),
+        ("generalandadministrativeexpenses", "General and administrative expenses", -136_543e3)]
+    assert sum(value for *_rest, value in income.current.rows) == income.current.total
+    assert income.current.lines == {"stockbasedcompensationexpense", "researchanddevelopmentexpenses", "generalandadministrativeexpenses"}
+
+
+def test_tagged_lines_that_do_not_close_the_gap_are_no_reconciliation():
+    # Coca-Cola tags revenue and capital spending on the same axis: nothing of them names the gap.
+    start, end = "2026-07-01", "2026-09-30"
+    rows = [fact(600e6, start, end, "ko:AMember", "us-gaap:OperatingSegmentsMember"), fact(500e6, start, end, "ko:BMember", "us-gaap:OperatingSegmentsMember"),
+            fact(1_000e6, start, end), {**fact(38e6, start, end, None, "us-gaap:CorporateNonSegmentMember"), "concept": "us-gaap:Revenues"}]
+    income = segment_income(pd.DataFrame(rows), date(2026, 9, 30), False, {}.get, None, {"us-gaap:Revenues": "Net operating revenues"}.get)
+    assert income.current.rows[-1][1] == "Unallocated" and income.current.rows[-1][3] == -100e6
+
+
+def test_one_item_that_is_the_gap_stands_beside_the_segments_own_sum():
+    # Coca-Cola tags its segments' sum as one reconciling item and Corporate as another.
+    start, end = "2026-07-01", "2026-10-02"
+    rows = [fact(600e6, start, end, "ko:AMember", "us-gaap:OperatingSegmentsMember"), fact(500e6, start, end, "ko:BMember", "us-gaap:OperatingSegmentsMember"),
+            fact(1_100e6, start, end, None, "us-gaap:MaterialReconcilingItemsMember"), fact(-100e6, start, end, None, "us-gaap:CorporateNonSegmentMember"),
+            fact(1_000e6, start, end)]
+    income = segment_income(pd.DataFrame(rows), date(2026, 10, 2), False, {}.get)
+    assert income.current.rows[-1][2:] == ("us-gaap:CorporateNonSegmentMember", -100e6)
+    assert "Unallocated" not in [row[1] for row in income.current.rows]
+
+
+def test_a_segments_operating_segment_suffix_is_not_part_of_its_name():
+    start, end = "2025-01-01", "2025-12-31"
+    rows = [fact(1_576e6, start, end, "pltr:GovernmentOperatingSegmentMember", "us-gaap:OperatingSegmentsMember"),
+            fact(1_367e6, start, end, "pltr:CommercialOperatingSegmentMember", "us-gaap:OperatingSegmentsMember"), fact(2_943e6, start, end)]
+    names = {"pltr:GovernmentOperatingSegmentMember": "Government Operating Segment", "pltr:CommercialOperatingSegmentMember": "Commercial"}
+    income = segment_income(pd.DataFrame(rows), date(2025, 12, 31), True, names.get)
+    assert [row[:2] for row in income.current.rows] == [("government", "Government"), ("commercial", "Commercial")]

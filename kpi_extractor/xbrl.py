@@ -172,6 +172,25 @@ def official_labels(element_catalog: dict | None) -> Callable[[str], str | None]
     return label
 
 
+def presented_labels(element_catalog: dict | None) -> Callable[[str], str | None]:
+    """A line item's name as its table presents it: Palantir's "General and administrative expenses" is the verbose
+    label of a concept whose standard label is "General and Administrative Expense Excluding Stockbased Compensation
+    Expense". The standard label only when the filing gives no other."""
+    catalog = element_catalog or {}
+
+    def rank(role: str) -> int:
+        return 0 if role.endswith("terseLabel") else 2 if role.endswith("/label") else 1
+
+    def label(qname: str) -> str | None:
+        element = catalog.get(qname.replace(":", "_"))
+        labels = getattr(element, "labels", None) or {}
+        shown = [(rank(role), str(text).strip()) for role, text in labels.items()
+                 if text and role.endswith(("Label", "/label")) and not role.endswith(("periodStartLabel", "periodEndLabel"))]
+        return min(shown, key=lambda item: item[0])[1] if shown else None
+
+    return label
+
+
 def member_children(xbrl) -> dict[str, set[str]]:
     """Each member's declared children (unh:TotalOptumMember → Optum Health, Optum Insight, Optum Rx), from the filing's
     presentation trees and its definition domains: what the company says a member is made of."""

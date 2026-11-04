@@ -48,7 +48,7 @@ from .statements import statement_lines
 from .replay import replay
 from .sec import (FilingRef, classification_excerpt, company_profile, earnings_releases, exhibit_html, ipo_prospectus,
                   is_own_document, periodic_reports)
-from .xbrl import XbrlCandidate, extract_breakdowns, member_children, member_key, official_labels
+from .xbrl import XbrlCandidate, extract_breakdowns, member_children, member_key, official_labels, presented_labels
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
 MAX_DOCUMENT_CHARS = 120_000
@@ -87,7 +87,7 @@ _NOT_REPORTED = "not reported: "
 # Reports parsed ahead of the one being read, and parsed reports kept in memory.
 _READ_AHEAD = 3
 _XBRL_KEPT = 6
-_XBRL_READER = "xbrl reader 40"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 41"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -279,6 +279,7 @@ class SymbolPipeline:
         # Each breakdown's year before its first report, from that report's comparatives (a recent listing; Brookfield
         # Asset Management, filing 10-Qs since 2025).
         self._year_ago_quarters()
+        self._retire_named_remainders()
         if prospectus is not None:
             self._store_prospectus_breakdowns(prospectus)
             if spec is not None:
@@ -471,7 +472,8 @@ class SymbolPipeline:
                             **({"ytd": ytd, "ytd_total": group.year_to_date_total} if ytd is not None and group.year_to_date_total else {}),
                         },
                     ))
-            records += self._income_records(facts, labels, breakdowns, ref, fiscal_year, fiscal_period, groups, own_revenue)
+            records += self._income_records(facts, labels, breakdowns, ref, fiscal_year, fiscal_period, groups, own_revenue,
+                                            presented_labels(getattr(xbrl, "element_catalog", None)))
             if records:
                 # The release's figures for this quarter give way to the report's; a line the report does not give
                 # (renamed, or not broken out) stops being served.
@@ -510,11 +512,11 @@ class SymbolPipeline:
                 for record in records]
 
     def _income_records(self, facts, labels, breakdowns, ref: FilingRef, fiscal_year: str, fiscal_period: str,
-                        groups, own_revenue=None) -> list[dict]:
+                        groups, own_revenue=None, line_labels=None) -> list[dict]:
         """Each segment's operating income, as tagged (see segment_income): its own breakdown, beside the revenue ones; and
         a company's own segment revenue measure, which its segment profit is measured against."""
         try:
-            income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children)
+            income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children, line_labels)
         except Exception as error:  # noqa: BLE001 - the revenue breakdowns stand without it
             self.log(f"{self.symbol}: segment income of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
             return []
@@ -536,8 +538,32 @@ class SymbolPipeline:
                                    else (key, label, element, value) for key, label, element, value in income.current.rows]
             if LEFT_OVER_KEY in prior:
                 prior[other] = prior.pop(LEFT_OVER_KEY)
-        return records + self._measure_records(income, INCOME_GROUP, INCOME_ORDER, groups, ref, fiscal_year, fiscal_period,
-                                               breakdowns.period_end, prior=prior)
+        records += self._measure_records(income, INCOME_GROUP, INCOME_ORDER, groups, ref, fiscal_year, fiscal_period,
+                                         breakdowns.period_end, prior=prior)
+        # The rows this report gives are the period's: one an earlier read stored under another name (a worked-out
+        # "Unallocated" whose lines are now named, Palantir's "Government Operating") would count twice.
+        fresh = {record["kpi_key"] for record in records if record["group_key"] == INCOME_GROUP}
+        return records + [{**value, "validation_status": "rejected", "notes": ["replaced by the report's own lines"]}
+                          for value in self.values.values()
+                          if value["group_key"] == INCOME_GROUP and value["method"] == "xbrl" and value["kpi_key"] not in fresh
+                          and value["validation_status"] != "rejected"
+                          and (value["fiscal_year"], value["fiscal_period"]) == (fiscal_year, fiscal_period)]
+
+    def _retire_named_remainders(self) -> None:
+        """A period whose year-ago lines now name what its worked-out "Unallocated" stood for keeps only the lines: the
+        rows it was stored with would otherwise count the same costs twice. Only when the lines equal it."""
+        periods: dict[tuple[str, str], list[dict]] = {}
+        for value in self.values.values():
+            if value["group_key"] == INCOME_GROUP and value["validation_status"] != "rejected" and value["method"] == "xbrl":
+                periods.setdefault((value["fiscal_year"], value["fiscal_period"]), []).append(value)
+        retired = []
+        for rows in periods.values():
+            left = next((row for row in rows if row["kpi_key"] == LEFT_OVER_KEY), None)
+            lines = [row for row in rows if (row.get("locator") or {}).get("line")]
+            if left and lines and abs(float(left["value"]) - sum(float(row["value"]) for row in lines)) <= max(abs(float(left["value"])) * 0.001, 1.0):
+                retired.append({**left, "validation_status": "rejected", "notes": ["named by the report's own lines"]})
+        if retired:
+            self._store(values=retired)
 
     def _measure_records(self, measure, group_key: str, group_order: int, groups, ref: FilingRef, fiscal_year: str,
                          fiscal_period: str, period_end, prior: dict | None = None) -> list[dict]:
@@ -556,6 +582,7 @@ class SymbolPipeline:
                 reconciliation_error_pct=0, notes=[], ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
                 period_end=period_end, locator={
                     "concept": measure.concept, "total": measure.current.total, "member": element,
+                    **({"line": True} if key in measure.current.lines else {}),
                     **({"prior": prior[key], "prior_total": measure.prior.total} if key in prior else {}),
                     **({"ytd": ytd[key], "ytd_total": measure.year_to_date.total} if key in ytd else {}),
                 },
@@ -1390,7 +1417,8 @@ class SymbolPipeline:
                 records.append({**line, "fiscal_year": before[0], "period_end": end.isoformat(), "value": float(prior),
                                 "reconciliation_error_pct": (sum(priors) - total) / total if total else None,
                                 "notes": [f"the year-ago figure in the report for {period} {year}"],
-                                "locator": {"total": total, "member": (line.get("locator") or {}).get("member"), "year_ago": True}})
+                                "locator": {"total": total, "member": (line.get("locator") or {}).get("member"), "year_ago": True,
+                                            **({"line": True} if (line.get("locator") or {}).get("line") else {})}})
         if records:
             self._store(values=records)
             self.log(f"{self.symbol}: {len(records)} year-ago values from the first reports' comparatives")

@@ -3,8 +3,9 @@ segments axis), with what the segments leave out of the company's operating inco
 
 Alphabet's segments are Google Services, Google Cloud and Other Bets; its "Alphabet-level activities" (shared AI research,
 about −$7.7 billion a quarter in 2026) are not a segment, so the segments add up to more than operating income. The
-filing's reconciling items keep their own names; whatever is still left is "Unallocated". The rows always add up to the
-operating income the report states."""
+filing's reconciling items keep their own names, and so do the cost lines its reconciliation tags (Palantir's research
+and development, general and administrative, and stock-based compensation); only what no filing line accounts for is
+"Unallocated". The rows always add up to the operating income the report states."""
 
 from __future__ import annotations
 
@@ -33,13 +34,21 @@ _OWN_PROFIT = re.compile(r"^[\w-]+:Segment(?:Earnings|Profit|ProfitLoss|Operatin
 _OWN_REVENUE = re.compile(r"^[\w-]+:SegmentRevenues?$")
 # A company's own segment contribution (Palantir's "pltr:Contribution", each segment's revenue less its own costs, since
 # its first inline-XBRL 10-Q): its filing reconciles it to operating income, so the rows do too, with the costs it
-# leaves out as "Unallocated".
+# leaves out under the names its reconciliation gives them.
 _CONTRIBUTION = re.compile(r"^[\w-]+:(?:Segment)?Contribution$")
 # A company's own segment revenue is its revenue by segment: it stands in for the GAAP revenue its notes split by
 # segment (Brookfield's leaves out its share of the managers it does not consolidate).
 REVENUE_GROUP_KEY = "segments"
 REVENUE_GROUP_LABEL = "Revenue by Segment"
 LEFT_OVER_KEY = member_key(_LEFT_OVER)
+# How close a reconciliation's tagged lines must come to the gap: filings round each line to their own unit.
+_LINES_CLOSE = 0.001
+
+
+def line_key(name: str) -> str:
+    """A reconciling line's identity across filings: Palantir's "Stock-based compensation expense" became "Total
+    stock-based compensation expense" in 2022 and is one series."""
+    return member_key(re.sub(r"^total\s+", "", name, flags=re.I))
 
 
 @dataclass
@@ -47,6 +56,8 @@ class IncomeRows:
     """One period's rows: (key, label, element or None, value)."""
     rows: list[tuple[str, str, str | None, float]]
     total: float
+    # The keys of the rows that are lines of the filing's reconciliation, not segments.
+    lines: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -65,8 +76,45 @@ def _period(frame: pd.DataFrame, end: date, low: int, high: int) -> pd.DataFrame
     return frame[(ends.dt.date == end) & days.between(low, high)]
 
 
+def _reconciling_facts(facts: pd.DataFrame, skip: set[str]) -> pd.DataFrame:
+    """Facts tagged with a reconciling item of the consolidation axis and nothing else, in any other concept: the cost
+    lines between the segments' measure and operating income (Palantir tags its research and development so)."""
+    columns = [column for column in facts.columns if column.startswith("dim_")]
+    axis = next((column for column in columns if _axis_name(column) == "ConsolidationItemsAxis"), None)
+    if axis is None:
+        return facts.iloc[0:0]
+    others = [column for column in columns if column != axis]
+    tagged = facts[axis].map(lambda member: pd.notna(member) and local_name(str(member)) in _RECONCILING)
+    alone = facts[others].isna().all(axis=1) if others else pd.Series(True, index=facts.index)
+    return facts[tagged & alone & facts["numeric_value"].notna() & (facts["period_type"] == "duration") & ~facts["concept"].isin(skip)]
+
+
+def _closing_lines(frame: pd.DataFrame | None, gap: float, line_label: Callable[[str], str | None]) -> list[tuple[str, str, None, float]]:
+    """The period's tagged reconciling lines as rows, when together they are exactly the gap. A report states them as
+    costs, so they count against operating income; lines that do not close the gap (revenue, capital spending and the
+    like on the same axis) are not a reconciliation, and no part of them is taken for one."""
+    if frame is None or frame.empty:
+        return []
+    found: dict[str, float] = {}
+    for concept, value in zip(frame["concept"].astype(str), frame["numeric_value"]):
+        if float(value):
+            found.setdefault(concept, float(value))
+    if not found:
+        return []
+    named = {concept: line_label(concept) for concept in found}
+    if not all(named.values()) or len({line_key(name) for name in named.values()}) < len(named):
+        return []
+    tolerance = max(abs(gap) * _LINES_CLOSE, 1.0)
+    costs = abs(gap + sum(found.values())) <= tolerance
+    if not costs and abs(gap - sum(found.values())) > tolerance:
+        return []
+    return [(line_key(named[concept]), named[concept], None, -value if costs else value)
+            for concept, value in sorted(found.items(), key=lambda item: -abs(item[1]))]
+
+
 def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[str, str],
-          children: dict[str, set[str]], summed: bool = False) -> IncomeRows | None:
+          children: dict[str, set[str]], summed: bool = False, lines: pd.DataFrame | None = None,
+          line_label: Callable[[str], str | None] = lambda _qname: None) -> IncomeRows | None:
     columns = [column for column in frame.columns if column.startswith("dim_")]
     total = None
     segments: dict[str, float] = {}
@@ -105,7 +153,8 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
         if member in reconciling and local_name(member) in _RECONCILING \
                 and (not own or len(own) > 40 or own.lower().startswith("segment")):
             return _RECONCILING[local_name(member)]
-        return own or humanize(member)
+        # Palantir's 10-Ks call Government "Government Operating Segment", its 10-Qs "Government": one segment.
+        return re.sub(r"\s+operating segment$", "", own, flags=re.I) if own else humanize(member)
 
     rows = [(member_key(name(member)), name(member), member, value)
             for member, value in sorted(segments.items(), key=lambda item: -item[1])]
@@ -113,12 +162,19 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
     # A tagged item stands only when it closes the gap to operating income: Nvidia tags its corporate item with the
     # segments' own sum, and then the gap is worked out instead.
     gap = total - sum(value for *_rest, value in rows)
-    if items and abs(gap - sum(value for *_rest, value in items)) <= max(abs(total) * 0.001, 1.0):
+    close = max(abs(total) * 0.001, 1.0)
+    if items and abs(gap - sum(value for *_rest, value in items)) <= close:
         rows += items
+    else:
+        # One item may be the gap by itself, beside the segments' own sum tagged as another (Coca-Cola's "Corporate").
+        rows += [item for item in items if abs(gap - item[3]) <= close][:1]
     left = total - sum(value for *_rest, value in rows)
+    named_lines: set[str] = set()
     if abs(left) > max(abs(total) * 0.001, 1.0):
-        rows.append((member_key(_LEFT_OVER), _LEFT_OVER, None, left))
-    return IncomeRows(rows, total)
+        closing = _closing_lines(lines, left, line_label)
+        rows += closing or [(member_key(_LEFT_OVER), _LEFT_OVER, None, left)]
+        named_lines = {key for key, *_rest in closing}
+    return IncomeRows(rows, total, named_lines)
 
 
 def _on_segments(facts: pd.DataFrame, concept: str) -> bool:
@@ -134,15 +190,16 @@ def _own_concept(facts: pd.DataFrame, pattern: re.Pattern) -> str | None:
 
 def segment_income(facts: pd.DataFrame, period_end: date, annual: bool,
                    label: Callable[[str], str | None] = lambda _qname: None,
-                   children: dict[str, set[str]] | None = None) -> SegmentIncome | None:
+                   children: dict[str, set[str]] | None = None,
+                   line_label: Callable[[str], str | None] | None = None) -> SegmentIncome | None:
     """The period's segment operating income, with the year to date (for a Q4 worked out from the year) and the year
     before (for a recent listing's history); else the company's own segment profit measure."""
     if _on_segments(facts, INCOME_CONCEPT):
-        return _measure(facts, INCOME_CONCEPT, GROUP_LABEL, period_end, annual, label, children)
+        return _measure(facts, INCOME_CONCEPT, GROUP_LABEL, period_end, annual, label, children, line_label=line_label or label)
     concept = _own_concept(facts, _OWN_PROFIT)
     if concept is None:
         contribution = _own_concept(facts, _CONTRIBUTION)
-        return _measure(facts, contribution, GROUP_LABEL, period_end, annual, label, children, INCOME_CONCEPT) \
+        return _measure(facts, contribution, GROUP_LABEL, period_end, annual, label, children, INCOME_CONCEPT, line_label or label) \
             if contribution else None
     name = "Earnings by Segment" if "Earnings" in concept else "Profit by Segment"
     return _measure(facts, concept, name, period_end, annual, label, children)
@@ -159,7 +216,8 @@ def segment_revenue(facts: pd.DataFrame, period_end: date, annual: bool,
 
 def _measure(facts: pd.DataFrame, concept: str, name: str, period_end: date, annual: bool,
              label: Callable[[str], str | None], children: dict[str, set[str]] | None,
-             reconciled_to: str | None = None) -> SegmentIncome | None:
+             reconciled_to: str | None = None,
+             line_label: Callable[[str], str | None] | None = None) -> SegmentIncome | None:
     """reconciled_to: the concept whose untagged figure the rows add up to, in place of the measure's own total."""
     selected = facts["concept"] == concept
     if reconciled_to:
@@ -173,12 +231,18 @@ def _measure(facts: pd.DataFrame, concept: str, name: str, period_end: date, ann
     labels = _member_labels(facts)
     children = children or {}
     low, high = (330, 400) if annual else (80, 100)
-    current = _rows(_period(frame, period_end, low, high), label, labels, children, own)
+    # Only a reconciliation to operating income has lines to name: a company's own measure stands alone.
+    lines = _reconciling_facts(facts, {concept, INCOME_CONCEPT}) if line_label else None
+
+    def rows_of(end: date, first: int, last: int) -> IncomeRows | None:
+        return _rows(_period(frame, end, first, last), label, labels, children, own,
+                     _period(lines, end, first, last) if lines is not None else None, line_label or label)
+
+    current = rows_of(period_end, low, high)
     if current is None:
         return None
     # A year before, within a week (52/53-week years end on a different day).
     year_ago = period_end - timedelta(days=364)
-    prior = next((rows for offset in range(-7, 8)
-                  if (rows := _rows(_period(frame, year_ago + timedelta(days=offset), low, high), label, labels, children, own))), None)
-    ytd = None if annual else _rows(_period(frame, period_end, 250, 290), label, labels, children, own)
+    prior = next((rows for offset in range(-7, 8) if (rows := rows_of(year_ago + timedelta(days=offset), low, high))), None)
+    ytd = None if annual else rows_of(period_end, 250, 290)
     return SegmentIncome(current, ytd, prior, {key: element for key, _name, element, _value in current.rows}, concept, name)
