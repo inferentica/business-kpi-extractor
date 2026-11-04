@@ -202,3 +202,27 @@ def test_a_reconciling_lines_names_over_the_years_are_one_series():
         assert line_key(name) == "researchanddevelopment"
     for name in ("Stock-based compensation expense", "Total stock-based compensation expense"):
         assert line_key(name) == "stockbasedcompensation"
+
+
+def test_the_one_set_of_lines_that_is_the_gap_is_found_among_others():
+    # Nvidia tags more than its reconciliation's lines on the corporate item.
+    start, end = "2026-01-26", "2026-04-26"
+    item = "us-gaap:CorporateNonSegmentMember"
+    rows = [fact(53_335e6, start, end, "nvda:C", "us-gaap:OperatingSegmentsMember"), fact(2_941e6, start, end, "nvda:G", "us-gaap:OperatingSegmentsMember"),
+            fact(53_536e6, start, end)]
+    lines = {"us-gaap:ShareBased": 1_928e6, "nvda:Unallocated": 565e6, "nvda:Acquisition": 247e6, "us-gaap:Depreciation": 391e6}
+    rows += [{**fact(value, start, end, None, item), "concept": concept} for concept, value in lines.items()]
+    names = {"us-gaap:ShareBased": "Stock-based compensation expense", "nvda:Unallocated": "Unallocated operating expenses",
+             "nvda:Acquisition": "Acquisition-related and other costs", "us-gaap:Depreciation": "Depreciation"}
+    income = segment_income(pd.DataFrame(rows), date(2026, 4, 26), False, {}.get, None, names.get)
+    assert [row[3] for row in income.current.rows[2:]] == [-1_928e6, -565e6, -247e6]
+
+
+def test_a_total_beside_its_parts_names_nothing():
+    start, end = "2026-01-01", "2026-03-31"
+    item = "us-gaap:CorporateNonSegmentMember"
+    rows = [fact(600e6, start, end, "x:A", "us-gaap:OperatingSegmentsMember"), fact(500e6, start, end, "x:B", "us-gaap:OperatingSegmentsMember"), fact(1_000e6, start, end)]
+    lines = {"x:One": 40e6, "x:Two": 60e6, "x:All": 100e6}
+    rows += [{**fact(value, start, end, None, item), "concept": concept} for concept, value in lines.items()]
+    income = segment_income(pd.DataFrame(rows), date(2026, 3, 31), False, {}.get, None, {"x:One": "One", "x:Two": "Two", "x:All": "All"}.get)
+    assert income.current.rows[-1][1] == "Unallocated"

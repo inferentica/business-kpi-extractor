@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from itertools import combinations
 from typing import Callable
 
 import pandas as pd
@@ -43,6 +44,8 @@ REVENUE_GROUP_LABEL = "Revenue by Segment"
 LEFT_OVER_KEY = member_key(_LEFT_OVER)
 # How close a reconciliation's tagged lines must come to the gap: filings round each line to their own unit.
 _LINES_CLOSE = 0.001
+# Sets of more lines than this are not searched: a fit among so many could be chance.
+_MOST_LINES = 10
 
 
 def line_key(name: str) -> str:
@@ -94,9 +97,10 @@ def _reconciling_facts(facts: pd.DataFrame, skip: set[str]) -> pd.DataFrame:
 
 
 def _closing_lines(frame: pd.DataFrame | None, gap: float, line_label: Callable[[str], str | None]) -> list[tuple[str, str, None, float]]:
-    """The period's tagged reconciling lines as rows, when together they are exactly the gap. A report states them as
-    costs, so they count against operating income; lines that do not close the gap (revenue, capital spending and the
-    like on the same axis) are not a reconciliation, and no part of them is taken for one."""
+    """The period's tagged reconciling lines as rows, when exactly one set of them is the gap. A report states them as
+    costs, so they count against operating income. Revenue, capital spending and the like share the axis (Nvidia tags
+    its corporate depreciation there too), so the set is looked for; two sets that both fit, a total beside its parts,
+    name nothing."""
     if frame is None or frame.empty:
         return []
     found: dict[str, float] = {}
@@ -106,14 +110,17 @@ def _closing_lines(frame: pd.DataFrame | None, gap: float, line_label: Callable[
     if not found:
         return []
     named = {concept: line_label(concept) for concept in found}
-    if not all(named.values()) or len({line_key(name) for name in named.values()}) < len(named):
+    found = {concept: value for concept, value in found.items() if named[concept]}
+    if len(found) > _MOST_LINES:
         return []
     tolerance = max(abs(gap) * _LINES_CLOSE, 1.0)
-    costs = abs(gap + sum(found.values())) <= tolerance
-    if not costs and abs(gap - sum(found.values())) > tolerance:
+    closing = [(chosen, costs) for size in range(1, len(found) + 1) for chosen in combinations(found, size)
+               for costs in (True, False) if abs(gap + (1 if costs else -1) * sum(found[concept] for concept in chosen)) <= tolerance]
+    if len(closing) != 1:
         return []
-    return [(line_key(named[concept]), named[concept], None, -value if costs else value)
-            for concept, value in sorted(found.items(), key=lambda item: -abs(item[1]))]
+    chosen, costs = closing[0]
+    return [(line_key(named[concept]), named[concept], None, -found[concept] if costs else found[concept])
+            for concept in sorted(chosen, key=lambda concept: -abs(found[concept]))]
 
 
 def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[str, str],
