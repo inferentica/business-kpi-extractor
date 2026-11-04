@@ -4,7 +4,8 @@ import pytest
 
 from kpi_extractor.ai import AiResponseError, Located, Spec, parse_located, parse_spec
 from kpi_extractor.document import parse_document
-from kpi_extractor.extract import check_period, read_values, validate_groups
+from kpi_extractor.checks import check_period, validate_groups
+from kpi_extractor.extract import read_values
 
 RELEASE = """
 <p>In the second quarter, shipments of 3-nanometer accounted for 30% of total wafer revenue; 5-nanometer accounted

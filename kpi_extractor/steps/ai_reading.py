@@ -9,7 +9,8 @@ from .. import ai
 from ..ai import AiResponseError, Located, Spec
 from ..control import ControlError
 from ..document import Document, clean
-from ..extract import ReadValue, check_period, describe, locator_hint, read_values, validate_groups
+from ..checks import check_period, far_above_quarter, looks_like_part_of_table, validate_groups
+from ..extract import ReadValue, describe, locator_hint, read_values
 from ..replay import replay
 from .shared import (AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
@@ -360,7 +361,7 @@ class AiReading:
             newest = max(value["period_end"] for value in reference)
             before = [value for value in reference if value["period_end"] == newest]
             before_total = next((float(v["locator"]["total"]) for v in before if (v.get("locator") or {}).get("total")), None)
-            if before_total and len(parts) < len(before) and total < 0.5 * before_total:
+            if looks_like_part_of_table(len(parts), total, len(before), before_total):
                 for item in items:
                     item.status = "needs_review"
                     item.notes.append("fewer rows and under half the total of the quarter compared: likely part of the table")
@@ -497,7 +498,7 @@ class AiReading:
             if item.group.kind != "revenue_breakdown" or not (item.is_total or item.kpi.key == item.group.total_kpi):
                 continue
             before = self._quarter_total_before(AI_GROUP_PREFIX + item.group.key, period_end.isoformat())
-            if before and item.value >= 2.5 * before:
+            if far_above_quarter(item.value, before):
                 return True
         return False
 

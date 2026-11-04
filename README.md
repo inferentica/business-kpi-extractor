@@ -46,12 +46,14 @@ wrong and missing values. Run it after any change to prompts, models or rules.
 ## Layout
 
 - `kpi_extractor/`: `sec.py` (filings), `xbrl.py`, `document.py` (tables, text, numbers, outlines), `ai.py` (tasks,
-  prompts, schemas), `extract.py` (reading and checks), `derive.py` (Q4 and full years), `cli.py` (one run), `evaluate.py`
+  prompts, schemas), `extract.py` (reading), `derive.py` (Q4 and full years), `cli.py` (one run), `evaluate.py`
   (golden set).
 - `kpi_extractor/pipeline.py` holds the order of one company's run. Its steps are in `kpi_extractor/steps/`: `loading.py`,
   `reports.py` (XBRL), `financial_statements.py`, `chart_slides.py`, `release_tables.py`, `tagged_kpis.py`,
   `listing_history.py`, `kpi_list.py`, `release_flow.py`, `ai_reading.py`, `series_identity.py`, `series_checks.py` and
   `shared.py`.
+- `kpi_extractor/checks.py` holds the checks on figures. Each declares what it applies to and answers with findings; the
+  caller decides what comes of them. `audit_stored` reports what a wider check would say about the figures now served.
 - `kpi_extractor/store.py` is the one way to change a company's figures and filings. Steps read them read-only and hand
   back the rows they want written; `tests/test_store.py` keeps it that way.
 - Control plane and storage live in the TradeTracker repository: `supabase/functions/business-kpi-workflow`, tables

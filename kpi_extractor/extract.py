@@ -1,21 +1,14 @@
-"""Reads the numbers the AI pointed at, and checks them before anything is served."""
+"""Reads the numbers the AI pointed at."""
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import date
 
 from .ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
+from .checks import MIX_TOLERANCE
 from .document import Document, Table, TextBlock, clean, declared_currency, parse_number, word_number
 from .xbrl import member_key, remove_subtotals
 
-MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
-BREAKDOWN_TOLERANCE = 0.01
-PERIOD_TOLERANCE_DAYS = 12
-MAX_RATIO_JUMP = 3.0
-MAX_MIX_JUMP = 30.0
-SMALL_COUNT = 50
-SMALL_COUNT_MOVE = 25
 _CURRENCY_MARKERS = (("NT$", "TWD"), ("US$", "USD"), ("HK$", "HKD"), ("C$", "CAD"), ("A$", "AUD"), ("RMB", "CNY"),
                      ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("$", "USD"))
 
@@ -561,116 +554,6 @@ def locator_hint(locator: dict | None) -> str | None:
     if "quote" in locator:
         return f"text like {locator['quote']!r}"
     return f"table row {locator.get('row_label')!r}"
-
-
-def check_period(located: Located, expected: date) -> str | None:
-    try:
-        reported = date.fromisoformat(str(located.period_end)[:10])
-    except ValueError:
-        return "reported period missing"
-    if abs((reported - expected).days) > PERIOD_TOLERANCE_DAYS:
-        return f"reported period {reported} does not match the quarter ended {expected}"
-    return None
-
-
-def validate_groups(values: list[ReadValue], previous: dict[str, float]) -> None:
-    """Marks every value of a group that fails its check as needs_review, with the reason."""
-    by_group: dict[str, list[ReadValue]] = {}
-    for item in values:
-        by_group.setdefault(item.group.key, []).append(item)
-    for group_key, items in by_group.items():
-        group = items[0].group
-        reason = None
-        if group.kind == "mix":
-            # A mix's own "Total 100%" row (its named total) is its check, not one of its shares.
-            shares = _top_level([item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)])
-            stated = next((item.value for item in items if item.is_total or item.kpi.key == group.total_kpi), None)
-            if any(not 0 <= item.value <= 100 for item in items):
-                reason = "share outside 0-100%"
-            elif stated is not None and abs(stated - 100) > MIX_TOLERANCE:
-                reason = f"the mix's total row reads {stated:.1f}%"
-            else:
-                total = sum(item.value for item in shares)
-                if abs(total - 100) > MIX_TOLERANCE:
-                    reason = f"shares add up to {total:.1f}%"
-        elif group.kind == "revenue_breakdown":
-            total_item = next((item for item in items if item.is_total or item.kpi.key == group.total_kpi), None)
-            parts = _top_level([item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)])
-            if total_item is None or not total_item.value:
-                reason = "no total revenue to reconcile against"
-            elif len(parts) < 2:
-                reason = "fewer than two parts"
-            else:
-                error = (sum(item.value for item in parts) - total_item.value) / total_item.value
-                if abs(error) > BREAKDOWN_TOLERANCE:
-                    reason = f"parts differ from the total by {error:.1%}"
-        if reason:
-            for item in items:
-                item.status = "needs_review"
-                item.notes.append(reason)
-        # Each parent the list names against its lines: a parent and its lines that do not add up need review.
-        if group.kind in ("revenue_breakdown", "mix"):
-            for parent in items:
-                lines = [item for item in items if item.kpi.parent == parent.kpi.key]
-                if not lines or not parent.value:
-                    continue
-                error = (sum(item.value for item in lines) - parent.value) / parent.value
-                if abs(error) > (MIX_TOLERANCE / 100 if group.kind == "mix" else BREAKDOWN_TOLERANCE):
-                    for item in [parent, *lines]:
-                        item.status = "needs_review"
-                        item.notes.append(f"lines differ from {parent.kpi.label} by {error:.1%}")
-        parts_total = sum(item.value for item in _top_level([item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]))
-        previous_total = sum(value for key, value in previous.items() if key.startswith(f"{group_key}."))
-        for item in items:
-            if group.kind == "revenue_breakdown" and parts_total and abs(item.value) < 0.01 * abs(parts_total):
-                continue  # an immaterial row (TSMC's residual 10nm) swings wildly; the group total still checks it
-            before = previous.get(f"{group_key}.{item.kpi.key}")
-            if group.kind == "revenue_breakdown" and before is not None and previous_total \
-                    and abs(before) < 0.01 * abs(previous_total):
-                continue  # growth from an immaterial base is a launch (TSMC's 3nm: NT$0.5B to NT$29B), not an error
-            jump = _jump(item, before)
-            if jump:
-                item.status = "needs_review"
-                item.notes.append(jump)
-
-
-def _top_level(parts: list[ReadValue]) -> list[ReadValue]:
-    """The parts a total is made of: those the list puts at the top, and the lines of a parent not read this quarter."""
-    read = {item.kpi.key for item in parts}
-    def counted(item: ReadValue) -> bool:
-        parent = item.kpi.parent
-        # A line counts in place of its parent when the parent was not read (nor any parent above it).
-        while parent is not None:
-            if parent in read:
-                return False
-            parent = next((other.kpi.parent for other in parts if other.kpi.key == parent), None) \
-                or next((kpi.parent for kpi in item.group.kpis if kpi.key == parent), None)
-        return True
-    return [item for item in parts if counted(item)]
-
-
-def _jump(item: ReadValue, before: float | None) -> str | None:
-    if before is None:
-        return None
-    if item.group.kind == "mix":
-        return f"moved {item.value - before:+.1f} points in a quarter" if abs(item.value - before) > MAX_MIX_JUMP else None
-    if item.kpi.unit == "percent" or before <= 0 or item.value <= 0:
-        return None
-    small = count_jump(item.kpi.unit, before, item.value)
-    return (small or None) if small is not None else _ratio_jump(before, item.value)
-
-
-def count_jump(unit: str, before: float, now: float) -> str | None:
-    """Small counts move by a few at a time (ASML's used systems sold, 3 one quarter and 10 the next): below SMALL_COUNT
-    a jump is an absolute move, not a ratio. Returns "" when the small-count rule applies and finds no jump."""
-    if unit != "count" or max(abs(before), abs(now)) >= SMALL_COUNT:
-        return None
-    return f"moved {now - before:+g} in a quarter" if abs(now - before) > SMALL_COUNT_MOVE else ""
-
-
-def _ratio_jump(before: float, now: float) -> str | None:
-    ratio = now / before
-    return f"changed {ratio:.1f}x in a quarter" if ratio > MAX_RATIO_JUMP or ratio < 1 / MAX_RATIO_JUMP else None
 
 
 def describe(document: Document, item: ReadValue) -> str:

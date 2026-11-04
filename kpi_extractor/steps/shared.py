@@ -6,6 +6,7 @@ from datetime import date
 
 from ..ai import Spec
 from ..archive import filing_folder
+from ..checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
 from ..document import Document, clean, parse_number
 from ..extract import column_header
 from ..sec import FilingRef
@@ -85,16 +86,6 @@ def _rounding(value: float) -> float:
     return step / 2
 
 
-def _significant(value: float) -> bool:
-    """A figure precise enough that equality with another is no coincidence (12,345,000,000, not 60,000,000,000)."""
-    digits = f"{abs(value):.0f}".rstrip("0")
-    return abs(value) >= 1e6 and len(digits) >= 3
-
-
-def _same(left: float, right: float) -> bool:
-    return abs(left - right) <= max(abs(left), abs(right)) * 1e-9
-
-
 def _is_jump(note: str) -> bool:
     return note.startswith(("changed ", "moved "))
 
@@ -102,10 +93,6 @@ def _is_jump(note: str) -> bool:
 def _document_text(document: Document) -> str:
     cells = [" ".join(cell for row in table.rows for cell in row) for table in document.tables.values()]
     return clean(" ".join([*(block.text for block in document.blocks.values()), *cells]))
-
-
-def _days(left: str, right: str) -> int:
-    return (date.fromisoformat(left[:10]) - date.fromisoformat(right[:10])).days
 
 
 class RecordBuilding:

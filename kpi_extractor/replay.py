@@ -9,7 +9,8 @@ from datetime import date
 
 from .ai import Located, Locator, TableLocator
 from .document import Document, Table, clean, parse_number
-from .extract import PERIOD_TOLERANCE_DAYS, _row_label, column_header
+from .checks import PERIOD_TOLERANCE_DAYS
+from .extract import _row_label, column_header
 from .xbrl import member_key
 
 _MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",

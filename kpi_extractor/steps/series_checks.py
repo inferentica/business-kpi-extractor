@@ -8,7 +8,8 @@ from datetime import date, timedelta
 from ..ai import Spec
 from ..derive import derive_periods
 from ..document import Document, parse_number
-from ..extract import ReadValue, column_header, count_jump
+from ..checks import count_jump, reported_matches
+from ..extract import ReadValue, column_header
 from ..sec import FilingRef
 from .shared import (AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
                      _year_ago_cells, value_key)
@@ -73,10 +74,8 @@ class SeriesChecks:
         segment_of: dict[str, set[str]] = {}
         for (group, _year, period), rows in groups.items():
             total, end = float(rows[0]["locator"]["total"]), rows[0]["period_end"]
-            nearby = [(figure, member) for figure_end, figure, member in reported.get(period, [])
-                      if abs(_days(figure_end, end)) <= 12]
-            matches = [member for figure, member in nearby if abs(figure - total) <= abs(total) * 0.001]
-            if nearby and not matches:
+            any_reported, matches = reported_matches(total, end, reported.get(period, []))
+            if any_reported and not matches:
                 flagged += [{**v, "validation_status": "needs_review",
                              "notes": [*(v.get("notes") or []), "total matches no figure the company reported in XBRL"]}
                             for v in rows]

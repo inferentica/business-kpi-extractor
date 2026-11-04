@@ -2,7 +2,8 @@ from kpi_extractor import ai
 from kpi_extractor.ai import Spec
 from kpi_extractor.document import parse_document
 from kpi_extractor.ai import KpiSpec
-from kpi_extractor.extract import read_values, validate_groups
+from kpi_extractor.checks import validate_groups
+from kpi_extractor.extract import read_values
 
 REPORT = """
 <p>(Amounts in Thousands of New Taiwan Dollars)</p>

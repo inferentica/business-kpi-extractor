@@ -1,6 +1,7 @@
 """Periods no document reports on its own: Q4 from the annual report, and full years from four reported quarters."""
 from __future__ import annotations
 
+from .checks import derived_gap
 from .segment_income import GROUP_KEY as INCOME_GROUP
 
 QUARTERS = ("Q1", "Q2", "Q3")
@@ -211,20 +212,17 @@ def _combine_year_to_date(annual: dict, nine: dict, nine_total: float, sources: 
     return rows
 
 
-MAX_DERIVED_GAP = 0.001
-
-
 def _reconcile(rows: list[dict], total: float) -> None:
     """A derived period is verified only if its parts add up to its derived total, like any reported one, and it is
     published whole: one flagged part (a negative Q4) flags them all."""
     # Lines of another row of the period (Apollo's management fees by asset class) are counted in that row.
     keys = {row["kpi_key"] for row in rows}
     top = [row for row in rows if (row.get("locator") or {}).get("parent") not in keys]
-    error = (sum(row["value"] for row in top) - total) / total
+    error, too_far = derived_gap(sum(row["value"] for row in top), total)
     for row in rows:
         row["reconciliation_error_pct"] = error
         row["locator"] = {**(row.get("locator") or {}), "total": total}
-        if abs(error) > MAX_DERIVED_GAP and row["validation_status"] == "verified":
+        if too_far and row["validation_status"] == "verified":
             row["validation_status"] = "needs_review"
             row["notes"] = [*row["notes"], f"derived parts differ from the derived total by {error:.1%}"]
     _whole(rows)

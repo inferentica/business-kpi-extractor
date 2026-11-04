@@ -7,12 +7,12 @@ from datetime import date
 from .. import ai
 from ..ai import Spec
 from ..document import Document, clean
-from ..extract import MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, check_period, count_jump, validate_groups
+from ..checks import check_period, date_order_findings, validate_groups
+from ..extract import ReadValue
 from ..fiscal import fiscal_label
 from ..sec import FilingRef
 from ..store import FilingReading, failed_reading
-from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI,
-                     _annual_header, _chain_of, _days, _document_text, _is_jump, _same, _significant, value_key)
+from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI, _annual_header, _chain_of, _document_text, _is_jump, value_key)
 
 _READ_BY_REPLAY = "read by replay"
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
@@ -198,35 +198,7 @@ class ReleaseFlow:
         it (a share against its last share, an amount against three times or a third of its last), and an amount equal
         to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole. Gives the
         rows to flag and the keys of those that jumped."""
-        series: dict[tuple[str, str], list[dict]] = {}
-        for v in self.values.values():
-            if v["method"] == "ai" and v["validation_status"] == "verified" and v["fiscal_period"] != "FY":
-                series.setdefault((v["group_key"], v["kpi_key"]), []).append(v)
-        flagged: dict[tuple, str] = {}
-        for rows in series.values():
-            rows.sort(key=lambda v: v["period_end"])
-            for previous, current in zip(rows, rows[1:]):
-                if value_key(current) not in keys or _days(previous["period_end"], current["period_end"]) > 120:
-                    continue
-                before, now = float(previous["value"]), float(current["value"])
-                small = count_jump(current["unit"], before, now)
-                if current["unit"] == "percent":
-                    jump = abs(now - before) > MAX_MIX_JUMP and f"moved {now - before:+.1f} points in a quarter"
-                elif small is not None:
-                    jump = small or None
-                else:
-                    jump = before and now / before > 0 and not 1 / MAX_RATIO_JUMP <= now / before <= MAX_RATIO_JUMP \
-                        and f"changed {now / before:.1f}x in a quarter"
-                if jump and not self._immaterial(current):
-                    flagged[value_key(current)] = jump
-                elif current["unit"] == "currency" and _significant(now) and _same(now, before):
-                    flagged[value_key(current)] = "the same figure as the quarter before: check the column"
-            by_end = {v["period_end"][:7]: v for v in rows}
-            for current in rows:
-                year_ago = by_end.get(f"{int(current['period_end'][:4]) - 1}{current['period_end'][4:7]}")
-                if (value_key(current) in keys and year_ago and current["unit"] == "currency"
-                        and _significant(float(current["value"])) and _same(float(current["value"]), float(year_ago["value"]))):
-                    flagged[value_key(current)] = "the same figure as a year earlier: check the column"
+        flagged = date_order_findings(self.values.values(), keys, value_key)
         groups = {(k[0], k[2], k[3]) for k in flagged if self.values[k]["group_kind"] != "metric"}
         changed = []
         for key, value in self.values.items():
@@ -273,11 +245,6 @@ class ReleaseFlow:
                     cleared.append({**v, "validation_status": "verified",
                                     "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"]})
         return cleared
-
-    def _immaterial(self, value: dict) -> bool:
-        """A breakdown row under 1% of its total, whose swings say nothing (as validate_groups treats it)."""
-        total = (value.get("locator") or {}).get("total")
-        return value["group_kind"] == "revenue_breakdown" and bool(total) and abs(float(value["value"])) < 0.01 * abs(float(total))
 
     def _release_records(self, read: list[ReadValue], spec: Spec, ref: FilingRef, document: Document, fiscal_year: str,
                          fiscal_period: str, period_end: date, period_problem: str | None) -> list[dict]:
