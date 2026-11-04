@@ -87,7 +87,7 @@ _NOT_REPORTED = "not reported: "
 # Reports parsed ahead of the one being read, and parsed reports kept in memory.
 _READ_AHEAD = 3
 _XBRL_KEPT = 6
-_XBRL_READER = "xbrl reader 43"  # 21: segment operating income
+_XBRL_READER = "xbrl reader 44"  # 21: segment operating income
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
@@ -531,13 +531,18 @@ class SymbolPipeline:
         quarters = [v for v in self.values.values() if v["group_key"] == INCOME_GROUP and v["validation_status"] == "verified"
                     and v["fiscal_year"] == fiscal_year and v["fiscal_period"] in ("Q1", "Q2", "Q3")]
         quarter_names = {v["kpi_key"]: v["kpi_label"] for v in quarters}
-        if breakdowns.annual and len({v["fiscal_period"] for v in quarters}) == 3 \
-                and keys - set(quarter_names) == {LEFT_OVER_KEY} and len(set(quarter_names) - keys) == 1:
+        # So does a year whose 10-K itemizes what its 10-Qs give as that one line (AMD's 2023 "All Other"): its Q4 is the
+        # year less the quarters, line by line.
+        apart = keys - set(quarter_names)
+        if breakdowns.annual and len({v["fiscal_period"] for v in quarters}) == 3 and apart and len(set(quarter_names) - keys) == 1 \
+                and apart <= {LEFT_OVER_KEY, *income.current.lines}:
             other = next(iter(set(quarter_names) - keys))
-            income.current.rows = [(other, quarter_names[other], element, value) if key == LEFT_OVER_KEY
-                                   else (key, label, element, value) for key, label, element, value in income.current.rows]
-            if LEFT_OVER_KEY in prior:
-                prior[other] = prior.pop(LEFT_OVER_KEY)
+            whole = sum(value for key, _label, _element, value in income.current.rows if key in apart)
+            income.current.rows = [(key, label, element, value) for key, label, element, value in income.current.rows
+                                   if key not in apart] + [(other, quarter_names[other], None, whole)]
+            income.current.lines = set()
+            if apart <= set(prior):
+                prior = {key: value for key, value in prior.items() if key not in apart} | {other: sum(prior[key] for key in apart)}
         records += self._measure_records(income, INCOME_GROUP, INCOME_ORDER, groups, ref, fiscal_year, fiscal_period,
                                          breakdowns.period_end, prior=prior)
         # The rows this report gives are the period's: one an earlier read stored under another name (a worked-out
