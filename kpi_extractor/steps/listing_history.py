@@ -10,6 +10,7 @@ from ..prospectus import interim_quarters, prospectus_breakdowns, quarter_sectio
 from ..release_breakdowns import line_key
 from ..sec import FilingRef, ipo_prospectus
 from ..segment_income import GROUP_KEY as INCOME_GROUP
+from ..store import FilingReading
 from .shared import AI_GROUP_PREFIX, _DONE
 
 _PROSPECTUS_READER = "prospectus reader 1"
@@ -43,7 +44,7 @@ class ListingHistory:
         return any(value["group_key"] == group and (value["fiscal_year"], value["fiscal_period"]) == quarter
                    and value["validation_status"] != "rejected" for value in self.values.values())
 
-    def _year_ago_quarters(self) -> None:
+    def _year_ago_quarters(self) -> list[dict]:
         """A company's first reports give each breakdown's year-ago quarter (SpaceX's Q2 2026 10-Q, Q2 2025): kept when
         every line has one and they add up to the year-ago total, for a quarter the company never reported."""
         records: list[dict] = []
@@ -70,15 +71,16 @@ class ListingHistory:
                                 "locator": {"total": total, "member": (line.get("locator") or {}).get("member"), "year_ago": True,
                                             **({"line": True} if (line.get("locator") or {}).get("line") else {})}})
         if records:
-            self._store(values=records)
             self.log(f"{self.symbol}: {len(records)} year-ago values from the first reports' comparatives")
+        return records
 
-    def _store_prospectus_breakdowns(self, ref: FilingRef) -> None:
+    def _read_prospectus_breakdowns(self, ref: FilingRef) -> tuple[FilingReading | None, dict[tuple[str, str], str]]:
         """Each XBRL breakdown for every period the prospectus's tables give it, for periods the company never reported
-        (see prospectus.py). Read once; the full years let the last pre-listing Q4 be worked out."""
+        (see prospectus.py). Read once; the full years let the last pre-listing Q4 be worked out. Also gives the lines the
+        prospectus calls by another name (group, its name) → today's key."""
         previous = self.filings.get(ref.accession) or {}
         if previous.get("status") in _DONE and _PROSPECTUS_READER in (previous.get("notes") or []):
-            return
+            return None, {}
         try:
             document = self._document(ref)
             records: list[dict] = []
@@ -111,13 +113,13 @@ class ListingHistory:
                             period_end=period.end, locator={"total": found.total, "member": (template.get("locator") or {}).get("member"),
                                                             "prospectus": True, "table": found.table, "row": found.rows.get(member)},
                         ))
-            self._store_filing(ref, "processed" if records else "skipped", records=records,
-                               notes=[_PROSPECTUS_READER, f"{len(records)} breakdown figures from the IPO prospectus"])
-            self._join_prospectus_names(renamed)
+            return FilingReading(ref, "processed" if records else "skipped", records=records,
+                                 notes=[_PROSPECTUS_READER, f"{len(records)} breakdown figures from the IPO prospectus"]), renamed
         except Exception as error:  # noqa: BLE001 - the history is extra
             self.log(f"{self.symbol}: prospectus breakdowns not read ({type(error).__name__}: {error})"[:300])
+            return None, {}
 
-    def _join_prospectus_names(self, renamed: dict[tuple[str, str], str]) -> None:
+    def _join_prospectus_names(self, renamed: dict[tuple[str, str], str]) -> list[dict]:
         """A line renamed after listing is one series under today's name: the prospectus's row the line was matched to
         (SpaceX's "AI", today "SI") names the reports' earlier key for it, when the two never share a quarter."""
         records = []
@@ -133,8 +135,8 @@ class ListingHistory:
                                 "notes": [*(value.get("notes") or []), f"named {value['kpi_label']} then"]})
                 records.append({**value, "validation_status": "rejected", "notes": [f"continued as {current[0]['kpi_label']}"]})
         if records:
-            self._store(values=records)
             self.log(f"{self.symbol}: {len(records) // 2} values joined to the line they were renamed to")
+        return records
 
     def _read_prospectus_quarters(self, ref: FilingRef, releases: list[FilingRef], spec: Spec, version: int) -> None:
         """The KPI list read from the prospectus, as from a release, for its latest interim quarter and the year before
@@ -155,4 +157,4 @@ class ListingHistory:
                 continue
             labels = [kpi.label for group in spec.groups for kpi in group.kpis]
             self._documents[quarter.accession] = quarter_sections(document, labels, end)
-            self._process_release(quarter, spec, version)
+            self._read_and_record_release(quarter, spec, version)

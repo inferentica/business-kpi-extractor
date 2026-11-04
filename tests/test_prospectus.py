@@ -65,13 +65,13 @@ def test_a_first_reports_year_ago_quarter_is_kept_when_it_adds_up():
     pipeline.values = {("segments", k, "2026", "Q2"): row(k, v, p) for k, v, p in
                        (("space", 962e6, 746e6), ("connectivity", 4_291e6, 2_588e6), ("si", 2_561e6, 737e6))}
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
-    pipeline._year_ago_quarters()
+    pipeline.store.write = stored.extend
+    pipeline.store.write(pipeline._year_ago_quarters())
     assert {(v["kpi_key"], v["fiscal_year"], v["period_end"], v["value"]) for v in stored} == {
         ("space", "2025", "2025-06-30", 746e6), ("connectivity", "2025", "2025-06-30", 2_588e6), ("si", "2025", "2025-06-30", 737e6)}
     stored.clear()
     pipeline.values[("segments", "si", "2026", "Q2")]["locator"]["prior"] = 700e6  # no longer adds up
-    pipeline._year_ago_quarters()
+    pipeline.store.write(pipeline._year_ago_quarters())
     assert stored == []
 
 
@@ -85,8 +85,8 @@ def test_the_prospectus_name_of_a_renamed_line_joins_its_earlier_quarters():
     pipeline.values = {("segments", k, "2026", q): row(k, l, q, v) for k, l, q, v in
                        (("ai", "AI", "Q2", 2_561e6), ("si", "SI", "Q3", 7_560e6))}
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
-    pipeline._join_prospectus_names({("segments", "ai"): "si"})
+    pipeline.store.write = stored.extend
+    pipeline.store.write(pipeline._join_prospectus_names({("segments", "ai"): "si"}))
     assert [(v["kpi_key"], v["kpi_label"], v["validation_status"]) for v in stored] == [("si", "SI", "verified"), ("ai", "AI", "rejected")]
 
 

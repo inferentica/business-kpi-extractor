@@ -8,7 +8,7 @@ from ..derive import balancing
 from ..sec import FilingRef
 from ..segment_income import GROUP_KEY as INCOME_GROUP
 from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _QUARTER_HEADER, _annual_header, _days, _is_jump, _same,
-                     _year_ago_cells, value_key)
+                     _year_ago_cells)
 
 def _quarter_column(value: dict) -> bool:
     """Whether a value was read from a column headed for three months, which no yearly total contradicts."""
@@ -26,7 +26,7 @@ def _restated_for(restated: dict, group: str, end: str) -> dict[str, float]:
 class SeriesIdentity:
     """Keeping each KPI one series over time: refiled periods, renamed lines, restatements and mislabelled quarters."""
 
-    def _harmonize_labels(self) -> None:
+    def _harmonize_labels(self) -> list[dict]:
         """One name per XBRL series across every period: the company's approved name, else its latest label."""
         latest: dict[tuple[str, str], dict] = {}
         for value in self.values.values():
@@ -49,15 +49,13 @@ class SeriesIdentity:
                       or latest[(value["group_key"], value["kpi_key"])]["kpi_label"])
             if (label, member) != (value["group_label"], value["kpi_label"]):
                 renamed.append({**value, "group_label": label, "kpi_label": member})
-        for start in range(0, len(renamed), 400):
-            self._store(values=renamed[start:start + 400])
+        return renamed
 
-    def _refile_annuals(self) -> None:
+    def _refile_annuals(self) -> list[dict]:
         """Repairs full-year figures stored as Q4 before these checks existed: every AI value from that filing moves
         to FY, and the Q4 rows are rejected so Q4 is derived as FY − Q1 − Q2 − Q3. A reading from a column headed for
         three months stays the quarter it is (Apple's FY2019 Q4 release: its product-type table was moved to FY with
         the release's yearly readings, and Q4 came out at −$110.8 billion); one moved before is moved back."""
-        self._unfile_quarters()
         annual_totals = {v["period_end"]: float(v["locator"]["total"]) for v in self.values.values()
                          if v["method"] == "xbrl" and v["fiscal_period"] == "FY" and (v.get("locator") or {}).get("total")}
         misfiled = set()
@@ -71,7 +69,7 @@ class SeriesIdentity:
             if (annual and abs(total - annual) <= abs(annual) * 0.01) or _annual_header(header):
                 misfiled.add((v["source_accession"], v["fiscal_year"]))
         if not misfiled:
-            return
+            return []
         moved = []
         for v in list(self.values.values()):
             if v["method"] == "ai" and v["fiscal_period"] == "Q4" and (v["source_accession"], v["fiscal_year"]) in misfiled \
@@ -82,11 +80,10 @@ class SeriesIdentity:
                 moved.append({**v, "fiscal_period": "FY", "validation_status": status,
                               "notes": [*notes, "full-year figures, re-filed from Q4"]})
                 moved.append({**v, "validation_status": "rejected", "notes": ["full-year figures filed as Q4; see FY"]})
-        for start in range(0, len(moved), 400):
-            self._store(values=moved[start:start + 400])
         self.log(f"{self.symbol}: re-filed {len(misfiled)} annual report(s) stored as Q4")
+        return moved
 
-    def _unfile_quarters(self) -> None:
+    def _unfile_quarters(self) -> list[dict]:
         """A quarter's figures moved to FY with their release's yearly readings go back to Q4, the year's derived rows
         rejected so the year is worked out again."""
         back = []
@@ -97,15 +94,11 @@ class SeriesIdentity:
             notes = [note for note in v.get("notes") or [] if note != "full-year figures, re-filed from Q4"]
             back.append({**v, "fiscal_period": "Q4", "validation_status": "verified", "notes": notes})
             back.append({**v, "validation_status": "rejected", "notes": ["a quarter's figure, moved back to Q4"]})
-            derived = self.values.get((v["group_key"], v["kpi_key"], v["fiscal_year"], "Q4"))
-            if derived and derived["method"] == "derived":
-                self.values.pop(value_key(derived), None)
-        for start in range(0, len(back), 400):
-            self._store(values=back[start:start + 400])
         if back:
             self.log(f"{self.symbol}: {len(back) // 2} quarterly figures moved back from FY to Q4")
+        return back
 
-    def _join_custom_axes(self) -> None:
+    def _join_custom_axes(self) -> list[dict]:
         """A company's own early axis continued by a standard one (Nvidia's 2016–18 "Revenue by Major Market" became its
         Revenue by Product): its periods join the standard group when most of its rows are rows of that group and every
         period the two share holds the same figures. No AI involved."""
@@ -135,10 +128,9 @@ class SeriesIdentity:
                     moved.append({**v, "group_key": target, "group_label": latest["group_label"],
                                   "group_order": latest["group_order"]})
                 moved.append({**v, "validation_status": "rejected", "notes": [f"continued as {target}"]})
-        for start in range(0, len(moved), 400):
-            self._store(values=moved[start:start + 400])
+        return moved
 
-    def _unify_series(self) -> None:
+    def _unify_series(self) -> list[dict]:
         """One key per business across a company's whole XBRL history, so Q4 = year − quarters always lines up.
         Two kinds of evidence link keys: the same XBRL element (a label change: "Dynamics" became "Dynamics products and
         cloud services"), and a member whose restated prior-year figure equals, to the unit, what another key reported
@@ -196,12 +188,11 @@ class SeriesIdentity:
                 if v["kpi_key"] != canonical:
                     rekeyed.append({**v, "kpi_key": canonical})
                     rekeyed.append({**v, "validation_status": "rejected", "notes": [f"continued as {canonical}"]})
-        for start in range(0, len(rekeyed), 400):
-            self._store(values=rekeyed[start:start + 400])
         if rekeyed:
             self.log(f"{self.symbol}: {len(rekeyed) // 2} XBRL values joined to their series")
+        return rekeyed
 
-    def _adopt_restated_quarters(self) -> None:
+    def _adopt_restated_quarters(self) -> list[dict]:
         """A year's quarter that is missing or lacks a row of the year's own 10-K (Alphabet's 2019 10-Qs grouped Search
         and YouTube as "Google properties" and left "Google other" untagged in Q1) is taken from the following year's
         10-Q for the same quarter, which restates it on the year's layout: only when that restated quarter has exactly
@@ -274,13 +265,12 @@ class SeriesIdentity:
                              "notes": [note]} for key, row in following.items()]
                 changed += [{**row, "validation_status": "rejected", "notes": ["replaced by the following year's restated layout"]}
                             for key, row in current.items() if key not in priors]
-        for start in range(0, len(changed), 400):
-            self._store(values=changed[start:start + 400])
         adopted = sum(1 for v in changed if v["validation_status"] == "verified")
         if adopted:
             self.log(f"{self.symbol}: {adopted} quarterly values taken from the following year's restated layout")
+        return changed
 
-    def _unify_release_series(self, releases: list[FilingRef]) -> None:
+    def _unify_release_series(self, releases: list[FilingRef]) -> list[dict]:
         """A line a release renamed (Alphabet's "Google other" became "Google subscriptions, platforms, and devices" in
         Q4 2023) is one series under its new name: the release's year-ago cell in the new line's row equals what the old
         line reported a year earlier. Without it a year's quarters carry two names and the year cannot be added up. The
@@ -320,19 +310,19 @@ class SeriesIdentity:
                     if v["kpi_key"] == matches[0]:
                         moved.append({**v, "kpi_key": key, "kpi_label": opening["kpi_label"]})
                         moved.append({**v, "validation_status": "rejected", "notes": [f"continued as {key}"]})
-        for start_at in range(0, len(moved), 400):
-            self._store(values=moved[start_at:start_at + 400])
         if moved:
             self.log(f"{self.symbol}: {len(moved) // 2} release values joined to their renamed series")
+        return moved
 
-    def _fix_mislabelled_quarters(self) -> None:
+    def _fix_mislabelled_quarters(self):
         """A filer's XBRL can attach figures to the wrong members (AMD's 2023 and 2024 10-Qs tag Data Center's $2,337M as
         Client). A later filing's comparatives then contradict them: the same member restated with a value another member
         of that quarter holds. The quarters of that year are relabelled with the one mapping that every later comparative
         and the year's own 10-K allow (no member's Q4 revenue below zero); if the evidence allows none or several, the
         mapping found for another group of the same filings (operating income takes revenue's) is used when it fits, else
         they are flagged, so swapped names are never served. Years go newest first: a relabelled year's own comparatives
-        are the evidence for the year before (AMD's 2024 10-Qs restate 2023 with the same wrong tags)."""
+        are the evidence for the year before (AMD's 2024 10-Qs restate 2023 with the same wrong tags): so its rows are handed
+        back year by year, each written before the next year is judged."""
         held = "member labels contradict later filings"
         done: set[tuple[str, str]] = set()
         for _round in range(6):
@@ -407,9 +397,8 @@ class SeriesIdentity:
                 changes += [{**row, "validation_status": "needs_review",
                              "notes": [*(row.get("notes") or []), *([] if held in (row.get("notes") or []) else [held])]}
                             for quarter in quarters for row in quarter.values()]
-            for start in range(0, len(changes), 400):
-                self._store(values=changes[start:start + 400])
             if changes:
+                yield changes
                 self.log(f"{self.symbol}: {len(changes)} XBRL values of {group} {year} relabelled or held from later filings' comparatives")
 
     @staticmethod

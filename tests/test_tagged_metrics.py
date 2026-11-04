@@ -67,12 +67,12 @@ def test_the_pipeline_fills_the_quarters_the_releases_skip():
                 "validation_status": "verified", "value": value, "locator": {}}
     pipeline.values = {("kpi_operating", "rpo", "2026", q): row(q, v) for q, v in (("Q1", 392e9), ("Q3", 627e9), ("Q4", 678e9))}
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
+    pipeline.store.write = stored.extend
     spec = ai.Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric",
                                                "kpis": [{"key": "rpo", "label": "Commercial RPO", "unit": "currency"}]}]})
     reports = [SimpleNamespace(accession=a, form="10-K" if a == "r4" else "10-Q", filed=day(2026, 1, 1), source_url="u")
                for a in ends]
-    pipeline._fill_tagged_metrics(reports, spec)
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
     assert [(v["fiscal_period"], v["value"], v["method"], v["locator"]["tagged"]) for v in stored] == [("Q2", 625e9, "ai", True)]
 
 
@@ -117,12 +117,12 @@ def _alphabet(picks):
                                   for key, want in picks.items()})
     pipeline._ask = ask
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
+    pipeline.store.write = stored.extend
     spec = ai.Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric", "kpis": [
         {"key": "backlog", "label": "Revenue Backlog", "unit": "currency"},
         {"key": "cloud_backlog", "label": "Google Cloud Backlog", "unit": "currency"}]}]})
     reports = [SimpleNamespace(accession=a, form="10-Q", filed=day(2026, 1, 1), source_url="u") for a in ends]
-    pipeline._fill_tagged_metrics(reports, spec)
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
     return stored, asked, pipeline, reports, spec
 
 
@@ -145,10 +145,10 @@ def test_a_pick_whose_unit_does_not_fit_is_refused_and_a_found_tag_needs_no_ai()
     stored, asked, pipeline, reports, spec = _alphabet({
         "backlog": "Revenue not yet recognized [RevenueRemainingPerformanceObligation] | 519",
         "cloud_backlog": "Revenue not yet recognized [RevenueRemainingPerformanceObligation] | Google Cloud"})
-    pipeline.values.update({(v["group_key"], v["kpi_key"], v["fiscal_year"], v["fiscal_period"]): v for v in stored})
+    pipeline.store._values.update({(v["group_key"], v["kpi_key"], v["fiscal_year"], v["fiscal_period"]): v for v in stored})
     pipeline._ask = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("asked again"))
     stored.clear()
-    pipeline._fill_tagged_metrics(reports, spec)  # each tag is kept on its figures: no question, nothing left to fill
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))  # each tag is kept on its figures: no question, nothing left to fill
     assert stored == []
 
 
@@ -192,12 +192,12 @@ def test_a_breakdowns_rounded_lines_take_the_reports_exact_figures():
                        for p, a, v in (("Q1", "q1", 1.53e9), ("Q2", "q2", 1.60e9), ("Q3", "q3", 1.65e9), ("Q4", "k", 1.72e9))}
     pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
+    pipeline.store.write = stored.extend
     spec = ai.Spec.model_validate({"groups": [{"key": "customers", "label": "Customers", "kind": "revenue_breakdown",
                                                "kpis": [{"key": "business", "label": "Business", "unit": "currency"}]}]})
     reports = [SimpleNamespace(accession=a, form="10-K" if a == "k" else "10-Q", filed=day(2026, 1, 1), source_url="u")
                for a in ends]
-    pipeline._fill_tagged_metrics(reports, spec)
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
     assert {v["fiscal_period"]: v["value"] for v in stored} == {"Q1": 1_534e6, "Q2": 1_595e6, "Q3": 1_648e6, "Q4": 1_718e6}
     assert all(v["locator"]["total"] == 6e9 and v["notes"][0].startswith("parts make up") for v in stored)
 
@@ -233,7 +233,7 @@ def test_a_breakdowns_year_before_comes_from_the_reports_comparative_columns():
         for p, a in (("Q1", "q1"), ("Q2", "q2"), ("Q3", "q3"), ("Q4", "k")):
             exact = columns[a][0][index] if a != "k" else 1_718e6
             tagged = a != "k"
-            pipeline.values[("kpi_customers", kpi, "2025", p)] = {
+            pipeline.store._values[("kpi_customers", kpi, "2025", p)] = {
                 "group_key": "kpi_customers", "group_label": "Customers", "group_kind": "revenue_breakdown", "group_order": 20,
                 "kpi_key": kpi, "kpi_label": kpi.title(), "kpi_order": 0, "unit": "currency", "currency": "USD",
                 "fiscal_year": "2025", "fiscal_period": p, "period_end": ends[a], "method": "ai", "validation_status": "verified",
@@ -242,13 +242,13 @@ def test_a_breakdowns_year_before_comes_from_the_reports_comparative_columns():
                                                 "dimensions": {"dim_srt_MajorCustomersAxis": members[kpi]}} if tagged else {})}}
     pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
+    pipeline.store.write = stored.extend
     spec = ai.Spec.model_validate({"groups": [{"key": "customers", "label": "Customers", "kind": "revenue_breakdown", "kpis": [
         {"key": "total", "label": "Total", "unit": "currency"},  # listed, never given by a release
         {"key": "business", "label": "Business", "unit": "currency"}, {"key": "creative", "label": "Creative", "unit": "currency"}]}]})
     reports = [SimpleNamespace(accession=a, form="10-K" if a == "k" else "10-Q", filed=day(2026, 1, 1), source_url="u")
                for a in ends]
-    pipeline._fill_tagged_metrics(reports, spec)
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
     by = {(v["kpi_key"], v["fiscal_year"], v["fiscal_period"]): v["value"] for v in stored}
     assert by == {("business", "2024", "Q1"): 1_339e6, ("business", "2024", "Q2"): 1_380e6, ("business", "2024", "Q3"): 1_437e6,
                   ("creative", "2024", "Q1"): 3_550e6, ("creative", "2024", "Q2"): 3_650e6, ("creative", "2024", "Q3"): 3_715e6,
@@ -284,19 +284,19 @@ def test_a_flagged_breakdown_quarter_whose_lines_are_all_tagged_exactly_is_settl
             "Q3": (1_300_000e3, 230_001e3, 1_530_001e3)}  # Q3's second line is a thousand off its tag
     for period, (fees, transaction, total) in read.items():
         for kpi, value in (("fees", fees), ("transaction", transaction), ("total", total)):
-            pipeline.values[("kpi_am", kpi, "2026", period)] = {
+            pipeline.store._values[("kpi_am", kpi, "2026", period)] = {
                 "group_key": "kpi_am", "group_label": "AM", "group_kind": "revenue_breakdown", "group_order": 20, "kpi_key": kpi,
                 "kpi_label": kpi, "kpi_order": 0, "unit": "currency", "currency": "USD", "fiscal_year": "2026", "fiscal_period": period,
                 "period_end": ends[f"q{period[1]}"], "method": "ai", "validation_status": "needs_review", "source_accession": "release",
                 "value": value, "notes": ["total matches no figure the company reported in XBRL"], "locator": {"total": total}}
     pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
+    pipeline.store.write = stored.extend
     spec = ai.Spec.model_validate({"groups": [{"key": "am", "label": "AM", "kind": "revenue_breakdown", "total_kpi": "total", "kpis": [
         {"key": "total", "label": "Total", "unit": "currency"}, {"key": "fees", "label": "Fees", "unit": "currency"},
         {"key": "transaction", "label": "Transaction", "unit": "currency"}]}]})
     reports = [SimpleNamespace(accession=a, form="10-Q", filed=day(2026, 11, 1), source_url="u") for a in ends]
-    pipeline._fill_tagged_metrics(reports, spec)
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
     settled = {(v["fiscal_period"], v["kpi_key"]) for v in stored if v["validation_status"] == "verified"}
     assert settled == {(p, k) for p in ("Q1", "Q2") for k in ("fees", "transaction", "total")}
     assert all(v["notes"] == ["the 10-Q's exact figure; every line of the quarter is tagged"] for v in stored)
@@ -330,7 +330,7 @@ def test_a_breakdown_quarter_missing_lines_its_report_tags_is_completed_when_it_
     for period, lines in read.items():
         total = sum(tagged[f"q{period[1]}"][kpi] for kpi in ("nr", "nii"))
         for kpi, value in lines.items():
-            pipeline.values[("kpi_rev", kpi, "2026", period)] = {
+            pipeline.store._values[("kpi_rev", kpi, "2026", period)] = {
                 "group_key": "kpi_rev", "group_label": "Revenue", "group_kind": "revenue_breakdown", "group_order": 20,
                 "kpi_key": kpi, "kpi_label": kpi, "kpi_order": 0, "unit": "currency", "currency": "USD", "fiscal_year": "2026",
                 "fiscal_period": period, "period_end": ends[f"q{period[1]}"], "method": "ai",
@@ -338,14 +338,14 @@ def test_a_breakdown_quarter_missing_lines_its_report_tags_is_completed_when_it_
                 "notes": ["parts differ from the total by 40%"], "locator": {"total": total}}
     pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
+    pipeline.store.write = stored.extend
     spec = ai.Spec.model_validate({"groups": [{"key": "rev", "label": "Revenue", "kind": "revenue_breakdown", "total_kpi": "total", "kpis": [
         {"key": "fees", "label": "Fees", "unit": "currency", "parent": "nr"},
         {"key": "card", "label": "Card", "unit": "currency", "parent": "nr"},
         {"key": "nr", "label": "Noninterest revenue", "unit": "currency"}, {"key": "nii", "label": "NII", "unit": "currency"},
         {"key": "total", "label": "Total", "unit": "currency"}]}]})
     reports = [SimpleNamespace(accession=a, form="10-Q", filed=day(2026, 11, 1), source_url="u") for a in ends]
-    pipeline._fill_tagged_metrics(reports, spec)
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
     q3 = {v["kpi_key"]: v["value"] for v in stored if v["fiscal_period"] == "Q3" and v["validation_status"] == "verified"}
     assert q3 == {"fees": 2.9e9, "nii": 5.2e9, "card": 1.4e9, "nr": 4.3e9}
     assert {(v["fiscal_period"], v["kpi_key"]) for v in stored} >= {(p, k) for p in ("Q1", "Q2") for k in ("fees", "card", "nr", "nii")}

@@ -31,26 +31,26 @@ def own_label(ref: FilingRef, own: dict) -> str:
 class ReleaseTableReading:
     """Figures read from earnings releases' tables with no AI: breakdowns, quarter tables and repeated rows."""
 
-    def _store_release_breakdowns(self, releases: list[FilingRef]) -> None:
+    def _read_release_breakdowns(self, releases: list[FilingRef]) -> list[dict]:
         """The newest quarter's segment and product revenue from its earnings release, while its report is not filed
         (Alphabet's 10-Q follows its release by days): each breakdown the reports gave last quarter, its lines found in
         a table of the release by name and checked against the year-ago column and total revenue. The report's XBRL
         replaces them; a breakdown the release does not give (Alphabet's regions) waits for the report."""
         latest = max((ref for ref in releases if ref.period_end), key=lambda item: item.filed, default=None)
         if latest is None:
-            return
+            return []
         try:
             own = fiscal_label(latest.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
             live = [value for value in self.values.values() if value["validation_status"] == "verified"
                     and value["fiscal_period"] != "FY" and value["unit"] == "currency"]
             if any(value["method"] == "xbrl" and (value["fiscal_year"], value["fiscal_period"]) == own for value in live):
-                return  # the report is in
+                return []  # the report is in
             stored = {value["group_key"] for value in live if (value["fiscal_year"], value["fiscal_period"]) == own
                       and (value.get("locator") or {}).get("release_table") and value["source_accession"] == latest.accession}
             reported = [value for value in live if value["method"] in ("xbrl", "derived")
                         and (value["fiscal_year"], value["fiscal_period"]) < own]
             if not reported:
-                return
+                return []
             before = max((value["fiscal_year"], value["fiscal_period"]) for value in reported)
             year_ago = (str(int(own[0]) - 1), own[1])
             groups: dict[str, list[dict]] = {}
@@ -99,12 +99,13 @@ class ReleaseTableReading:
                                  **({"prior": found.prior[member]} if member in found.prior else {})},
                     ))
             if records:
-                self._store(values=records)
-                self.log(f"{self.symbol}: {latest.form} {latest.filed} release breakdowns stored ({len(records)} values)")
+                self.log(f"{self.symbol}: {latest.form} {latest.filed} release breakdowns read ({len(records)} values)")
+            return records
         except Exception as error:  # noqa: BLE001
             self.log(f"{self.symbol}: breakdowns of {latest.form} {latest.filed} not read ({type(error).__name__}: {error})"[:300])
+            return []
 
-    def _fill_quarter_tables(self, releases: list[FilingRef]) -> None:
+    def _fill_quarter_tables(self, releases: list[FilingRef]) -> list[dict]:
         """A metric's missing quarters from the quarter-headed tables releases carry (ASML's slides give five quarters of
         lithography systems sold; its KPI, added later, was read only from the latest releases). A row is found by the
         names the KPI's readings give it and taken only when another of its columns equals a figure already held, which
@@ -129,7 +130,7 @@ class ReleaseTableReading:
             if labels and gaps:
                 wanted[kpi] = (sorted(labels), gaps)
         if not wanted:
-            return
+            return []
         reach = {quarter for _labels, gaps in wanted.values() for gap in gaps for quarter in own
                  if 0 <= index(quarter) - index(gap) <= 4}
         texts: dict[str, list[str]] = {}
@@ -175,10 +176,10 @@ class ReleaseTableReading:
                                 "notes": [f"from the quarterly table of the release for {own_label(ref, own)}"],
                                 "locator": {"quarter_table": True, "row": labels[0]}})
         if records:
-            self._store(values=records)
             self.log(f"{self.symbol}: {len(records)} KPI values from the releases' quarterly tables")
+        return records
 
-    def _fill_quoted_rows(self, releases: list[FilingRef]) -> None:
+    def _fill_quoted_rows(self, releases: list[FilingRef]) -> list[dict]:
         """A metric's missing quarters from rows its releases repeat in a fixed layout: TSMC's management report gives
         "Shipment (Kpcs, 12"-equiv. Wafer) 2,916 3,227 3,799" (the quarter, the one before, the year before). The layout
         is learned from the KPI's own readings, a column for a lag only when at least two readings agree with figures
@@ -297,10 +298,10 @@ class ReleaseTableReading:
                                 "value": value, "method": "ai", "validation_status": "verified", "reconciliation_error_pct": None,
                                 "notes": [f"from {where}"], "locator": {"quoted_row": True, "row": labels[0]}})
         if records:
-            self._store(values=records)
             self.log(f"{self.symbol}: {len(records)} KPI values from rows the releases repeat")
+        return records
 
-    def _fill_release_columns(self, releases: list[FilingRef]) -> None:
+    def _fill_release_columns(self, releases: list[FilingRef]) -> list[dict]:
         """A recent listing's releases show earlier quarters beside their own (see release_columns): each KPI read from a
         release and each line of a breakdown its reports tag are taken from those columns for quarters held by nothing
         else, at the scale of the release's own figure. A breakdown's quarter must add up to the revenue another source
@@ -323,8 +324,8 @@ class ReleaseTableReading:
             records += self._release_column_kpis(ref, own, rows)
             records += self._release_column_lines(ref, own, rows, groups)
         if records:
-            self._store(values=records)
             self.log(f"{self.symbol}: {len(records)} values from the earlier quarters the releases show")
+        return records
 
     def _quarter_of(self, end: date) -> tuple[str, str] | None:
         try:

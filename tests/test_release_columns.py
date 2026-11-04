@@ -49,6 +49,6 @@ def test_a_kpi_read_from_a_release_takes_its_earlier_columns_at_its_own_scale():
                    "value": 12_000_000.0, "source_accession": "a", "locator": {"block": "P5", "quote": "Starlink Subscribers (#, in millions, as of period end) 12.0 10.3 6.0"}}
     pipeline.values = {("kpi_operating", "subs", "2026", "Q2"): subscribers}
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
-    pipeline._fill_release_columns([SimpleNamespace(accession="a", form="8-K", filed=date(2026, 8, 4), source_url="u", period_end=date(2026, 6, 30))])
+    pipeline.store.write = stored.extend
+    pipeline.store.write(pipeline._fill_release_columns([SimpleNamespace(accession="a", form="8-K", filed=date(2026, 8, 4), source_url="u", period_end=date(2026, 6, 30))]))
     assert sorted((v["fiscal_year"], v["fiscal_period"], v["value"]) for v in stored) == [("2025", "Q2", 6_000_000.0), ("2026", "Q1", 10_300_000.0)]

@@ -10,6 +10,7 @@ from ..document import Document, clean
 from ..extract import MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, check_period, count_jump, validate_groups
 from ..fiscal import fiscal_label
 from ..sec import FilingRef
+from ..store import FilingReading, failed_reading
 from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI,
                      _annual_header, _chain_of, _days, _document_text, _is_jump, _same, _significant, value_key)
 
@@ -60,14 +61,13 @@ def release_reread_due(previous: dict | None) -> bool:
 class ReleaseFlow:
     """Earnings documents in turn: which are read, by how many readers at once, and how their readings are stored."""
 
-    def _process_release(self, ref: FilingRef, spec: Spec, version: int) -> bool:
+    def _read_release(self, ref: FilingRef, spec: Spec, version: int) -> FilingReading | None:
         previous = self.filings.get(ref.accession)
         if not self.force and previous and previous.get("spec_version") == version and (
                 previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS) and not release_reread_due(previous):
-            return False
+            return None
         if not spec.groups:
-            self._store_filing(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
-            return True
+            return FilingReading(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
         if ref.period_end != self._newest_release:
             spec = self._readable(spec)  # the newest quarter always reads every group: a fixed bug lets it verify
         try:
@@ -106,10 +106,16 @@ class ReleaseFlow:
             status = "processed" if verified else "needs_review" if records else "skipped"
             unreported = _unreported(spec, read)
             notes = [how, _RELEASE_READER, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []), *problems[:20]]
-            self._store_filing(ref, status, records=records, spec_version=version, period_end=period_end,
-                               fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
+            return FilingReading(ref, status, records=records, spec_version=version, period_end=period_end,
+                                 fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001
-            self._fail_filing(ref, error, spec_version=version)
+            return failed_reading(ref, error, version)
+
+    def _read_and_record_release(self, ref: FilingRef, spec: Spec, version: int) -> bool:
+        reading = self._read_release(ref, spec, version)
+        if reading is None:
+            return False
+        self.store.record_or_fail(reading, self._dead)
         return True
 
     def _readable(self, spec: Spec) -> Spec:
@@ -158,7 +164,7 @@ class ReleaseFlow:
         done: set[str] = set()
 
         def read(ref: FilingRef) -> None:
-            if self._process_release(ref, spec, version):
+            if self._read_and_record_release(ref, spec, version):
                 done.add(ref.accession)
 
         def chain(quarter_refs: list[FilingRef]) -> None:
@@ -181,14 +187,17 @@ class ReleaseFlow:
                 chains.setdefault(_chain_of(ref.period_end or date.min), []).append(ref)
             with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
                 list(pool.map(chain, chains.values()))
-            self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
-                                    | {key for key in before if self.values[key].get("source_accession") in done}, refs)
+            flagged, jumps = self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
+                                                     | {key for key in before if self.values[key].get("source_accession") in done})
+            self.store.write(flagged)
+            self.store.write(self._explain_stored(jumps, refs))
         return [ref for ref in refs if ref.accession in done]
 
-    def _check_read_series(self, keys: set[tuple], refs: list[FilingRef] = ()) -> None:
+    def _check_read_series(self, keys: set[tuple]) -> tuple[list[dict], set[tuple]]:
         """The jump checks of quarters read side by side, run again in date order: each value against the quarter before
         it (a share against its last share, an amount against three times or a third of its last), and an amount equal
-        to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole."""
+        to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole. Gives the
+        rows to flag and the keys of those that jumped."""
         series: dict[tuple[str, str], list[dict]] = {}
         for v in self.values.values():
             if v["method"] == "ai" and v["validation_status"] == "verified" and v["fiscal_period"] != "FY":
@@ -225,11 +234,9 @@ class ReleaseFlow:
             if key in flagged or (group_period in groups and value["method"] == "ai" and value["validation_status"] == "verified"):
                 note = flagged.get(key, "another part of this breakdown needs review")
                 changed.append({**value, "validation_status": "needs_review", "notes": [*(value.get("notes") or []), note]})
-        for start in range(0, len(changed), 400):
-            self._store(values=changed[start:start + 400])
-        self._explain_stored({key for key, note in flagged.items() if _is_jump(note)}, refs)
+        return changed, {key for key, note in flagged.items() if _is_jump(note)}
 
-    def _explain_stored(self, keys: set[tuple], refs: list[FilingRef]) -> None:
+    def _explain_stored(self, keys: set[tuple], refs: list[FilingRef]) -> list[dict]:
         """Jumps the date-order check found, given the reading-time treatment: the reasoning reader is asked whether each is a real
         change, and one backed by a quote found in the document stands (its breakdown's other parts are released by
         _release_held_breakdowns). One reasoning call per release with such a jump."""
@@ -265,8 +272,7 @@ class ReleaseFlow:
                 if verdict and verdict.legitimate and len(quote) >= 20 and quote in haystack:
                     cleared.append({**v, "validation_status": "verified",
                                     "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"]})
-        for start in range(0, len(cleared), 400):
-            self._store(values=cleared[start:start + 400])
+        return cleared
 
     def _immaterial(self, value: dict) -> bool:
         """A breakdown row under 1% of its total, whose swings say nothing (as validate_groups treats it)."""

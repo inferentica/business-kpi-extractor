@@ -21,7 +21,7 @@ from .archive import Archive
 from .control import ControlError
 from .document import Document
 from .sec import FilingRef, company_profile, earnings_releases, periodic_reports
-from .steps.shared import _folder, only_adds, value_key
+from .steps.shared import RecordBuilding, _folder, only_adds
 from .steps.loading import FilingLoading
 from .steps.reports import ReportReading
 from .steps.financial_statements import StatementReading
@@ -34,7 +34,7 @@ from .steps.release_flow import ReleaseFlow
 from .steps.ai_reading import AiReading
 from .steps.series_identity import SeriesIdentity
 from .steps.series_checks import SeriesChecks
-from .steps.storage import Storage
+from .store import CompanyStore, FilingReading
 
 _PASSED_OVER = "not an earnings document: no exhibit, or furnished outside the weeks after a quarter end"
 LOCK_WAITS, LOCK_WAIT_SECONDS = 20, 30
@@ -67,7 +67,10 @@ class SymbolResult:
 
 class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReading, ReleaseTableReading,
                      TaggedKpiReading, ListingHistory, KpiListUpkeep, ReleaseFlow, AiReading,
-                     SeriesIdentity, SeriesChecks, Storage):
+                     SeriesIdentity, SeriesChecks, RecordBuilding):
+    """The run order, and every write of a step's rows: steps read through self.values and self.filings (read-only) and
+    hand back what they want written."""
+
     def __init__(self, control, symbol: str, quarters: int, force: bool, today: date | None = None, log=print,
                  wait_for_lock: bool = False, report_quarters: int | None = None):
         self.control = control
@@ -80,8 +83,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.reports_since = (today or date.today()) - timedelta(days=92 * max(quarters, report_quarters or 0) + 120)
         self.log = log
         self.result = SymbolResult(symbol)
-        self.filings: dict[str, dict] = {}
-        self.values: dict[tuple, dict] = {}
+        self.store = CompanyStore(control, symbol, self.result, log)
         self.names: dict = {}
         self._xbrl_cache: dict[str, Future] = {}
         self._xbrl_used: set[str] = set()
@@ -101,6 +103,14 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self._curations: dict[tuple, list[str]] = {}
                 # A Refresh waits for a run already working on the company instead of being skipped.
         self.wait_for_lock = wait_for_lock
+
+    @property
+    def values(self):
+        return self.store.values
+
+    @property
+    def filings(self):
+        return self.store.filings
 
     @property
     def company(self) -> str:
@@ -132,8 +142,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             return self.result
         self._curations = {(row["group_key"], row["members_key"]): list(row["chosen"])
                            for row in state.get("curations") or []}
-        self.filings = {filing["accession"]: filing for filing in state.get("filings") or []}
-        self.values = {value_key(value): value for value in state.get("values") or []}
+        self.store.load(state.get("values") or [], state.get("filings") or [])
         self.names = (state.get("spec") or {}).get("names") or {}
         # Which filing gave each stored statement period: a quarter read from releases belongs to the newest release
         # that presents it.
@@ -162,15 +171,21 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             later = [other for other in pending if other.filed > ref.filed or (other.filed == ref.filed and other is not ref)]
             for other in later[:_READ_AHEAD]:
                 self._read_ahead(other)
-            self._process_report(ref)
+            reading = self._read_report(ref)
+            if reading is not None:
+                self.store.record_or_fail(reading)
         releases = [ref for ref in sorted(listing.result(), key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
         for ref in passed:
             if ref.accession not in self.filings:
-                self._store_filing(ref, "skipped", notes=[_PASSED_OVER], counted=False)
+                self.store.record(FilingReading(ref, "skipped", notes=[_PASSED_OVER], counted=False))
         self._newest_release = max((ref.period_end for ref in releases if ref.period_end), default=None)
         self._store_release_statements(reports, releases)
-        self._store_chart_breakdowns(releases)
-        self._store_release_breakdowns(releases)
+        if self._no_quarterly_reports(reports):
+            self._write_extra(self._read_titled_pies(releases), "pie figures")
+        for rows in self._read_chart_breakdowns(releases):
+            self._write_extra(rows, "chart figures")
+        self.store.write(self._bare_shares())
+        self._write_extra(self._read_release_breakdowns(releases), "release breakdowns")
         for ref in releases:
             if self.force or self._pending(ref):
                 for exhibit in ref.exhibits[:6]:
@@ -202,30 +217,35 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         prospectus = self._prospectus(company, reports)
         # Each breakdown's year before its first report, from that report's comparatives (a recent listing; Brookfield
         # Asset Management, filing 10-Qs since 2025).
-        self._year_ago_quarters()
-        self._retire_named_remainders()
+        self.store.write(self._year_ago_quarters())
+        self.store.write(self._retire_named_remainders())
         if prospectus is not None:
             self._store_prospectus_breakdowns(prospectus)
             if spec is not None:
                 self._read_prospectus_quarters(prospectus, releases, spec, version)
             # After the prospectus, whose audited figures stand where both give a quarter.
-            self._fill_release_columns(releases)
+            self.store.write(self._fill_release_columns(releases))
         if spec is not None:
-            self._adopt_listed_keys(spec)
-            self._fill_tagged_metrics(reports, spec)
-            self._fill_quarter_tables(releases)
-            self._fill_quoted_rows(releases)
-        self._refile_annuals()
-        self._recheck_flagged()
-        self._anchor_ai_breakdowns()
-        self._prove_flagged(releases)
-        self._join_custom_axes()
-        self._unify_series()
-        self._unify_release_series(releases)
-        self._adopt_restated_quarters()
-        self._fix_mislabelled_quarters()
-        self._derive(spec)
-        self._harmonize_labels()
+            self.store.write(self._adopt_listed_keys(spec))
+            self.store.write(self._fill_tagged_metrics(reports, spec))
+            self.store.write(self._fill_quarter_tables(releases))
+            self.store.write(self._fill_quoted_rows(releases))
+        # Across periods, in this order: each step sees what the one before wrote.
+        self.store.write(self._unfile_quarters())
+        self.store.write(self._refile_annuals())
+        self.store.write(self._recheck_flagged())
+        self.store.write(self._release_held_breakdowns())
+        self.store.write(self._anchor_ai_breakdowns())
+        self.store.write(self._prove_flagged(releases))
+        self.store.write(self._release_held_breakdowns())
+        self.store.write(self._join_custom_axes())
+        self.store.write(self._unify_series())
+        self.store.write(self._unify_release_series(releases))
+        self.store.write(self._adopt_restated_quarters())
+        for rows in self._fix_mislabelled_quarters():
+            self.store.write(rows)
+        self.store.write(self._derive(spec))
+        self.store.write(self._harmonize_labels())
         self.result.q4_gaps = self._q4_gaps()
         live = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] != "rejected"]
         self.result.release_values = len(live)
@@ -238,3 +258,20 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             future.exception()  # archiving finishes before the download threads are shut down
         self.log(f"{self.symbol}: filing archive {self.archive.reads} read, {self.archive.writes} added")
         return self.result
+
+    def _write_extra(self, rows: list[dict], what: str) -> None:
+        """Figures a filing's report will replace or that only add to it: failing to store them never holds up the KPIs."""
+        try:
+            self.store.write(rows)
+        except Exception as error:  # noqa: BLE001
+            self.log(f"{self.symbol}: {what} not stored ({type(error).__name__}: {error})"[:300])
+
+    def _store_prospectus_breakdowns(self, ref: FilingRef) -> None:
+        reading, renamed = self._read_prospectus_breakdowns(ref)
+        if reading is None:
+            return
+        try:
+            self.store.record(reading)
+            self.store.write(self._join_prospectus_names(renamed))
+        except Exception as error:  # noqa: BLE001 - the history is extra
+            self.log(f"{self.symbol}: prospectus breakdowns not stored ({type(error).__name__}: {error})"[:300])

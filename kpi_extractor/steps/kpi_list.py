@@ -10,6 +10,7 @@ from ..control import ControlError
 from ..extract import _listed_kpi
 from ..sec import FilingRef, classification_excerpt, is_own_document
 from ..segment_income import GROUP_KEY as INCOME_GROUP
+from ..store import FilingReading
 from ..xbrl import XbrlCandidate
 from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds
 
@@ -121,8 +122,7 @@ class KpiListUpkeep:
         except AiResponseError:
             return None
         self._curations[cache_key] = answer.members
-        self.control.call("store", symbol=self.symbol, filings=[], values=[], curations=[
-            {"group_key": candidate.key, "members_key": cache_key[1], "chosen": answer.members}])
+        self.store.curation(candidate.key, cache_key[1], answer.members)
         return candidate.group(answer.members)
 
     def _is_earnings_document(self, ref: FilingRef) -> bool:
@@ -139,7 +139,7 @@ class KpiListUpkeep:
         except (AiResponseError, ControlError):
             return False  # nothing is recorded, so the next run classifies it again
         if answer.kind == "other":
-            self._store_filing(ref, "skipped", notes=[_NOT_EARNINGS, *([_CLASSIFIED_PAST_COVER] if own else [])])
+            self.store.record(FilingReading(ref, "skipped", notes=[_NOT_EARNINGS, *([_CLASSIFIED_PAST_COVER] if own else [])]))
             return False
         return True
 
@@ -153,7 +153,7 @@ class KpiListUpkeep:
                 # an hour before the 10-Q tagged them) goes once the report's XBRL gives the same rows.
                 cleaned = without_xbrl_repeats(spec, [] if self.profile.foreign else self._current_xbrl_members())
                 if cleaned is not spec:
-                    self._set_aside_dropped(spec, cleaned)
+                    self.store.write(self._set_aside_dropped(spec, cleaned))
                     spec = cleaned
             if spec.model_dump() != stored.model_dump():
                 # A stored list that breaks the rules is repaired once; its filings are then read with the new version.
@@ -191,7 +191,7 @@ class KpiListUpkeep:
         # and service sales, listed before XBRL tagged them as a view) goes.
         spec = without_xbrl_repeats(spec, [] if self.profile.foreign else self._current_xbrl_members(),
                                     keep=current if getattr(self, "_owner_edited", False) else None)
-        self._set_aside_dropped(current, spec)
+        self.store.write(self._set_aside_dropped(current, spec))
         spec = self._capped(spec)
         # Names may only rename breakdowns and members that exist.
         names = {
@@ -204,24 +204,23 @@ class KpiListUpkeep:
         self.log(f"{self.symbol}: KPI list v{version} with {sum(len(g.kpis) for g in spec.groups)} KPIs")
         return spec, version, True
 
-    def _set_aside_dropped(self, before: Spec | None, after: Spec) -> None:
+    def _set_aside_dropped(self, before: Spec | None, after: Spec) -> list[dict]:
         """Figures of a group the list no longer has because it repeats an XBRL breakdown are set aside, as the template
         page's save does, so the breakdown is not shown twice (once from XBRL, once as releases' leftover rows)."""
         if before is None:
-            return
+            return []
         covered = [] if self.profile.foreign else self._current_xbrl_members()
         kept = {group.key for group in after.groups}
         dropped = {f"{AI_GROUP_PREFIX}{group.key}" for group in before.groups
                    if group.key not in kept and repeats_xbrl(group, covered)}
         if not dropped:
-            return
+            return []
         aside = [{**value, "validation_status": "rejected", "notes": ["repeats a breakdown read from XBRL"]}
                  for value in self.values.values()
                  if value["group_key"] in dropped and value["method"] in ("ai", "derived") and value["validation_status"] != "rejected"]
-        for start in range(0, len(aside), 400):
-            self._store(values=aside[start:start + 400])
         if aside:
             self.log(f"{self.symbol}: {len(aside)} values of {', '.join(sorted(dropped))} set aside (repeats XBRL)")
+        return aside
 
     def _capped(self, spec: Spec) -> Spec:
         """normalize_spec, with any KPI the cap took off recorded for the run summary."""
@@ -265,16 +264,14 @@ class KpiListUpkeep:
         updated = self._capped(updated)  # the audit's additions are kept to the cap like any list
         if updated.model_dump() == spec.model_dump():
             return None
-        self._set_aside_dropped(spec, updated)
+        self.store.write(self._set_aside_dropped(spec, updated))
         self._store_spec(updated, self.names, version + 1, latest_quarter[-1].accession)
         self.log(f"{self.symbol}: KPI list v{version + 1} after audit ({sum(len(g.kpis) for g in updated.groups)} KPIs)")
         return updated, version + 1
 
     def _store_spec(self, spec: Spec, names: dict, version: int, accession: str) -> None:
-        self.control.call("store", symbol=self.symbol, spec={
-            "version": version, "groups": [group.model_dump() for group in spec.groups], "names": names,
-            "sourceAccession": accession,
-        })
+        self.store.spec({"version": version, "groups": [group.model_dump() for group in spec.groups], "names": names,
+                         "sourceAccession": accession})
 
     def _xbrl_breakdowns(self) -> dict[str, dict]:
         """Each XBRL breakdown's latest title and members (key → label)."""
@@ -338,10 +335,9 @@ class KpiListUpkeep:
                    "document_role": ref.role, "source_url": ref.source_url, "period_end": filing.get("period_end"),
                    "spec_version": version, "status": filing["status"], "attempts": max(1, filing.get("attempts") or 1),
                    "value_count": filing.get("value_count", 0), "notes": filing.get("notes") or []}
-        self._store(filings=[carried])
-        self.filings[ref.accession] = {**filing, "spec_version": version}
+        self.store.carry(carried)
 
-    def _adopt_listed_keys(self, spec: Spec) -> None:
+    def _adopt_listed_keys(self, spec: Spec) -> list[dict]:
         """Stored rows of a table read whole move to the key of the listed KPI they are ("3-nanometer" → nm3), the key a
         row-by-row reading uses, so one quarter never holds a figure twice and years line up for Q4. No AI involved."""
         groups = {AI_GROUP_PREFIX + group.key: group for group in spec.groups}
@@ -359,5 +355,4 @@ class KpiListUpkeep:
                 continue
             moved.append({**v, "kpi_key": kpi.key, "kpi_label": kpi.label})
             moved.append({**v, "validation_status": "rejected", "notes": [f"continued as {kpi.key}"]})
-        for start in range(0, len(moved), 400):
-            self._store(values=moved[start:start + 400])
+        return moved

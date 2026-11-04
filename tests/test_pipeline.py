@@ -8,6 +8,7 @@ from kpi_extractor.document import parse_document
 from kpi_extractor.evaluate import score
 from kpi_extractor.extract import read_values
 from kpi_extractor.pipeline import SymbolPipeline
+from kpi_extractor.store import FilingReading, failed_reading
 from kpi_extractor.steps.ai_reading import _template
 from kpi_extractor.steps.kpi_list import apply_maintenance, without_xbrl_repeats
 from kpi_extractor.xbrl import XbrlCandidate
@@ -301,7 +302,7 @@ def test_a_re_read_withdraws_what_the_earlier_reading_of_that_filing_had():
     pipeline = _pipeline(control, [old])
     ref = FilingRef("a1", "6-K", date(2026, 7, 15), "earnings_release", "https://www.sec.gov/x.htm")
     new = {**old, "group_key": "kpi_revenue_by_product_line", "value": 6.0}
-    pipeline._store_filing(ref, "processed", records=[new])
+    pipeline.store.record(FilingReading(ref, "processed", records=[new]))
     assert pipeline.values[("kpi_revenue_by_product", "systems", "2026", "Q2")]["validation_status"] == "rejected"
     assert pipeline.values[("kpi_revenue_by_product_line", "systems", "2026", "Q2")]["validation_status"] == "verified"
     assert pipeline.filings["a1"]["value_count"] == 1
@@ -349,7 +350,8 @@ def test_a_fast_growers_real_q4_is_not_taken_for_a_year():
     history.append({**base, "fiscal_year": "2026", "fiscal_period": "Q4", "period_end": "2026-12-31",
                     "source_accession": "q4", "locator": {"total": 300}})
     pipeline = _pipeline(FakeControl({}), history)
-    pipeline._refile_annuals()
+    pipeline.store.write(pipeline._unfile_quarters())
+    pipeline.store.write(pipeline._refile_annuals())
     assert pipeline.values[("kpi_product", "a", "2026", "Q4")]["validation_status"] == "verified"
 
 
@@ -367,7 +369,7 @@ def test_one_business_keeps_one_series_across_renamed_and_reused_elements():
         row("2026", "Q3", "2026-03-31", "linkedin", 4832.0, "msft:LinkedInCorporationMember"),
     ]
     pipeline = _pipeline(FakeControl({}), history)
-    pipeline._unify_series()
+    pipeline.store.write(pipeline._unify_series())
     live = {(v["fiscal_year"], v["fiscal_period"]): v["kpi_key"] for v in pipeline.values.values()
             if v["validation_status"] != "rejected" and v["kpi_key"] != "linkedin"}
     assert set(live.values()) == {"searchadvertising"} and len(live) == 4
@@ -398,7 +400,7 @@ def test_stored_whole_table_rows_move_to_the_listed_keys():
             {**base, "kpi_key": "nm3", "kpi_label": "3nm", "value": 30.0, "validation_status": "needs_review",
              "source_accession": "release"}]
     pipeline = _pipeline(FakeControl({}), rows)
-    pipeline._adopt_listed_keys(spec)
+    pipeline.store.write(pipeline._adopt_listed_keys(spec))
     assert pipeline.values[("kpi_technology", "nm3", "2026", "Q2")]["value"] == 320.0
     assert pipeline.values[("kpi_technology", "r3nanometer", "2026", "Q2")]["validation_status"] == "rejected"
 
@@ -418,7 +420,7 @@ def test_a_failed_re_read_keeps_the_filings_good_values():
             "source_accession": "a1", "group_label": "x", "kpi_label": "x"}
     pipeline = _pipeline(FakeControl({}), [good])
     ref = FilingRef("a1", "8-K", date(2026, 7, 15), "earnings_release", "https://www.sec.gov/x.htm")
-    pipeline._fail_filing(ref, RuntimeError("AI unavailable"))
+    pipeline.store.record(failed_reading(ref, RuntimeError("AI unavailable")))
     assert pipeline.values[("kpi_segments", "cloud", "2026", "Q2")]["validation_status"] == "verified"
 
 
@@ -430,7 +432,8 @@ def test_a_big_q4_is_never_moved_to_the_year_by_size_alone():
             {**base, "fiscal_year": "2026", "fiscal_period": "Q4", "period_end": "2026-12-31", "source_accession": "q4",
              "locator": {"total": 260, "header": "three months ended @ # #"}}]
     pipeline = _pipeline(FakeControl({}), rows)
-    pipeline._refile_annuals()
+    pipeline.store.write(pipeline._unfile_quarters())
+    pipeline.store.write(pipeline._refile_annuals())
     assert pipeline.values[("kpi_product", "a", "2026", "Q4")]["validation_status"] == "verified"
 
 
@@ -525,7 +528,7 @@ def test_an_ai_breakdown_must_total_a_reported_figure():
     bad = [{**base, "group_key": "kpi_wrong", "kpi_key": k, "method": "ai", "value": v, "validation_status": "verified",
             "locator": {"total": 9000.0}} for k, v in (("a", 5000.0), ("b", 4000.0))]
     pipeline = _pipeline(FakeControl({}), xbrl + good + bad)
-    pipeline._anchor_ai_breakdowns()
+    pipeline.store.write(pipeline._anchor_ai_breakdowns())
     assert pipeline.values[("kpi_cg", "client", "2026", "Q2")]["validation_status"] == "verified"
     assert pipeline.values[("kpi_wrong", "a", "2026", "Q2")]["validation_status"] == "needs_review"
 
@@ -566,7 +569,8 @@ def test_quarters_a_filer_mislabelled_are_relabelled_from_later_comparatives():
     for period, (end, datacenter, embedded) in later.items():
         history += [row("2025", period, end, "datacenter", 1, prior=datacenter), row("2025", period, end, "embedded", 1, prior=embedded)]
     pipeline = _pipeline(FakeControl({}), history)
-    pipeline._fix_mislabelled_quarters()
+    for rows in pipeline._fix_mislabelled_quarters():
+        pipeline.store.write(rows)
     q1 = {k: v["value"] for (g, k, y, p), v in pipeline.values.items() if y == "2024" and p == "Q1" and v["validation_status"] == "verified"}
     assert q1 == {"datacenter": 2337, "client": 1368, "gaming": 922, "embedded": 846}
 
@@ -586,7 +590,7 @@ def test_parts_held_for_another_part_are_released_once_it_clears():
             {**base, "kpi_key": "nm5", "value": 82.0, "validation_status": "needs_review",
              "notes": ["another part of this breakdown needs review"]}]
     pipeline = _pipeline(FakeControl({}), rows)
-    pipeline._release_held_breakdowns()
+    pipeline.store.write(pipeline._release_held_breakdowns())
     assert pipeline.values[("kpi_technology", "nm5", "2024", "FY")]["validation_status"] == "verified"
 
 
@@ -623,7 +627,7 @@ def test_a_breakdown_of_one_segment_is_titled_for_it():
     ai_rows = [{**base, "group_key": "kpi_cg", "group_label": "Revenue by Product", "kpi_key": k, "method": "ai", "value": v,
                 "validation_status": "verified", "locator": {"total": 3841.0}} for k, v in (("client", 3062.0), ("gaming", 779.0))]
     pipeline = _pipeline(FakeControl({}), xbrl + ai_rows)
-    pipeline._anchor_ai_breakdowns()
+    pipeline.store.write(pipeline._anchor_ai_breakdowns())
     assert pipeline.values[("kpi_cg", "client", "2026", "Q2")]["group_label"] == "Client and Gaming Revenue by Product"
 
 
@@ -640,7 +644,8 @@ def _flagged_fixture(html, flagged):
                for key, value in flagged.items()]
     pipeline = _pipeline(FakeControl({}), later + earlier)
     pipeline._document = lambda ref: document
-    pipeline._prove_flagged([SimpleNamespace(accession="later")])
+    pipeline.store.write(pipeline._prove_flagged([SimpleNamespace(accession="later")]))
+    pipeline.store.write(pipeline._release_held_breakdowns())
     return {k: v for (g, k, y, p), v in pipeline.values.items() if y == "2025"}
 
 
@@ -673,7 +678,8 @@ def test_a_flagged_value_equal_to_an_official_figure_is_proven_only_when_precise
         {**xbrl, "kpi_key": "datacenter", "value": 3_859_000_000.0}, {**xbrl, "kpi_key": "round", "value": 60_000_000_000.0},
         {**ai_row, "kpi_key": "datacenter", "value": 3_859_000_000.0}, {**ai_row, "group_key": "kpi_other", "kpi_key": "round",
                                                                          "value": 60_000_000_000.0}])
-    pipeline._prove_flagged([])
+    pipeline.store.write(pipeline._prove_flagged([]))
+    pipeline.store.write(pipeline._release_held_breakdowns())
     assert pipeline.values[("kpi_product", "datacenter", "2025", "Q2")]["validation_status"] == "verified"
     assert pipeline.values[("kpi_other", "round", "2025", "Q2")]["validation_status"] == "needs_review"
 
@@ -690,14 +696,17 @@ def test_a_split_of_part_of_a_reported_line_is_proven_by_nearly_filling_it():
     rows = [{**xbrl, "kpi_key": "subscription", "value": 5_989_000_000.0},
             {**group, "kpi_key": "business", "value": 1_720_000_000.0}, {**group, "kpi_key": "creative", "value": 4_250_000_000.0}]
     pipeline = _pipeline(FakeControl({}), rows)
-    pipeline._prove_flagged([])
+    pipeline.store.write(pipeline._prove_flagged([]))
+    pipeline.store.write(pipeline._release_held_breakdowns())
     assert pipeline.values[("kpi_customer", "business", "2025", "Q4")]["validation_status"] == "verified"
     exact = _pipeline(FakeControl({}), [rows[0], *({**row, "notes": ["the 10-Q's exact figure; the release gave $1.72 billion",
                                                                       *row["notes"]]} for row in rows[1:])])
-    exact._prove_flagged([])
+    exact.store.write(exact._prove_flagged([]))
+    exact.store.write(exact._release_held_breakdowns())
     assert exact.values[("kpi_customer", "creative", "2025", "Q4")]["validation_status"] == "verified"
     short = _pipeline(FakeControl({}), [rows[0], {**rows[1], "value": 1_500_000_000.0}, rows[2]])
-    short._prove_flagged([])
+    short.store.write(short._prove_flagged([]))
+    short.store.write(short._release_held_breakdowns())
     assert short.values[("kpi_customer", "business", "2025", "Q4")]["validation_status"] == "needs_review"
 
 
@@ -720,7 +729,7 @@ def test_an_early_custom_axis_joins_the_standard_group_it_became():
     new = [row("products", key, "2019", "Q1", "2018-04-29", value)
            for key, value in (("gaming", 1723.0), ("datacenter", 701.0), ("automotive", 145.0), ("oemandip", 387.0))]
     pipeline = _pipeline(FakeControl({}), old + new)
-    pipeline._join_custom_axes()
+    pipeline.store.write(pipeline._join_custom_axes())
     joined = {k for (g, k, y, p), v in pipeline.values.items() if g == "products" and y == "2018" and v["validation_status"] == "verified"}
     assert joined == {"gaming", "datacenter", "automotive"}
     assert all(v["validation_status"] == "rejected" for (g, *_), v in pipeline.values.items() if g == "x_revenuebymajormarket")
@@ -749,7 +758,8 @@ def test_a_part_equal_to_xbrl_is_not_proven_in_a_breakdown_that_misses_its_total
         {**part, "kpi_key": "uhc", "value": 87_113_000_000.0, "validation_status": "needs_review", "notes": ["parts differ"]},
         {**part, "kpi_key": "optumrx", "value": 41_456_000_000.0, "validation_status": "verified",
          "notes": ["equals a figure reported in XBRL"]}])
-    pipeline._prove_flagged([])
+    pipeline.store.write(pipeline._prove_flagged([]))
+    pipeline.store.write(pipeline._release_held_breakdowns())
     assert pipeline.values[("kpi_segment", "uhc", "2025", "Q4")]["validation_status"] == "needs_review"
     assert pipeline.values[("kpi_segment", "optumrx", "2025", "Q4")]["validation_status"] == "needs_review"
 
@@ -770,7 +780,7 @@ def test_a_renamed_release_line_joins_its_series_by_the_year_ago_cell():
             row("subscriptions", "2023", "Q4", "2023-12-31", 10_794.0, "new", {"table": table, "row": 1, "col": 1})]
     pipeline = _pipeline(FakeControl({}), rows)
     pipeline._document = lambda ref: document
-    pipeline._unify_release_series([SimpleNamespace(accession="new")])
+    pipeline.store.write(pipeline._unify_release_series([SimpleNamespace(accession="new")]))
     renamed = {(y, p) for (g, k, y, p), v in pipeline.values.items() if k == "subscriptions" and v["validation_status"] == "verified"}
     assert renamed == {("2022", "Q4"), ("2023", "Q3"), ("2023", "Q4")}
 
@@ -786,7 +796,7 @@ def test_a_quarter_on_an_older_layout_takes_the_following_years_restatement():
               row("search", "2020", "Q2", "2020-06-30", 26.0, prior=24.5, total=32.0, accession="b"),
               row("youtube", "2020", "Q2", "2020-06-30", 6.0, prior=5.5, total=32.0, accession="b")]
     pipeline = _pipeline(FakeControl({}), values)
-    pipeline._adopt_restated_quarters()
+    pipeline.store.write(pipeline._adopt_restated_quarters())
     q2 = {k: v["value"] for (g, k, y, p), v in pipeline.values.items() if y == "2019" and p == "Q2" and v["validation_status"] == "verified"}
     assert q2 == {"search": 24.5, "youtube": 5.5}
     assert pipeline.values[("products", "properties", "2019", "Q2")]["validation_status"] == "rejected"
@@ -806,7 +816,7 @@ def test_a_business_added_the_following_year_does_not_block_the_restatement():
               row("aws", "2017", "Q3", "2017-09-30", 5.0, prior=3.0, total=44.0, accession="b"),
               row("physical", "2017", "Q3", "2017-09-30", 13.0, prior=0.0, total=44.0, accession="b")]
     pipeline = _pipeline(FakeControl({}), values)
-    pipeline._adopt_restated_quarters()
+    pipeline.store.write(pipeline._adopt_restated_quarters())
     q3 = {k: v["value"] for (g, k, y, p), v in pipeline.values.items() if y == "2016" and p == "Q3" and v["validation_status"] == "verified"}
     assert q3 == {"online": 29.0, "aws": 3.0}
 
@@ -823,7 +833,7 @@ def test_a_quarter_finer_than_its_year_keeps_its_own_rows():
               row("us", "2027", "Q1", "2026-04-26", 20.0, prior=15.0, total=30.0, accession="b"),
               row("other", "2027", "Q1", "2026-04-26", 10.0, prior=10.0, total=30.0, accession="b")]
     pipeline = _pipeline(FakeControl({}), values)
-    pipeline._adopt_restated_quarters()
+    pipeline.store.write(pipeline._adopt_restated_quarters())
     assert pipeline.values[("geography", "singapore", "2026", "Q1")]["validation_status"] == "verified"
 
 
@@ -891,7 +901,7 @@ def test_quarters_read_side_by_side_are_checked_against_each_other_in_date_order
                 "notes": []}
     values = [row("2026-03-31", 100.0, "Q1"), row("2026-06-30", 900.0, "Q2"), row("2026-09-30", 105.0, "Q3")]
     pipeline = _pipeline(FakeControl({}), values)
-    pipeline._check_read_series({("kpi_ops", "users", "2026", "Q2")})
+    pipeline.store.write(pipeline._check_read_series({("kpi_ops", "users", "2026", "Q2")})[0])
     assert pipeline.values[("kpi_ops", "users", "2026", "Q2")]["validation_status"] == "needs_review"
     assert pipeline.values[("kpi_ops", "users", "2026", "Q3")]["validation_status"] == "verified"  # not read now
 
@@ -1061,7 +1071,9 @@ def test_chart_slides_become_revenue_breakdowns_and_unit_metrics_checked_against
     module._fetch_image = lambda link: fetched.append(link) or b""
     module.ocr_words = lambda _image, *_region: [Word(*word) for word in SLIDE]
     try:
-        pipeline._store_chart_breakdowns([q1, q2])
+        for rows in pipeline._read_chart_breakdowns([q1, q2]):
+            pipeline.store.write(rows)
+        pipeline.store.write(pipeline._bare_shares())
         values = [value for operation, payload in control.calls if operation == "store" for value in payload["values"]]
         # The Q2 slide gives its own quarter and, since the Q1 release had no slide, the quarter before.
         assert {(value["fiscal_period"], value["period_end"]) for value in values} == {("Q2", "2026-06-28"), ("Q1", "2026-03-29")}
@@ -1082,7 +1094,9 @@ def test_chart_slides_become_revenue_breakdowns_and_unit_metrics_checked_against
         assert fetched == ["https://www.sec.gov/Archives/edgar/data/1/2/deck008.jpg"]
         # Stored quarters are not read again.
         control.calls.clear()
-        pipeline._store_chart_breakdowns([q1, q2])
+        for rows in pipeline._read_chart_breakdowns([q1, q2]):
+            pipeline.store.write(rows)
+        pipeline.store.write(pipeline._bare_shares())
         assert control.calls == [] and len(fetched) == 1
     finally:
         module._fetch_image, module.ocr_words = original
@@ -1156,7 +1170,9 @@ def test_a_pie_a_point_off_100_is_stored_only_once_a_second_slide_shows_the_same
         module._fetch_image = lambda link: b""
         module.ocr_words = lambda _image, *_region: [Word(*word) for word in short]
         try:
-            pipeline._store_chart_breakdowns(releases)
+            for rows in pipeline._read_chart_breakdowns(releases):
+                pipeline.store.write(rows)
+            pipeline.store.write(pipeline._bare_shares())
         finally:
             module._fetch_image, module.ocr_words = original
         values = [value for operation, payload in control.calls if operation == "store" for value in payload["values"]]
@@ -1204,11 +1220,11 @@ def test_a_report_without_xbrl_is_judged_once_and_never_counts_past_the_store():
     run = pipeline.SymbolPipeline(Control(), "TSM", 20, False, log=lambda *_: None)
     ref = FilingRef("0001193125-17-122097", "20-F", date(2017, 4, 13), "periodic_report", "https://www.sec.gov/x.htm",
                     period_end=date(2016, 12, 31))
-    run.filings[ref.accession] = {"status": "skipped", "attempts": 100, "notes": ["no XBRL"]}
+    run.store._filings[ref.accession] = {"status": "skipped", "attempts": 100, "notes": ["no XBRL"]}
     assert run._pending(ref)  # an unstamped judgement: read again
-    run._store_filing(ref, "skipped", notes=["no XBRL", _XBRL_READER], counted=False)
+    run.store.record(FilingReading(ref, "skipped", notes=["no XBRL", _XBRL_READER], counted=False))
     assert stored[-1]["attempts"] == 100
-    run.filings[ref.accession] = stored[-1]
+    run.store._filings[ref.accession] = stored[-1]
     assert not run._pending(ref)
 
 
@@ -1268,7 +1284,7 @@ def test_a_group_dropped_for_repeating_xbrl_has_its_figures_set_aside():
         {"key": "ops", "label": "Operating", "kind": "metric", "kpis": [{"key": "employees", "label": "Employees", "unit": "count"}]}]})
     after = without_xbrl_repeats(before, pipeline._current_xbrl_members())
     assert [group.key for group in after.groups] == ["ops"]
-    pipeline._set_aside_dropped(before, after)
+    pipeline.store.write(pipeline._set_aside_dropped(before, after))
     statuses = {v["kpi_key"]: v["validation_status"] for v in pipeline.values.values()}
     assert statuses == {"net_product_sales": "rejected", "net_service_sales": "rejected"}
 
@@ -1283,7 +1299,8 @@ def test_a_breakdown_part_restated_alone_returns_to_its_filed_figure():
                 "notes": list(notes)}
     values = [row("n7", 25.4, ["restated in the next year's release (was 25.3)"]), row("n16", 74.7)]
     pipeline = _pipeline(FakeControl({}), values)
-    pipeline._prove_flagged([])
+    pipeline.store.write(pipeline._prove_flagged([]))
+    pipeline.store.write(pipeline._release_held_breakdowns())
     assert {v["kpi_key"]: v["value"] for v in pipeline.values.values()} == {"n7": 25.3, "n16": 74.7}
 
 
@@ -1402,7 +1419,8 @@ def test_a_relabelled_year_corrects_the_year_before_and_its_operating_income():
         history += [row("segment_income", "2025", period, ends["2025"][index], "datacenter", 1, dc),
                     row("segment_income", "2025", period, ends["2025"][index], "embedded", 1, embedded)]
     pipeline = _pipeline(FakeControl({}), history)
-    pipeline._fix_mislabelled_quarters()
+    for rows in pipeline._fix_mislabelled_quarters():
+        pipeline.store.write(rows)
 
     def quarter(group, year):
         return {k: v["value"] for (g, k, y, p), v in pipeline.values.items()
@@ -1421,7 +1439,8 @@ def test_a_quarter_moved_to_the_year_with_its_release_goes_back_to_q4():
             {**base, "kpi_key": "products", "kpi_label": "Products", "fiscal_period": "Q4", "value": 51_529e6,
              "validation_status": "rejected", "notes": ["full-year figures filed as Q4; see FY"]}]
     pipeline = _pipeline(FakeControl({}), rows)
-    pipeline._refile_annuals()
+    pipeline.store.write(pipeline._unfile_quarters())
+    pipeline.store.write(pipeline._refile_annuals())
     assert pipeline.values[("kpi_product_type", "products", "2019", "Q4")]["validation_status"] == "verified"
     assert pipeline.values[("kpi_product_type", "products", "2019", "FY")]["validation_status"] == "rejected"
 
@@ -1481,9 +1500,8 @@ def test_a_note_is_stored_once():
     stored = []
     control.call = lambda operation, **payload: stored.extend(payload.get("values") or [])
     pipeline = _pipeline(control)
-    pipeline.result = SimpleNamespace(values=0)
     note = "confirmed by the next year's release"
-    pipeline._store(values=[{"group_key": "kpi_x", "kpi_key": "a", "fiscal_year": "2020", "fiscal_period": "Q4", "value": 1,
+    pipeline.store.write([{"group_key": "kpi_x", "kpi_key": "a", "fiscal_year": "2020", "fiscal_period": "Q4", "value": 1,
                              "validation_status": "needs_review", "notes": ["total matches no figure", note, note, note]}])
     assert stored[0]["notes"] == ["total matches no figure", note]
 
@@ -1512,9 +1530,9 @@ def test_a_metrics_missing_quarters_come_from_the_releases_quarterly_tables():
     pipeline.offset = 0
     pipeline._document = lambda ref: parse_document(f"<p>{slides.get(ref.accession, '')}</p>", ref.source_url)
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
+    pipeline.store.write = stored.extend
     pipeline.log = lambda *_: None
-    pipeline._fill_quarter_tables(releases)
+    pipeline.store.write(pipeline._fill_quarter_tables(releases))
     assert {(v["fiscal_period"], v["value"], v["source_accession"]) for v in stored} == {
         ("Q2", 72, "q2"), ("Q3", 79, "q3"), ("Q4", 82, "q4")}
 
@@ -1528,11 +1546,13 @@ def test_a_breakdown_adding_up_to_a_reported_figure_to_its_rounding_is_proven():
              "notes": ["total matches no figure the company reported in XBRL"], "locator": {"total": 447_000_000.0}}
     lines = [{**group, "kpi_key": key, "value": value} for key, value in (("grow", 298e6), ("create", 132e6), ("other", 17e6))]
     pipeline = _pipeline(FakeControl({}), [{**xbrl, "kpi_key": "total", "value": 446_523_000.0}, *lines])
-    pipeline._prove_flagged([])
+    pipeline.store.write(pipeline._prove_flagged([]))
+    pipeline.store.write(pipeline._release_held_breakdowns())
     assert pipeline.values[("kpi_segment", "grow", "2024", "Q3")]["validation_status"] == "verified"
     # A real gap is not rounding.
     off = _pipeline(FakeControl({}), [{**xbrl, "kpi_key": "total", "value": 440_000_000.0}, *lines])
-    off._prove_flagged([])
+    off.store.write(off._prove_flagged([]))
+    off.store.write(off._release_held_breakdowns())
     assert off.values[("kpi_segment", "grow", "2024", "Q3")]["validation_status"] == "needs_review"
 
 
@@ -1566,9 +1586,9 @@ def test_a_metrics_gaps_come_from_rows_the_releases_repeat_in_a_learned_layout()
     pipeline.offset = 0
     pipeline._document = lambda ref: parse_document(f"<p>{slides.get(ref.accession, '')}</p>", ref.source_url)
     stored = []
-    pipeline._store = lambda values: stored.extend(values)
+    pipeline.store.write = stored.extend
     pipeline.log = lambda *_: None
-    pipeline._fill_quoted_rows(releases)
+    pipeline.store.write(pipeline._fill_quoted_rows(releases))
     by = {(v["fiscal_year"], v["fiscal_period"]): (v["value"], v["source_accession"]) for v in stored}
     # Q1 2023 from Q2 2023's column a quarter before (and Q1 2024's a year before); Q4 2023 from its own release.
     assert by == {("2023", "Q1"): (3227, "r2023Q2"), ("2023", "Q4"): (2957, "r2023Q4")}
@@ -1620,17 +1640,15 @@ def test_a_figure_from_outside_sec_filings_is_never_rewritten():
     from kpi_extractor.pipeline import SymbolPipeline
     pipeline = SymbolPipeline(None, "U", quarters=4, force=False, log=lambda *_: None)
     calls = []
-    pipeline.control = SimpleNamespace(call=lambda name, **payload: calls.append(payload))
-    pipeline.values = {}
-    pipeline.result = SimpleNamespace(values=0)
+    pipeline.store.control = SimpleNamespace(call=lambda name, **payload: calls.append(payload))
     base = {"symbol": "U", "group_key": "kpi_seg", "kpi_key": "grow", "fiscal_year": "2025", "fiscal_period": "Q1",
             "value": 1.0, "notes": [], "validation_status": "verified"}
     owner = {**base, "method": "ai", "source_url": "https://s205.q4cdn.com/x.xlsx"}
     derived = {**base, "fiscal_period": "FY", "method": "derived", "source_url": "https://s205.q4cdn.com/x.xlsx"}
     filed = {**base, "kpi_key": "create", "method": "xbrl", "source_url": "https://www.sec.gov/Archives/x.htm"}
-    pipeline._store(values=[owner, derived, filed])
+    pipeline.store.write([owner, derived, filed])
     stored = calls[0]["values"]
     assert [(v["kpi_key"], v["fiscal_period"], v["source_url"]) for v in stored] == [
         ("grow", "FY", None), ("create", "Q1", "https://www.sec.gov/Archives/x.htm")]
-    pipeline._store(values=[owner])
+    pipeline.store.write([owner])
     assert len(calls) == 1  # nothing left to write

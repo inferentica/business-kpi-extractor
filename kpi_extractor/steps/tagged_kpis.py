@@ -15,7 +15,7 @@ from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _UNANCHORED, _is_jump, _rou
 class TaggedKpiReading:
     """KPIs filled from a report's XBRL tags, and breakdown periods settled by exact tagged figures."""
 
-    def _fill_tagged_metrics(self, reports: list[FilingRef], spec: Spec) -> None:
+    def _fill_tagged_metrics(self, reports: list[FilingRef], spec: Spec) -> list[dict]:
         """Quarters of an operating KPI its releases do not state, from the reports' XBRL where the KPI is tagged
         (Microsoft's commercial remaining performance obligation, in its releases only from FY2026). The tag is learned
         from quarters both give (see tagged_metrics); a quarter the release states, or the owner decided, is left as it
@@ -33,7 +33,7 @@ class TaggedKpiReading:
                 continue
             quarters[(year, period)] = (ref, end)
         if not quarters:
-            return
+            return []
         facts: dict[tuple[str, str], dict] = {}
 
         def facts_of(quarter: tuple[str, str]) -> dict:
@@ -58,8 +58,8 @@ class TaggedKpiReading:
             if not picked:
                 break
         if records:
-            self._store(values=records)
             self.log(f"{self.symbol}: {len(records)} KPI values read from reports' XBRL where the releases do not give them")
+        return records
 
     def _kpi_template(self, group, kpi, key: str) -> dict:
         """The stored shape of a KPI no release has given yet."""

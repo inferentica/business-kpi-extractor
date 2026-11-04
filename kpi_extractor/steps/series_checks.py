@@ -49,7 +49,7 @@ def _proven(value: dict) -> bool:
 class SeriesChecks:
     """Checks across periods: proving or clearing flagged figures, scale runs, and working out derived periods."""
 
-    def _anchor_ai_breakdowns(self) -> None:
+    def _anchor_ai_breakdowns(self) -> list[dict]:
         """An AI breakdown's total must be a figure the company reported in XBRL for the same period: its revenue, or a
         segment it splits (AMD's "Client and Gaming"). Checked every run, so a release read before its 10-Q arrived is
         checked once it has. A breakdown that matches nothing reported is flagged, all of it."""
@@ -91,10 +91,9 @@ class SeriesChecks:
             for v in self.values.values():
                 if v["group_key"] == group and v["validation_status"] != "rejected" and member not in v["group_label"]:
                     flagged.append({**v, "group_label": f"{member} {v['group_label']}"[:80]})
-        for start in range(0, len(flagged), 400):
-            self._store(values=flagged[start:start + 400])
+        return flagged
 
-    def _prove_flagged(self, releases: list[FilingRef]) -> None:
+    def _prove_flagged(self, releases: list[FilingRef]) -> list[dict]:
         """Settles flagged release values by evidence, with no AI and no one reviewing them:
         - a value equal to a figure the company reported in XBRL for the same period is proven;
         - a breakdown whose parts add up to such a figure is proven whole;
@@ -257,12 +256,10 @@ class SeriesChecks:
             if any((settled.get(value_key(v)) or v)["validation_status"] != "verified" for v in siblings):
                 settled[key] = {**row, "validation_status": "needs_review"}
         changed = list(settled.values())
-        for start in range(0, len(changed), 400):
-            self._store(values=changed[start:start + 400])
         proven = sum(1 for v in changed if v["validation_status"] == "verified")
         if proven:
             self.log(f"{self.symbol}: {proven} flagged values proven by later or official figures")
-        self._release_held_breakdowns()
+        return changed
 
     def _q4_gaps(self) -> list[str]:
         periods: dict[tuple[str, str], set[str]] = {}
@@ -272,7 +269,7 @@ class SeriesChecks:
         return sorted(f"{label} {year}" for (label, year), found in periods.items()
                       if {"FY", "Q1", "Q2", "Q3"} <= found and "Q4" not in found)
 
-    def _recheck_flagged(self) -> None:
+    def _recheck_flagged(self) -> list[dict]:
         """Clears flags that stored figures themselves disprove, without reading anything again:
         - a full year flagged for jumping against a quarter is compared with the year before instead;
         - a table read whole without its total row reconciles to a figure the same filing reports for the same period
@@ -323,9 +320,7 @@ class SeriesChecks:
                                 for m in members]
         cleared += self._scale_runs()
         cleared += self._outdated_flags()
-        for start in range(0, len(cleared), 400):
-            self._store(values=cleared[start:start + 400])
-        self._release_held_breakdowns()
+        return cleared
 
     def _scale_runs(self) -> list[dict]:
         """A run of a metric's figures read without their table's scale (Visa's "Processed Transactions (millions)",
@@ -412,7 +407,7 @@ class SeriesChecks:
                              "notes": [*(v.get("notes") or []), "the parts add up to the release's total"]} for v in rows]
         return cleared
 
-    def _release_held_breakdowns(self) -> None:
+    def _release_held_breakdowns(self) -> list[dict]:
         """Parts flagged only because another part of their breakdown was, released once that part is cleared: TSMC's
         FY2024 nodes were held for 3nm's 3.5× ramp, which the year's reconciling table then confirmed."""
         held = "another part of this breakdown needs review"
@@ -427,8 +422,7 @@ class SeriesChecks:
                                for v in waiting):
                 released += [{**v, "validation_status": "verified",
                               "notes": [note for note in (v.get("notes") or []) if note != held]} for v in waiting]
-        for start in range(0, len(released), 400):
-            self._store(values=released[start:start + 400])
+        return released
 
     def _reports_full_year(self, read: list[ReadValue], period_end: date) -> bool:
         """Whether a breakdown in this document adds up to the fiscal year's revenue in XBRL (an annual report the
@@ -482,7 +476,7 @@ class SeriesChecks:
         currencies = [value.get("currency") for value in self.values.values() if value["method"] == "xbrl"]
         return next((currency for currency in reversed(currencies) if currency), None)
 
-    def _derive(self, spec: Spec | None = None) -> None:
+    def _derive(self, spec: Spec | None = None) -> list[dict]:
         changed = []
         # A template KPI that is a line of another (Apollo's Credit and Equity management fees, lines of its management
         # fees) carries that parent, so a worked-out period is checked on its top level only.
@@ -505,5 +499,4 @@ class SeriesChecks:
                     and existing["validation_status"] == record["validation_status"]):
                 continue
             changed.append(record)
-        for start in range(0, len(changed), 400):
-            self._store(values=changed[start:start + 400])
+        return changed

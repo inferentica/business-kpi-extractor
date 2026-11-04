@@ -7,6 +7,7 @@ from ..document import Document, clean, parse_document, parse_number
 from ..fiscal import fiscal_label
 from ..release_breakdowns import line_key
 from ..sec import FilingRef
+from ..store import FilingReading, failed_reading
 from ..segment_income import (GROUP_KEY as INCOME_GROUP, LEFT_OVER_KEY, REVENUE_GROUP_KEY as OWN_REVENUE_GROUP,
                               segment_income, segment_revenue)
 from ..xbrl import extract_breakdowns, member_children, member_key, official_labels, presented_labels
@@ -37,22 +38,20 @@ def _row_named(document: Document, value: float, others: set[str]) -> str | None
 class ReportReading:
     """10-Qs and 10-Ks read from XBRL: their breakdowns and each segment's operating income."""
 
-    def _process_report(self, ref: FilingRef) -> None:
+    def _read_report(self, ref: FilingRef) -> FilingReading | None:
         if not self.force and not self._pending(ref):
-            return
+            return None
         try:
             xbrl = self._xbrl(ref)
             if xbrl is None:
                 # Judged by this reader: stamped, so later runs leave it (it was re-read every run until attempts ran out).
-                self._store_filing(ref, "skipped", notes=["no XBRL", _XBRL_READER])
-                return
+                return FilingReading(ref, "skipped", notes=["no XBRL", _XBRL_READER])
             facts = xbrl.facts.to_dataframe()
             labels = official_labels(getattr(xbrl, "element_catalog", None))
             self._member_children = member_children(xbrl)
             breakdowns = extract_breakdowns(facts, xbrl.entity_info or {}, ref.form, labels, self._member_children)
             if breakdowns is None:
-                self._store_filing(ref, "skipped", notes=["no document period", _XBRL_READER])
-                return
+                return FilingReading(ref, "skipped", notes=["no document period", _XBRL_READER])
             fiscal_year, fiscal_period = fiscal_label(breakdowns.period_end, self.profile.fiscal_year_end,
                                                       annual=breakdowns.annual, year_offset=self.offset)
             self._store_statements(ref, xbrl, breakdowns, fiscal_year, fiscal_period)
@@ -142,10 +141,10 @@ class ReportReading:
             status = "failed" if ai_pending else "processed" if records else "skipped"
             notes = [_XBRL_READER, *([_AI_PENDING] if ai_pending else [] if records
                                      else ["no revenue breakdown reconciles to reported revenue"])]
-            self._store_filing(ref, status, records=records, period_end=breakdowns.period_end,
-                               fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
+            return FilingReading(ref, status, records=records, period_end=breakdowns.period_end,
+                                 fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
-            self._fail_filing(ref, error)
+            return failed_reading(ref, error)
 
     def _name_remainders(self, ref: FilingRef, records: list[dict]) -> list[dict]:
         """A breakdown's worked-out remainder under the name the report's own table gives it: Salesforce's Q2 FY2027
@@ -212,7 +211,7 @@ class ReportReading:
                           and value["validation_status"] != "rejected"
                           and (value["fiscal_year"], value["fiscal_period"]) == (fiscal_year, fiscal_period)]
 
-    def _retire_named_remainders(self) -> None:
+    def _retire_named_remainders(self) -> list[dict]:
         """A period whose year-ago lines now name what its worked-out "Unallocated" stood for keeps only the lines: the
         rows it was stored with would otherwise count the same costs twice. Only when the lines equal it."""
         periods: dict[tuple[str, str], list[dict]] = {}
@@ -225,8 +224,7 @@ class ReportReading:
             lines = [row for row in rows if (row.get("locator") or {}).get("line")]
             if left and lines and abs(float(left["value"]) - sum(float(row["value"]) for row in lines)) <= max(abs(float(left["value"])) * 0.001, 1.0):
                 retired.append({**left, "validation_status": "rejected", "notes": ["named by the report's own lines"]})
-        if retired:
-            self._store(values=retired)
+        return retired
 
     def _measure_records(self, measure, group_key: str, group_order: int, groups, ref: FilingRef, fiscal_year: str,
                          fiscal_period: str, period_end, prior: dict | None = None) -> list[dict]:

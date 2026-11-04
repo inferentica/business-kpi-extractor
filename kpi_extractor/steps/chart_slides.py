@@ -49,7 +49,7 @@ def _fetch_image(link: str) -> bytes:
 class ChartReading:
     """Figures only a slide's chart gives: pies and unit bars, read by OCR with no AI."""
 
-    def _store_titled_pies(self, releases: list[FilingRef]) -> None:
+    def _read_titled_pies(self, releases: list[FilingRef]) -> list[dict]:
         """A quarter's platform split from its results-day slide (TSMC's "3Q26 Revenue by Platform"), read by the local
         OCR model weeks before the quarter's report gives the amounts. The slide's growth chart grows each platform's
         reported amount of the quarter before ("+22%"), scaled to the quarter's net revenue, which the release states;
@@ -59,6 +59,7 @@ class ChartReading:
 
         The technology pie is a split of wafer revenue, an amount the release does not give: its shares are stored as
         shares (Bedrock's percentage chart shows them) until the report's amounts replace them."""
+        stored: list[dict] = []
         for ref in sorted((ref for ref in releases if ref.period_end), key=lambda item: item.filed, reverse=True)[:2]:
             try:
                 quarter = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
@@ -90,10 +91,11 @@ class ChartReading:
                         continue
                     records.extend(self._titled_pie_records(pie, growth, group, base, ref, link))
                 if records:
-                    self._store(values=records)
-                    self.log(f"{self.symbol}: {ref.form} {ref.filed} pie figures stored ({len(records)} values)")
+                    stored += records
+                    self.log(f"{self.symbol}: {ref.form} {ref.filed} pie figures read ({len(records)} values)")
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: pies of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+        return stored
 
     def _technology_share_records(self, pie: ChartBreakdown, group: str, ref: FilingRef, link: str) -> list[dict]:
         """A technology pie's shares of wafer revenue, under the series' members, as percentages. The release's own
@@ -163,14 +165,15 @@ class ChartReading:
             locator={"image": link, "share": pie.shares[names[key]], "growth": growth[names[key]], "total": amount},
         ) for key in names]
 
-    def _store_chart_breakdowns(self, releases: list[FilingRef]) -> None:
+    def _read_chart_breakdowns(self, releases: list[FilingRef]):
         """What a release shows only as charts (ASML's slide: net system sales by technology, end-use and region as
         pies, and units sold by technology as bars), read from the slide's picture by a local OCR model, no AI service.
 
         A pie is a split of the amount it names, so it is stored as a revenue breakdown: each share of that quarter's
         net system sales, which the release's statements give. Units are stored as operating metrics and must add up
         to the quarter's reported units. A slide shows its quarter and the one before, so what one slide could not
-        give is taken from the next. A slide that cannot be read never holds up the KPIs."""
+        give is taken from the next. A slide that cannot be read never holds up the KPIs. Hands back each release's rows
+        as it finishes it, so a long first reading of the slides keeps what it has read."""
         period_ends = {fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset): ref.period_end
                        for ref in releases if ref.period_end}
         chart_values = [value for value in self.values.values()
@@ -226,18 +229,18 @@ class ChartReading:
                             have.add((rows[0]["group_key"], *quarter))
                             groups.add(rows[0]["group_key"])
                 if records:
-                    self._store(values=records)
-                    self.log(f"{self.symbol}: {ref.form} {ref.filed} chart figures stored ({len(records)} values)")
+                    self.log(f"{self.symbol}: {ref.form} {ref.filed} chart figures read ({len(records)} values)")
+                    yield records
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: charts of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
+
+    def _bare_shares(self) -> list[dict]:
         # A share left as a bare percentage (its quarter's amount is not known) is not a revenue breakdown: withdrawn.
-        stale = [{**value, "validation_status": "rejected", "notes": ["a share without its amount; read again as a revenue breakdown"]}
+        return [{**value, "validation_status": "rejected", "notes": ["a share without its amount; read again as a revenue breakdown"]}
                  for value in self.values.values()
                  if value["method"] == CHART_METHOD and value["unit"] == "percent" and value["validation_status"] != "rejected"
                  # A results-day share of an amount no release gives (TSMC's wafer revenue) is kept as a share.
                  and "share_of" not in (value.get("locator") or {})]
-        for start in range(0, len(stale), 400):
-            self._store(values=stale[start:start + 400])
 
     def _quarter_amount(self, subject: str, quarter: tuple[str, str], ref: FilingRef, period_end: date) -> tuple[float, str | None] | None:
         """The amount a pie splits ("Net system sales") for a quarter: the verified value read for it, else the line of

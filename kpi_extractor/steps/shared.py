@@ -106,3 +106,12 @@ def _document_text(document: Document) -> str:
 
 def _days(left: str, right: str) -> int:
     return (date.fromisoformat(left[:10]) - date.fromisoformat(right[:10])).days
+
+
+class RecordBuilding:
+    def _record(self, *, ref: FilingRef, period_end: date, source_url: str | None = None, **fields) -> dict:
+        return {
+            "symbol": self.symbol, **fields, "period_end": period_end.isoformat(),
+            "source_accession": ref.accession, "source_url": source_url or ref.source_url,
+            "filed_at": ref.filed.isoformat(),
+        }

@@ -20,17 +20,19 @@ class StatementReading:
             shared = {"fiscal_year": fiscal_year, "fiscal_period": fiscal_period,
                       "period_end": breakdowns.period_end.isoformat(), "form": ref.form,
                       "filed_at": ref.filed.isoformat(), "currency": currency}
-            self.control.call("store_statements", symbol=self.symbol, accession=ref.accession,
-                              lines=[{**line, **shared} for line in lines])
+            self.store.statements(ref.accession, [{**line, **shared} for line in lines])
         except Exception as error:  # noqa: BLE001
             self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not stored ({type(error).__name__}: {error})"[:300])
+
+    def _no_quarterly_reports(self, reports: list[FilingRef]) -> bool:
+        return bool(reports) and not any(ref.form.upper().startswith("10-Q") for ref in reports)
 
     def _store_release_statements(self, reports: list[FilingRef], releases: list[FilingRef]) -> None:
         """Quarterly statements for a filer whose only XBRL is annual (a 20-F filer such as ASML): read from its
         earnings releases' own tables, no AI. Each quarter is in several releases (a five-quarter summary), so it is
         kept from the newest release that presents it; a release whose own quarter a newer one already gave is not
         even opened. A release that cannot be read never holds up the KPIs."""
-        if not reports or any(ref.form.upper().startswith("10-Q") for ref in reports):
+        if not self._no_quarterly_reports(reports):
             return
         owners = self._statement_owners
         for ref in sorted(releases, key=lambda item: item.filed, reverse=True):
@@ -59,12 +61,11 @@ class StatementReading:
                     lines.extend({**line, **shared} for line in statement.lines)
                     owners[key] = {"accession": ref.accession, "filed_at": ref.filed.isoformat()}
                 if lines:
-                    self.control.call("store_statements", symbol=self.symbol, accession=ref.accession, lines=lines)
+                    self.store.statements(ref.accession, lines)
                     self.log(f"{self.symbol}: {ref.form} {ref.filed} statements stored ({len(lines)} lines)")
             except Exception as error:  # noqa: BLE001
                 self.log(f"{self.symbol}: statements of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
         self._store_headline(releases)
-        self._store_titled_pies(releases)
 
     def _store_headline(self, releases: list[FilingRef]) -> None:
         """The newest quarter's selected income lines from its earnings release (TSMC's summary table), while that
@@ -85,8 +86,7 @@ class StatementReading:
             shared = {"statement": "income", "duration": "headline", "fiscal_year": own[0], "fiscal_period": own[1],
                       "period_end": statement.period_end.isoformat(), "form": latest.form,
                       "filed_at": latest.filed.isoformat(), "currency": statement.currency}
-            self.control.call("store_statements", symbol=self.symbol, accession=latest.accession,
-                              lines=[{**line, **shared} for line in statement.lines])
+            self.store.statements(latest.accession, [{**line, **shared} for line in statement.lines])
             owners[("income", *own, "headline")] = {"accession": latest.accession, "filed_at": latest.filed.isoformat()}
             self.log(f"{self.symbol}: {latest.form} {latest.filed} headline figures stored ({len(statement.lines)} lines)")
         except Exception as error:  # noqa: BLE001
