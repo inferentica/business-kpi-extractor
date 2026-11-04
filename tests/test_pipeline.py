@@ -7,7 +7,9 @@ from kpi_extractor.ai import Spec
 from kpi_extractor.document import parse_document
 from kpi_extractor.evaluate import score
 from kpi_extractor.extract import read_values
-from kpi_extractor.pipeline import SymbolPipeline, _template, apply_maintenance, without_xbrl_repeats
+from kpi_extractor.pipeline import SymbolPipeline
+from kpi_extractor.steps.ai_reading import _template
+from kpi_extractor.steps.kpi_list import apply_maintenance, without_xbrl_repeats
 from kpi_extractor.xbrl import XbrlCandidate
 
 RELEASE = """
@@ -188,7 +190,7 @@ def test_large_documents_are_narrowed_to_the_sections_flash_picks():
     table_id = next(iter(document.tables))
     control = FakeControl({("select", "flash"): {"ids": [table_id, "made_up"]}})
     pipeline = _pipeline(control)
-    import kpi_extractor.pipeline as module
+    from kpi_extractor.steps import ai_reading as module
     limit, module.MAX_DOCUMENT_CHARS = module.MAX_DOCUMENT_CHARS, 5_000
     try:
         text = pipeline._prompt_document(document, SPEC)
@@ -282,7 +284,7 @@ def test_an_unavailable_ai_does_not_cost_the_filing_or_the_company():
 
 
 def test_a_text_block_cited_as_a_table_is_retried_with_how_to_quote_it():
-    from kpi_extractor.pipeline import _explain_pointer
+    from kpi_extractor.steps.ai_reading import _explain_pointer
     document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
     block = next(iter(document.blocks))
     message = _explain_pointer(f"technology.n3: unknown table {block}", document)
@@ -317,7 +319,7 @@ def test_a_quarter_is_compared_with_the_last_quarter_not_the_full_year():
 
 
 def test_a_re_proposed_list_keeps_the_groups_it_dropped():
-    from kpi_extractor.pipeline import keep_current_groups
+    from kpi_extractor.steps.kpi_list import keep_current_groups
     current = Spec.model_validate({"groups": [
         {"key": "technology", "label": "Revenue by Technology", "kind": "mix", "kpis": [{"key": "n3", "label": "3nm", "unit": "percent"}]},
         {"key": "platform", "label": "Revenue by Platform", "kind": "mix", "kpis": [{"key": "hpc", "label": "HPC", "unit": "percent"}]},
@@ -402,7 +404,7 @@ def test_stored_whole_table_rows_move_to_the_listed_keys():
 
 
 def test_an_audit_that_only_adds_is_recognized():
-    from kpi_extractor.pipeline import only_adds
+    from kpi_extractor.steps.shared import only_adds
     added = apply_maintenance(SPEC, ai.Maintenance.model_validate({
         "add_kpis": {"technology": [{"key": "n2", "label": "2nm", "unit": "percent"}]}}))
     retired = apply_maintenance(SPEC, ai.Maintenance.model_validate({"retire": ["technology.other"]}))
@@ -725,7 +727,7 @@ def test_an_early_custom_axis_joins_the_standard_group_it_became():
 
 
 def test_a_report_read_by_an_older_xbrl_reader_is_read_again():
-    from kpi_extractor.pipeline import _XBRL_READER
+    from kpi_extractor.steps.shared import _XBRL_READER
     pipeline = _pipeline(FakeControl({}))
     ref = SimpleNamespace(accession="a", role="periodic_report")
     pipeline.filings = {"a": {"status": "processed", "attempts": 1, "notes": []}}
@@ -965,7 +967,8 @@ def test_a_breakdown_read_from_part_of_its_table_is_flagged():
 
 
 def test_a_release_an_older_reader_left_incomplete_is_read_again():
-    from kpi_extractor.pipeline import _NOT_REPORTED, _RELEASE_READER, release_reread_due
+    from kpi_extractor.steps.shared import _NOT_REPORTED
+    from kpi_extractor.steps.release_flow import _RELEASE_READER, release_reread_due
 
     incomplete = {"status": "processed", "notes": ["read by AI", "release reader 0", f"{_NOT_REPORTED}revenue_by_product.net_system_sales"]}
     assert release_reread_due(incomplete) is True
@@ -1024,7 +1027,7 @@ def test_release_statements_go_to_the_newest_release_presenting_each_quarter():
 def test_chart_slides_become_revenue_breakdowns_and_unit_metrics_checked_against_the_quarter():
     from datetime import date as day
 
-    from kpi_extractor import pipeline as module
+    from kpi_extractor.steps import chart_slides as module
     from kpi_extractor.charts import Word
     from kpi_extractor.sec import FilingRef
     from test_charts import SLIDE
@@ -1117,7 +1120,7 @@ def test_units_that_do_not_add_up_to_the_quarter_are_left_out_and_one_unread_bar
 def test_a_pie_a_point_off_100_is_stored_only_once_a_second_slide_shows_the_same():
     from datetime import date as day
 
-    from kpi_extractor import pipeline as module
+    from kpi_extractor.steps import chart_slides as module
     from kpi_extractor.charts import Word
     from kpi_extractor.sec import FilingRef
     from test_charts import SLIDE
@@ -1167,7 +1170,7 @@ def test_a_pie_a_point_off_100_is_stored_only_once_a_second_slide_shows_the_same
 
 def test_a_pie_missing_from_a_slides_reading_is_taken_from_a_closer_one():
     from types import SimpleNamespace as Pie
-    from kpi_extractor.pipeline import fill_pies, missing_pies
+    from kpi_extractor.steps.chart_slides import fill_pies, missing_pies
 
     q3 = [Pie(axis="end-use", fiscal_year="2026", fiscal_period="Q3"), Pie(axis="region", fiscal_year="2026", fiscal_period="Q3")]
     q2 = [Pie(axis=axis, fiscal_year="2026", fiscal_period="Q2") for axis in ("technology", "end-use", "region")]
@@ -1177,7 +1180,7 @@ def test_a_pie_missing_from_a_slides_reading_is_taken_from_a_closer_one():
 
 
 def test_a_release_whose_quote_from_a_bullet_table_was_dropped_is_read_again_once():
-    from kpi_extractor.pipeline import _RELEASE_READER, release_reread_due
+    from kpi_extractor.steps.release_flow import _RELEASE_READER, release_reread_due
 
     dropped = {"status": "skipped", "notes": ["read by AI", "not reported: operating.dap", "flash operating.dap: unknown text block A_T3"]}
     assert release_reread_due(dropped) is True
@@ -1189,6 +1192,7 @@ def test_a_release_whose_quote_from_a_bullet_table_was_dropped_is_read_again_onc
 def test_a_report_without_xbrl_is_judged_once_and_never_counts_past_the_store():
     from kpi_extractor import pipeline
     from kpi_extractor.sec import FilingRef
+    from kpi_extractor.steps.shared import _XBRL_READER
 
     stored = []
 
@@ -1202,7 +1206,7 @@ def test_a_report_without_xbrl_is_judged_once_and_never_counts_past_the_store():
                     period_end=date(2016, 12, 31))
     run.filings[ref.accession] = {"status": "skipped", "attempts": 100, "notes": ["no XBRL"]}
     assert run._pending(ref)  # an unstamped judgement: read again
-    run._store_filing(ref, "skipped", notes=["no XBRL", pipeline._XBRL_READER], counted=False)
+    run._store_filing(ref, "skipped", notes=["no XBRL", _XBRL_READER], counted=False)
     assert stored[-1]["attempts"] == 100
     run.filings[ref.accession] = stored[-1]
     assert not run._pending(ref)
@@ -1210,7 +1214,7 @@ def test_a_report_without_xbrl_is_judged_once_and_never_counts_past_the_store():
 
 def test_a_group_repeating_a_breakdown_still_tagged_in_xbrl_is_never_added():
     from kpi_extractor import ai
-    from kpi_extractor.pipeline import apply_maintenance, without_xbrl_repeats
+    from kpi_extractor.steps.kpi_list import apply_maintenance, without_xbrl_repeats
 
     spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric",
                                              "kpis": [{"key": "dap", "label": "DAP", "unit": "count"}]}]})
@@ -1228,7 +1232,7 @@ def test_a_group_repeating_a_breakdown_still_tagged_in_xbrl_is_never_added():
 
 
 def test_a_group_repeating_xbrl_with_a_subtotal_beside_its_parts_is_still_a_repeat():
-    from kpi_extractor.pipeline import repeats_xbrl
+    from kpi_extractor.steps.kpi_list import repeats_xbrl
 
     group = ai.GroupSpec.model_validate({"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown", "kpis": [
         {"key": k, "label": label, "unit": "currency"} for k, label in
@@ -1349,7 +1353,7 @@ def test_a_listed_group_the_next_report_tags_goes_from_the_stored_list():
 
 
 def test_a_group_of_lines_beside_their_segment_total_repeats_xbrl():
-    from kpi_extractor.pipeline import repeats_xbrl
+    from kpi_extractor.steps.kpi_list import repeats_xbrl
     group = ai.GroupSpec.model_validate({"key": "si", "label": "SI revenue", "kind": "revenue_breakdown", "kpis": [
         {"key": k, "label": label, "unit": "currency"} for k, label in
         [("ads", "Advertising revenues"), ("infra", "SI solutions & infrastructure revenues"), ("si", "SI revenues")]]})
@@ -1595,7 +1599,7 @@ def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
 def test_a_worked_out_remainder_takes_the_name_the_reports_table_gives_it():
     # Salesforce's Q2 FY2027 10-Q tags no "Hedging gains", which its table lists beside its regions.
     from kpi_extractor.document import parse_document
-    from kpi_extractor.pipeline import _row_named
+    from kpi_extractor.steps.reports import _row_named
     from kpi_extractor.release_breakdowns import line_key
     document = parse_document(
         "<p>Revenues by geographical region consisted of the following (in millions):</p><table>"

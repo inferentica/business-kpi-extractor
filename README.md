@@ -46,8 +46,12 @@ wrong and missing values. Run it after any change to prompts, models or rules.
 ## Layout
 
 - `kpi_extractor/`: `sec.py` (filings), `xbrl.py`, `document.py` (tables, text, numbers, outlines), `ai.py` (tasks,
-  prompts, schemas), `extract.py` (reading and checks), `derive.py` (Q4 and full years), `pipeline.py` (one company),
-  `cli.py` (one run), `evaluate.py` (golden set).
+  prompts, schemas), `extract.py` (reading and checks), `derive.py` (Q4 and full years), `cli.py` (one run), `evaluate.py`
+  (golden set).
+- `kpi_extractor/pipeline.py` holds the order of one company's run. Its steps are in `kpi_extractor/steps/`: `loading.py`,
+  `reports.py` (XBRL), `financial_statements.py`, `chart_slides.py`, `release_tables.py`, `tagged_kpis.py`,
+  `listing_history.py`, `kpi_list.py`, `release_flow.py`, `ai_reading.py`, `series_identity.py`, `series_checks.py`,
+  `storage.py` and `shared.py`.
 - Control plane and storage live in the TradeTracker repository: `supabase/functions/business-kpi-workflow`, tables
   `business_kpi_runs`, `business_kpi_specs`, `business_kpi_filings`, `business_kpi_values`.
 

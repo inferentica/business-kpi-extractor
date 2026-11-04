@@ -1,0 +1,311 @@
+"""Earnings documents in turn: which are read, by how many readers at once, and how their readings are stored."""
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date
+
+from .. import ai
+from ..ai import Spec
+from ..document import Document, clean
+from ..extract import MAX_MIX_JUMP, MAX_RATIO_JUMP, ReadValue, check_period, count_jump, validate_groups
+from ..fiscal import fiscal_label
+from ..sec import FilingRef
+from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI,
+                     _annual_header, _chain_of, _days, _document_text, _is_jump, _same, _significant, value_key)
+
+_READ_BY_REPLAY = "read by replay"
+# Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
+# when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
+# with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
+# stamping began are never re-read by it, so a bump cannot re-read every company's history.
+_RELEASE_READER = "release reader 2"
+_RELEASE_READER_PREFIX = "release reader "
+# Releases a company's run reads at once, after its newest (see _process_releases).
+RELEASE_READERS = 4
+# A group read this many quarters without one verified period is not read again (see _readable).
+DEAD_GROUP_QUARTERS = 8
+
+def _annual_columns(read: list[ReadValue]) -> bool:
+    """Whether the breakdown was read from a column its header calls a year ("Twelve Months Ended", "Year Ended")."""
+    headers = [str(item.locator.get("header") or "") for item in read if item.group.kind == "revenue_breakdown"]
+    return bool(headers) and all(_annual_header(header) for header in headers)
+
+
+def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
+    """The listed KPIs a document did not report, apart from breakdowns read as whole tables (their rows vary)."""
+    whole = {item.group.key for item in read if item.locator.get("whole_table")}
+    found = {f"{item.group.key}.{item.kpi.key}" for item in read}
+    return [f"{group.key}.{kpi.key}" for group in spec.groups if group.key not in whole for kpi in group.kpis
+            if kpi.key != group.total_kpi and f"{group.key}.{kpi.key}" not in found]
+
+
+def release_reread_due(previous: dict | None) -> bool:
+    """Whether a finished release should be read again, once, by the reader that fixes what an older one missed:
+    * reader 1 reads every tracked group: a release an earlier stamped reader left with a group unread (one read
+      before stamping began is left alone);
+    * reader 2 reads a quote from a table laid out as text (Meta's highlight bullets): a release where a reading was
+      dropped as "unknown text block", whatever came of it."""
+    if not previous or previous.get("status") not in _DONE:
+        return False
+    notes = previous.get("notes") or []
+    stamp = next((note for note in notes if note.startswith(_RELEASE_READER_PREFIX)), None)
+    version = int(stamp.removeprefix(_RELEASE_READER_PREFIX)) if stamp and stamp.removeprefix(_RELEASE_READER_PREFIX).isdigit() else None
+    if (version is None or version < 2) and any("unknown text block" in note for note in notes):
+        return True
+    return (previous.get("status") == "processed" and version is not None and version < 1
+            and any(note.startswith(_NOT_REPORTED) for note in notes))
+
+
+
+class ReleaseFlow:
+    """Earnings documents in turn: which are read, by how many readers at once, and how their readings are stored."""
+
+    def _process_release(self, ref: FilingRef, spec: Spec, version: int) -> bool:
+        previous = self.filings.get(ref.accession)
+        if not self.force and previous and previous.get("spec_version") == version and (
+                previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS) and not release_reread_due(previous):
+            return False
+        if not spec.groups:
+            self._store_filing(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
+            return True
+        if ref.period_end != self._newest_release:
+            spec = self._readable(spec)  # the newest quarter always reads every group: a fixed bug lets it verify
+        try:
+            expected = ref.period_end
+            fiscal_year, fiscal_period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)
+            document = self._document(ref)
+            period_hint = f"quarter ended about {expected} (fiscal {fiscal_period} {fiscal_year})"
+
+            def text(subset: Spec | None = None) -> str:  # built only when the AI reads: a replayed quarter costs none
+                return ai.prompt(self.company, self._prompt_document(document, spec), ai.LOCATE_TASK,
+                                 ai.locate_data(period_hint, subset or spec, self._hints(expected)))
+
+            read, problems, located = self._read(text, document, spec, expected, version)
+            how = _READ_BY_REPLAY if getattr(self._local, "replayed", False) else _READ_BY_AI
+            period_problem = check_period(located, expected)
+            period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
+            # A document counts as annual only on evidence: its breakdown adds up to the XBRL full year, or its
+            # column says so. A total far above the quarter before is only a reason to look again.
+            if not located.annual and (self._reports_full_year(read, period_end) or _annual_columns(read)):
+                located.annual = True
+                problems.append("breakdown reports the full year: stored as the fiscal year")
+            elif not located.annual and fiscal_period == "Q4" and self._far_above_quarters(read, period_end):
+                for item in read:
+                    if item.group.kind == "revenue_breakdown":
+                        item.status = "needs_review"
+                        item.notes.append("total far above the quarter before: check the period")
+            if located.annual:
+                # An annual report: its values are the full year, and Q4 is derived from them.
+                fiscal_year, fiscal_period = fiscal_label(period_end, self.profile.fiscal_year_end, annual=True,
+                                                          year_offset=self.offset)
+            validate_groups(read, self._previous(period_end, annual=located.annual))
+            self._flag_partial_tables(read, period_end, document)
+            self._explain_jumps(read, document, spec)
+            records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
+            verified = sum(1 for record in records if record["validation_status"] == "verified")
+            status = "processed" if verified else "needs_review" if records else "skipped"
+            unreported = _unreported(spec, read)
+            notes = [how, _RELEASE_READER, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []), *problems[:20]]
+            self._store_filing(ref, status, records=records, spec_version=version, period_end=period_end,
+                               fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
+        except Exception as error:  # noqa: BLE001
+            self._fail_filing(ref, error, spec_version=version)
+        return True
+
+    def _readable(self, spec: Spec) -> Spec:
+        """The list without groups that have never verified in at least eight quarters read (JPMorgan's income-statement
+        lines listed as a breakdown): reading them again would only flag them again, at a reasoning read each quarter. Decided
+        once per run (see _process_releases), before re-reading a filing could withdraw their history. Used for older
+        quarters only: the newest is read whole every run, so a group that failed for an extractor bug verifies again
+        once the bug is fixed, and is read in full from then on."""
+        dead = self._dead if self._dead is not None else self._never_verified()
+        if not dead or all(group.key in dead for group in spec.groups):
+            return spec
+        return Spec.model_validate({"groups": [g.model_dump() for g in spec.groups if g.key not in dead],
+                                    "names": spec.names})
+
+    def _never_verified(self) -> set[str]:
+        periods: dict[str, set[tuple[str, str]]] = {}
+        verified: set[str] = set()
+        for v in self.values.values():
+            if v["method"] == "ai" and v["validation_status"] != "rejected" and v["fiscal_period"] != "FY":
+                group = v["group_key"].removeprefix(AI_GROUP_PREFIX)
+                periods.setdefault(group, set()).add((v["fiscal_year"], v["fiscal_period"]))
+                if v["validation_status"] == "verified":
+                    verified.add(group)
+        return {group for group, seen in periods.items() if len(seen) >= DEAD_GROUP_QUARTERS and group not in verified}
+
+    def _waiting(self, wait):
+        """Lets other readers work while this one waits on the AI or a download, when it holds the state lock."""
+        if not getattr(self._local, "holding", False):
+            return wait()
+        self._state.release()
+        try:
+            return wait()
+        finally:
+            self._state.acquire()
+
+    def _process_releases(self, refs: list[FilingRef], spec: Spec, version: int) -> list[FilingRef]:
+        """Reads releases in four chains, one per fiscal quarter (every Q1 oldest to newest, every Q2, ...), the chains
+        side by side. Each read then has the same quarter a year earlier already read in this run: the reference for
+        where each KPI sits, and the year-ago figure its column must match. Readings stored by an earlier run for a
+        filing this run is still to re-read are never a reference. Afterwards the quarters just read are checked against
+        each other in date order, as reading them one by one would have."""
+        before = {key for key, value in self.values.items() if value["method"] == "ai"}
+        self._dead = self._never_verified()
+        pending = [ref for ref in refs if self.force or self._pending(ref) or
+                   (self.filings.get(ref.accession) or {}).get("spec_version") != version]
+        done: set[str] = set()
+
+        def read(ref: FilingRef) -> None:
+            if self._process_release(ref, spec, version):
+                done.add(ref.accession)
+
+        def chain(quarter_refs: list[FilingRef]) -> None:
+            for ref in quarter_refs:
+                with self._state:
+                    self._local.holding = True
+                    self._local.chained = True  # history lookups see this chain's own earlier quarters only
+                    try:
+                        read(ref)
+                    finally:
+                        self._local.holding = False
+                        self._local.chained = False
+
+        if len(pending) <= 2:
+            for ref in refs:
+                read(ref)
+        else:
+            chains: dict[int, list[FilingRef]] = {}
+            for ref in sorted(refs, key=lambda ref: ref.period_end or date.min):
+                chains.setdefault(_chain_of(ref.period_end or date.min), []).append(ref)
+            with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
+                list(pool.map(chain, chains.values()))
+            self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
+                                    | {key for key in before if self.values[key].get("source_accession") in done}, refs)
+        return [ref for ref in refs if ref.accession in done]
+
+    def _check_read_series(self, keys: set[tuple], refs: list[FilingRef] = ()) -> None:
+        """The jump checks of quarters read side by side, run again in date order: each value against the quarter before
+        it (a share against its last share, an amount against three times or a third of its last), and an amount equal
+        to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole."""
+        series: dict[tuple[str, str], list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "ai" and v["validation_status"] == "verified" and v["fiscal_period"] != "FY":
+                series.setdefault((v["group_key"], v["kpi_key"]), []).append(v)
+        flagged: dict[tuple, str] = {}
+        for rows in series.values():
+            rows.sort(key=lambda v: v["period_end"])
+            for previous, current in zip(rows, rows[1:]):
+                if value_key(current) not in keys or _days(previous["period_end"], current["period_end"]) > 120:
+                    continue
+                before, now = float(previous["value"]), float(current["value"])
+                small = count_jump(current["unit"], before, now)
+                if current["unit"] == "percent":
+                    jump = abs(now - before) > MAX_MIX_JUMP and f"moved {now - before:+.1f} points in a quarter"
+                elif small is not None:
+                    jump = small or None
+                else:
+                    jump = before and now / before > 0 and not 1 / MAX_RATIO_JUMP <= now / before <= MAX_RATIO_JUMP \
+                        and f"changed {now / before:.1f}x in a quarter"
+                if jump and not self._immaterial(current):
+                    flagged[value_key(current)] = jump
+                elif current["unit"] == "currency" and _significant(now) and _same(now, before):
+                    flagged[value_key(current)] = "the same figure as the quarter before: check the column"
+            by_end = {v["period_end"][:7]: v for v in rows}
+            for current in rows:
+                year_ago = by_end.get(f"{int(current['period_end'][:4]) - 1}{current['period_end'][4:7]}")
+                if (value_key(current) in keys and year_ago and current["unit"] == "currency"
+                        and _significant(float(current["value"])) and _same(float(current["value"]), float(year_ago["value"]))):
+                    flagged[value_key(current)] = "the same figure as a year earlier: check the column"
+        groups = {(k[0], k[2], k[3]) for k in flagged if self.values[k]["group_kind"] != "metric"}
+        changed = []
+        for key, value in self.values.items():
+            group_period = (key[0], key[2], key[3])
+            if key in flagged or (group_period in groups and value["method"] == "ai" and value["validation_status"] == "verified"):
+                note = flagged.get(key, "another part of this breakdown needs review")
+                changed.append({**value, "validation_status": "needs_review", "notes": [*(value.get("notes") or []), note]})
+        for start in range(0, len(changed), 400):
+            self._store(values=changed[start:start + 400])
+        self._explain_stored({key for key, note in flagged.items() if _is_jump(note)}, refs)
+
+    def _explain_stored(self, keys: set[tuple], refs: list[FilingRef]) -> None:
+        """Jumps the date-order check found, given the reading-time treatment: the reasoning reader is asked whether each is a real
+        change, and one backed by a quote found in the document stands (its breakdown's other parts are released by
+        _release_held_breakdowns). One reasoning call per release with such a jump."""
+        by_accession = {ref.accession: ref for ref in refs}
+        jumps: dict[str, list[dict]] = {}
+        for key in keys:
+            value = self.values.get(key)
+            if value and value.get("source_accession") in by_accession:
+                jumps.setdefault(value["source_accession"], []).append(value)
+        def explain(item: tuple[str, list[dict]]):
+            accession, rows = item
+            try:
+                document = self._document(by_accession[accession])
+                lines = "\n".join(
+                    f"- {v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']} ({v['group_label']} / {v['kpi_label']}): "
+                    f"now {float(v['value']):g}; {'; '.join(n for n in v.get('notes') or [] if _is_jump(n))}" for v in rows)
+                answer = self._ask(ai.prompt(self.company, self._prompt_document(document, None), ai.EXPLAIN_TASK, lines),
+                                   "explain", ai.Explanations, thinking_first=True, model="flash")
+                return rows, document, answer
+            except Exception:  # noqa: BLE001 - unexplained, they stay flagged
+                return rows, None, None
+
+        cleared = []
+        with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:  # one reasoning call per release, side by side
+            answers = list(pool.map(explain, jumps.items()))
+        for rows, document, answer in answers:
+            if answer is None:
+                continue
+            haystack = _document_text(document)
+            for v in rows:
+                verdict = answer.items.get(f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}")
+                quote = clean(verdict.quote or "") if verdict else ""
+                if verdict and verdict.legitimate and len(quote) >= 20 and quote in haystack:
+                    cleared.append({**v, "validation_status": "verified",
+                                    "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"]})
+        for start in range(0, len(cleared), 400):
+            self._store(values=cleared[start:start + 400])
+
+    def _immaterial(self, value: dict) -> bool:
+        """A breakdown row under 1% of its total, whose swings say nothing (as validate_groups treats it)."""
+        total = (value.get("locator") or {}).get("total")
+        return value["group_kind"] == "revenue_breakdown" and bool(total) and abs(float(value["value"])) < 0.01 * abs(float(total))
+
+    def _release_records(self, read: list[ReadValue], spec: Spec, ref: FilingRef, document: Document, fiscal_year: str,
+                         fiscal_period: str, period_end: date, period_problem: str | None) -> list[dict]:
+        # A breakdown's total row is its reconciliation target, not a segment of its own.
+        def is_total(item: ReadValue) -> bool:
+            return item.is_total or item.kpi.key == item.group.total_kpi
+
+        totals = {item.group.key: item.value for item in read if item.group.kind == "revenue_breakdown" and is_total(item)}
+        parts_sum: dict[str, float] = {}
+        for item in read:
+            if item.group.key in totals and not is_total(item):
+                parts_sum[item.group.key] = parts_sum.get(item.group.key, 0.0) + item.value
+        # A breakdown or mix is published whole or not at all: one flagged part flags them all, so the last complete
+        # reading stays in place (the store never lets an unchecked row replace a verified one).
+        open_groups = {item.group.key for item in read if item.group.kind != "metric" and not is_total(item)
+                       and item.status != "verified"}
+        records = []
+        for item in read:
+            if is_total(item):
+                continue
+            notes, status = list(item.notes), item.status
+            if item.group.key in open_groups and status == "verified":
+                status, notes = "needs_review", [*notes, "another part of this breakdown needs review"]
+            if period_problem:
+                status, notes = "needs_review", [*notes, period_problem]
+            total = totals.get(item.group.key)
+            records.append(self._record(
+                group_key=AI_GROUP_PREFIX + item.group.key, group_label=item.group.label,
+                group_kind=item.group.kind, group_order=AI_GROUP_ORDER + spec.groups.index(item.group),
+                kpi_key=item.kpi.key, kpi_label=item.kpi.label,
+                kpi_order=item.group.kpis.index(item.kpi) if item.kpi in item.group.kpis else 100 + int(item.locator.get("row", 0)),
+                unit=item.kpi.unit, value=item.value, currency=item.currency, method="ai",
+                validation_status=status, reconciliation_error_pct=(parts_sum[item.group.key] - total) / total if total else None,
+                notes=notes, ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period, period_end=period_end,
+                locator={**item.locator, "total": total} if total else item.locator, source_url=document.source_url,
+            ))
+        return records
