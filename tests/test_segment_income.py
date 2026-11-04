@@ -3,7 +3,7 @@ from datetime import date
 
 import pandas as pd
 
-from kpi_extractor.segment_income import segment_income
+from kpi_extractor.segment_income import line_key, segment_income
 
 SEG, CONS = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_ConsolidationItemsAxis"
 
@@ -160,11 +160,11 @@ def test_a_reconciliations_tagged_lines_keep_the_filings_names():
     income = segment_income(pd.DataFrame(rows), date(2026, 9, 30), False, names.get, None, shown.get)
     assert [(key, name, value) for key, name, _element, value in income.current.rows] == [
         ("commercial", "Commercial", 897_525e3), ("government", "Government", 797_258e3),
-        ("stockbasedcompensationexpense", "Total stock-based compensation expense", -318_889e3),
-        ("researchanddevelopmentexpenses", "Research and development expenses", -154_506e3),
-        ("generalandadministrativeexpenses", "General and administrative expenses", -136_543e3)]
+        ("stockbasedcompensation", "Total stock-based compensation expense", -318_889e3),
+        ("researchanddevelopment", "Research and development expenses", -154_506e3),
+        ("generalandadministrative", "General and administrative expenses", -136_543e3)]
     assert sum(value for *_rest, value in income.current.rows) == income.current.total
-    assert income.current.lines == {"stockbasedcompensationexpense", "researchanddevelopmentexpenses", "generalandadministrativeexpenses"}
+    assert income.current.lines == {"stockbasedcompensation", "researchanddevelopment", "generalandadministrative"}
 
 
 def test_tagged_lines_that_do_not_close_the_gap_are_no_reconciliation():
@@ -194,3 +194,11 @@ def test_a_segments_operating_segment_suffix_is_not_part_of_its_name():
     names = {"pltr:GovernmentOperatingSegmentMember": "Government Operating Segment", "pltr:CommercialOperatingSegmentMember": "Commercial"}
     income = segment_income(pd.DataFrame(rows), date(2025, 12, 31), True, names.get)
     assert [row[:2] for row in income.current.rows] == [("government", "Government"), ("commercial", "Commercial")]
+
+
+def test_a_reconciling_lines_names_over_the_years_are_one_series():
+    for name in ("Research and development", "Research and development expenses",
+                 "Research and Development Expense Excluding Stockbased Compensation Expense"):
+        assert line_key(name) == "researchanddevelopment"
+    for name in ("Stock-based compensation expense", "Total stock-based compensation expense"):
+        assert line_key(name) == "stockbasedcompensation"

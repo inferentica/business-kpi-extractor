@@ -46,9 +46,13 @@ _LINES_CLOSE = 0.001
 
 
 def line_key(name: str) -> str:
-    """A reconciling line's identity across filings: Palantir's "Stock-based compensation expense" became "Total
-    stock-based compensation expense" in 2022 and is one series."""
-    return member_key(re.sub(r"^total\s+", "", name, flags=re.I))
+    """A reconciling line's identity across filings, whose names for it vary: Palantir's "Research and development",
+    "Research and development expenses" and "Research and Development Expense Excluding Stockbased Compensation Expense"
+    are one series, as are "Stock-based compensation expense" and "Total stock-based compensation expense"."""
+    base = re.sub(r"^total\s+", "", name, flags=re.I)
+    base = re.sub(r"\s+excluding\b.*$", "", base, flags=re.I)
+    base = re.sub(r"\s+(?:expenses?|costs?)$", "", base, flags=re.I)
+    return member_key(re.sub(r"stock-?based", "stockbased", base, flags=re.I))
 
 
 @dataclass
