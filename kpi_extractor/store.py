@@ -54,6 +54,7 @@ class CompanyStore:
         self._values: dict[tuple, MappingProxyType] = {}
         self._filings: dict[str, dict] = {}
         self.owner_rejected: list[dict] = []
+        self._loaded: dict[tuple, MappingProxyType] = {}
         self._owner_rejected: set[tuple] = set()
         self.values = MappingProxyType(self._values)
         self.filings = MappingProxyType(self._filings)
@@ -65,6 +66,7 @@ class CompanyStore:
         self._owner_rejected = {value_key(row) for row in owner_rejected}
         self._values.clear()
         self._values.update({value_key(value): MappingProxyType(dict(value)) for value in values})
+        self._loaded = dict(self._values)
         self._filings.clear()
         self._filings.update({filing["accession"]: filing for filing in filings})
 
@@ -114,6 +116,23 @@ class CompanyStore:
             if reading.error is not None:
                 raise
             self.record(failed_reading(reading.ref, error, reading.spec_version), unread_groups)
+
+    def served_changes(self) -> dict:
+        """What this run changed among the figures served: every run says so, so a change that should have changed
+        nothing (a refactor, a new reader) shows itself without anyone comparing tables."""
+        served = lambda rows: {key: row for key, row in rows.items() if row["validation_status"] == "verified"}  # noqa: E731
+        before, after = served(self._loaded), served(self._values)
+        added = [key for key in after if key not in before]
+        removed = [key for key in before if key not in after]
+        changed = [key for key in after if key in before and float(after[key]["value"]) != float(before[key]["value"])]
+        renamed = [key for key in after if key in before and (after[key].get("kpi_label"), after[key].get("group_label"))
+                   != (before[key].get("kpi_label"), before[key].get("group_label"))]
+        if not (added or removed or changed or renamed):
+            return {}
+        return {"added": len(added), "removed": len(removed), "changed": len(changed), "renamed": len(renamed),
+                "examples": [{"change": kind, "group": key[0], "kpi": key[1], "year": key[2], "period": key[3]}
+                             for kind, keys in (("changed", changed), ("removed", removed), ("added", added), ("renamed", renamed))
+                             for key in keys[:5]][:10]}
 
     def carry(self, carried: dict) -> None:
         """A finished filing moved to a new KPI list version, its readings kept."""

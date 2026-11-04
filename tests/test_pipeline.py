@@ -1684,3 +1684,13 @@ def test_a_figure_the_owner_rejected_still_ties_a_series_together():
     joined.store.owner_rejected = [row("search", "SearchNewsMember", "2026", 3.0), row("search", "SearchMember", "2020", 4.0)]
     written = joined._unify_series()
     assert {(v["kpi_key"], v["fiscal_year"], v["validation_status"]) for v in written} == {("search", "2024", "verified"), ("searchnews", "2024", "rejected")}
+
+
+def test_a_figure_that_must_not_be_served_scores_wrong_when_it_is():
+    golden = [{"symbol": "X", "period_end": "2026-06-30", "label": "^AI$", "group": "^Revenue$", "unit": "currency", "absent": True}]
+    row = {"group_key": "g", "kpi_key": "ai", "fiscal_year": "2026", "fiscal_period": "Q2", "unit": "currency", "validation_status": "verified",
+           "period_end": "2026-06-30", "kpi_label": "AI", "group_label": "Revenue", "value": 5.0, "method": "xbrl"}
+    assert score(golden, {"X": []})["results"][0]["outcome"] == "correct"
+    served = score(golden, {"X": [row]})
+    assert served["results"][0]["outcome"] == "wrong" and served["results"][0]["methods"] == ["xbrl"] and served["wrong"] == 1
+    assert score(golden, {"X": [{**row, "group_label": "Costs"}]})["results"][0]["outcome"] == "correct"

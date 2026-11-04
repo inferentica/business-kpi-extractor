@@ -69,6 +69,7 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
     results = []
     for item in golden:
         pattern = re.compile(item["label"], re.I)
+        group = re.compile(item["group"], re.I) if item.get("group") else None
         target = date.fromisoformat(item["period_end"])
         latest: dict[tuple, dict] = {}
         for value in captured.get(item["symbol"], []):
@@ -79,7 +80,14 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
             and abs((date.fromisoformat(value["period_end"]) - target).days) <= 7
             and value["fiscal_period"] == item.get("fiscal_period", value["fiscal_period"])
             and pattern.search(value["kpi_label"])
+            and (group is None or group.search(value["group_label"]))
         ]
+        if item.get("absent"):
+            # A figure that must not be served: rows a reading once produced that were wrong (a segment's old name
+            # beside its new one, a segment taken for a line of a breakdown).
+            results.append({**item, "outcome": "wrong" if candidates else "correct", "methods": sorted({v["method"] for v in candidates}),
+                            "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates]})
+            continue
         expected = float(item["value"])
         tolerance = float(item.get("tolerance", 1e-6))
         # The whole observation must match: the number, and its currency where the golden value names one.
@@ -90,7 +98,7 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
             outcome = "wrong"
         else:
             outcome = "optional" if item.get("optional") else "missing"
-        results.append({**item, "outcome": outcome,
+        results.append({**item, "outcome": outcome, "methods": sorted({v["method"] for v in candidates}),
                         "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates][:3]})
     counted = [result for result in results if result["outcome"] != "optional"]
     correct = sum(1 for result in counted if result["outcome"] == "correct")
@@ -106,11 +114,15 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
     }
 
 
+def expected_text(result: dict) -> str:
+    return f"{result['value']:,}" if "value" in result else "not served"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--golden", default=str(GOLDEN))
     parser.add_argument("--quarters", type=int, default=6)
-    parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args(argv)
     configure_identity()
     golden = json.loads(Path(args.golden).read_text())
@@ -128,12 +140,15 @@ def main(argv: list[str] | None = None) -> int:
     report["secondReads"] = sum(result.second_reads for result in results)
     report["replayedReads"] = sum(result.replayed_reads for result in results)
     report["errors"] = {result.symbol: result.errors[:5] for result in results if result.errors}
-    plane.call("finish", summary={key: value for key, value in report.items() if key != "results"})
+    # Kept with the run, so a score can be compared with any earlier one; the workflow's artifact expires in 30 days.
+    plane.call("finish", summary={**{key: value for key, value in report.items() if key != "results"},
+                                  "results": [{key: result.get(key) for key in ("symbol", "period_end", "label", "group", "outcome", "found", "methods")}
+                                              for result in report["results"]]})
     lines = [f"Golden set: {report['correct']}/{report['total']} correct, {report['wrong']} wrong, {report['missing']} missing "
              f"(accuracy {report['accuracy']:.1%}, recall {report['recall']:.1%}); AI calls {report['aiCalls']}",
              "", "| Company | Period | KPI | Expected | Found | Outcome |", "|---|---|---|---|---|---|"]
     for result in report["results"]:
-        lines.append(f"| {result['symbol']} | {result['period_end']} | {result['label']} | {result['value']:,} | "
+        lines.append(f"| {result['symbol']} | {result['period_end']} | {result['label']} | {expected_text(result)} | "
                      f"{', '.join(result['found']) or '—'} | {result['outcome']} |")
     text = "\n".join(lines)
     print(text)

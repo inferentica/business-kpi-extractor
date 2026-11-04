@@ -131,3 +131,14 @@ def test_a_re_read_keeps_a_period_the_owner_confirmed_held():
     reading = FilingReading(FilingRef("f1", "10-Q", date(2026, 8, 4), "periodic_report", "https://www.sec.gov/x.htm"), "processed", records=[])
     store.record(reading)
     assert store.values[("kpi_x", "si", "2026", "Q2")]["validation_status"] == "verified"
+
+
+def test_a_run_says_what_it_changed_among_the_figures_served():
+    store = _store()
+    store.load([_row("same"), _row("moved"), _row("gone"), _row("flagged", status="needs_review"), _row("named", kpi_label="Old")])
+    assert store.served_changes() == {}
+    store.write([{**_row("moved"), "value": 2.0}, {**_row("gone"), "validation_status": "rejected"}, _row("new"), _row("flagged"),
+                 _row("named", kpi_label="New")])
+    changes = store.served_changes()
+    assert {key: changes[key] for key in ("added", "removed", "changed", "renamed")} == {"added": 2, "removed": 1, "changed": 1, "renamed": 1}
+    assert {"change": "changed", "group": "kpi_x", "kpi": "moved", "year": "2026", "period": "Q2"} in changes["examples"]

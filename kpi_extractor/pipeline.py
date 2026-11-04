@@ -62,6 +62,8 @@ class SymbolResult:
     # KPIs the list cap took off (operating metrics only), so a lost metric is never silent.
     trimmed_kpis: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    # What the run changed among the figures served (see CompanyStore.served_changes).
+    served_changes: dict = field(default_factory=dict)
 
 
 
@@ -248,6 +250,9 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.write(self._derive(spec))
         self.store.write(self._harmonize_labels())
         self.result.q4_gaps = self._q4_gaps()
+        self.result.served_changes = self.store.served_changes()
+        if self.result.served_changes:
+            self.log(f"{self.symbol}: served figures changed: {self.result.served_changes}")
         live = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] != "rejected"]
         self.result.release_values = len(live)
         self.result.release_verified = sum(1 for v in live if v["validation_status"] == "verified")

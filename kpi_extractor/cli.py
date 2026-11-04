@@ -101,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
             "skippedCompanies": [result.symbol for result in results if result.skipped],
             "trimmedKpis": {result.symbol: result.trimmed_kpis for result in results if result.trimmed_kpis},
             "errors": {result.symbol: result.errors[:5] for result in results if result.errors},
+            "servedChanges": {result.symbol: result.served_changes for result in results if result.served_changes},
             "lowestAvailableMemoryGb": round(memory.lowest_available_gb, 1) if memory.lowest_available_gb is not None else None,
         }
         print(f"Summary: {summary}")
