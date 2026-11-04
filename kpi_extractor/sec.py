@@ -4,11 +4,17 @@ from __future__ import annotations
 import os
 import html
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
+import httpx
 from edgar import Company, set_identity
+from edgar.exceptions import IdentityError, http_status
+from edgar.httprequests import is_unreachable
+from edgar.sgml import FilingSGML
+from edgar.settings import get_identity
 
 from .archive import exhibits_from_record, exhibits_record, filing_folder
 from .fiscal import nominal_quarter_end_before
@@ -21,6 +27,11 @@ _LISTING_READERS = 6
 # Recent 6-Ks that are not earnings documents (monthly revenue, buyback notices) are recorded as looked at, so the
 # discovery pass, which counts a filing from the last 30 days that is not recorded as new, does not start runs for them.
 PASSED_OVER_DAYS = timedelta(days=35)
+# How long to wait before each further try after a temporary SEC failure. Listing a company's filings is not guarded per
+# filing, so one error page or timeout there used to fail the whole company for the run (KO, AMZN, APO in November 2026).
+_SEC_WAITS = (5, 20, 60)
+_TEMPORARY_STATUS = {408, 425, 429, 500, 502, 503, 504}
+_SUBMISSION_TIMEOUT = 120
 
 
 def configure_identity() -> None:
@@ -50,7 +61,61 @@ class FilingRef:
     confirmed: bool = True
 
 
+def _temporary(error: Exception) -> bool:
+    """A failure that trying again can cure: no answer, an error page, or a busy server. A rejected identity or a filing
+    that does not exist would only fail again."""
+    if isinstance(error, IdentityError):
+        return False
+    return is_unreachable(error) or http_status(error) in _TEMPORARY_STATUS
+
+
+def _with_retries(read, read_again=None):
+    """The result of `read`; after a temporary failure, of `read_again` (or `read`) a few more times, waiting between."""
+    try:
+        return read()
+    except Exception as error:  # noqa: BLE001 - sorted by _temporary
+        if not _temporary(error):
+            raise
+        failure = error
+    for wait in _SEC_WAITS:
+        print(f"SEC: {type(failure).__name__}; trying again in {wait} s", flush=True)
+        time.sleep(wait)
+        try:
+            return (read_again or read)()
+        except Exception as error:  # noqa: BLE001 - sorted by _temporary
+            if not _temporary(error):
+                raise
+            failure = error
+    raise failure
+
+
+def _read_submission_afresh(filing) -> None:
+    # Past edgartools' cache, which keeps anything read from /Archives for good and could hand back the same error page.
+    response = httpx.get(filing.text_url, headers={"User-Agent": get_identity()}, timeout=_SUBMISSION_TIMEOUT,
+                         follow_redirects=True)
+    response.raise_for_status()
+    submission = FilingSGML.from_text(response.text)
+    # As FilingSGML.from_filing fills what a submission's header leaves out.
+    if not submission.accession_number:
+        submission.header.filing_metadata.update("ACCESSION NUMBER", filing.accession_no)
+    if not submission.header.filing_metadata.get("CIK"):
+        submission.header.filing_metadata.update("CIK", str(filing.cik).zfill(10))
+    if not submission.header.form:
+        submission.header.filing_metadata.update("CONFORMED SUBMISSION TYPE", filing.form)
+    filing._sgml = submission
+
+
+def _load_submission(filing) -> None:
+    """Holds a filing's full submission on it. Its URL and attachments are read from the submission, so reading those
+    afterwards cannot fail."""
+    _with_retries(filing.sgml, lambda: _read_submission_afresh(filing))
+
+
 def company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
+    return _with_retries(lambda: _company_profile(symbol))
+
+
+def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
     company = Company(symbol)
     fiscal_year_end = str(getattr(company, "fiscal_year_end", None) or "1231").zfill(4)
     profile = CompanyProfile(
@@ -64,11 +129,12 @@ def company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
 
 
 def periodic_reports(company: Company, since: date) -> list[FilingRef]:
-    filings = company.get_filings(form=list(PERIODIC_FORMS), filing_date=f"{since.isoformat()}:")
+    filings = _with_retries(lambda: company.get_filings(form=list(PERIODIC_FORMS), filing_date=f"{since.isoformat()}:"))
     refs = []
     for filing in filings:
         if filing.form not in PERIODIC_FORMS:
             continue  # amendments restate a subset; the original report is the complete one
+        _load_submission(filing)
         refs.append(FilingRef(
             accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="periodic_report",
             source_url=filing.filing_url if hasattr(filing, "filing_url") else filing.url, filing=filing,
@@ -84,7 +150,8 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date, ar
     earnings release, the quarterly financial report, or unrelated notices). A recent foreign filer's 6-K that is no
     candidate (no exhibit, or outside the window) goes to `passed`, so it is recorded as looked at."""
     form = "6-K" if profile.foreign else "8-K"
-    filings = sorted(company.get_filings(form=form, filing_date=f"{since.isoformat()}:"), key=lambda item: item.filing_date)
+    filings = sorted(_with_retries(lambda: company.get_filings(form=form, filing_date=f"{since.isoformat()}:")),
+                     key=lambda item: item.filing_date)
     confirmed_quarters = set()
     refs: list[FilingRef] = []
     candidates = []
@@ -170,6 +237,7 @@ def _archived_exhibits(filing, archive) -> list:
 def _html_exhibits(filing) -> list:
     """A filing's HTML exhibits. A 6-K with none carries its content in its own document (TSMC's until October 2019:
     its results and quarterly financial statements, by technology from 2018), which then stands in for them."""
+    _load_submission(filing)
     attachments = list(filing.attachments)
     exhibits = [attachment for attachment in attachments
                 if str(attachment.document_type or "").upper().startswith("EX-99") and attachment.is_html()]
@@ -207,12 +275,13 @@ def ipo_prospectus(company: Company, first_report: date | None, today: date | No
     None for a company listed longer, whose reports reach back on their own."""
     if first_report is None or first_report < (today or date.today()) - _RECENT_LISTING:
         return None
-    filings = company.get_filings(form=list(PROSPECTUS_FORMS),
-                                  filing_date=f"{(first_report - _PROSPECTUS_BEFORE).isoformat()}:{first_report.isoformat()}")
+    filings = _with_retries(lambda: company.get_filings(
+        form=list(PROSPECTUS_FORMS), filing_date=f"{(first_report - _PROSPECTUS_BEFORE).isoformat()}:{first_report.isoformat()}"))
     filings = sorted((filing for filing in filings if filing.form in PROSPECTUS_FORMS), key=lambda item: item.filing_date)
     if not filings:
         return None
     filing = filings[-1]
+    _load_submission(filing)
     document = next((attachment for attachment in filing.attachments
                      if str(attachment.document_type or "").upper() == filing.form and attachment.is_html()), None)
     if document is None:
