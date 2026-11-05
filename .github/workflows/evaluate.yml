@@ -18,6 +18,11 @@ on:
           - flash-high
           - flash-max
           - flash-max-all
+      golden:
+        description: Values to score against; its companies are the ones read
+        required: true
+        default: evals/golden.json
+        type: string
       lists:
         description: KPI lists - stored (production's, cheaper and stable) or fresh (written anew, as for a new company)
         required: true
@@ -61,7 +66,8 @@ jobs:
           QUARTERS: ${{ inputs.quarters || '6' }}
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
-        run: python -m kpi_extractor.evaluate --quarters "$QUARTERS"
+          GOLDEN: ${{ inputs.golden || 'evals/golden.json' }}
+        run: python -m kpi_extractor.evaluate --quarters "$QUARTERS" --golden "$GOLDEN"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
