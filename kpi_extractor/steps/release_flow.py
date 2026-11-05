@@ -8,7 +8,7 @@ from .. import ai
 from ..ai import Spec
 from ..document import Document, clean
 from ..checks import check_period, date_order_findings, validate_groups
-from ..extract import ReadValue
+from ..extract import ReadValue, falls, net_gross_mismatch
 from ..fiscal import fiscal_label
 from ..sec import FilingRef
 from ..store import FilingReading, failed_reading
@@ -19,7 +19,7 @@ _READ_BY_REPLAY = "read by replay"
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
 # stamping began are never re-read by it, so a bump cannot re-read every company's history.
-_RELEASE_READER = "release reader 2"
+_RELEASE_READER = "release reader 3"
 _RELEASE_READER_PREFIX = "release reader "
 # Releases a company's run reads at once, after its newest (see _process_releases).
 RELEASE_READERS = 4
@@ -38,6 +38,21 @@ def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
     found = {f"{item.group.key}.{item.kpi.key}" for item in read}
     return [f"{group.key}.{kpi.key}" for group in spec.groups if group.key not in whole for kpi in group.kpis
             if kpi.key != group.total_kpi and f"{group.key}.{kpi.key}" not in found]
+
+
+def stored_reading_fails(value: dict) -> bool:
+    """Whether a served AI reading is one reader 3 rejects or reads differently: a fall stored as a rise ("decreased by
+    16%" served as 16), or a net figure under a gross KPI. Its release is read again once, stamped or not."""
+    if value.get("method") != "ai" or value.get("validation_status") != "verified" or value.get("owner_decision"):
+        return False
+    locator = value.get("locator") or {}
+    quote, value_text = clean(str(locator.get("quote") or "")), clean(str(locator.get("value_text") or ""))
+    if value.get("unit") == "percent" and float(value.get("value") or 0) > 0 and quote and value_text and falls(quote, value_text):
+        return True
+    label = str(value.get("kpi_label") or "")
+    if quote and value_text and net_gross_mismatch(quote[:quote.find(value_text)][-80:], label):
+        return True
+    return bool(locator.get("row_label")) and net_gross_mismatch(str(locator["row_label"]), label) is not None
 
 
 def release_reread_due(previous: dict | None) -> bool:
@@ -64,7 +79,8 @@ class ReleaseFlow:
     def _read_release(self, ref: FilingRef, spec: Spec, version: int) -> FilingReading | None:
         previous = self.filings.get(ref.accession)
         if not self.force and previous and previous.get("spec_version") == version and (
-                previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS) and not release_reread_due(previous):
+                previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS) and not release_reread_due(previous) \
+                and not self._reader3_due(previous, ref.accession):
             return None
         if not spec.groups:
             return FilingReading(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
@@ -110,6 +126,13 @@ class ReleaseFlow:
                                  fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001
             return failed_reading(ref, error, version)
+
+    def _reader3_due(self, previous: dict, accession: str) -> bool:
+        """A release read before reader 3 that holds a served reading reader 3 would reject (see stored_reading_fails)."""
+        stamp = next((note for note in previous.get("notes") or [] if note.startswith(_RELEASE_READER_PREFIX)), "")
+        if stamp.removeprefix(_RELEASE_READER_PREFIX).isdigit() and int(stamp.removeprefix(_RELEASE_READER_PREFIX)) >= 3:
+            return False
+        return any(value.get("source_accession") == accession and stored_reading_fails(value) for value in self.values.values())
 
     def _read_and_record_release(self, ref: FilingRef, spec: Spec, version: int) -> bool:
         reading = self._read_release(ref, spec, version)

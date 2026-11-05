@@ -56,14 +56,16 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             continue
         group, kpi = kpis[locator.kpi]
         try:
-            if group.kind != "metric" and locator.table is not None and locator.table in document.tables:
-                # A part of a breakdown or mix pointed at a combined line (Total Markets & Securities Services for
-                # Securities Services). A metric is often reported as its own total ("Total assets under management").
+            if locator.table is not None and locator.table in document.tables:
                 table = document.tables[locator.table]
                 row_label = _row_label(table.rows[locator.row], locator.col) if locator.row < len(table.rows) else ""
-                if _combined_line(row_label, kpi.label):
+                # A part of a breakdown or mix pointed at a combined line (Total Markets & Securities Services for
+                # Securities Services). A metric is often reported as its own total ("Total assets under management").
+                if group.kind != "metric" and _combined_line(row_label, kpi.label):
                     raise LocateError(f"{locator.table} r{locator.row} is the combined line {row_label!r}, not "
                                       f"{kpi.label!r}: point at the row for {kpi.label} itself")
+                if other := net_gross_mismatch(row_label, kpi.label):
+                    raise LocateError(f"{locator.table} r{locator.row} is the {other} figure {row_label!r}, not {kpi.label!r}")
             value, currency, notes = _read(document, locator, kpi, default_currency)
         except LocateError as error:
             problems.append(f"{locator.kpi}: {error}")
@@ -164,6 +166,13 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         # TSMC's results-day slide gives node shares ("0.15/0.18um 2%"), never amounts: a share is not this KPI.
         raise LocateError(f"{value_text!r} is a percentage, not an amount")
     value = parsed.value
+    before = quote[:quote.find(value_text)]
+    if other := net_gross_mismatch(before[-80:], kpi.label):
+        raise LocateError(f"the quote gives the {other} figure, not {kpi.label!r}")
+    if kpi.unit == "percent" and value > 0 and falls(quote, value_text):
+        # "The average price per ad decreased by 16%" is a change of -16%: the sentence carries the sign, not the number.
+        value = -value
+        notes.append("a fall, as the quote says")
     if kpi.unit == "count" and parsed.scale_word is None:
         # A count takes its label's own scale, as a table row's does: "Starlink Subscribers (#, in millions) 12.0".
         value *= _row_scale(quote[:quote.find(value_text)]) or 1
@@ -179,6 +188,29 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         elif value < 1_000:
             raise LocateError(f"{value_text!r} has no amount scale")
     return value, _currency(f"{value_text} {quote}", kpi, default_currency, block.text), notes
+
+
+# A fall named just before the number: "decreased by 16%", "a decrease of 1%", "down 5%", "the decline on a
+# constant-dollar basis was 5%". Only words may stand between, so "decreased by 3% and margin was 40%" is no fall for
+# the 40%, and a level ("declined to 30%", "fell from 32% to 30%") never is.
+_FALL = re.compile(r"\b(?:decreas\w*|declin\w*|fell|falls?|falling|dropped|drops?|down|lower|contracted|reduc\w*)"
+                   r"(?:\s+(?!to\b|from\b)[A-Za-z][\w-]*){0,6}?\s*(?:\b(?:by|of|was|were)\s*)?$", re.I)
+
+
+def falls(quote: str, value_text: str) -> bool:
+    """Whether the quote calls the figure a fall, so a change it states as a plain number is negative."""
+    at = quote.find(value_text)
+    return at >= 0 and bool(_FALL.search(quote[:at][-80:]))
+
+
+def net_gross_mismatch(text: str, kpi_label: str) -> str | None:
+    """"net" when the text names a net figure and the KPI a gross one (KKR's Net Unrealized Carried Interest is not its
+    Gross Unrealized Carried Interest), "gross" the other way round, else None."""
+    named = {word for word in ("net", "gross") if re.search(rf"\b{word}\b", text, re.I)}
+    wanted = {word for word in ("net", "gross") if re.search(rf"\b{word}\b", kpi_label, re.I)}
+    if len(wanted) == 1 and len(named) == 1 and named != wanted:
+        return named.pop()
+    return None
 
 
 def _table_as_text(document: Document, key: str | None) -> TextBlock | None:

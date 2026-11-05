@@ -285,3 +285,78 @@ def test_a_quote_takes_the_last_scale_heading_before_it_in_its_block():
     assert read("Fee-Generating AUM $858", "$858") == 858e9
     assert read("Inflows $60", "$60") == 60e9
     assert read("Fee Related Earnings $785", "$785") == 785e6
+
+
+def _metric_spec(*kpis):
+    return Spec.model_validate({"groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric",
+                                             "kpis": [{"key": key, "label": label, "unit": unit} for key, label, unit in kpis]}]})
+
+
+def test_a_quote_that_calls_a_change_a_fall_is_read_as_negative():
+    # Meta 2023: "the average price per ad decreased by 16%" was served as +16. Visa and Meta's headcount the same way.
+    document = parse_document("""
+<p>Ad impressions increased by 34% year-over-year and the average price per ad decreased by 16% year-over-year.</p>
+<p>Headcount was 75,472 as of June 30, 2026, a decrease of 1% year-over-year.</p>
+<p>Cross-border volume fell, and the decline on a constant- dollar basis was 5% in the quarter.</p>
+<p>Unit volume was down 3% while price/mix was 7%.</p>
+<p>Gross margin declined to 30%, and costs decreased by 3% and margin was 40%.</p>
+""", "https://example.com/ex99.htm")
+    spec = _metric_spec(("impressions", "Ad Impressions Year over Year Growth", "percent"),
+                        ("price", "Average Price per Ad Year over Year Growth", "percent"),
+                        ("headcount", "Headcount Year over Year Growth", "percent"),
+                        ("cross_border", "Cross-Border Volume Growth", "percent"),
+                        ("units", "Unit Volume Growth", "percent"), ("mix", "Price Mix", "percent"),
+                        ("margin", "Gross Margin", "percent"), ("op_margin", "Margin", "percent"))
+    quotes = [("impressions", "Ad impressions increased by 34%", "34%"), ("price", "the average price per ad decreased by 16%", "16%"),
+              ("headcount", "a decrease of 1% year-over-year", "1%"), ("cross_border", "the decline on a constant- dollar basis was 5%", "5%"),
+              ("units", "Unit volume was down 3%", "3%"), ("mix", "while price/mix was 7%", "7%"),
+              ("margin", "Gross margin declined to 30%", "30%"), ("op_margin", "costs decreased by 3% and margin was 40%", "40%")]
+    located = Located.model_validate({"period_end": "2026-06-30", "values": [
+        {"kpi": f"operating.{key}", "block": _block(document, quote), "quote": quote, "value_text": value} for key, quote, value in quotes]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == []
+    assert {item.kpi.key: item.value for item in values} == {"impressions": 34, "price": -16, "headcount": -1, "cross_border": -5,
+                                                             "units": -3, "mix": 7, "margin": 30, "op_margin": 40}
+
+
+def test_a_net_figure_never_fills_a_gross_kpi():
+    # KKR 2019-2020: "Net Unrealized Carried Interest" was served as Gross Unrealized Carried Interest.
+    document = parse_document("""
+<table>
+<tr><td>($ in thousands)</td><td>June 30, 2020</td></tr>
+<tr><td>Net Unrealized Carried Interest</td><td>1,305,013</td></tr>
+<tr><td>Gross Unrealized Carried Interest</td><td>2,610,026</td></tr>
+</table>
+<p>Net unrealized carried interest was $1.3 billion as of June 30, 2020.</p>
+""", "https://example.com/ex99.htm")
+    spec = _metric_spec(("gross_carry", "Gross Unrealized Carried Interest", "currency"))
+    table = next(iter(document.tables))
+    for wrong in ({"kpi": "operating.gross_carry", "table": table, "row": 1, "col": 1, "scale": 1000},
+                  {"kpi": "operating.gross_carry", "block": _block(document, "Net unrealized"),
+                   "quote": "Net unrealized carried interest was $1.3 billion", "value_text": "$1.3 billion"}):
+        values, problems = read_values(document, spec, Located.model_validate({"period_end": "2020-06-30", "values": [wrong]}), "USD")
+        assert values == [] and "net figure" in problems[0]
+    right = {"kpi": "operating.gross_carry", "table": table, "row": 2, "col": 1, "scale": 1000}
+    values, problems = read_values(document, spec, Located.model_validate({"period_end": "2020-06-30", "values": [right]}), "USD")
+    assert problems == [] and [item.value for item in values] == [2_610_026_000]
+
+
+def test_a_release_holding_a_reading_reader_3_rejects_is_read_again_once():
+    from types import SimpleNamespace
+
+    from kpi_extractor.steps.release_flow import ReleaseFlow, stored_reading_fails
+
+    fall = {"method": "ai", "validation_status": "verified", "unit": "percent", "value": 16, "source_accession": "A1",
+            "kpi_label": "Average Price per Ad Year over Year Growth",
+            "locator": {"quote": "the average price per ad decreased by 16% year-over-year", "value_text": "16%"}}
+    net = {"method": "ai", "validation_status": "verified", "unit": "currency", "value": 1.3e9, "source_accession": "A2",
+           "kpi_label": "Gross Unrealized Carried Interest", "locator": {"row_label": "Net Unrealized Carried Interest"}}
+    assert stored_reading_fails(fall) and stored_reading_fails(net)
+    assert not stored_reading_fails({**fall, "value": -16})
+    assert not stored_reading_fails({**fall, "owner_decision": "confirmed"})
+    assert not stored_reading_fails({**net, "locator": {"row_label": "Gross Unrealized Carried Interest"}})
+    flow = SimpleNamespace(values={"a": fall, "b": net})
+    assert ReleaseFlow._reader3_due(flow, {"notes": ["read by AI", "release reader 2"]}, "A1")
+    assert ReleaseFlow._reader3_due(flow, {"notes": ["read by AI"]}, "A2")
+    assert not ReleaseFlow._reader3_due(flow, {"notes": ["read by AI", "release reader 3"]}, "A1")
+    assert not ReleaseFlow._reader3_due(flow, {"notes": ["read by AI", "release reader 2"]}, "A9")
