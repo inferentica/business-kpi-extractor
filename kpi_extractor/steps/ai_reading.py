@@ -468,7 +468,9 @@ class AiReading:
                 continue
             if chained and (value["period_end"] > cutoff or not _same_chain(value["period_end"], before)):
                 continue  # in a chain: only its own earlier quarters, which are always read first
-            if source is not None and _source_template(value.get("source_url") or "") != source:
+            # The kind of document is its filing's: a figure links to the exhibit it was read from, which may not be the first.
+            filing_url = (self.filings.get(value.get("source_accession") or "") or {}).get("source_url") or value.get("source_url") or ""
+            if source is not None and _source_template(filing_url) != source:
                 continue
             key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
             if value["period_end"] < cutoff:

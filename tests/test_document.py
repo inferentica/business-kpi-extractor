@@ -144,3 +144,19 @@ def test_a_table_declaring_scales_for_units_and_revenue_gives_amounts_the_revenu
 
 def test_a_scale_word_gives_the_exact_figure():
     assert parse_number("DAUs were 2.11 billion on average").value == 2_110_000_000
+
+
+def test_each_exhibit_of_a_filing_keeps_its_own_link():
+    # JPMorgan files its earnings release (EX-99.1) and Financial Supplement (EX-99.2) together; a figure read from the
+    # supplement links to the supplement.
+    release = parse_document("<p>Net revenue was $46.0 billion.</p><table><tr><td>Revenue</td><td>46,014</td></tr></table>",
+                             "https://www.sec.gov/x/release.htm", prefix="A_")
+    supplement = parse_document("<table><tr><td>Fixed Income Markets</td><td>5,849</td></tr></table>",
+                                "https://www.sec.gov/x/supplement.htm", prefix="B_")
+    release.extend(supplement)
+    table_b = next(key for key in release.tables if key.startswith("B_"))
+    block_a = next(key for key in release.blocks if key.startswith("A_"))
+    assert release.url_of(table_b) == "https://www.sec.gov/x/supplement.htm"
+    assert release.url_of(block_a) == "https://www.sec.gov/x/release.htm"
+    assert release.url_of(None) == release.source_url == "https://www.sec.gov/x/release.htm"
+    assert parse_document("<p>x</p>", "https://www.sec.gov/x/one.htm").url_of("T0") == "https://www.sec.gov/x/one.htm"

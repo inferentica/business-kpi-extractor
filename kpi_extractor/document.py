@@ -103,6 +103,14 @@ class Document:
     tables: dict[str, Table] = field(default_factory=dict)
     blocks: dict[str, TextBlock] = field(default_factory=dict)
     order: list[str] = field(default_factory=list)
+    # Each exhibit's own link by its id prefix ("B_" for the second): a figure read from JPMorgan's Financial Supplement
+    # links to the supplement, not to the earnings release that comes first in the filing.
+    part_urls: dict[str, str] = field(default_factory=dict)
+
+    def url_of(self, item_id: str | None) -> str:
+        """The link of the exhibit holding a table or text block, by its id's prefix; the document's own link otherwise."""
+        prefix = re.match(r"([A-Z]+_)", item_id or "")
+        return self.part_urls.get(prefix.group(1), self.source_url) if prefix else self.source_url
 
     def render(self) -> str:
         return "\n\n".join((self.tables.get(key) or self.blocks[key]).render() for key in self.order)
@@ -180,6 +188,7 @@ class Document:
         self.tables.update(other.tables)
         self.blocks.update(other.blocks)
         self.order.extend(other.order)
+        self.part_urls.update(other.part_urls)
 
 
 @dataclass(frozen=True)
@@ -238,7 +247,7 @@ def parse_document(raw_html: bytes | str, source_url: str, prefix: str = "") -> 
     root = html.fromstring(raw_html)
     for node in root.xpath("//script|//style|//head"):
         node.drop_tree()
-    document = Document(source_url=source_url)
+    document = Document(source_url=source_url, part_urls={prefix: source_url} if prefix else {})
     tables = root.xpath("//table[not(ancestor::table)]")
     for index, element in enumerate(tables):
         rows = _table_rows(element)

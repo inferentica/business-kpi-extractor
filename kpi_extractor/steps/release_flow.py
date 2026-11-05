@@ -302,6 +302,7 @@ class ReleaseFlow:
                 unit=item.kpi.unit, value=item.value, currency=item.currency, method="ai",
                 validation_status=status, reconciliation_error_pct=(parts_sum[item.group.key] - total) / total if total else None,
                 notes=notes, ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period, period_end=period_end,
-                locator={**item.locator, "total": total} if total else item.locator, source_url=document.source_url,
+                locator={**item.locator, "total": total} if total else item.locator,
+                source_url=document.url_of(item.locator.get("table") or item.locator.get("block")),
             ))
         return records
