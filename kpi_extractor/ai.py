@@ -165,7 +165,9 @@ class TableLocator(BaseModel):
 
 # Why a reader found no value for a KPI (Locate) or why a reading is not the quarter's value (Review). Anything else a
 # reader answers is kept as "unstated", so a new wording never fails a reading.
-MISSING_REASONS = ("not_reported", "not_in_excerpt", "related_only", "guidance_only")
+# The AI is not told whether it sees a whole document, so whether a figure was left out of a long one is decided by
+# code (left_out_names_it, in the filing's notes), never asked of the reader.
+MISSING_REASONS = ("not_reported", "elsewhere", "related_only", "guidance_only")
 REVIEW_REASONS = ("prior_period", "year_to_date", "full_year", "guidance", "different_metric", "wrong_row", "wrong_scale",
                   "not_reported")
 
@@ -376,9 +378,9 @@ for a company whose quarters are counted in weeks), never the prior-year quarter
 or full-year columns.
 - For a percentage, point to the percentage itself, not an amount.
 - If a KPI is not reported for this quarter, list its key in "missing". Do not guess. Give each missing key a reason in \
-"missing_reasons": "not_reported" (the document does not report it), "not_in_excerpt" (the document is cut short or \
-the figure is likely in a part not shown), "related_only" (only a related measure under another name is reported), or \
-"guidance_only" (only an outlook or forecast mentions it).
+"missing_reasons": "not_reported" (the document does not report it), "elsewhere" (the document says it is given in \
+another document, a presentation or an attachment), "related_only" (only a related measure under another name is \
+reported), or "guidance_only" (only an outlook or forecast mentions it).
 - Never point to guidance, an outlook or any statement of what the company expects ("We expect revenue from AI to be \
 $12 billion for fiscal year 2024"): only to what it reports for the period.
 - The value must be the measure the KPI names, not a related one under another name: one app's daily active users \

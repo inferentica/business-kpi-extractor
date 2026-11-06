@@ -147,6 +147,7 @@ class ReleaseFlow:
             status = "processed" if verified else "needs_review" if records else "skipped"
             unreported = _unreported(spec, read)
             reasons = {key: located.missing_reasons.get(key, "unstated") for key in unreported} if how == _READ_BY_AI else {}
+            reasons.update(dict.fromkeys(self._left_out_naming(document, spec, list(reasons)), "left_out_names_it"))
             second = getattr(self._local, "second_read", None) if how == _READ_BY_AI else None
             notes = [how, _RELEASE_READER, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []),
                      *([_MISSING_WHY + ", ".join(f"{key}={code}" for key, code in reasons.items())] if reasons else []),

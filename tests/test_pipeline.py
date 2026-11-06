@@ -1792,7 +1792,7 @@ def test_reason_codes_are_kept_and_unknown_ones_marked_unstated():
 def test_second_reads_and_reviews_record_why():
     document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
     flash = {"period_end": "2026-06-30", "values": [_quote(document, "technology.n3", "3-nanometer accounted for 20%", "20%")],
-             "missing": ["technology.n5"], "missing_reasons": {"technology.n5": "not_in_excerpt"}}
+             "missing": ["technology.n5"], "missing_reasons": {"technology.n5": "elsewhere"}}
     control = FakeControl({
         ("locate", "flash"): flash,
         ("locate", "reasoning"): {"period_end": "2026-06-30", "values": [], "missing": ["technology.n3"],
@@ -1804,7 +1804,7 @@ def test_second_reads_and_reviews_record_why():
     assert pipeline.result.second_read_reasons == {"checks_failed": 1}
     assert any("kept neither (prior_period)" in problem for problem in problems)
     # The standing reading's reason wins; the other reader's fills the KPIs it gave none for.
-    assert located.missing_reasons == {"technology.n3": "not_reported", "technology.n5": "not_in_excerpt"}
+    assert located.missing_reasons == {"technology.n3": "not_reported", "technology.n5": "elsewhere"}
 
 
 def test_a_first_quarter_goes_to_the_second_reader_as_not_placed():
@@ -1813,3 +1813,18 @@ def test_a_first_quarter_goes_to_the_second_reader_as_not_placed():
     pipeline = _pipeline(control)
     pipeline._read("prompt", document, SPEC, EXPECTED)
     assert pipeline.result.second_read_reasons == {"not_placed": 1}
+
+
+def test_a_missing_kpi_named_in_a_left_out_part_is_marked_by_code():
+    from kpi_extractor.steps.ai_reading import MAX_DOCUMENT_CHARS
+    filler = "".join(f"<p>Filler passage {i} {'x' * 900}</p>" for i in range(MAX_DOCUMENT_CHARS // 900 + 5))
+    document = parse_document(RELEASE + filler + "<p>Last of all, 5-nanometer accounted for 33%.</p>", "https://www.sec.gov/x.htm")
+    pipeline = _pipeline(FakeControl({}))
+    first = [key for key in document.order[:3]]
+    pipeline._prompt_documents[str(id(document))] = document.render_ids(set(first), MAX_DOCUMENT_CHARS, opening=3)
+    spec = Spec.model_validate({"groups": [{"key": "technology", "label": "Revenue by Technology", "kind": "mix", "kpis": [
+        {"key": "n5", "label": "5-nanometer accounted", "unit": "percent"}, {"key": "n9", "label": "9-nanometer share", "unit": "percent"}]}]})
+    assert pipeline._left_out_naming(document, spec, ["technology.n5", "technology.n9"]) == {"technology.n5"}
+    whole = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    pipeline._prompt_documents[str(id(whole))] = whole.render()
+    assert pipeline._left_out_naming(whole, spec, ["technology.n5"]) == set()

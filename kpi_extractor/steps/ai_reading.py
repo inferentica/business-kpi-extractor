@@ -464,6 +464,31 @@ class AiReading:
         self._prompt_documents[key] = text
         return text
 
+    def _left_out_naming(self, document: Document, spec: Spec, keys: list[str]) -> set[str]:
+        """The KPIs among `keys` that a part of a long document left out of the reading names: a table row with the
+        KPI's label (or last quarter's row label), or a passage containing a label of two words or more. Such a KPI may
+        be reported in the cut part (the unread-figures lead); a whole document leaves nothing out."""
+        text = self._prompt_documents.get(str(id(document)))
+        if not keys or text is None or document.fits(MAX_DOCUMENT_CHARS):
+            return set()
+        kept = set(re.findall(r"^\[([^\]\s]+)\]", text, flags=re.M))
+        left = [key for key in document.order if key not in kept]
+        hints = {key: (value.get("locator") or {}).get("row_label") for key, value in self._ai_history(date.max).items()}
+        rows = {_identity_text(row[0]) for key in left if key in document.tables for row in document.tables[key].rows if row}
+        passages = [_identity_text(document.blocks[key].text) for key in left if key in document.blocks]
+        found = set()
+        for group in spec.groups:
+            for kpi in group.kpis:
+                key = f"{group.key}.{kpi.key}"
+                if key not in keys:
+                    continue
+                labels = [label for label in (kpi.label, hints.get(key) or "") if _identity_text(label)]
+                names = {_identity_text(label) for label in labels}
+                phrases = {_identity_text(label) for label in labels if len(label.split()) >= 2}
+                if names & rows or any(phrase in passage for phrase in phrases for passage in passages):
+                    found.add(key)
+        return found
+
     def _sections_naming_kpis(self, document: Document, spec: Spec) -> set[str]:
         """The tables with a row named for a listed KPI (by its label, or the row label it had last quarter)."""
         hints = {key: (value.get("locator") or {}).get("row_label") for key, value in self._ai_history(date.max).items()}
