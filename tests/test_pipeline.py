@@ -1900,3 +1900,11 @@ def test_an_explanation_must_give_a_cause_and_not_show_a_small_change():
     cause = "In real estate, we raised $7.1 billion of capital, including $5.9 billion for the fifth vintage of our flagship fund."
     assert explanation_supports(cause, "Real Estate Fundraising", 7.1e9, 2.0e9)
     assert not explanation_supports("Unit case volume declined 1% for the quarter.", "Unit Case Volume Growth", -1, -5)
+
+
+def test_fresh_lists_are_scored_against_the_owners():
+    from kpi_extractor.evaluate import score_lists
+    owner = {"X": {"groups": [{"key": "g", "kpis": [{"key": "a", "label": "Cloud"}, {"key": "b", "label": "Devices"}]}]}}
+    fresh = {"X": {"groups": [{"key": "g", "kpis": [{"key": "a", "label": "cloud"}, {"key": "c", "label": "Operating income"}]}]}}
+    lists = score_lists(fresh, owner)
+    assert lists["precision"] == 0.5 and lists["recall"] == 0.5 and lists["byCompany"]["X"]["notKept"] == ["operatingincome"]

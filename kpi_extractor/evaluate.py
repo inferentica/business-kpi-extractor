@@ -28,6 +28,7 @@ class EvalControl:
         self.plane = plane
         self.stored_lists = stored_lists
         self.values: dict[str, list[dict]] = {}
+        self.specs: dict[str, dict] = {}  # the list a run writes (fresh lists): scored against the owner's
 
     @property
     def run_id(self):
@@ -45,6 +46,8 @@ class EvalControl:
             return {}
         if operation == "store":
             self.values.setdefault(payload["symbol"], []).extend(payload.get("values") or [])
+            if payload.get("spec"):
+                self.specs[payload["symbol"]] = payload["spec"]
             return {}
         return self.plane.call(operation, **payload)
 
@@ -52,7 +55,7 @@ class EvalControl:
         return self.plane.ai(*args, **kwargs)
 
 
-def evaluate_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolResult, list[dict]]:
+def evaluate_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolResult, list[dict], dict | None]:
     """One company in its own process; what it would have stored comes back with its result."""
     stored = os.environ.get("KPI_EVAL_LISTS", "fresh") == "stored"
     control = EvalControl(plane, stored_lists=stored)
@@ -61,7 +64,29 @@ def evaluate_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[Sy
         result = SymbolPipeline(control, symbol, quarters, not stored, log=lambda line: print(line, flush=True)).run()
     except Exception as error:  # noqa: BLE001
         result = SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
-    return result, control.values.get(symbol, [])
+    return result, control.values.get(symbol, []), control.specs.get(symbol)
+
+
+def _kpis(groups: list[dict]) -> set[str]:
+    return {re.sub(r"[^a-z0-9]+", "", f"{kpi.get('label', '')}".lower()) for group in groups or [] for kpi in group.get("kpis") or []
+            if kpi.get("key") != group.get("total_kpi")} - {""}
+
+
+def score_lists(fresh: dict[str, dict], owner: dict[str, dict]) -> dict:
+    """Propose scored against the lists the owner edited by hand: of the owner's KPIs, how many a fresh list names
+    (recall), and of a fresh list's KPIs, how many the owner keeps (precision), matched by label. The owner removed
+    174 groups Propose once listed, so precision is the number to watch."""
+    rows, kept, owned, proposed = {}, 0, 0, 0
+    for symbol, spec in owner.items():
+        if symbol not in fresh:
+            continue
+        mine, theirs = _kpis(spec.get("groups")), _kpis(fresh[symbol].get("groups"))
+        both = mine & theirs
+        rows[symbol] = {"owner": len(mine), "fresh": len(theirs), "both": len(both),
+                        "notKept": sorted(theirs - mine)[:12], "notNamed": sorted(mine - theirs)[:12]}
+        kept, owned, proposed = kept + len(both), owned + len(mine), proposed + len(theirs)
+    return {"companies": len(rows), "recall": kept / owned if owned else None, "precision": kept / proposed if proposed else None,
+            "byCompany": rows}
 
 
 def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
@@ -132,9 +157,17 @@ def main(argv: list[str] | None = None) -> int:
     plane.run_id = started["runId"]
     with company_pool(max(1, min(args.workers, len(symbols)))) as pool:
         outcomes = list(pool.map(evaluate_symbol, [plane] * len(symbols), symbols, [args.quarters] * len(symbols)))
-    results = [result for result, _values in outcomes]
-    captured = {symbol: values for symbol, (_result, values) in zip(symbols, outcomes)}
+    results = [result for result, _values, _spec in outcomes]
+    captured = {symbol: values for symbol, (_result, values, _spec) in zip(symbols, outcomes)}
     report = score(golden, captured)
+    fresh = {symbol: spec for symbol, (_result, _values, spec) in zip(symbols, outcomes) if spec}
+    if fresh and os.environ.get("KPI_EVAL_LISTS", "fresh") != "stored":
+        owner = {}
+        for symbol in fresh:
+            state = plane.call("symbol_state", symbol=symbol).get("spec") or {}
+            if state.get("owner_edited_at"):
+                owner[symbol] = state
+        report["lists"] = score_lists(fresh, owner)
     report["aiCalls"] = sum(result.ai_calls for result in results)
     report["flashOnlyReads"] = sum(result.flash_only_reads for result in results)
     report["secondReads"] = sum(result.second_reads for result in results)
@@ -146,8 +179,11 @@ def main(argv: list[str] | None = None) -> int:
     plane.call("finish", summary={**{key: value for key, value in report.items() if key != "results"},
                                   "results": [{key: result.get(key) for key in ("symbol", "period_end", "label", "group", "outcome", "found", "methods")}
                                               for result in report["results"]]})
+    lists = report.get("lists")
     lines = [f"Golden set: {report['correct']}/{report['total']} correct, {report['wrong']} wrong, {report['missing']} missing "
              f"(accuracy {report['accuracy']:.1%}, recall {report['recall']:.1%}); AI calls {report['aiCalls']}",
+             *([f"Propose against {lists['companies']} hand-edited lists: precision {lists['precision']:.0%}, recall {lists['recall']:.0%}"]
+               if lists and lists["companies"] else []),
              "", "| Company | Period | KPI | Expected | Found | Outcome |", "|---|---|---|---|---|---|"]
     for result in report["results"]:
         lines.append(f"| {result['symbol']} | {result['period_end']} | {result['label']} | {expected_text(result)} | "
