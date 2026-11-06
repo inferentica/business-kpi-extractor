@@ -9,6 +9,7 @@ reading, review, audit and explanations) hit DeepSeek's context cache and cost a
 from __future__ import annotations
 
 import hashlib
+from datetime import date, timedelta
 import json
 import re
 from typing import Literal
@@ -50,11 +51,42 @@ class KpiSpec(BaseModel):
     # The KPI of its own group it is a line of (UnitedHealth's Optum Health under Total Optum; Alphabet's Search under
     # Google advertising, under Google Services), set by the owner: lines add up to it, and it is a part of the group.
     parent: str | None = None
+    # The periods the KPI is reported for, set by the owner (period ends, YYYY-MM-DD): JPMorgan's advisors under today's
+    # definition only since 2023, TSMC's Asia only until fiscal 2017. Outside them nothing is read or kept.
+    since: str | None = None
+    until: str | None = None
 
     @field_validator("key")
     @classmethod
     def _key(cls, value: str) -> str:
         return _check_key(value)
+
+    @field_validator("since", "until")
+    @classmethod
+    def _day(cls, value: str | None) -> str | None:
+        if value in (None, ""):
+            return None
+        date.fromisoformat(str(value)[:10])
+        return str(value)[:10]
+
+    def reported_at(self, period_end) -> bool:
+        """Whether the KPI is reported for a period ending on this day (a few days' grace for week-based calendars)."""
+        day = period_end if isinstance(period_end, date) else date.fromisoformat(str(period_end)[:10])
+        return not (self.since and day < date.fromisoformat(self.since) - timedelta(days=10)
+                    or self.until and day > date.fromisoformat(self.until) + timedelta(days=10))
+
+
+def for_period(spec: "Spec", period_end) -> "Spec":
+    """The list as it stands for one period: KPIs outside their reported periods left out, and a group with none left."""
+    if all(kpi.reported_at(period_end) for group in spec.groups for kpi in group.kpis):
+        return spec
+    groups = []
+    for group in spec.groups:
+        kpis = [kpi for kpi in group.kpis if kpi.reported_at(period_end)]
+        if kpis:
+            total = group.total_kpi if any(kpi.key == group.total_kpi for kpi in kpis) else None
+            groups.append(group.model_copy(update={"kpis": kpis, "total_kpi": total}))
+    return spec.model_copy(update={"groups": groups})
 
 
 class GroupSpec(BaseModel):

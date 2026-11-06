@@ -16,6 +16,7 @@ from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds
 
 # The audit retires a KPI only after this many quarters without a figure for it.
 RETIRE_AFTER = 3
+OUTSIDE_REPORTED_PERIODS = "outside the KPI's reported periods"
 
 # The quarters a refresh or a scheduled run covers; Read filings reaches further (40).
 REFRESH_QUARTERS = 20
@@ -281,6 +282,29 @@ class KpiListUpkeep:
         self._store_spec(updated, self.names, version + 1, latest_quarter[-1].accession)
         self.log(f"{self.symbol}: KPI list v{version + 1} after audit ({sum(len(g.kpis) for g in updated.groups)} KPIs)")
         return updated, version + 1
+
+    def _apply_windows(self, spec: Spec) -> None:
+        """Each listed KPI's reported periods, kept by the store; figures already stored outside them, which the owner has
+        not decided on, are set aside with the reason (JPMorgan's advisors under an older definition)."""
+        self.store.windows = {(f"{AI_GROUP_PREFIX}{group.key}", kpi.key): (kpi.since, kpi.until)
+                              for group in spec.groups for kpi in group.kpis if kpi.since or kpi.until}
+        # A period the owner opened again (a window widened or cleared): what was set aside for it comes back to review.
+        back = [value for value in self.values.values() if value["validation_status"] == "rejected"
+                and OUTSIDE_REPORTED_PERIODS in (value.get("notes") or []) and not value.get("owner_decision")
+                and self.store._in_window({**value, "validation_status": "verified"})]
+        if back:
+            self.store.write([{**value, "validation_status": "needs_review",
+                               "notes": [note for note in value["notes"] if note != OUTSIDE_REPORTED_PERIODS]} for value in back])
+            self.log(f"{self.symbol}: {len(back)} readings back to review: their KPI's reported periods now include them")
+        if not self.store.windows:
+            return
+        outside = [value for value in self.values.values()
+                   if value["validation_status"] != "rejected" and not value.get("owner_decision")
+                   and not self.store._in_window(value)]
+        if outside:
+            self.store.write([{**value, "validation_status": "rejected",
+                               "notes": [*(value.get("notes") or []), OUTSIDE_REPORTED_PERIODS]} for value in outside])
+            self.log(f"{self.symbol}: {len(outside)} stored readings outside their KPI's reported periods set aside")
 
     def _long_absent(self, keys: list[str], newest: str) -> list[str]:
         """The KPIs among `keys` with no figure (read or held for review) in the newest RETIRE_AFTER quarters: only those

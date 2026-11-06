@@ -197,6 +197,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
                     self._exhibit(exhibit)
         spec, version, proposed = self._spec(state.get("spec"), releases)
         self._owner_edited = bool((state.get("spec") or {}).get("owner_edited_at"))
+        if spec is not None:
+            self._apply_windows(spec)
         if spec is not None and not proposed:
             self._carry_owner_additions(spec, version, state.get("previousSpec"), releases)
         if spec is not None:

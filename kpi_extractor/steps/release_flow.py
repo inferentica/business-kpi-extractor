@@ -116,7 +116,7 @@ class ReleaseFlow:
             return None
         if not spec.groups:
             return FilingReading(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
-        listed = spec
+        listed = spec = ai.for_period(spec, ref.period_end)  # KPIs outside their reported periods are not looked for
         if ref.period_end != self._newest_release:
             spec = self._readable(spec)  # the newest quarter always reads every group: a fixed bug lets it verify
         skipped = [group.key for group in listed.groups if group.key not in {kept.key for kept in spec.groups}]

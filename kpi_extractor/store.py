@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from types import MappingProxyType
 
+from .ai import KpiSpec
 from .sec import FilingRef
 from .steps.shared import AI_GROUP_PREFIX, CHART_METHOD, value_key
 
@@ -54,6 +55,8 @@ class CompanyStore:
         self._values: dict[tuple, MappingProxyType] = {}
         self._filings: dict[str, dict] = {}
         self.owner_rejected: list[dict] = []
+        # Each listed KPI's reported periods (group key, KPI key) -> (since, until): a figure outside them is not kept.
+        self.windows: dict[tuple[str, str], tuple[str | None, str | None]] = {}
         self._loaded: dict[tuple, MappingProxyType] = {}
         self._owner_rejected: set[tuple] = set()
         self.values = MappingProxyType(self._values)
@@ -149,6 +152,14 @@ class CompanyStore:
         self.control.call("store", symbol=self.symbol, filings=[], values=[], curations=[
             {"group_key": group_key, "members_key": members_key, "chosen": chosen}])
 
+    def _in_window(self, value: dict) -> bool:
+        """A figure for a period its KPI is reported for, or one set aside (the reason it is written at all)."""
+        window = self.windows.get((value.get("group_key"), value.get("kpi_key")))
+        if not window or value.get("validation_status") == "rejected" or not value.get("period_end"):
+            return True
+        since, until = window
+        return KpiSpec.model_construct(since=since, until=until).reported_at(value["period_end"])
+
     def _send(self, *, filings: list[dict] | None = None, values: list | None = None) -> None:
         # Stored rows are read-only, so a step may hand one back as it is: it goes out as a plain record.
         values = list({value_key(value): dict(value) for value in values or []}.values())  # one row per key per write
@@ -162,6 +173,10 @@ class CompanyStore:
         # failed the whole run. A figure worked out from one keeps it out of its source.
         values = [value if _sec_source(value) else {**value, "source_url": None}
                   for value in values if _sec_source(value) or value.get("method") == "derived"]
+        outside = [value for value in values if not self._in_window(value)]
+        if outside:
+            self.log(f"{self.symbol}: {len(outside)} readings outside their KPI's reported periods not kept")
+            values = [value for value in values if self._in_window(value)]
         if not values and not filings:
             return
         self.control.call("store", symbol=self.symbol, filings=filings or [], values=values)

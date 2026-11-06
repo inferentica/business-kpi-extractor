@@ -1955,3 +1955,31 @@ def test_a_kpi_retires_only_after_three_quarters_without_a_figure():
                                            stored("rejected_only", "2026-03-31", "rejected")])
     kept = pipeline._long_absent(["operating.recent", "operating.old", "operating.never", "operating.rejected_only"], "2026-09-30")
     assert kept == ["operating.old", "operating.never", "operating.rejected_only"]
+
+
+def test_a_kpi_is_looked_for_and_kept_only_in_its_reported_periods():
+    from kpi_extractor.steps.kpi_list import OUTSIDE_REPORTED_PERIODS
+    spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "advisors", "label": "Client Advisors", "unit": "count", "since": "2023-03-31"},
+        {"key": "asia", "label": "Asia", "unit": "currency", "until": "2017-12-31"}]}]})
+    assert [k.key for g in ai.for_period(spec, date(2016, 12, 31)).groups for k in g.kpis] == ["asia"]
+    assert [k.key for g in ai.for_period(spec, date(2024, 3, 31)).groups for k in g.kpis] == ["advisors"]
+    assert ai.for_period(spec, date(2020, 6, 30)).groups == []
+
+    def row(kpi, end, status="verified", notes=(), decision=None):
+        return {"group_key": "kpi_operating", "kpi_key": kpi, "fiscal_year": end[:4], "fiscal_period": "Q4", "period_end": end,
+                "method": "ai", "validation_status": status, "value": 1.0, "notes": list(notes), "owner_decision": decision,
+                "source_url": "https://www.sec.gov/x.htm"}
+    stored = [row("advisors", "2022-12-31"), row("advisors", "2023-03-31"), row("advisors", "2021-12-31", decision="confirmed"),
+              row("asia", "2018-12-31", "rejected", [OUTSIDE_REPORTED_PERIODS])]
+    pipeline = _pipeline(FakeControl({}), stored)
+    sent = []
+    pipeline.store.write = sent.extend
+    wider = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "advisors", "label": "Client Advisors", "unit": "count", "since": "2023-03-31"},
+        {"key": "asia", "label": "Asia", "unit": "currency", "until": "2018-12-31"}]}]})
+    pipeline._apply_windows(wider)
+    by = {(v["kpi_key"], v["period_end"]): v["validation_status"] for v in sent}
+    # Before its definition: set aside (the owner's own decision stays); a period opened again comes back to review.
+    assert by == {("advisors", "2022-12-31"): "rejected", ("asia", "2018-12-31"): "needs_review"}
+    assert pipeline.store._in_window(row("advisors", "2023-03-31")) and not pipeline.store._in_window(row("advisors", "2022-06-30"))
