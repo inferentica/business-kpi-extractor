@@ -10,7 +10,7 @@ from ..ai import AiResponseError, Located, Spec
 from ..control import ControlError
 from ..document import Document, clean
 from ..checks import check_period, far_above_quarter, looks_like_part_of_table, validate_groups
-from ..extract import ReadValue, describe, locator_hint, read_values
+from ..extract import ReadValue, describe, explanation_supports, locator_hint, read_values
 from ..replay import replay
 from .shared import (AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
@@ -383,7 +383,7 @@ class AiReading:
         for item in flagged:
             verdict = answer.items.get(f"{item.group.key}.{item.kpi.key}")
             quote = clean(verdict.quote or "") if verdict else ""
-            if verdict and verdict.legitimate and len(quote) >= 20 and quote in haystack:
+            if verdict and verdict.legitimate and quote in haystack and explanation_supports(quote, item.kpi.label, item.value):
                 item.status = "verified"
                 item.notes = [*item.notes, f"change explained: {quote[:200]}"]
 

@@ -351,6 +351,8 @@ for a company whose quarters are counted in weeks), never the prior-year quarter
 or full-year columns.
 - For a percentage, point to the percentage itself, not an amount.
 - If a KPI is not reported for this quarter, list its key in "missing". Do not guess.
+- Never point to guidance, an outlook or any statement of what the company expects ("We expect revenue from AI to be \
+$12 billion for fiscal year 2024"): only to what it reports for the period.
 - The value must be the measure the KPI names, not a related one under another name: one app's daily active users \
 (DAUs) are not a family's daily active people (DAP), bookings are not revenue. List such a KPI in "missing".
 - "period_end" is the last day of the reported quarter as YYYY-MM-DD.
@@ -417,7 +419,9 @@ JSON shape: {"members": ["us_and_canada", "europe", "asia_pacific", "rest_of_wor
 EXPLAIN_TASK = """The values below changed sharply from the previous quarter. For each, decide from the document \
 whether the change is real (for example a reorganisation, acquisition, divestiture, restatement, stock split, a new \
 product ramp, or a change of definition the company states). If real, quote the exact sentence that shows it \
-(max 200 characters, copied character for character). If the document gives no reason, answer false.
+(max 200 characters, copied character for character). The sentence must be about this KPI (name it or state its \
+figure) and this quarter: never guidance or an outlook, never another period's figure, never another line's. If the \
+document gives no such reason, answer false.
 
 JSON shape: {"items": {"<group>.<kpi>": {"legitimate": true, "quote": "..."}}}"""
 

@@ -403,3 +403,35 @@ def test_unlisted_rows_of_a_complete_table_are_placed_or_left_out():
     assert read["securitiesgains"] == (-3_000_000, "nonint")
     validate_groups(values, previous={})
     assert all(item.status == "verified" for item in values)
+
+
+def test_a_forecast_is_never_read_as_the_quarter():
+    # Broadcom, Q3 FY2024: "We expect revenue from AI to be $12 billion for fiscal year 2024" was read as the quarter.
+    document = parse_document("""
+<p>We expect revenue from AI to be $12 billion for fiscal year 2024 driven by Ethernet networking.</p>
+<p>Q1 AI revenue of $8.4 billion grew 106% year-over-year, above our forecast.</p>
+<p>Current remaining performance obligation, which represents the future revenues under contract expected to be recognized over the next 12 months, was $11.9 billion.</p>
+""", "https://example.com/ex99.htm")
+    spec = _metric_spec(("ai", "AI Semiconductor Revenue", "currency"), ("crpo", "Current Remaining Performance Obligation", "currency"))
+    def read(kpi, quote, value_text):
+        located = Located.model_validate({"period_end": "2024-08-04", "values": [
+            {"kpi": f"operating.{kpi}", "block": _block(document, quote[:20]), "quote": quote, "value_text": value_text}]})
+        return read_values(document, spec, located, "USD")
+    values, problems = read("ai", "We expect revenue from AI to be $12 billion", "$12 billion")
+    assert values == [] and "forecast" in problems[0]
+    assert [item.value for item in read("ai", "Q1 AI revenue of $8.4 billion grew 106% year-over-year, above our forecast", "$8.4 billion")[0]] == [8.4e9]
+    assert [item.value for item in read("crpo", "Current remaining performance obligation, which represents the future revenues under contract expected to be recognized over the next 12 months, was $11.9 billion", "$11.9 billion")[0]] == [11.9e9]
+
+
+def test_an_explanation_must_be_about_the_figure_and_the_quarter():
+    from kpi_extractor.extract import explanation_supports
+
+    assert explanation_supports("Unit case volume declined 36% driven by India and South Africa due to the coronavirus.", "Bottling Investments Unit Case Volume Growth", -36)
+    assert explanation_supports("The increase in Incentive fees was driven by fund distributions.", "Incentive fees", 587e6)
+    assert explanation_supports("Inflows from Asset Management of $95 billion in the first quarter were driven by Athora's acquisition", "Asset Management Inflows", 95e9)
+    # Guidance, another period, another line, or a sentence that names nothing of the KPI: not an explanation.
+    assert not explanation_supports("We expect revenue from AI to be $12 billion for fiscal year 2024 driven by Ethernet networking", "AI Semiconductor Revenue", 12e9)
+    assert not explanation_supports("resulting in approximately $6.8 billion of inflows attributable to Athene for the first six months of 2023", "Inflows Attributable to Athene", 3.101e9)
+    assert not explanation_supports("Pension Group Annuities: Closed one transaction during the quarter despite heightened competition", "Other Spread Products Inflows", 577e6)
+    assert not explanation_supports("Second vintage of strategic third-party sidecar is expected to begin supporting Athene's organic growth", "Inflows Attributable to ADIP", 31e6)
+    assert not explanation_supports("AUM were impacted by market volatility and outflows in the current period.", "Long-term Net Flows", -14.4e9)

@@ -8,7 +8,7 @@ from .. import ai
 from ..ai import Spec
 from ..document import Document, clean
 from ..checks import check_period, date_order_findings, validate_groups
-from ..extract import ReadValue, falls, net_gross_mismatch
+from ..extract import ReadValue, explanation_supports, falls, forward_looking, net_gross_mismatch
 from ..fiscal import fiscal_label
 from ..sec import FilingRef
 from ..xbrl import member_key
@@ -20,7 +20,7 @@ _READ_BY_REPLAY = "read by replay"
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
 # stamping began are never re-read by it, so a bump cannot re-read every company's history.
-_RELEASE_READER = "release reader 4"
+_RELEASE_READER = "release reader 5"
 # Stamped on a release read without some of the list's groups (see _readable): read again once they are read once more.
 _GROUPS_NOT_READ = "groups not read: "
 _RELEASE_READER_PREFIX = "release reader "
@@ -43,10 +43,16 @@ def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
             if kpi.key != group.total_kpi and f"{group.key}.{kpi.key}" not in found]
 
 
-def stored_reading_fails(value: dict) -> bool:
+def stored_reading_fails(value: dict, read_by: int = 0) -> bool:
     """Whether a served AI reading is one reader 3 rejects or reads differently: a fall stored as a rise ("decreased by
     16%" served as 16), or a net figure under a gross KPI. Its release is read again once, stamped or not."""
     if value.get("method") != "ai" or value.get("validation_status") != "verified" or value.get("owner_decision"):
+        return False
+    # Each rule re-reads only releases read before the reader that brought it: reader 3 (signs, net and gross),
+    # reader 5 (forecasts, explanations).
+    if read_by < 5 and _reader5_rejects(value):
+        return True
+    if read_by >= 3:
         return False
     locator = value.get("locator") or {}
     quote, value_text = clean(str(locator.get("quote") or "")), clean(str(locator.get("value_text") or ""))
@@ -56,6 +62,16 @@ def stored_reading_fails(value: dict) -> bool:
     if quote and value_text and net_gross_mismatch(quote[:quote.find(value_text)][-80:], label):
         return True
     return bool(locator.get("row_label")) and net_gross_mismatch(str(locator["row_label"]), label) is not None
+
+
+def _reader5_rejects(value: dict) -> bool:
+    """A forecast or guidance read as the figure, or a sharp change cleared by a sentence that does not explain it."""
+    locator = value.get("locator") or {}
+    quote, value_text = clean(str(locator.get("quote") or "")), clean(str(locator.get("value_text") or ""))
+    if quote and value_text and value_text in quote and forward_looking(quote[:quote.find(value_text)]):
+        return True
+    explained = next((note.removeprefix("change explained: ") for note in value.get("notes") or [] if note.startswith("change explained: ")), None)
+    return explained is not None and not explanation_supports(clean(explained), str(value.get("kpi_label") or ""), float(value.get("value") or 0))
 
 
 def release_reread_due(previous: dict | None) -> bool:
@@ -137,9 +153,8 @@ class ReleaseFlow:
     def _reader3_due(self, previous: dict, accession: str) -> bool:
         """A release read before reader 3 that holds a served reading reader 3 would reject (see stored_reading_fails)."""
         stamp = next((note for note in previous.get("notes") or [] if note.startswith(_RELEASE_READER_PREFIX)), "")
-        if stamp.removeprefix(_RELEASE_READER_PREFIX).isdigit() and int(stamp.removeprefix(_RELEASE_READER_PREFIX)) >= 3:
-            return False
-        return any(value.get("source_accession") == accession and stored_reading_fails(value) for value in self.values.values())
+        read_by = int(stamp.removeprefix(_RELEASE_READER_PREFIX)) if stamp.removeprefix(_RELEASE_READER_PREFIX).isdigit() else 0
+        return any(value.get("source_accession") == accession and stored_reading_fails(value, read_by) for value in self.values.values())
 
     def _keep_listed_series(self, read: list[ReadValue]) -> None:
         """A row a whole-table reading labels by its own name that the group already holds, under that row label, as a
@@ -313,7 +328,7 @@ class ReleaseFlow:
             for v in rows:
                 verdict = answer.items.get(f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}")
                 quote = clean(verdict.quote or "") if verdict else ""
-                if verdict and verdict.legitimate and len(quote) >= 20 and quote in haystack:
+                if verdict and verdict.legitimate and quote in haystack and explanation_supports(quote, v["kpi_label"], float(v["value"])):
                     cleared.append({**v, "validation_status": "verified",
                                     "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"]})
         return cleared

@@ -1748,3 +1748,17 @@ def test_a_re_read_row_keeps_the_listed_series_its_label_was_stored_under():
             ReadValue(group, group.kpis[1], 2.0, "USD", {"row_label": "Corporate Client Banking"})]
     ReleaseFlow._keep_listed_series(SimpleNamespace(values=stored), read)
     assert [item.kpi.key for item in read] == ["commercial_specialized_industries", "sharedline", "brandnewline", "corporate_client_banking"]
+
+
+def test_reader_5_re_reads_a_release_whose_change_was_explained_by_another_sentence():
+    from kpi_extractor.steps.release_flow import stored_reading_fails
+
+    explained = {"method": "ai", "validation_status": "verified", "unit": "currency", "value": 577e6, "kpi_label": "Other Spread Products Inflows",
+                 "locator": {"quote": "Other Spread Products 577", "value_text": "577"},
+                 "notes": ["changed 3.9x in a quarter", "change explained: Pension Group Annuities: Closed one transaction during the quarter"]}
+    assert stored_reading_fails(explained)
+    good = {**explained, "notes": ["change explained: Other Spread Products: Record new markets activity, including stable value"]}
+    assert not stored_reading_fails(good)
+    forecast = {"method": "ai", "validation_status": "verified", "unit": "currency", "value": 12e9, "kpi_label": "AI Semiconductor Revenue",
+                "locator": {"quote": "We expect revenue from AI to be $12 billion for fiscal year 2024", "value_text": "$12 billion"}}
+    assert stored_reading_fails(forecast)

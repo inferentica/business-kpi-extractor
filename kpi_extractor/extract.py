@@ -170,6 +170,8 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         raise LocateError(f"{value_text!r} is a percentage, not an amount")
     value = parsed.value
     before = quote[:quote.find(value_text)]
+    if forward_looking(before):
+        raise LocateError("the quote is a forecast or guidance, not the reported figure")
     if other := net_gross_mismatch(before[-80:], kpi.label):
         raise LocateError(f"the quote gives the {other} figure, not {kpi.label!r}")
     if kpi.unit == "percent" and value > 0 and falls(quote, value_text):
@@ -198,6 +200,45 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
 # the 40%, and a level ("declined to 30%", "fell from 32% to 30%") never is.
 _FALL = re.compile(r"\b(?:decreas\w*|declin\w*|fell|falls?|falling|dropped|drops?|down|lower|contracted|reduc\w*)"
                    r"(?:\s+(?!to\b|from\b)[A-Za-z][\w-]*){0,6}?\s*(?:\b(?:by|of|was|were)\s*)?$", re.I)
+
+
+# A statement about the future: "We expect revenue from AI to be $12 billion" (Broadcom's guidance, once read as its
+# quarter). Not "above our forecast" after a figure, nor an RPO "expected to be recognized over the next 12 months".
+_FORWARD = re.compile(r"\b(?:we|management|the company)\s+(?:now\s+)?(?:expects?|anticipates?|forecasts?|projects?|plans?|targets?|guides?)\b"
+                      r"|\bguidance\b|\boutlook\b|\bwill be\b|\b(?:is|are) expected to\b(?! be recogni)", re.I)
+# A figure for another period than the quarter: "for the first six months of 2023", "for fiscal year 2024".
+_OTHER_PERIOD = re.compile(r"\bfirst (?:six|nine) months\b|\b(?:six|nine|twelve) months ended\b|\bfor the (?:full )?(?:fiscal )?year\b"
+                           r"|\bfull[- ]year\b|\bfiscal (?:year )?\d{4}\b|\byear[- ]to[- ]date\b", re.I)
+# Words of a KPI's name that say nothing on their own.
+_PLAIN_WORDS = {"other", "total", "revenue", "revenues", "growth", "net", "inflows", "outflows", "flows", "income", "fees", "fee", "year",
+                "over", "and", "the", "of", "by", "constant", "dollar", "dollars", "excluding", "quarter", "quarterly", "sales", "volume"}
+
+
+def forward_looking(text: str) -> bool:
+    return bool(_FORWARD.search(text))
+
+
+def _figure_forms(value: float) -> set[str]:
+    """How a figure may be written: 12000000000 as "12", "12.0" or "12,000", whatever the scale word."""
+    forms = set()
+    for scale in (1, 1e3, 1e6, 1e9, 1e12):
+        scaled = abs(value) / scale
+        for digits in (0, 1, 2):
+            if scaled >= 1 and abs(round(scaled, digits) - scaled) < 1e-9:
+                forms.add(f"{scaled:,.{digits}f}")
+    return forms
+
+
+def explanation_supports(quote: str, kpi_label: str, value: float) -> bool:
+    """Whether a quote can explain a sharp change in this figure: it states the figure or names the KPI, does not speak of
+    the future, and is not about another period. Broadcom's "We expect revenue from AI to be $12 billion for fiscal year
+    2024" once cleared a quarter; Apollo's "Pension Group Annuities: ..." cleared its Other Spread Products."""
+    if len(quote) < 20 or forward_looking(quote) or _OTHER_PERIOD.search(quote):
+        return False
+    if any(re.search(r"(?<![\d,.])" + re.escape(form) + r"(?![\d,])", quote) for form in _figure_forms(value)):
+        return True
+    words = {word for word in re.findall(r"[a-z][a-z0-9-]+", kpi_label.lower()) if word not in _PLAIN_WORDS and len(word) > 2}
+    return any(re.search(rf"\b{re.escape(word)}\b", quote, re.I) for word in words)
 
 
 def falls(quote: str, value_text: str) -> bool:
