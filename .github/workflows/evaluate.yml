@@ -12,6 +12,11 @@ on:
         options:
           - golden
           - prompts
+          - trial
+      symbols:
+        description: For a trial - comma-separated tickers to read as new companies (nothing is stored)
+        required: false
+        type: string
       quarters:
         description: Quarters of history to read
         required: true
@@ -74,8 +79,15 @@ jobs:
         env:
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
         run: python -m kpi_extractor.prompt_eval
+      - name: Read new companies (trial)
+        if: inputs.suite == 'trial'
+        env:
+          KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
+          SYMBOLS: ${{ inputs.symbols }}
+          QUARTERS: ${{ inputs.quarters || '4' }}
+        run: python -m kpi_extractor.trial --symbols "$SYMBOLS" --quarters "$QUARTERS"
       - name: Score against the golden set
-        if: inputs.suite != 'prompts'
+        if: inputs.suite != 'prompts' && inputs.suite != 'trial'
         env:
           QUARTERS: ${{ inputs.quarters || '6' }}
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}

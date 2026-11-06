@@ -1983,3 +1983,28 @@ def test_a_kpi_is_looked_for_and_kept_only_in_its_reported_periods():
     # Before its definition: set aside (the owner's own decision stays); a period opened again comes back to review.
     assert by == {("advisors", "2022-12-31"): "rejected", ("asia", "2018-12-31"): "needs_review"}
     assert pipeline.store._in_window(row("advisors", "2023-03-31")) and not pipeline.store._in_window(row("advisors", "2022-06-30"))
+
+
+def test_a_trial_scores_what_a_new_company_would_store():
+    from kpi_extractor.pipeline import SymbolResult
+    from kpi_extractor.trial import audit_sample, company_report, summarize
+
+    def value(kpi, period, status, notes=()):
+        return {"group_key": "kpi_operating", "group_label": "Operating", "kpi_key": kpi, "kpi_label": kpi, "fiscal_year": "2026",
+                "fiscal_period": period, "period_end": "2026-06-30", "validation_status": status, "value": 1.0, "method": "ai",
+                "notes": list(notes), "locator": {"quote": "q"}, "source_url": "https://www.sec.gov/x.htm"}
+    values = [value("a", "Q1", "verified"), value("b", "Q1", "verified"), value("a", "Q2", "verified"),
+              value("b", "Q2", "needs_review", ["changed 1.9x in a quarter"]), value("c", "Q2", "rejected"),
+              {**value("seg", "Q2", "verified"), "group_key": "products"}]
+    filings = [{"accession": "1", "status": "processed", "notes": ["read by AI", "missing reasons: operating.d=elsewhere, operating.e=not_reported",
+                                                                   "second read: not_placed"]}]
+    spec = {"groups": [{"label": "Operating", "kpis": [{"key": "a"}, {"key": "b"}]}]}
+    report = company_report("X", SymbolResult("X", ai_calls=7), values, filings, spec)
+    assert report["aiFigures"] == {"verified": 3, "needs_review": 1, "rejected": 1} and report["xbrlFigures"] == 1
+    assert report["autoAccepted"] == 0.75 and report["quarters"] == 2 and report["reviewItemsPerQuarter"] == 0.5
+    assert report["reviewReasons"] == {"changed # in a quarter": 1}
+    assert report["missingReasons"] == {"elsewhere": 1, "not_reported": 1} and report["secondReadReasons"] == {"not_placed": 1}
+    summary = summarize([report])
+    assert summary["autoAccepted"] == 0.75 and summary["companyQuarters"] == 2 and summary["aiCalls"] == 7
+    sample = audit_sample({"X": values}, 2, seed=1)
+    assert len(sample) == 2 and all(item["symbol"] == "X" and item["where"] == "q" for item in sample)
