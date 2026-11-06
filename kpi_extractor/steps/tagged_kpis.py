@@ -12,6 +12,10 @@ from ..tagged_metrics import (agrees, fact_lines, learn_tag, learn_tags, quarter
                               year_ago_facts)
 from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _UNANCHORED, _is_jump, _rounding, value_key
 
+# Where the AI's tag picks are kept between runs, beside the XBRL row curations.
+TAG_PICKS = "xbrl_tags"
+
+
 class TaggedKpiReading:
     """KPIs filled from a report's XBRL tags, and breakdown periods settled by exact tagged figures."""
 
@@ -74,6 +78,11 @@ class TaggedKpiReading:
         """The AI points to the tagged figure that is each KPI no release gives, in the latest report; code keeps a pick
         only when its unit fits the KPI and the same tag is in the report before (a KPI the company reports)."""
         latest = newest_first[0]
+        # The answer for one report and one set of KPIs is kept between runs: the same question was asked again on
+        # every run (Adobe, Amazon, Alphabet, SpaceX: an AI call each, every all-company run, for nothing new).
+        cache_key = (TAG_PICKS, f"{quarters[latest][0].accession}|{','.join(sorted(kpi.key for _g, kpi, _k in unread))}"[:2000])
+        if cache_key in self._curations:
+            return dict(choice.split("=", 1) for choice in self._curations[cache_key] if "=" in choice)
         lines = fact_lines(self._xbrl(quarters[latest][0]).facts.to_dataframe(), quarters[latest][1])
         ids = {f"F{index}": line for index, line in enumerate(lines)}
         document = "\n".join(f"[{id_}] {label} | {value:,.15g} | {unit}" for id_, (_tag, value, label, unit) in ids.items())
@@ -93,6 +102,9 @@ class TaggedKpiReading:
             picked[kpi.key] = line[0]
         if picked:
             self.log(f"{self.symbol}: tags picked for {', '.join(sorted(picked))}")
+        chosen = [f"{key}={tag}"[:120] for key, tag in sorted(picked.items())]
+        self._curations[cache_key] = chosen
+        self.store.curation(TAG_PICKS, cache_key[1], chosen)  # an empty choice is kept too: no tag fits
         return picked
 
     def _tagged_records(self, spec: Spec, quarters, newest_first, facts_of, opened: dict, unread: list[tuple],
