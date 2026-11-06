@@ -346,8 +346,9 @@ with its unit word or % sign. Ids containing P are text blocks: quote them; only
 whose cells are sentences (highlights set as bullets) may be quoted the same way, with its id as "block".
 
 Rules:
-- Use the reported quarter's column (three months ended at the period end), never the prior-year quarter, the prior \
-quarter, year-to-date or full-year columns.
+- Use the reported quarter's column (three months ended at the period end, or the 12, 13, 14 or 16 weeks ended then \
+for a company whose quarters are counted in weeks), never the prior-year quarter, the prior quarter, year-to-date \
+or full-year columns.
 - For a percentage, point to the percentage itself, not an amount.
 - If a KPI is not reported for this quarter, list its key in "missing". Do not guess.
 - The value must be the measure the KPI names, not a related one under another name: one app's daily active users \

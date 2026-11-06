@@ -41,3 +41,42 @@ def test_learn_year_offset():
     assert learn_year_offset([(date(2026, 7, 26), "2027", False)], "0125") == 0
     assert learn_year_offset([(date(2026, 2, 1), "2025", True)], "0201") == -1
     assert learn_year_offset([], "1231") == 0
+
+
+@pytest.mark.parametrize(("period_end", "year_end", "expected"), [
+    # PepsiCo: 12, 12, 12 and 16 weeks to the last Saturday of December.
+    (date(2025, 3, 22), "1227", ("2025", "Q1")), (date(2025, 6, 14), "1227", ("2025", "Q2")),
+    (date(2025, 9, 6), "1227", ("2025", "Q3")), (date(2025, 12, 27), "1227", ("2025", "Q4")),
+    # Costco: 12, 12, 12 and 16 weeks to the Sunday nearest August 31.
+    (date(2024, 11, 24), "0831", ("2025", "Q1")), (date(2025, 2, 16), "0831", ("2025", "Q2")),
+    (date(2025, 5, 11), "0831", ("2025", "Q3")), (date(2025, 8, 31), "0831", ("2025", "Q4")),
+    # Kroger: a 16-week first quarter, then three of 12 weeks, to the Saturday nearest January 31.
+    (date(2025, 5, 24), "0131", ("2026", "Q1")), (date(2025, 8, 16), "0131", ("2026", "Q2")),
+    (date(2025, 11, 8), "0131", ("2026", "Q3")), (date(2026, 1, 31), "0131", ("2026", "Q4")),
+    # 13-week retail quarters and a 14-week fourth quarter in a 53-week year (Broadcom's fiscal 2023).
+    (date(2025, 4, 30), "0131", ("2026", "Q1")), (date(2023, 10, 29), "1029", ("2023", "Q4")),
+])
+def test_fiscal_label_knows_week_based_calendars(period_end, year_end, expected):
+    assert fiscal_label(period_end, year_end) == expected
+
+
+def test_a_release_is_matched_to_the_companys_own_quarter_end():
+    # Costco reported its third quarter (ended May 11, 2025) on May 29, before the month-end guess of May 31; its
+    # reports give last year's third quarter (May 12, 2024), so this year's is about 52 weeks later.
+    assert nominal_quarter_end_before(date(2025, 5, 29), "0831") == date(2025, 2, 28)
+    assert nominal_quarter_end_before(date(2025, 5, 29), "0831", own_ends=[date(2024, 5, 12), date(2025, 2, 16)]) == date(2025, 5, 11)
+    # Kroger's 16-week first quarter ended May 24, 2025: its own end replaces the April 30 guess.
+    assert nominal_quarter_end_before(date(2025, 6, 20), "0131", own_ends=[date(2024, 5, 25)]) == date(2025, 5, 24)
+    # A filed quarter's own end wins over the projection, and a month-end company is unchanged.
+    assert nominal_quarter_end_before(date(2025, 10, 9), "1227", own_ends=[date(2025, 9, 6), date(2024, 9, 7)]) == date(2025, 9, 6)
+    assert nominal_quarter_end_before(date(2026, 7, 16), "1231", own_ends=[date(2025, 6, 30), date(2026, 3, 31)]) == date(2026, 6, 30)
+
+
+def test_report_period_ends_reads_the_filing_index():
+    from types import SimpleNamespace
+
+    from kpi_extractor.sec import report_period_ends
+
+    filings = [SimpleNamespace(period_of_report="2025-05-11"), SimpleNamespace(report_date=date(2024, 5, 12)), SimpleNamespace()]
+    company = SimpleNamespace(get_filings=lambda **_: filings)
+    assert report_period_ends(company, date(2025, 1, 1)) == (date(2024, 5, 12), date(2025, 5, 11))

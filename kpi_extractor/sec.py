@@ -151,6 +151,23 @@ def periodic_reports(company: Company, since: date, known_urls: dict[str, str] |
     return refs
 
 
+def report_period_ends(company: Company, since: date) -> tuple[date, ...]:
+    """The period each 10-Q and 10-K covers, from the filing index (no document is read): the company's own quarter
+    ends, which a week-based calendar puts weeks before month end. Empty for a foreign filer or when the index says none."""
+    try:
+        filings = _with_retries(lambda: company.get_filings(form=list(PERIODIC_FORMS), filing_date=f"{(since - timedelta(days=400)).isoformat()}:"))
+    except Exception:  # noqa: BLE001 - the month-end guess still works without them
+        return ()
+    ends = set()
+    for filing in filings:
+        raw = getattr(filing, "period_of_report", None) or getattr(filing, "report_date", None)
+        try:
+            ends.add(raw if isinstance(raw, date) else date.fromisoformat(str(raw)[:10]))
+        except ValueError:
+            continue
+    return tuple(sorted(ends))
+
+
 def earnings_releases(company: Company, profile: CompanyProfile, since: date, archive=None,
                       passed: list[FilingRef] | None = None, known_urls: dict[str, str] | None = None) -> list[FilingRef]:
     """Earnings documents and candidates. 8-K Item 2.02 exhibits are confirmed earnings releases. Other filings with
@@ -159,6 +176,7 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date, ar
     earnings release, the quarterly financial report, or unrelated notices). A recent foreign filer's 6-K that is no
     candidate (no exhibit, or outside the window) goes to `passed`, so it is recorded as looked at."""
     form = "6-K" if profile.foreign else "8-K"
+    own_ends = () if profile.foreign else report_period_ends(company, since)
     filings = sorted(_with_retries(lambda: company.get_filings(form=form, filing_date=f"{since.isoformat()}:")),
                      key=lambda item: item.filing_date)
     confirmed_quarters = set()
@@ -167,7 +185,7 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date, ar
     for filing in filings:
         if filing.form != form:
             continue
-        quarter_end = nominal_quarter_end_before(filing.filing_date, profile.fiscal_year_end)
+        quarter_end = nominal_quarter_end_before(filing.filing_date, profile.fiscal_year_end, own_ends=own_ends)
         in_window = _EARNINGS_WINDOW[0] <= filing.filing_date - quarter_end <= _EARNINGS_WINDOW[1]
         item_202 = not profile.foreign and "2.02" in str(getattr(filing, "items", "") or "")
         if item_202 or in_window:
@@ -182,7 +200,7 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date, ar
             if passed is not None and profile.foreign and filing.filing_date >= date.today() - PASSED_OVER_DAYS:
                 passed.append(_passed_ref(filing, known_urls))
             continue
-        ref = _release_ref(filing, exhibits, profile)
+        ref = _release_ref(filing, exhibits, profile, own_ends)
         ref.confirmed = item_202
         if item_202:
             confirmed_quarters.add(ref.period_end)
@@ -263,11 +281,11 @@ def _passed_ref(filing, known_urls: dict[str, str] | None = None) -> FilingRef:
     )
 
 
-def _release_ref(filing, exhibits: list, profile: CompanyProfile) -> FilingRef:
+def _release_ref(filing, exhibits: list, profile: CompanyProfile, own_ends: tuple = ()) -> FilingRef:
     return FilingRef(
         accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="earnings_release",
         source_url=exhibits[0].url,
-        period_end=nominal_quarter_end_before(filing.filing_date, profile.fiscal_year_end),
+        period_end=nominal_quarter_end_before(filing.filing_date, profile.fiscal_year_end, own_ends=own_ends),
         exhibits=exhibits, filing=filing,
     )
 

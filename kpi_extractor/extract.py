@@ -83,9 +83,12 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
     return kept, problems
 
 
-_QUARTER = re.compile(r"<3 months>|three months|<1[34] weeks>|thirteen weeks|fourteen weeks|quarter|\bq[1-4]\b|\b[1-4]q\b")
-_LONGER = re.compile(r"<(6|9|12) months>|(six|nine|twelve) months|<(2[67]|39|40|5[23]) weeks>|"
-                     r"(twenty-six|thirty-nine|fifty-two|fifty-three) weeks|years? ended|year to date|fiscal years?")
+# A week-based quarter is 12, 13, 14 or 16 weeks (PepsiCo, Costco, Kroger); its half and three quarters 24 to 28 and
+# 36 to 40 weeks.
+_QUARTER = re.compile(r"<3 months>|three months|<1[2-6] weeks>|(twelve|thirteen|fourteen|sixteen) weeks|quarter|\bq[1-4]\b|\b[1-4]q\b")
+_LONGER = re.compile(r"<(6|9|12) months>|(six|nine|twelve) months|<(2[4-8]|3[6-9]|40|5[23]) weeks>|"
+                     r"(twenty-four|twenty-six|twenty-eight|thirty-six|thirty-nine|forty|fifty-two|fifty-three) weeks|"
+                     r"years? ended|year to date|fiscal years?")
 
 
 def column_duration_problem(header: str, annual: bool) -> str | None:

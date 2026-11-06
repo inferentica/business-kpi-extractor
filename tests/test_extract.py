@@ -360,3 +360,14 @@ def test_a_release_holding_a_reading_reader_3_rejects_is_read_again_once():
     assert ReleaseFlow._reader3_due(flow, {"notes": ["read by AI"]}, "A2")
     assert not ReleaseFlow._reader3_due(flow, {"notes": ["read by AI", "release reader 3"]}, "A1")
     assert not ReleaseFlow._reader3_due(flow, {"notes": ["read by AI", "release reader 2"]}, "A9")
+
+
+def test_week_based_columns_are_told_from_their_half_years():
+    from kpi_extractor.extract import column_duration_problem
+
+    assert column_duration_problem("<12 weeks> ended @ #", annual=False) is None
+    assert column_duration_problem("<16 weeks> ended @ #", annual=False) is None
+    assert column_duration_problem("sixteen weeks ended @ #", annual=False) is None
+    assert column_duration_problem("<24 weeks> ended @ #", annual=False) is not None
+    assert column_duration_problem("<36 weeks> ended @ #", annual=False) is not None
+    assert column_duration_problem("<28 weeks> ended @ #", annual=False) is not None
