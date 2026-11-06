@@ -19,7 +19,9 @@ _READ_BY_REPLAY = "read by replay"
 # when this changes (the newest quarter's locators are replayed first, so a fixed reader seldom needs the AI): bump it
 # with a release-reader fix, e.g. ASML's slide statements, which once left 2025's quarters unread. Releases read before
 # stamping began are never re-read by it, so a bump cannot re-read every company's history.
-_RELEASE_READER = "release reader 3"
+_RELEASE_READER = "release reader 4"
+# Stamped on a release read without some of the list's groups (see _readable): read again once they are read once more.
+_GROUPS_NOT_READ = "groups not read: "
 _RELEASE_READER_PREFIX = "release reader "
 # Releases a company's run reads at once, after its newest (see _process_releases).
 RELEASE_READERS = 4
@@ -80,12 +82,14 @@ class ReleaseFlow:
         previous = self.filings.get(ref.accession)
         if not self.force and previous and previous.get("spec_version") == version and (
                 previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS) and not release_reread_due(previous) \
-                and not self._reader3_due(previous, ref.accession):
+                and not self._reader3_due(previous, ref.accession) and not self._skipped_groups_due(previous, ref.accession, spec):
             return None
         if not spec.groups:
             return FilingReading(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
+        listed = spec
         if ref.period_end != self._newest_release:
             spec = self._readable(spec)  # the newest quarter always reads every group: a fixed bug lets it verify
+        skipped = [group.key for group in listed.groups if group.key not in {kept.key for kept in spec.groups}]
         try:
             expected = ref.period_end
             fiscal_year, fiscal_period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)
@@ -121,7 +125,8 @@ class ReleaseFlow:
             verified = sum(1 for record in records if record["validation_status"] == "verified")
             status = "processed" if verified else "needs_review" if records else "skipped"
             unreported = _unreported(spec, read)
-            notes = [how, _RELEASE_READER, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []), *problems[:20]]
+            notes = [how, _RELEASE_READER, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []),
+                     *([_GROUPS_NOT_READ + ", ".join(skipped)] if skipped else []), *problems[:20]]
             return FilingReading(ref, status, records=records, spec_version=version, period_end=period_end,
                                  fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001
@@ -133,6 +138,26 @@ class ReleaseFlow:
         if stamp.removeprefix(_RELEASE_READER_PREFIX).isdigit() and int(stamp.removeprefix(_RELEASE_READER_PREFIX)) >= 3:
             return False
         return any(value.get("source_accession") == accession and stored_reading_fails(value) for value in self.values.values())
+
+    def _skipped_groups_due(self, previous: dict, accession: str, spec: Spec) -> bool:
+        """A release read while a group of today's list was not read (see _readable) and that group is read again now:
+        JPMorgan's Revenue by Product went unread for 2016 to 2020 after a list fix, and the owner typed 216 figures in.
+        A release stamped before reader 4 has no record of what it left out, so a listed group with nothing stored from it
+        and not named as unreported counts as left out. Read again once: reader 4 stamps it."""
+        notes = previous.get("notes") or []
+        dead = self._dead or set()
+        live = {group.key for group in spec.groups if group.key not in dead}
+        marked = next((note for note in notes if note.startswith(_GROUPS_NOT_READ)), None)
+        if marked is not None:
+            return bool(live & set(marked.removeprefix(_GROUPS_NOT_READ).split(", ")))
+        stamp = next((note for note in notes if note.startswith(_RELEASE_READER_PREFIX)), "")
+        version = stamp.removeprefix(_RELEASE_READER_PREFIX)
+        if not version.isdigit() or int(version) >= 4:
+            return False  # read before stamping began (left alone, as for other re-reads), or by reader 4 already
+        named = " ".join(notes)
+        held = {value["group_key"].removeprefix(AI_GROUP_PREFIX) for value in self.values.values()
+                if value.get("source_accession") == accession}
+        return any(group not in held and f"{group}." not in named for group in live)
 
     def _read_and_record_release(self, ref: FilingRef, spec: Spec, version: int) -> bool:
         reading = self._read_release(ref, spec, version)

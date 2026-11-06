@@ -1694,3 +1694,29 @@ def test_a_figure_that_must_not_be_served_scores_wrong_when_it_is():
     served = score(golden, {"X": [row]})
     assert served["results"][0]["outcome"] == "wrong" and served["results"][0]["methods"] == ["xbrl"] and served["wrong"] == 1
     assert score(golden, {"X": [{**row, "group_label": "Costs"}]})["results"][0]["outcome"] == "correct"
+
+
+def test_a_release_that_left_out_a_group_now_read_is_read_again_once():
+    from types import SimpleNamespace
+
+    from kpi_extractor.steps.release_flow import ReleaseFlow, _GROUPS_NOT_READ
+
+    spec = Spec.model_validate({"groups": [
+        {"key": "revenue_by_product", "label": "Revenue by Product", "kind": "metric", "kpis": [{"key": "nii", "label": "Net Interest Income", "unit": "currency"}]},
+        {"key": "operating", "label": "Operating Metrics", "kind": "metric", "kpis": [{"key": "branches", "label": "Branches", "unit": "count"}]}]})
+    held = {"a": {"group_key": "kpi_operating", "source_accession": "A1"}}
+    flow = SimpleNamespace(values=held, _dead=set())
+    due = lambda notes, accession="A1", dead=None: ReleaseFlow._skipped_groups_due(
+        SimpleNamespace(values=held, _dead=dead or set()), {"notes": notes}, accession, spec)
+    # Reader 4 records what it left out: read again once that group is read.
+    assert due(["read by AI", "release reader 4", _GROUPS_NOT_READ + "revenue_by_product"]) is True
+    assert due(["read by AI", "release reader 4", _GROUPS_NOT_READ + "revenue_by_product"], dead={"revenue_by_product"}) is False
+    assert due(["read by AI", "release reader 4"]) is False
+    # An older stamp: a listed group with nothing stored from this release and not named as unreported was left out.
+    assert due(["read by AI", "release reader 2"]) is True
+    assert due(["read by AI", "release reader 2", "not reported: revenue_by_product.nii"]) is False
+    assert due(["read by AI", "release reader 2"], dead={"revenue_by_product"}) is False
+    flow.values = {**held, "b": {"group_key": "kpi_revenue_by_product", "source_accession": "A1"}}
+    assert ReleaseFlow._skipped_groups_due(flow, {"notes": ["read by AI", "release reader 2"]}, "A1", spec) is False
+    # Never stamped (read before stamping began): left alone, as for every other re-read.
+    assert due(["read by AI"]) is False
