@@ -160,3 +160,26 @@ def test_each_exhibit_of_a_filing_keeps_its_own_link():
     assert release.url_of(block_a) == "https://www.sec.gov/x/release.htm"
     assert release.url_of(None) == release.source_url == "https://www.sec.gov/x/release.htm"
     assert parse_document("<p>x</p>", "https://www.sec.gov/x/one.htm").url_of("T0") == "https://www.sec.gov/x/one.htm"
+
+
+def test_a_page_of_placed_text_has_its_tables_rebuilt():
+    from kpi_extractor.document import parse_document
+    box = lambda left, top, text: f'<div style="position:absolute;left:{left}px;top:{top}px;">{text}</div>'
+    boxes = [box(60, 100, "Revenue by business division"), box(60, 120, "USD m"), box(430, 120, "30.9.26"), box(485, 120, "30.6.26"),
+             box(60, 140, "Global Wealth Management"), box(430, 140, "6,512"), box(495, 140, "640"),
+             box(60, 153, "Investment Bank"), box(435, 153, "3,104"), box(485, 153, "2,990"), box(470, 153, "1"),
+             box(60, 166, "Total"), box(430, 166, "9,616"), box(490, 166, "3,630")]
+    filler = "".join(box(60, 300 + i * 13, f"Note text line {i}") for i in range(200))
+    html = f'<html><body><div style="position:relative">{"".join(boxes)}{filler}</div></body></html>'
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables.values()))
+    rows = [[cell for cell in row if cell] for row in table.rows]
+    assert rows[:4] == [["USD m", "30.9.26", "30.6.26"], ["Global Wealth Management", "6,512", "640"],
+                        ["Investment Bank", "3,104", "2,990"], ["Total", "9,616", "3,630"]]
+    assert "Revenue by business division" in table.context
+
+
+def test_ordinary_tables_are_left_alone():
+    from kpi_extractor.document import parse_document
+    document = parse_document("<table><tr><td>Revenue</td><td>10</td></tr></table>", "https://www.sec.gov/x.htm")
+    assert next(iter(document.tables.values())).rows == [["Revenue", "10"]]

@@ -127,23 +127,33 @@ def company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
 
 def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
     company = Company(symbol)
-    fiscal_year_end = annual_report_year_end(company, str(getattr(company, "fiscal_year_end", None) or "1231").zfill(4))
+    latest = _latest_annual_report(company)
+    fiscal_year_end = annual_report_year_end(company, str(getattr(company, "fiscal_year_end", None) or "1231").zfill(4), latest)
     profile = CompanyProfile(
         symbol=symbol,
         cik=int(company.cik),
         name=str(company.name),
         fiscal_year_end=fiscal_year_end,
-        foreign=bool(getattr(company, "is_foreign", False)),
+        # A Canadian issuer filing 40-F (Bank of Nova Scotia, TD) is not "foreign" to edgartools, yet furnishes its
+        # results on 6-K and never on 8-K: its annual report's form decides.
+        foreign=bool(getattr(company, "is_foreign", False)) or str(getattr(latest, "form", "")) in ("20-F", "40-F"),
     )
     return profile, company
 
 
-def annual_report_year_end(company: Company, stated: str) -> str:
+def _latest_annual_report(company: Company):
+    try:
+        return company.get_filings(form=["10-K", "20-F", "40-F"]).latest(1)
+    except Exception:  # noqa: BLE001 - no annual report yet, or SEC unreachable
+        return None
+
+
+def annual_report_year_end(company: Company, stated: str, latest=False) -> str:
     """The fiscal year end, checked against the newest annual report's period: SEC's own record can be wrong (Sun
     Communities' "0513" for a December year, which failed every quarter's label). A year end within ten days of the
     report's stands (a 52/53-week year moves a few days); a further one gives way to the report's month and day."""
     try:
-        latest = company.get_filings(form=["10-K", "20-F", "40-F"]).latest(1)
+        latest = company.get_filings(form=["10-K", "20-F", "40-F"]).latest(1) if latest is False else latest
         period = date.fromisoformat(str(getattr(latest, "period_of_report", "") or "")[:10])
     except Exception:  # noqa: BLE001 - no annual report yet, or SEC unreachable: keep what SEC states
         return stated
