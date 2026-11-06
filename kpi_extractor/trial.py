@@ -26,6 +26,9 @@ from .steps.shared import AI_GROUP_PREFIX, value_key
 
 AUDIT_SAMPLE = 60  # accepted figures drawn for the hand audit
 _MISSING = re.compile(r"^missing reasons: (.*)$")
+_CODE = re.compile(r"^[a-z_]+$")
+# Notes a held figure carries that are not why it is held.
+_NOT_A_REASON = {"confirmed by review", "settled by the checks"}
 _SECOND = re.compile(r"^second read: (\w+)")
 
 
@@ -74,7 +77,9 @@ def company_report(symbol: str, result: SymbolResult, values: list[dict], filing
         for note in filing.get("notes") or []:
             if match := _MISSING.match(note):
                 for pair in match.group(1).split(", "):
-                    missing[pair.rsplit("=", 1)[-1]] += 1
+                    code = pair.rsplit("=", 1)[-1] if "=" in pair else ""
+                    if _CODE.match(code):  # a note cut at 300 characters ends in half a pair
+                        missing[code] += 1
             if match := _SECOND.match(note):
                 second[match.group(1)] += 1
     accepted = status["verified"] + status["needs_review"]
@@ -90,7 +95,7 @@ def company_report(symbol: str, result: SymbolResult, values: list[dict], filing
         "reviewItems": len(held),
         "reviewItemsPerQuarter": len(held) / len(quarters) if quarters else None,
         "quartersWithReview": len(held_quarters),
-        "reviewReasons": Counter(_reason(note) for v in held for note in v.get("notes") or [] if note),
+        "reviewReasons": Counter(_reason(note) for v in held for note in v.get("notes") or [] if note and note not in _NOT_A_REASON),
         "missingReasons": dict(missing),
         "secondReadReasons": dict(result.second_read_reasons or second),
         "aiCalls": result.ai_calls,
@@ -189,7 +194,8 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(exist_ok=True)
     (out / "trial.json").write_text(json.dumps({"summary": summary, "companies": companies,
                                                 "values": {s: o[1] for s, o in zip(symbols, outcomes)},
-                                                "lists": {s: o[3] for s, o in zip(symbols, outcomes)}}, default=str, indent=1))
+                                                "lists": {s: o[3] for s, o in zip(symbols, outcomes)},
+                                                "filings": {s: o[2] for s, o in zip(symbols, outcomes)}}, default=str, indent=1))
     (out / "audit_sample.json").write_text(json.dumps(sample, default=str, indent=1))
     return 0
 

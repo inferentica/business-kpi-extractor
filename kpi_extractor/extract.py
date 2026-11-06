@@ -130,7 +130,8 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         if kpi.unit in ("currency", "count") and parsed.percent:
             raise LocateError(f"{text!r} is a percentage, not an amount")
         header = " ".join(" ".join(row) for row in table.rows[:3])
-        if kpi.unit == "percent" and not parsed.percent and not re.search(r"%|\bpercent", f"{' '.join(table.rows[locator.row])} {header}", re.I):
+        if kpi.unit == "percent" and not parsed.percent and not re.search(
+                r"%|\bpercent", f"{' '.join(table.rows[locator.row])} {header} {_section_heading(table, locator.row)}", re.I):
             raise LocateError(f"{text!r} is not a percentage")
         value = parsed.value
         if kpi.unit == "count" and parsed.scale_word is None:
@@ -756,6 +757,7 @@ _MONTHS = {name: index for index, names in enumerate(
     [("january", "jan"), ("february", "feb"), ("march", "mar"), ("april", "apr"), ("may",), ("june", "jun"), ("july", "jul"),
      ("august", "aug"), ("september", "sep", "sept"), ("october", "oct"), ("november", "nov"), ("december", "dec")], 1)
     for name in names}
+_NUMERIC_DATE = re.compile(r"\b(\d{1,2})/(\d{1,2})/((?:19|20)\d{2})\b")
 _FULL_DATE = re.compile(r"\b(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")\.?\s+(\d{1,2}),?\s+((?:19|20)\d{2})\b")
 _YEAR = re.compile(r"(?<![\d$.,])(?:fy\s?)?'?((?:19|20)\d{2})(?![\d%]|[,.]\d)|\b[1-4]q'?(\d{2})\b|\bq[1-4]\s?'?(\d{2}|(?:19|20)\d{2})\b")
 
@@ -770,6 +772,11 @@ def column_dates(table: Table, first_data_row: int, col: int) -> tuple[list[date
     for month, day, year in _FULL_DATE.findall(text):
         try:
             dates.append(date(int(year), _MONTHS[month], int(day)))
+        except ValueError:
+            continue
+    for month, day, year in _NUMERIC_DATE.findall(text):  # PepsiCo's "12 Weeks Ended 6/14/2025"
+        try:
+            dates.append(date(int(year), int(month), int(day)))
         except ValueError:
             continue
     years = sorted({int(full) if full else 2000 + int(short or quarter[-2:]) for full, short, quarter in _YEAR.findall(text)
@@ -863,3 +870,15 @@ def _ai_scale_notes(document: Document, part, scale_text: str | None, scale: flo
     if _scale_quoted(document, part, scale_text, scale):
         return [f"scale quoted: {clean(scale_text or '')[:40]!r}"]
     return [SCALE_NOT_STATED]
+
+
+def _section_heading(table: Table, row: int) -> str:
+    """The heading rows just above a row inside its table (a label with no figures): PepsiCo's "Impact on % Change of:"
+    over its organic volume change, whose cells print no % sign."""
+    headings = []
+    for index in range(row - 1, max(-1, row - 4), -1):
+        cells = table.rows[index] if index < len(table.rows) else []
+        if not cells or any(parse_number(cell) for cell in cells[1:]):
+            break
+        headings.append(" ".join(cells))
+    return " ".join(headings)

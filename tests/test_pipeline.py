@@ -2008,3 +2008,19 @@ def test_a_trial_scores_what_a_new_company_would_store():
     assert summary["autoAccepted"] == 0.75 and summary["companyQuarters"] == 2 and summary["aiCalls"] == 7
     sample = audit_sample({"X": values}, 2, seed=1)
     assert len(sample) == 2 and all(item["symbol"] == "X" and item["where"] == "q" for item in sample)
+
+
+def test_a_percentage_takes_its_sign_from_a_heading_row_above_it():
+    html = """<table><tr><td></td><td>12 Weeks Ended 6/14/2025</td><td></td></tr><tr><td></td><td>PFNA</td><td>Total</td></tr>
+    <tr><td>Organic Revenue % Change</td><td>(2)</td><td>2</td></tr><tr><td>Impact on % Change of:</td><td></td><td></td></tr>
+    <tr><td>Organic volume change (d)</td><td>(1.5)</td><td>(1.5)</td></tr></table>"""
+    from kpi_extractor.extract import column_dates
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables.values()))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "volume", "label": "Organic Volume Change (PFNA)", "unit": "percent"}]}]})
+    located = ai.Located.model_validate({"period_end": "2025-06-14", "values": [
+        {"kpi": "ops.volume", "table": table.id, "row": 4, "col": 1, "scale": 1, "row_label": "Organic volume change (d)"}]})
+    read, problems = read_values(document, spec, located, None)
+    assert [item.value for item in read] == [-1.5] and not problems
+    assert column_dates(table, 4, 1)[0] == [date(2025, 6, 14)]
