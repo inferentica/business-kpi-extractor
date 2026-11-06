@@ -3,7 +3,7 @@ from datetime import date
 from types import SimpleNamespace
 
 from kpi_extractor import ai
-from kpi_extractor.ai import Spec
+from kpi_extractor.ai import KpiSpec, Spec
 from kpi_extractor.document import parse_document
 from kpi_extractor.evaluate import score
 from kpi_extractor.extract import read_values
@@ -1720,3 +1720,31 @@ def test_a_release_that_left_out_a_group_now_read_is_read_again_once():
     assert ReleaseFlow._skipped_groups_due(flow, {"notes": ["read by AI", "release reader 2"]}, "A1", spec) is False
     # Never stamped (read before stamping began): left alone, as for every other re-read.
     assert due(["read by AI"]) is False
+
+
+def test_a_re_read_row_keeps_the_listed_series_its_label_was_stored_under():
+    # JPMorgan's 2016 "Middle Market Banking" row was stored as Commercial & Specialized Industries; a re-read that read
+    # the table whole labelled it by its own name and split the series.
+    from types import SimpleNamespace
+
+    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.steps.release_flow import ReleaseFlow
+
+    spec = Spec.model_validate({"groups": [{"key": "coverage", "label": "Banking & Payments Revenue by Client Coverage Segment",
+                                             "kind": "revenue_breakdown", "kpis": [
+        {"key": "commercial_specialized_industries", "label": "Commercial & Specialized Industries", "unit": "currency"},
+        {"key": "corporate_client_banking", "label": "Corporate Client Banking", "unit": "currency"},
+        {"key": "other", "label": "Other", "unit": "currency"}]}]})
+    group = spec.groups[0]
+    stored = {
+        "a": {"method": "ai", "group_key": "kpi_coverage", "kpi_key": "commercial_specialized_industries", "locator": {"row_label": "Middle Market Banking"}},
+        "b": {"method": "ai", "group_key": "kpi_coverage", "kpi_key": "other", "locator": {"row_label": "Other"}},
+        "c": {"method": "ai", "group_key": "kpi_coverage", "kpi_key": "corporate_client_banking", "locator": {"row_label": "Shared Line"}},
+        "d": {"method": "ai", "group_key": "kpi_coverage", "kpi_key": "other", "locator": {"row_label": "Shared Line"}},
+    }
+    def row(label, key):
+        return ReadValue(group, KpiSpec(key=key, label=label, unit="currency"), 1.0, "USD", {"row_label": label, "whole_table": True})
+    read = [row("Middle Market Banking", "middlemarketbanking"), row("Shared Line", "sharedline"), row("Brand New Line", "brandnewline"),
+            ReadValue(group, group.kpis[1], 2.0, "USD", {"row_label": "Corporate Client Banking"})]
+    ReleaseFlow._keep_listed_series(SimpleNamespace(values=stored), read)
+    assert [item.kpi.key for item in read] == ["commercial_specialized_industries", "sharedline", "brandnewline", "corporate_client_banking"]

@@ -11,6 +11,7 @@ from ..checks import check_period, date_order_findings, validate_groups
 from ..extract import ReadValue, falls, net_gross_mismatch
 from ..fiscal import fiscal_label
 from ..sec import FilingRef
+from ..xbrl import member_key
 from ..store import FilingReading, failed_reading
 from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI, _annual_header, _chain_of, _document_text, _is_jump, value_key)
 
@@ -101,6 +102,7 @@ class ReleaseFlow:
                                  ai.locate_data(period_hint, subset or spec, self._hints(expected)))
 
             read, problems, located = self._read(text, document, spec, expected, version)
+            self._keep_listed_series(read)
             how = _READ_BY_REPLAY if getattr(self._local, "replayed", False) else _READ_BY_AI
             period_problem = check_period(located, expected)
             period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
@@ -138,6 +140,28 @@ class ReleaseFlow:
         if stamp.removeprefix(_RELEASE_READER_PREFIX).isdigit() and int(stamp.removeprefix(_RELEASE_READER_PREFIX)) >= 3:
             return False
         return any(value.get("source_accession") == accession and stored_reading_fails(value) for value in self.values.values())
+
+    def _keep_listed_series(self, read: list[ReadValue]) -> None:
+        """A row a whole-table reading labels by its own name that the group already holds, under that row label, as a
+        listed KPI, is that KPI: JPMorgan's 2016 "Middle Market Banking" was stored as Commercial & Specialized Industries,
+        and a re-read without this split it into a series of its own (and replaced 34 served figures). Only a label that
+        points to one listed KPI of the group counts."""
+        listed: dict[str, dict[str, object]] = {}
+        for item in read:
+            listed.setdefault(item.group.key, {kpi.key: kpi for kpi in item.group.kpis})
+        aliases: dict[tuple[str, str], set[str]] = {}
+        for value in self.values.values():
+            group = value["group_key"].removeprefix(AI_GROUP_PREFIX)
+            label = (value.get("locator") or {}).get("row_label")
+            if value["method"] != "ai" or group not in listed or not label or value["kpi_key"] not in listed[group]:
+                continue
+            aliases.setdefault((group, member_key(str(label))), set()).add(value["kpi_key"])
+        for item in read:
+            if item.is_total or item.kpi.key in listed[item.group.key] or not item.locator.get("row_label"):
+                continue
+            keys = aliases.get((item.group.key, member_key(str(item.locator["row_label"]))), set())
+            if len(keys) == 1:
+                item.kpi = listed[item.group.key][next(iter(keys))]
 
     def _skipped_groups_due(self, previous: dict, accession: str, spec: Spec) -> bool:
         """A release read while a group of today's list was not read (see _readable) and that group is read again now:
