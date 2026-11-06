@@ -1,0 +1,407 @@
+{
+ "drawn": "2026-11-06",
+ "seed": 20261106,
+ "rules": "Random within sector quotas (proportional, at least 2) and size bands (large >= $10B, mid $2-10B, small $0.3-2B), from active NYSE/Nasdaq stocks with a CIK; excluding the 28 tracked companies, NFLX and the trial's COST, PEP and DIS; one share class per company. SAIL replaced by NOVT (no filings under its CIK since 2025).",
+ "companies": [
+  {
+   "symbol": "UBS",
+   "name": "UBS Group AG",
+   "sector": "Financial Services",
+   "size": "large",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "BNS",
+   "name": "The Bank of Nova Scotia",
+   "sector": "Financial Services",
+   "size": "large",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "PNC",
+   "name": "The PNC Financial Services Group, Inc.",
+   "sector": "Financial Services",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "PRU",
+   "name": "Prudential Financial, Inc.",
+   "sector": "Financial Services",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "SYBT",
+   "name": "Stock Yards Bancorp, Inc.",
+   "sector": "Financial Services",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "MCBS",
+   "name": "MetroCity Bankshares, Inc.",
+   "sector": "Financial Services",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "UCB",
+   "name": "United Community Banks, Inc.",
+   "sector": "Financial Services",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "FFBC",
+   "name": "First Financial Bancorp.",
+   "sector": "Financial Services",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "HUBB",
+   "name": "Hubbell Incorporated",
+   "sector": "Industrials",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "RTX",
+   "name": "RTX Corporation",
+   "sector": "Industrials",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "LMT",
+   "name": "Lockheed Martin Corporation",
+   "sector": "Industrials",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "FDX",
+   "name": "FedEx Corporation",
+   "sector": "Industrials",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "BV",
+   "name": "BrightView Holdings, Inc.",
+   "sector": "Industrials",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "PRIM",
+   "name": "Primoris Services Corporation",
+   "sector": "Industrials",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "HXL",
+   "name": "Hexcel Corporation",
+   "sector": "Industrials",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "KEYS",
+   "name": "Keysight Technologies, Inc.",
+   "sector": "Technology",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "TSEM",
+   "name": "Tower Semiconductor Ltd.",
+   "sector": "Technology",
+   "size": "large",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "MSI",
+   "name": "Motorola Solutions, Inc.",
+   "sector": "Technology",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "OKTA",
+   "name": "Okta, Inc.",
+   "sector": "Technology",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "RXT",
+   "name": "Rackspace Technology, Inc.",
+   "sector": "Technology",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "FROG",
+   "name": "JFrog Ltd.",
+   "sector": "Technology",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "ROL",
+   "name": "Rollins, Inc.",
+   "sector": "Consumer Cyclical",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "TSLA",
+   "name": "Tesla, Inc.",
+   "sector": "Consumer Cyclical",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "BKNG",
+   "name": "Booking Holdings Inc.",
+   "sector": "Consumer Cyclical",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "CPS",
+   "name": "Cooper-Standard Holdings Inc.",
+   "sector": "Consumer Cyclical",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "BLBD",
+   "name": "Blue Bird Corporation",
+   "sector": "Consumer Cyclical",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": true
+  },
+  {
+   "symbol": "SHOO",
+   "name": "Steven Madden, Ltd.",
+   "sector": "Consumer Cyclical",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "PHG",
+   "name": "Koninklijke Philips N.V.",
+   "sector": "Healthcare",
+   "size": "large",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "HSIC",
+   "name": "Henry Schein, Inc.",
+   "sector": "Healthcare",
+   "size": "large",
+   "foreign": false,
+   "weekBased": true
+  },
+  {
+   "symbol": "AUNA",
+   "name": "Auna S.A.",
+   "sector": "Healthcare",
+   "size": "small",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "GRFS",
+   "name": "Grifols, S.A.",
+   "sector": "Healthcare",
+   "size": "mid",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "TNGX",
+   "name": "Tango Therapeutics, Inc.",
+   "sector": "Healthcare",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "MPC",
+   "name": "Marathon Petroleum Corporation",
+   "sector": "Energy",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "COP",
+   "name": "ConocoPhillips",
+   "sector": "Energy",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "BORR",
+   "name": "Borr Drilling Limited",
+   "sector": "Energy",
+   "size": "small",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "MP",
+   "name": "MP Materials Corp.",
+   "sector": "Basic Materials",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "DOW",
+   "name": "Dow Inc.",
+   "sector": "Basic Materials",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "TROX",
+   "name": "Tronox Holdings plc",
+   "sector": "Basic Materials",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "DLTR",
+   "name": "Dollar Tree, Inc.",
+   "sector": "Consumer Defensive",
+   "size": "large",
+   "foreign": false,
+   "weekBased": true
+  },
+  {
+   "symbol": "UL",
+   "name": "Unilever PLC",
+   "sector": "Consumer Defensive",
+   "size": "large",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "UTI",
+   "name": "Universal Technical Institute, Inc.",
+   "sector": "Consumer Defensive",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "SUI",
+   "name": "Sun Communities, Inc.",
+   "sector": "Real Estate",
+   "size": "large",
+   "foreign": false,
+   "weekBased": true
+  },
+  {
+   "symbol": "DLR",
+   "name": "Digital Realty Trust, Inc.",
+   "sector": "Real Estate",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "PINE",
+   "name": "Alpine Income Property Trust, Inc.",
+   "sector": "Real Estate",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "ROKU",
+   "name": "Roku, Inc.",
+   "sector": "Communication Services",
+   "size": "large",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "VOD",
+   "name": "Vodafone Group Public Limited Company",
+   "sector": "Communication Services",
+   "size": "large",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "GTN",
+   "name": "Gray Media, Inc.",
+   "sector": "Communication Services",
+   "size": "small",
+   "foreign": false,
+   "weekBased": false
+  },
+  {
+   "symbol": "AXIA",
+   "name": "AXIA Energia S.A.",
+   "sector": "Utilities",
+   "size": "large",
+   "foreign": true,
+   "weekBased": false
+  },
+  {
+   "symbol": "SPH",
+   "name": "Suburban Propane Partners, L.P.",
+   "sector": "Utilities",
+   "size": "small",
+   "foreign": false,
+   "weekBased": true
+  },
+  {
+   "symbol": "NOVT",
+   "name": "Novanta Inc.",
+   "sector": "Technology",
+   "size": "mid",
+   "foreign": false,
+   "weekBased": false
+  }
+ ]
+}
