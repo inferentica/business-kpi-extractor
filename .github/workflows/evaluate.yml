@@ -4,6 +4,14 @@ name: Evaluate
 on:
   workflow_dispatch:
     inputs:
+      suite:
+        description: What to score - the golden set (whole pipeline) or each prompt on its own (evals/prompts.json)
+        required: true
+        default: golden
+        type: choice
+        options:
+          - golden
+          - prompts
       quarters:
         description: Quarters of history to read
         required: true
@@ -61,7 +69,13 @@ jobs:
           enable-cache: true
           cache-dependency-glob: pyproject.toml
       - run: uv pip install .
+      - name: Score each prompt
+        if: inputs.suite == 'prompts'
+        env:
+          KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
+        run: python -m kpi_extractor.prompt_eval
       - name: Score against the golden set
+        if: inputs.suite != 'prompts'
         env:
           QUARTERS: ${{ inputs.quarters || '6' }}
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}

@@ -1877,3 +1877,14 @@ def test_row_labels_are_read_back_against_the_cell():
         {"group": "technology", "table": table.id, "col": 1, "first_row": 2, "last_row": 4, "first_label": "5nm", "last_label": "Other"}]})
     read, problems = read_values(document, SPEC, whole, None)
     assert read == [] and any("row mismatch" in problem for problem in problems)
+
+
+def test_prompt_scores_count_what_production_would_keep():
+    from kpi_extractor.prompt_eval import summarize
+    summary = summarize({
+        "review": [{"wrong_kind": "year-ago column", "outcome": "right"}, {"wrong_kind": "another row", "outcome": "planted"}],
+        "explain": [{"planted": True, "said_real": True, "stands": False}, {"planted": False, "said_real": True, "stands": True}],
+        "select": [{"needed": 3, "select_kept": 2, "with_names_kept": 3}]})
+    assert summary["review"]["right"] == 1 and summary["review"]["planted"] == 1
+    assert summary["explain"]["plantedSaidReal"] == 1 and summary["explain"]["plantedStands"] == 0 and summary["explain"]["genuineStands"] == 1
+    assert summary["select"]["documentsComplete"] == 1
