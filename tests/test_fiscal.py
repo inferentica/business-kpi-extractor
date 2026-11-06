@@ -101,3 +101,12 @@ def test_the_annual_reports_form_decides_whether_results_come_on_6_k():
     assert not files_as_foreign(SimpleNamespace(is_foreign=True), SimpleNamespace(form="10-K"))  # JFrog, Tronox
     assert files_as_foreign(SimpleNamespace(is_foreign=True), SimpleNamespace(form="20-F"))
     assert files_as_foreign(SimpleNamespace(is_foreign=True), None)  # no annual report yet
+
+
+def test_a_filing_days_after_a_quarter_closes_reports_that_quarter():
+    from datetime import date as day
+    from kpi_extractor.sec import release_period
+    assert release_period(day(2025, 10, 2), "1231") == day(2025, 9, 30)    # Tesla's Q3 deliveries, two days on
+    assert release_period(day(2025, 10, 22), "1231") == day(2025, 9, 30)   # an ordinary results release
+    assert release_period(day(2025, 12, 10), "1231") == day(2025, 9, 30)   # late in the window, still the quarter before
+    assert release_period(day(2025, 7, 2), "0630") == day(2025, 6, 30)     # a June year end the same way

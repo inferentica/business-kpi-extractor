@@ -323,11 +323,22 @@ def _passed_ref(filing, known_urls: dict[str, str] | None = None) -> FilingRef:
     )
 
 
+def release_period(filed: date, fiscal_year_end: str, own_ends: tuple = ()) -> date:
+    """The quarter a furnished filing reports. Usually the latest quarter end at least five days before it; but a
+    filing days after a quarter closes (Tesla's production and deliveries, two days after) is about that quarter, not
+    the one before it: no results come more than the earnings window after their quarter."""
+    usual = nominal_quarter_end_before(filed, fiscal_year_end, own_ends=own_ends)
+    if filed - usual <= _EARNINGS_WINDOW[1]:
+        return usual
+    latest = nominal_quarter_end_before(filed, fiscal_year_end, min_gap_days=0, own_ends=own_ends)
+    return latest if latest > usual else usual
+
+
 def _release_ref(filing, exhibits: list, profile: CompanyProfile, own_ends: tuple = ()) -> FilingRef:
     return FilingRef(
         accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="earnings_release",
         source_url=exhibits[0].url,
-        period_end=nominal_quarter_end_before(filing.filing_date, profile.fiscal_year_end, own_ends=own_ends),
+        period_end=release_period(filing.filing_date, profile.fiscal_year_end, own_ends),
         exhibits=exhibits, filing=filing,
     )
 
