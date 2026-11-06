@@ -1905,6 +1905,6 @@ def test_an_explanation_must_give_a_cause_and_not_show_a_small_change():
 def test_fresh_lists_are_scored_against_the_owners():
     from kpi_extractor.evaluate import score_lists
     owner = {"X": {"groups": [{"key": "g", "kpis": [{"key": "a", "label": "Cloud"}, {"key": "b", "label": "Devices"}]}]}}
-    fresh = {"X": {"groups": [{"key": "g", "kpis": [{"key": "a", "label": "cloud"}, {"key": "c", "label": "Operating income"}]}]}}
+    fresh = {"X": {"groups": [{"key": "g", "kpis": [{"key": "a", "label": "Cloud (in millions)"}, {"key": "c", "label": "Operating income"}]}]}}
     lists = score_lists(fresh, owner)
-    assert lists["precision"] == 0.5 and lists["recall"] == 0.5 and lists["byCompany"]["X"]["notKept"] == ["operatingincome"]
+    assert lists["precision"] == 0.5 and lists["recall"] == 0.5 and lists["byCompany"]["X"]["notKept"] == ["Operating income"]

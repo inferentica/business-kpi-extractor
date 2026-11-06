@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .cli import company_pool
 from .control import ControlPlane
+from .extract import labels_agree
 from .pipeline import SymbolPipeline, SymbolResult
 from .sec import configure_identity
 
@@ -67,9 +68,17 @@ def evaluate_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[Sy
     return result, control.values.get(symbol, []), control.specs.get(symbol)
 
 
-def _kpis(groups: list[dict]) -> set[str]:
-    return {re.sub(r"[^a-z0-9]+", "", f"{kpi.get('label', '')}".lower()) for group in groups or [] for kpi in group.get("kpis") or []
-            if kpi.get("key") != group.get("total_kpi")} - {""}
+_UNIT_WORDS = re.compile(r"\((?:in )?(?:thousands|millions|billions|%|percent|\$[^)]*|[a-z ]*)\)|\b(?:in )?(?:thousands|millions|billions)\b", re.I)
+
+
+def _kpis(groups: list[dict]) -> list[str]:
+    return [label for group in groups or [] for kpi in group.get("kpis") or [] if kpi.get("key") != group.get("total_kpi")
+            and (label := _UNIT_WORDS.sub("", str(kpi.get("label") or "")).strip())]
+
+
+def _same_kpi(a: str, b: str) -> bool:
+    # Labels written differently for the same KPI ("Non-strategic" and "Non-strategic revenue", "(in thousands)").
+    return labels_agree(a, b) and labels_agree(b, a)
 
 
 def score_lists(fresh: dict[str, dict], owner: dict[str, dict]) -> dict:
@@ -81,12 +90,16 @@ def score_lists(fresh: dict[str, dict], owner: dict[str, dict]) -> dict:
         if symbol not in fresh:
             continue
         mine, theirs = _kpis(spec.get("groups")), _kpis(fresh[symbol].get("groups"))
-        both = mine & theirs
-        rows[symbol] = {"owner": len(mine), "fresh": len(theirs), "both": len(both),
-                        "notKept": sorted(theirs - mine)[:12], "notNamed": sorted(mine - theirs)[:12]}
-        kept, owned, proposed = kept + len(both), owned + len(mine), proposed + len(theirs)
-    return {"companies": len(rows), "recall": kept / owned if owned else None, "precision": kept / proposed if proposed else None,
-            "byCompany": rows}
+        kept_here = [label for label in theirs if any(_same_kpi(label, other) for other in mine)]
+        named = [label for label in mine if any(_same_kpi(label, other) for other in theirs)]
+        rows[symbol] = {"owner": len(mine), "fresh": len(theirs), "kept": len(kept_here), "named": len(named),
+                        "notKept": [label for label in theirs if label not in kept_here][:12],
+                        "notNamed": [label for label in mine if label not in named][:12]}
+        kept, owned, proposed = kept + len(kept_here), owned + len(mine), proposed + len(theirs)
+        rows[symbol]["recall"] = len(named) / len(mine) if mine else None
+    named_total = sum(row["named"] for row in rows.values())
+    return {"companies": len(rows), "recall": named_total / owned if owned else None,
+            "precision": kept / proposed if proposed else None, "byCompany": rows}
 
 
 def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:

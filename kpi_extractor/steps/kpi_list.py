@@ -166,6 +166,13 @@ class KpiListUpkeep:
             return None, 0, False
         latest = releases[-1]
         latest_quarter = [ref for ref in releases if ref.period_end == latest.period_end]
+        if self.profile.foreign:
+            # A foreign issuer's report follows its release by weeks (TSMC's consolidated report, with every breakdown
+            # table, a month after a short release and slide images): a list written in between named only Wafer
+            # Shipments. The quarter before is read too, so the list sees a full quarter's documents.
+            earlier = sorted({ref.period_end for ref in releases if ref.period_end < latest.period_end})
+            if earlier:
+                latest_quarter = [ref for ref in releases if ref.period_end == earlier[-1]] + latest_quarter
         breakdowns = self._xbrl_breakdowns()
         # Foreign issuers tag XBRL only once a year, so their quarterly breakdowns must still come from releases.
         covered = [] if self.profile.foreign else [
