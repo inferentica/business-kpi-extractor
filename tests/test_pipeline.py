@@ -1945,3 +1945,13 @@ def test_a_removed_group_proposed_again_is_counted():
     kept = {"X": {"groups": [{"label": "Revenue by Customer Type", "kpis": [{"label": "Optum Health"}, {"label": "Optum Rx"}]}]}}
     assert proposed_again(again, owner, removed) == ["X: Segment Revenue (removed Revenue by Segment)"]
     assert proposed_again(kept, owner, removed) == []
+
+
+def test_a_kpi_retires_only_after_three_quarters_without_a_figure():
+    def stored(kpi, period_end, status="verified"):
+        return {"group_key": "kpi_operating", "kpi_key": kpi, "fiscal_year": "2026", "fiscal_period": "Q1", "period_end": period_end,
+                "method": "ai", "validation_status": status, "value": 1.0}
+    pipeline = _pipeline(FakeControl({}), [stored("recent", "2026-03-31"), stored("old", "2025-06-30"),
+                                           stored("rejected_only", "2026-03-31", "rejected")])
+    kept = pipeline._long_absent(["operating.recent", "operating.old", "operating.never", "operating.rejected_only"], "2026-09-30")
+    assert kept == ["operating.old", "operating.never", "operating.rejected_only"]

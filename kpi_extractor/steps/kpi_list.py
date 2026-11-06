@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 
 from .. import ai
 from ..ai import AiResponseError, Spec
@@ -13,6 +13,9 @@ from ..segment_income import GROUP_KEY as INCOME_GROUP
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
 from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds
+
+# The audit retires a KPI only after this many quarters without a figure for it.
+RETIRE_AFTER = 3
 
 # The quarters a refresh or a scheduled run covers; Read filings reaches further (40).
 REFRESH_QUARTERS = 20
@@ -257,6 +260,9 @@ class KpiListUpkeep:
             if getattr(self, "_owner_edited", False):
                 # The owner decides what an edited list tracks: the audit may suggest additions, never retirements.
                 answer = answer.model_copy(update={"retire": []})
+            elif answer.retire:
+                # One quarter without a KPI (a table left out, a reading missed) is not the company dropping it.
+                answer = answer.model_copy(update={"retire": self._long_absent(answer.retire, period_end)})
             covered = [] if self.profile.foreign else self._current_xbrl_members()
             updated = apply_maintenance(spec, answer, covered)
             if not getattr(self, "_owner_edited", False):
@@ -275,6 +281,18 @@ class KpiListUpkeep:
         self._store_spec(updated, self.names, version + 1, latest_quarter[-1].accession)
         self.log(f"{self.symbol}: KPI list v{version + 1} after audit ({sum(len(g.kpis) for g in updated.groups)} KPIs)")
         return updated, version + 1
+
+    def _long_absent(self, keys: list[str], newest: str) -> list[str]:
+        """The KPIs among `keys` with no figure (read or held for review) in the newest RETIRE_AFTER quarters: only those
+        may be retired. A KPI never read at all counts as absent."""
+        cutoff = (date.fromisoformat(newest[:10]) - timedelta(days=91 * RETIRE_AFTER - 20)).isoformat()
+        recent = {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}" for v in self.values.values()
+                  if v["validation_status"] != "rejected" and v["fiscal_period"] != "FY" and v["period_end"] >= cutoff}
+        kept = [key for key in keys if key not in recent]
+        if len(kept) < len(keys):
+            self.log(f"{self.symbol}: audit retirements kept for now (reported within {RETIRE_AFTER} quarters): "
+                     f"{', '.join(key for key in keys if key in recent)}")
+        return kept
 
     def _store_spec(self, spec: Spec, names: dict, version: int, accession: str) -> None:
         self.store.spec({"version": version, "groups": [group.model_dump() for group in spec.groups], "names": names,

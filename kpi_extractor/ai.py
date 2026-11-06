@@ -22,8 +22,8 @@ _KEY = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
 MAX_GROUPS = 8
 # A breakdown keeps its history: TSMC lists today's merged node buckets beside the finer nodes they replaced (17).
 MAX_KPIS_PER_GROUP = 24
-# A focused list: every KPI is read, and possibly disputed, every quarter. The proposal is asked for at most six
-# groups; the code keeps any list to this many KPIs (see normalize_spec).
+# A focused list: every KPI is read, and possibly disputed, every quarter. Propose is told these limits; the code
+# keeps any list to this many KPIs in all, trimming operating metrics from the end of their group (see normalize_spec).
 MAX_LISTED_KPIS = 24
 MIN_KEPT_METRICS = 10
 
@@ -356,7 +356,9 @@ only when they help.
 quarterly version of an annual XBRL breakdown), give both the same title and row labels, so they read as one view.
 - "names" renames each breakdown listed under "Name these XBRL breakdowns": {{"<breakdown key>": {{"label": "...", \
 "members": {{"<member key>": "..."}}}}}}. Use only the keys given; omit a member whose label is already right.
-- At most 8 groups and 16 KPIs per group. Prefer fewer, clearly reported KPIs.
+- At most {MAX_GROUPS} groups and {MAX_KPIS_PER_GROUP} KPIs per group, and about {MAX_LISTED_KPIS} KPIs in all. Over that, \
+operating metrics are dropped from the end of their group (breakdowns and mixes never are), so list operating metrics \
+most important first. Prefer fewer, clearly reported KPIs.
 
 JSON shape:
 {{"groups": [{{"key": "revenue_by_technology", "label": "Revenue by Technology", "kind": "mix", "total_kpi": null,
