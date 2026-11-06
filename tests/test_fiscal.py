@@ -92,3 +92,12 @@ def test_a_stated_year_end_far_from_the_annual_reports_gives_way():
     assert annual_report_year_end(report("2026-01-02"), "1231") == "1231"  # across the new year
     assert year_ends_agree("0926", day(2025, 9, 27)) and not year_ends_agree("0513", day(2025, 12, 31))
     assert annual_report_year_end(SimpleNamespace(get_filings=lambda form: (_ for _ in ()).throw(ValueError())), "0630") == "0630"
+
+
+def test_the_annual_reports_form_decides_whether_results_come_on_6_k():
+    from types import SimpleNamespace
+    from kpi_extractor.sec import files_as_foreign
+    assert files_as_foreign(SimpleNamespace(is_foreign=False), SimpleNamespace(form="40-F"))  # Bank of Nova Scotia
+    assert not files_as_foreign(SimpleNamespace(is_foreign=True), SimpleNamespace(form="10-K"))  # JFrog, Tronox
+    assert files_as_foreign(SimpleNamespace(is_foreign=True), SimpleNamespace(form="20-F"))
+    assert files_as_foreign(SimpleNamespace(is_foreign=True), None)  # no annual report yet

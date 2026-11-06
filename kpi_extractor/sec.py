@@ -134,11 +134,22 @@ def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
         cik=int(company.cik),
         name=str(company.name),
         fiscal_year_end=fiscal_year_end,
-        # A Canadian issuer filing 40-F (Bank of Nova Scotia, TD) is not "foreign" to edgartools, yet furnishes its
-        # results on 6-K and never on 8-K: its annual report's form decides.
-        foreign=bool(getattr(company, "is_foreign", False)) or str(getattr(latest, "form", "")) in ("20-F", "40-F"),
+        foreign=files_as_foreign(company, latest),
     )
     return profile, company
+
+
+def files_as_foreign(company: Company, latest) -> bool:
+    """Whether the company furnishes results on 6-K (a foreign private issuer) or files 8-Ks like a U.S. company: its
+    annual report's form decides. edgartools goes by incorporation, so a 40-F filer (Bank of Nova Scotia) read as
+    domestic and found no 8-Ks, and a 10-K filer incorporated abroad (JFrog in Israel, Tronox a UK plc) as foreign and
+    found no 6-Ks. Only a company with no annual report yet keeps edgartools' answer."""
+    form = str(getattr(latest, "form", "") or "")
+    if form in ("20-F", "40-F"):
+        return True
+    if form == "10-K":
+        return False
+    return bool(getattr(company, "is_foreign", False))
 
 
 def _latest_annual_report(company: Company):
