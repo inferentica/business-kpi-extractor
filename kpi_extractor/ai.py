@@ -134,6 +134,8 @@ class Locator(BaseModel):
     scale: float | None = None
     # The row's own label as the reader saw it (read back by code against the cell's row).
     row_label: str | None = None
+    # The document's own words stating the scale ("in millions", "(Bil.)"), checked by code when it finds none itself.
+    scale_text: str | None = None
     block: str | None = None
     quote: str | None = None
     value_text: str | None = None
@@ -160,6 +162,7 @@ class TableLocator(BaseModel):
     # The labels of first_row and last_row as the reader saw them (read back by code).
     first_label: str | None = None
     last_label: str | None = None
+    scale_text: str | None = None
 
     @model_validator(mode="after")
     def _rows(self) -> "TableLocator":
@@ -372,7 +375,9 @@ none). Use this in "tables".
 For each other KPI, in "values", either:
 - a table cell: {{"kpi": "<group>.<kpi>", "table": "A_T3", "row": 5, "col": 2, "scale": 1000000, "row_label": "Wafer revenue"}}
   "row_label" (and a table's "first_label" and "last_label") is the row's own label copied from its c0 cell, not the \
-KPI's name; code checks it against the row you point to.
+KPI's name; code checks it against the row you point to. With every "scale" other than 1, give "scale_text": the \
+document's own words that state it, copied exactly ("in millions", "($ millions)", "(Bil.)"); a scale the document \
+does not state is not used.
   "scale" is the multiplier that applies to that row ("in millions" = 1000000, "in thousands" = 1000, none = 1). A \
 header such as "(in millions, except employee data)" does not apply to the rows it excepts: use 1 for them.
 - or text: {{"kpi": "<group>.<kpi>", "block": "A_P7", "quote": "<exact excerpt, max 160 chars>", "value_text": "3.60 billion"}}

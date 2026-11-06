@@ -75,7 +75,8 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             problems.append(f"{locator.kpi}: {error}")
             continue
         seen.add(locator.kpi)
-        values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator), notes))
+        values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator), notes,
+                                status="needs_review" if SCALE_NOT_STATED in notes else "verified"))
     # One gate for every reading (replay, Flash, the reasoning reader): the column's own header outranks a period the AI states.
     kept = []
     for item in values:
@@ -134,14 +135,23 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         value = parsed.value
         if kpi.unit == "count" and parsed.scale_word is None:
             # A table's "(in millions, except employee data)" describes its amounts, not its counts: a count takes a
-            # scale only from its own row label ("Paid memberships (in millions)") or from the reading.
-            row_scale = _row_scale(" ".join(table.rows[locator.row]))
-            value *= row_scale or (locator.scale if locator.scale in (1, 1e3, 1e6, 1e9) else 1)
+            # scale only from its own row label ("Paid memberships (in millions)"), its column's ("Purchase Trans.
+            # (Mil.)"), or a scale the reading quotes from the document.
+            row_scale = _row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col)
+            if row_scale is None and locator.scale in (1e3, 1e6, 1e9):
+                if _scale_quoted(document, table, locator.scale_text, locator.scale):
+                    row_scale = locator.scale
+                    notes.append(f"scale quoted: {clean(locator.scale_text or '')[:40]!r}")
+                else:
+                    notes.append(SCALE_NOT_STATED)
+                    row_scale = locator.scale
+            value *= row_scale or 1
             return value, None, notes
         if kpi.unit == "currency" and parsed.scale_word is None:
             # A row that states its own scale overrides the table's: JPM's "Debit and credit card sales volume (in
             # billions)" in a table "(in millions)".
-            declared = _row_scale(" ".join(table.rows[locator.row])) or table.declared_scale()
+            declared = _row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col) \
+                or table.declared_scale()
             if declared is None:
                 declared = document.default_scale()
             if declared is not None:
@@ -150,8 +160,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
                 value *= declared
             elif locator.scale in (1, 1e3, 1e6, 1e9):
                 value *= locator.scale
-                if locator.scale != 1:
-                    notes.append("scale read by AI")
+                notes.extend(_ai_scale_notes(document, table, locator.scale_text, locator.scale, value))
             else:
                 raise LocateError("amount scale unknown")
         context = f"{table.context} {' '.join(' '.join(row) for row in table.rows[:4])}"
@@ -191,7 +200,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         declared = _preceding_scale(block.text, block.text.find(quote)) or block.declared_scale() or document.default_scale()
         if declared is None and locator.scale in (1, 1e3, 1e6, 1e9):
             declared = locator.scale
-            notes.append("scale read by AI")
+            notes.extend(_ai_scale_notes(document, block, locator.scale_text, locator.scale, value * declared))
         if declared is not None:
             value *= declared
         elif value < 1_000:
@@ -410,8 +419,11 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     header = " ".join(" ".join(row) for row in table.rows[:3])
     scale = 1.0
     if unit == "currency":
-        scale = table.declared_scale() or document.default_scale() or (
-            locator.scale if locator.scale in (1, 1e3, 1e6, 1e9) else None)
+        scale = _column_scale(table, locator.first_row, locator.col) or table.declared_scale() or document.default_scale()
+        if scale is None and locator.scale in (1, 1e3, 1e6, 1e9):
+            scale = locator.scale
+            if locator.scale != 1 and not _scale_quoted(document, table, locator.scale_text, locator.scale):
+                raise LocateError(f"scale {locator.scale:g} is not stated in the table: quote the words that state it in scale_text")
         if scale is None:
             raise LocateError("amount scale unknown")
 
@@ -796,3 +808,58 @@ def labels_agree(named: str | None, actual: str) -> bool:
         return True
     shared = set(named_words) & set(actual_words)
     return len(shared) >= 0.5 * min(len(set(named_words)), len(set(actual_words)))
+
+
+# A figure whose scale only the AI gives: held for review, never served on the AI's word.
+SCALE_NOT_STATED = "scale not stated in the document"
+_COLUMN_SCALE = re.compile(r"\(\s*(?:US)?\$?\s*(?P<word>bil|bn|b|billions?|mil|mm|m|millions?|thous|thousands?|k|000s?)\.?\s*\)", re.I)
+_SCALE_OF = (("bil", 1e9), ("bn", 1e9), ("b", 1e9), ("mil", 1e6), ("mm", 1e6), ("m", 1e6), ("thous", 1e3), ("k", 1e3),
+             ("000", 1e3))
+
+
+def _scale_word(word: str) -> float | None:
+    word = word.lower()
+    return next((scale for prefix, scale in _SCALE_OF if word.startswith(prefix)), None)
+
+
+def _column_scale(table: Table, row: int, col: int) -> float | None:
+    """The scale a column's own header states: Mastercard's "GDV (Bil.)" and "Purchase Trans. (Mil.)"."""
+    cells = [_heading(header, col) for header in table.rows[:max(row, 1)][:6] if col < len(header)]
+    found = {_scale_word(match.group("word")) for cell in cells for match in _COLUMN_SCALE.finditer(cell)} - {None}
+    return found.pop() if len(found) == 1 else None
+
+
+def _scale_quoted(document: Document, part, scale_text: str | None, scale: float) -> bool:
+    """Whether the words a reader quotes for a scale are in the table (its caption, header or rows) or the passages
+    just before it, and state that scale."""
+    words = clean(scale_text or "")
+    if not words:
+        return False
+    stated = {_SCALE_WORDS_OF[match.group("word").lower().rstrip("s")] for match in _ANY_SCALE.finditer(words)}
+    stated |= {_scale_word(match.group("word")) for match in _COLUMN_SCALE.finditer(words)} - {None}
+    if stated != {scale}:
+        return False
+    if isinstance(part, Table):
+        nearby = [part.context, *(" ".join(row) for row in part.rows)]
+    else:
+        nearby = [part.text]
+    key = getattr(part, "id", None)
+    if key in document.order:
+        at = document.order.index(key)
+        nearby += [document.blocks[other].text for other in document.order[max(0, at - 4):at] if other in document.blocks]
+    flat = lambda text: re.sub(r"\s+", " ", clean(text)).lower()
+    return any(flat(words) in flat(text) for text in nearby)
+
+
+_ANY_SCALE = re.compile(r"\b(?P<word>thousands?|millions?|billions?)\b", re.I)
+_SCALE_WORDS_OF = {"thousand": 1e3, "million": 1e6, "billion": 1e9}
+
+
+def _ai_scale_notes(document: Document, part, scale_text: str | None, scale: float, value: float) -> list[str]:
+    """A scale code did not find: one the reader quotes from the document stands, anything else is held for review.
+    Scale 1 claims no multiplier (a price per unit, a figure written out in full) and stands as read."""
+    if scale == 1:
+        return []
+    if _scale_quoted(document, part, scale_text, scale):
+        return [f"scale quoted: {clean(scale_text or '')[:40]!r}"]
+    return [SCALE_NOT_STATED]

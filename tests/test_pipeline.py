@@ -1908,3 +1908,30 @@ def test_fresh_lists_are_scored_against_the_owners():
     fresh = {"X": {"groups": [{"key": "g", "kpis": [{"key": "a", "label": "Cloud (in millions)"}, {"key": "c", "label": "Operating income"}]}]}}
     lists = score_lists(fresh, owner)
     assert lists["precision"] == 0.5 and lists["recall"] == 0.5 and lists["byCompany"]["X"]["notKept"] == ["Operating income"]
+
+
+def test_a_scale_must_be_stated_by_the_document():
+    from kpi_extractor.extract import SCALE_NOT_STATED
+    html = """<table><tr><td></td><td>GDV (Bil.)</td><td>Purchase Trans. (Mil.)</td><td>Volume</td></tr>
+    <tr><td>Worldwide</td><td>2,952</td><td>59,480</td><td>2,483</td></tr></table>"""
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    first = next(iter(document.tables))
+    other = parse_document("<table><tr><td>($ millions)</td><td>3Q 2026</td></tr><tr><td>Advisory</td><td>$887</td></tr></table>",
+                           "https://www.sec.gov/y.htm")
+    second = next(iter(other.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "gdv", "label": "GDV", "unit": "currency"}, {"key": "trans", "label": "Purchase Transactions", "unit": "count"},
+        {"key": "pv", "label": "Purchase Volume", "unit": "currency"}, {"key": "pv2", "label": "Volume", "unit": "currency"},
+        {"key": "adv", "label": "Advisory", "unit": "currency"}]}]})
+    located = ai.Located.model_validate({"period_end": "2026-09-30", "values": [
+        {"kpi": "ops.gdv", "table": first, "row": 1, "col": 1, "scale": 1e6},  # the column says billions: code wins
+        {"kpi": "ops.trans", "table": first, "row": 1, "col": 2, "scale": 1},
+        {"kpi": "ops.pv", "table": first, "row": 1, "col": 3, "scale": 1e9},  # no words state it
+        {"kpi": "ops.pv2", "table": first, "row": 1, "col": 3, "scale": 1e9, "scale_text": "(Bil.)"}]})  # quoted, in the table
+    read, _ = read_values(document, spec, located, "USD")
+    values = {item.kpi.key: item for item in read}
+    advisory, _ = read_values(other, spec, ai.Located.model_validate({"period_end": "2026-09-30", "values": [
+        {"kpi": "ops.adv", "table": second, "row": 1, "col": 1, "scale": 1}]}), "USD")
+    assert values["gdv"].value == 2952e9 and values["trans"].value == 59480e6 and advisory[0].value == 887e6
+    assert values["pv"].status == "needs_review" and SCALE_NOT_STATED in values["pv"].notes
+    assert values["pv2"].status == "verified" and values["pv2"].value == 2483e9

@@ -23,7 +23,9 @@ _RELEVANT = re.compile(r"revenue|net sales|\bsales\b|shipment|subscri|users|memb
 _AMOUNT = re.compile(r"[^\w]*\d[\d,.]*\s*[%)]*")
 # Words that name what a declared scale applies to as money, beside one for counts ("Units in thousands").
 _AMOUNT_WORDS = re.compile(r"revenue|net sales|\bsales\b|amounts?|dollars?|\$\s*$", re.I)
-_TABLE_SCALE = re.compile(r"\b(?:in|amounts in|\(in)\s+(?:[A-Z]{0,3}\$\s*|NT\$\s*|US\$\s*)?(?P<word>thousands|millions|billions)\b", re.I)
+# "(in millions)", "amounts in thousands", and a heading without "in": Morgan Stanley's "($ millions)".
+_TABLE_SCALE = re.compile(r"(?:\b(?:in|amounts in)\s+|\(\s*(?:in\s+)?)(?:[A-Z]{0,3}\$\s*|NT\$\s*|US\$\s*)?(?:in\s+)?"
+                          r"(?P<word>thousands|millions|billions)\b", re.I)
 
 
 _DECLARED_CURRENCIES = (
