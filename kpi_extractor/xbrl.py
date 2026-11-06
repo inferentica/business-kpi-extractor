@@ -517,7 +517,10 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         suffix = None
         if standard is None and own_level and not any(other in _SEGMENT_AXES for other in best_by_axis):
             standard, suffix = _STANDARD_AXES["StatementBusinessSegmentsAxis"], _title(axis_label)
-        key, title, order = standard or (f"x_{_snake(axis)}", f"Revenue by {_title(axis_label)}", 10)
+        # An axis already named for revenue ("Revenue by Major Market") is not prefixed again.
+        axis_title = _title(axis_label)
+        key, title, order = standard or (f"x_{_snake(axis)}", axis_title if axis_title.lower().startswith("revenue")
+                                         else f"Revenue by {axis_title}", 10)
 
         def bare(name: str) -> str:
             return name[:-len(suffix)].rstrip(" -–,") if suffix and name.lower().endswith(suffix.lower()) and len(name) > len(suffix) else name
