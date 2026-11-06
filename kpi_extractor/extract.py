@@ -383,6 +383,16 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     parents = {kpi.parent for kpi in group.kpis if kpi.parent}
     for key in parents & set(parts):
         kept.setdefault(key, parts[key][1])
+    # A subtotal the list names as a parent but that the table labels as a total ("Total noninterest revenue", JPMorgan's
+    # 2016-2017 supplements) is that parent, not a closing total.
+    named_parents = {kpi.parent for kpi in group.kpis if kpi.parent}
+    for index in labelled_totals:
+        row = read_row(index) if index != total_index else None
+        kpi = _listed_kpi(group, row[0]) if row else None
+        if kpi is not None and kpi.key in named_parents and member_key(row[0]) not in parts:
+            parts[member_key(row[0])] = (row[0], row[1], index)
+            kept[member_key(row[0])] = row[1]
+    parent_of = _place_unlisted_rows(group, parts, kept, total)
     if len(kept) < 2:
         raise LocateError("fewer than two rows")
     context = f"{table.context} {header}"
@@ -404,7 +414,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                   "header": column_header(table, locator.first_row, locator.col)}
         if key in nine and "__total__" in nine:
             record.update({"ytd": nine[key] * scale, "ytd_total": nine["__total__"] * scale})
-        values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit),
+        values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit,
+                                                                            parent=parent_of.get(key)),
                                 value, currency, record))
     if total_row is not None:
         record = {"table": total_table.id, "row": total_index, "col": total_col, "row_label": "Total", "whole_table": True,
@@ -412,6 +423,37 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         values.append(ReadValue(group, KpiSpec(key=group.total_kpi or "total", label="Total", unit=unit), total_row[1],
                                 currency, record, is_total=True))
     return values
+
+
+def _place_unlisted_rows(group: GroupSpec, parts: dict[str, tuple[str, float, int]], kept: dict[str, float],
+                         total: float | None) -> dict[str, str]:
+    """Rows of a whole table the list does not name, where the list's own top level already adds up to the total. A row
+    inside a listed subtotal's block is one of its lines (JPMorgan's "Securities gains" among the noninterest revenue
+    lines) and is placed under it. A row outside every such block can't be a missing part, since the top level is
+    complete, so it is left out: JPMorgan's interest income and interest expense, which only make up net interest income.
+    Returns the parent of each row placed; changes nothing when the listed rows do not add up on their own."""
+    if not total or group.kind != "revenue_breakdown":
+        return {}
+    listed = {key: kpi for key in kept if (kpi := _listed_kpi(group, parts[key][0])) is not None}
+    if not any(kpi.parent for kpi in listed.values()):
+        return {}
+    top = [key for key, kpi in listed.items() if not kpi.parent and kpi.key != group.total_kpi]
+    if len(top) < 2 or abs(sum(kept[key] for key in top) - total) > abs(total) * 0.001:
+        return {}
+    blocks: dict[str, tuple[int, int]] = {}
+    for key, kpi in listed.items():
+        lines = [parts[other][2] for other, line in listed.items() if line.parent == kpi.key]
+        if lines:
+            blocks[kpi.key] = (min(lines), parts[key][2])
+    placed: dict[str, str] = {}
+    for key in [key for key in kept if key not in listed]:
+        index = parts[key][2]
+        parent = next((name for name, (first, last) in blocks.items() if min(first, last) <= index <= max(first, last)), None)
+        if parent:
+            placed[key] = parent
+        else:
+            del kept[key]
+    return placed
 
 
 def _raw_header(table: Table, first_data_row: int, col: int) -> str:

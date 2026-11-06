@@ -371,3 +371,35 @@ def test_week_based_columns_are_told_from_their_half_years():
     assert column_duration_problem("<24 weeks> ended @ #", annual=False) is not None
     assert column_duration_problem("<36 weeks> ended @ #", annual=False) is not None
     assert column_duration_problem("<28 weeks> ended @ #", annual=False) is not None
+
+
+def test_unlisted_rows_of_a_complete_table_are_placed_or_left_out():
+    # JPMorgan's revenue table: fee lines, their subtotal, then interest income and expense, which only make up net
+    # interest income. The owner's list names the fee lines (under Noninterest Revenue), Net Interest Income and the total.
+    document = parse_document("""
+<table>
+<tr><td>(in millions)</td><td>1Q17</td></tr>
+<tr><td>Investment banking fees</td><td>1,817</td></tr>
+<tr><td>Securities gains</td><td>(3)</td></tr>
+<tr><td>Card income</td><td>914</td></tr>
+<tr><td>Total noninterest revenue</td><td>2,728</td></tr>
+<tr><td>Interest income</td><td>15,042</td></tr>
+<tr><td>Interest expense</td><td>2,978</td></tr>
+<tr><td>Net interest income</td><td>12,064</td></tr>
+<tr><td>Total net revenue</td><td>14,792</td></tr>
+</table>""", "https://example.com/supplement.htm")
+    spec = Spec.model_validate({"groups": [{"key": "product", "label": "Revenue by Product", "kind": "revenue_breakdown", "total_kpi": "total",
+        "kpis": [{"key": "ib", "label": "Investment Banking Fees", "unit": "currency", "parent": "nonint"},
+                 {"key": "card", "label": "Card Income", "unit": "currency", "parent": "nonint"},
+                 {"key": "nonint", "label": "Total Noninterest Revenue", "unit": "currency"},
+                 {"key": "nii", "label": "Net Interest Income", "unit": "currency"},
+                 {"key": "total", "label": "Total Net Revenue", "unit": "currency"}]}]})
+    located = Located.model_validate({"period_end": "2017-03-31", "tables": [
+        {"group": "product", "table": "T0", "col": 1, "first_row": 1, "last_row": 7, "total_row": 8, "scale": 1000000}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == []
+    read = {item.kpi.key: (item.value, item.kpi.parent) for item in values if not item.is_total}
+    assert "interestincome" not in read and "interestexpense" not in read
+    assert read["securitiesgains"] == (-3_000_000, "nonint")
+    validate_groups(values, previous={})
+    assert all(item.status == "verified" for item in values)
