@@ -1935,3 +1935,13 @@ def test_a_scale_must_be_stated_by_the_document():
     assert values["gdv"].value == 2952e9 and values["trans"].value == 59480e6 and advisory[0].value == 887e6
     assert values["pv"].status == "needs_review" and SCALE_NOT_STATED in values["pv"].notes
     assert values["pv2"].status == "verified" and values["pv2"].value == 2483e9
+
+
+def test_a_removed_group_proposed_again_is_counted():
+    from kpi_extractor.evaluate import proposed_again
+    removed = [{"symbol": "X", "key": "seg", "label": "Revenue by Segment", "kpis": ["Optum Health", "Optum Insight", "Optum Rx"]}]
+    owner = {"X": {"groups": [{"label": "Revenue by Customer Type", "kpis": []}]}}
+    again = {"X": {"groups": [{"label": "Segment Revenue", "kpis": [{"label": "Optum Health"}, {"label": "Optum Rx"}]}]}}
+    kept = {"X": {"groups": [{"label": "Revenue by Customer Type", "kpis": [{"label": "Optum Health"}, {"label": "Optum Rx"}]}]}}
+    assert proposed_again(again, owner, removed) == ["X: Segment Revenue (removed Revenue by Segment)"]
+    assert proposed_again(kept, owner, removed) == []

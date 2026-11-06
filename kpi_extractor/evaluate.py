@@ -81,6 +81,33 @@ def _same_kpi(a: str, b: str) -> bool:
     return labels_agree(a, b) and labels_agree(b, a)
 
 
+REMOVED = Path("evals/removed_groups.json")  # groups the owner took off lists Propose wrote (2026-10)
+
+
+def _same_group(a: str, b: str) -> bool:
+    # Group labels share generic words ("Revenue by ..."), so only the same name, or one inside the other, counts.
+    x, y = re.sub(r"[^a-z0-9]+", "", a.lower()), re.sub(r"[^a-z0-9]+", "", b.lower())
+    return bool(x and y) and (x in y or y in x)
+
+
+def proposed_again(fresh: dict[str, dict], owner: dict[str, dict], removed: list[dict]) -> list[str]:
+    """Groups the owner removed that a fresh list names again: most of a removed group's KPIs, in a group that is not
+    one the owner kept."""
+    again = []
+    for gone in removed:
+        spec = fresh.get(gone["symbol"])
+        if not spec:
+            continue
+        kept = owner.get(gone["symbol"], {}).get("groups") or []
+        for group in spec.get("groups") or []:
+            if any(_same_group(group["label"], other["label"]) for other in kept):
+                continue
+            shared = sum(1 for kpi in group.get("kpis") or [] if any(_same_kpi(kpi["label"], label) for label in gone["kpis"]))
+            if shared >= max(2, (len(gone["kpis"]) + 1) // 2):
+                again.append(f"{gone['symbol']}: {group['label']} (removed {gone['label']})")
+    return again
+
+
 def score_lists(fresh: dict[str, dict], owner: dict[str, dict]) -> dict:
     """Propose scored against the lists the owner edited by hand: of the owner's KPIs, how many a fresh list names
     (recall), and of a fresh list's KPIs, how many the owner keeps (precision), matched by label. The owner removed
@@ -181,6 +208,8 @@ def main(argv: list[str] | None = None) -> int:
             if state.get("owner_edited_at"):
                 owner[symbol] = state
         report["lists"] = score_lists(fresh, owner)
+        removed = json.loads(REMOVED.read_text()) if REMOVED.exists() else []
+        report["lists"]["proposedAgain"] = proposed_again(fresh, owner, removed)
     report["aiCalls"] = sum(result.ai_calls for result in results)
     report["flashOnlyReads"] = sum(result.flash_only_reads for result in results)
     report["secondReads"] = sum(result.second_reads for result in results)
@@ -195,7 +224,9 @@ def main(argv: list[str] | None = None) -> int:
     lists = report.get("lists")
     lines = [f"Golden set: {report['correct']}/{report['total']} correct, {report['wrong']} wrong, {report['missing']} missing "
              f"(accuracy {report['accuracy']:.1%}, recall {report['recall']:.1%}); AI calls {report['aiCalls']}",
-             *([f"Propose against {lists['companies']} hand-edited lists: precision {lists['precision']:.0%}, recall {lists['recall']:.0%}"]
+             *([f"Propose against {lists['companies']} hand-edited lists: precision {lists['precision']:.0%}, recall {lists['recall']:.0%}; "
+                f"groups the owner removed proposed again: {len(lists.get('proposedAgain') or [])}"
+                + (f" ({'; '.join(lists['proposedAgain'][:5])})" if lists.get("proposedAgain") else "")]
                if lists and lists["companies"] else []),
              "", "| Company | Period | KPI | Expected | Found | Outcome |", "|---|---|---|---|---|---|"]
     for result in report["results"]:

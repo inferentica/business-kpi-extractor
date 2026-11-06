@@ -1,0 +1,142 @@
+[
+ {
+  "symbol": "AMD",
+  "key": "revenue_by_client_and_gaming_business",
+  "label": "Revenue by Client and Gaming Business",
+  "kpis": [
+   "Client",
+   "Gaming",
+   "Total Client and Gaming"
+  ]
+ },
+ {
+  "symbol": "AMZN",
+  "key": "revenue_by_segment_mix",
+  "label": "Revenue by Segment",
+  "kpis": [
+   "North America",
+   "International",
+   "AWS"
+  ]
+ },
+ {
+  "symbol": "AMZN",
+  "key": "revenue_by_type",
+  "label": "Revenue by Product and Service",
+  "kpis": [
+   "Net product sales",
+   "Net service sales",
+   "Total net sales"
+  ]
+ },
+ {
+  "symbol": "GOOGL",
+  "key": "revenue_by_google_services_product",
+  "label": "Revenue by Google Services Product",
+  "kpis": [
+   "Google Search & other",
+   "YouTube ads",
+   "Google Network",
+   "Google subscriptions, platforms, and devices",
+   "Google Services total"
+  ]
+ },
+ {
+  "symbol": "GOOGL",
+  "key": "revenue_by_product",
+  "label": "Revenue by Product",
+  "kpis": [
+   "Google Search & Other",
+   "YouTube Ads",
+   "Google Network",
+   "Google Subscriptions, Platforms, and Devices",
+   "Google Cloud",
+   "Other Bets",
+   "Hedging Gains (Losses)",
+   "Total Revenues"
+  ]
+ },
+ {
+  "symbol": "META",
+  "key": "revenue_by_segment",
+  "label": "Revenue by Segment",
+  "kpis": [
+   "Family of Apps",
+   "Reality Labs"
+  ]
+ },
+ {
+  "symbol": "META",
+  "key": "revenue_by_type",
+  "label": "Revenue by Type",
+  "kpis": [
+   "Advertising",
+   "Other Revenue"
+  ]
+ },
+ {
+  "symbol": "MSFT",
+  "key": "product_service_offerings_revenue",
+  "label": "Product and Service Offerings Revenue",
+  "kpis": [
+   "Azure Revenue",
+   "Microsoft 365 Cloud Revenue",
+   "Productivity and Server Licensing Revenue",
+   "Search and Advertising Revenue",
+   "XBOX Revenue",
+   "Industry Solutions Revenue",
+   "Windows OEM and Devices Revenue",
+   "Frontier and Support Services Revenue"
+  ]
+ },
+ {
+  "symbol": "MSFT",
+  "key": "revenue_by_product_service",
+  "label": "Revenue by Product and Service",
+  "kpis": [
+   "Product",
+   "Service and other",
+   "Total revenue"
+  ]
+ },
+ {
+  "symbol": "MSFT",
+  "key": "segment_revenue",
+  "label": "Segment Revenue",
+  "kpis": [
+   "Agents and Infra Revenue",
+   "Devices and Consumer Revenue"
+  ]
+ },
+ {
+  "symbol": "TSM",
+  "key": "wafer_revenue_by_technology",
+  "label": "Wafer Revenue by Technology",
+  "kpis": [
+   "2-nanometer",
+   "3-nanometer",
+   "5-nanometer",
+   "7-nanometer",
+   "16-nanometer",
+   "20-nanometer",
+   "28-nanometer",
+   "40/45-nanometer",
+   "65-nanometer",
+   "90-nanometer-0.13 micron",
+   "0.15 micron and above",
+   "Wafer Revenue"
+  ]
+ },
+ {
+  "symbol": "UNH",
+  "key": "revenue_by_segment",
+  "label": "Revenue by Segment",
+  "kpis": [
+   "UnitedHealthcare",
+   "Optum Health",
+   "Optum Insight",
+   "Optum Rx",
+   "Total UnitedHealth Group"
+  ]
+ }
+]
