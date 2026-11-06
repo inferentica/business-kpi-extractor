@@ -13,7 +13,7 @@ from ..fiscal import fiscal_label
 from ..sec import FilingRef
 from ..xbrl import member_key
 from ..store import FilingReading, failed_reading
-from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI, _annual_header, _chain_of, _document_text, _is_jump, value_key)
+from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI, _annual_header, _chain_of, _days, _document_text, _is_jump, value_key)
 
 _READ_BY_REPLAY = "read by replay"
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
@@ -22,6 +22,11 @@ _READ_BY_REPLAY = "read by replay"
 # stamping began are never re-read by it, so a bump cannot re-read every company's history.
 _RELEASE_READER = "release reader 5"
 # Stamped on a release read without some of the list's groups (see _readable): read again once they are read once more.
+# An amount this many times from the same KPI's other periods, or a breakdown line this many times below revenue, is off
+# by a scale the document did not state.
+_SCALE_GAP = 1e4
+_REVENUE_GAP = 1e5
+SCALE_OUTLIER = "amount far from its other periods or from revenue: a scale not stated"
 _GROUPS_NOT_READ = "groups not read: "
 # Why the AI found no value for each unreported KPI (Locate's reason codes), and what sent a reading to a second reader.
 _MISSING_WHY = "missing reasons: "
@@ -150,6 +155,7 @@ class ReleaseFlow:
                 fiscal_year, fiscal_period = fiscal_label(period_end, self.profile.fiscal_year_end, annual=True,
                                                           year_offset=self.offset)
             validate_groups(read, self._previous(period_end, annual=located.annual))
+            self._flag_scale_outliers(read, period_end, annual=located.annual)
             self._flag_partial_tables(read, period_end, document)
             self._explain_jumps(read, document, spec)
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
@@ -167,6 +173,46 @@ class ReleaseFlow:
                                  fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
         except Exception as error:  # noqa: BLE001
             return failed_reading(ref, error, version)
+
+    def _flag_scale_outliers(self, read: list[ReadValue], period_end: date, annual: bool = False) -> None:
+        """Holds an amount off by a scale nobody stated: 10,000 times from the same KPI's other periods, or a breakdown
+        line 100,000 times below the company's revenue for the period. Unilever's Q3 segment turnover, printed in
+        millions without saying so, was served as €3,477 (a group with no earlier quarter had nothing to compare)."""
+        revenue = self._period_revenue(period_end, annual)
+        history: dict[tuple[str, str], list[float]] = {}
+        for value in self.values.values():
+            if value["validation_status"] == "verified" and value.get("unit") == "currency" and float(value["value"] or 0):
+                history.setdefault((value["group_key"], value["kpi_key"]), []).append(abs(float(value["value"])))
+        for item in read:
+            if item.kpi.unit != "currency" or not item.value or item.is_total:
+                continue
+            amount = abs(item.value)
+            others = sorted(history.get((f"{AI_GROUP_PREFIX}{item.group.key}", item.kpi.key), []))
+            typical = others[len(others) // 2] if others else None
+            off = typical and (amount * _SCALE_GAP < typical or amount > typical * _SCALE_GAP)
+            # Revenue decides only for a KPI with no history yet: a line that has dwindled (TSMC's 10-nanometer, NT$0.7
+            # million against NT$700 billion of revenue) is judged against its own past.
+            tiny = not others and item.group.kind == "revenue_breakdown" and revenue and amount * _REVENUE_GAP < revenue
+            if off or tiny:
+                item.status = "needs_review"
+                item.notes.append(SCALE_OUTLIER)
+
+    def _period_revenue(self, period_end: date, annual: bool) -> float | None:
+        """The company's revenue for a period of this length, from its XBRL breakdowns' totals: the quarter's, else a
+        nearby year's divided by four (a foreign filer tags XBRL once a year)."""
+        quarter, year = None, None
+        for value in self.values.values():
+            total = (value.get("locator") or {}).get("total")
+            if value["group_key"].startswith(AI_GROUP_PREFIX) or value["method"] not in ("xbrl", "derived") or not total:
+                continue
+            days = abs(_days(value["period_end"], period_end.isoformat()))
+            if value["fiscal_period"] == "FY" and days <= 400:
+                year = max(year or 0.0, abs(float(total)))
+            elif value["fiscal_period"] != "FY" and days <= 100:
+                quarter = max(quarter or 0.0, abs(float(total)))
+        if annual:
+            return year
+        return quarter or (year / 4 if year else None)
 
     def _reader3_due(self, previous: dict, accession: str) -> bool:
         """A release read before reader 3 that holds a served reading reader 3 would reject (see stored_reading_fails)."""

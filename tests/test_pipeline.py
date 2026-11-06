@@ -2024,3 +2024,26 @@ def test_a_percentage_takes_its_sign_from_a_heading_row_above_it():
     read, problems = read_values(document, spec, located, None)
     assert [item.value for item in read] == [-1.5] and not problems
     assert column_dates(table, 4, 1)[0] == [date(2025, 6, 14)]
+
+
+def test_an_amount_off_by_an_unstated_scale_is_held():
+    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.steps.release_flow import SCALE_OUTLIER
+    group = ai.GroupSpec.model_validate({"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown",
+                                         "kpis": [{"key": "beauty", "label": "Beauty", "unit": "currency"}, {"key": "foods", "label": "Foods", "unit": "currency"}]})
+    beauty, foods = group.kpis
+
+    def stored(group_key, kpi, value, period, end, method="ai", total=None):
+        return {"group_key": group_key, "kpi_key": kpi, "fiscal_year": end[:4], "fiscal_period": period, "period_end": end, "method": method,
+                "validation_status": "verified", "value": value, "unit": "currency", "locator": {"total": total} if total else {}}
+    # A first quarter, nothing stored for the group: revenue (a year's XBRL total over four) shows 3,477 is millions.
+    pipeline = _pipeline(FakeControl({}), [stored("geography", "europe", 20e9, "FY", "2025-12-31", "xbrl", total=60e9)])
+    read = [ReadValue(group, beauty, 3477.0, "EUR", {}), ReadValue(group, foods, 3109.0, "EUR", {})]
+    pipeline._flag_scale_outliers(read, date(2026, 9, 30))
+    assert all(item.status == "needs_review" and SCALE_OUTLIER in item.notes for item in read)
+    # With history, history decides: a dwindling line stays; a figure 10,000 times off its past is held.
+    pipeline = _pipeline(FakeControl({}), [stored("geography", "europe", 20e9, "FY", "2025-12-31", "xbrl", total=60e9),
+                                           stored("kpi_segments", "beauty", 3.4e9, "Q2", "2026-06-30"), stored("kpi_segments", "foods", 9e6, "Q2", "2026-06-30")])
+    read = [ReadValue(group, beauty, 3477.0, "EUR", {}), ReadValue(group, foods, 7e6, "EUR", {})]
+    pipeline._flag_scale_outliers(read, date(2026, 9, 30))
+    assert [item.status for item in read] == ["needs_review", "verified"]
