@@ -42,7 +42,7 @@ def _source_template(url: str) -> str:
     """A document's kind from its file name with the dates and numbers taken out ("a2q26e_withguidance.htm")."""
     return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
 
-_INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in|combined line")
+_INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in|combined line|row mismatch")
 
 def _explain_pointer(problem: str, document: Document) -> str:
     """Retry feedback that names the fix: a text block cited as a table (ASML's statements are slide images whose

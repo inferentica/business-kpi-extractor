@@ -60,6 +60,9 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             if locator.table is not None and locator.table in document.tables:
                 table = document.tables[locator.table]
                 row_label = _row_label(table.rows[locator.row], locator.col) if locator.row < len(table.rows) else ""
+                if not labels_agree(locator.row_label, row_label):
+                    raise LocateError(f"row mismatch: {locator.table} r{locator.row} is {row_label!r}, not the "
+                                      f"{locator.row_label!r} you named")
                 # A part of a breakdown or mix pointed at a combined line (Total Markets & Securities Services for
                 # Securities Services). A metric is often reported as its own total ("Total assets under management").
                 if group.kind != "metric" and _combined_line(row_label, kpi.label):
@@ -356,6 +359,10 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     table = document.tables.get(locator.table)
     if table is None:
         raise LocateError(f"unknown table {locator.table}")
+    for index, named in ((locator.first_row, locator.first_label), (locator.last_row, locator.last_label)):
+        actual = _row_label(table.rows[index], locator.col) if 0 <= index < len(table.rows) else ""
+        if not labels_agree(named, actual):
+            raise LocateError(f"row mismatch: {locator.table} r{index} is {actual!r}, not the {named!r} you named")
     unit = "percent" if group.kind == "mix" else "currency"
     header = " ".join(" ".join(row) for row in table.rows[:3])
     scale = 1.0
@@ -728,3 +735,21 @@ def header_contradicts(table: Table, row: int, col: int, expected: date, *also: 
     if years and max(years) < (expected - timedelta(days=10)).year:
         return f"column headed {max(years)}, not the quarter ended {expected.isoformat()}"
     return None
+
+
+def _label_words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", _FOOTNOTE.sub("", clean(text or "")).lower())
+
+
+def labels_agree(named: str | None, actual: str) -> bool:
+    """Whether the row label a reader names is the row's own: the same words once case, punctuation and footnote marks
+    are set aside, one label inside the other ("Wafer" in "Wafer revenue"), or at least half the words shared. A
+    reader that names no label, or a row without one, has nothing to check."""
+    named_words, actual_words = _label_words(named or ""), _label_words(actual)
+    if not named_words or not actual_words:
+        return True
+    a, b = "".join(named_words), "".join(actual_words)
+    if a in b or b in a:
+        return True
+    shared = set(named_words) & set(actual_words)
+    return len(shared) >= 0.5 * min(len(set(named_words)), len(set(actual_words)))

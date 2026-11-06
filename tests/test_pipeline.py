@@ -1858,3 +1858,22 @@ def test_fiscal_years_named_ahead_of_the_calendar_never_contradict():
     table = next(iter(parse_document(html, "https://www.sec.gov/x.htm").tables.values()))
     assert header_contradicts(table, 1, 1, date(2026, 12, 26)) is None
     assert header_contradicts(table, 1, 2, date(2026, 12, 26)) is None  # FY2026 is the quarter's calendar year: not proof
+
+
+def test_row_labels_are_read_back_against_the_cell():
+    from kpi_extractor.extract import labels_agree
+    assert labels_agree("Wafer", "Wafer revenue") and labels_agree("High Performance Computing", "High performance computing (1)")
+    assert labels_agree(None, "Wafer") and labels_agree("Wafer", "")
+    assert not labels_agree("5nm", "3nm") and not labels_agree("Smartphone", "Internet of Things")
+    document = parse_document(YEAR_TABLE, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables.values()))
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "values": [
+        {"kpi": "technology.n3", "table": table.id, "row": 3, "col": 1, "scale": 1, "row_label": "3nm"},
+        {"kpi": "technology.n5", "table": table.id, "row": 3, "col": 1, "scale": 1, "row_label": "5nm"}]})
+    read, problems = read_values(document, SPEC, located, None)
+    assert [item.kpi.key for item in read] == ["n5"]
+    assert any("row mismatch" in problem and "'5nm'" in problem for problem in problems)
+    whole = ai.Located.model_validate({"period_end": "2026-06-30", "tables": [
+        {"group": "technology", "table": table.id, "col": 1, "first_row": 2, "last_row": 4, "first_label": "5nm", "last_label": "Other"}]})
+    read, problems = read_values(document, SPEC, whole, None)
+    assert read == [] and any("row mismatch" in problem for problem in problems)
