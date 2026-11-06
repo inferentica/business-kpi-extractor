@@ -80,3 +80,15 @@ def test_report_period_ends_reads_the_filing_index():
     filings = [SimpleNamespace(period_of_report="2025-05-11"), SimpleNamespace(report_date=date(2024, 5, 12)), SimpleNamespace()]
     company = SimpleNamespace(get_filings=lambda **_: filings)
     assert report_period_ends(company, date(2025, 1, 1)) == (date(2024, 5, 12), date(2025, 5, 11))
+
+
+def test_a_stated_year_end_far_from_the_annual_reports_gives_way():
+    from datetime import date as day
+    from types import SimpleNamespace
+    from kpi_extractor.sec import annual_report_year_end, year_ends_agree
+    report = lambda end: SimpleNamespace(get_filings=lambda form: SimpleNamespace(latest=lambda n: SimpleNamespace(period_of_report=end)))
+    assert annual_report_year_end(report("2025-12-31"), "0513") == "1231"  # Sun Communities
+    assert annual_report_year_end(report("2026-01-31"), "0130") == "0130"  # Dollar Tree's 52/53 weeks: a day off stands
+    assert annual_report_year_end(report("2026-01-02"), "1231") == "1231"  # across the new year
+    assert year_ends_agree("0926", day(2025, 9, 27)) and not year_ends_agree("0513", day(2025, 12, 31))
+    assert annual_report_year_end(SimpleNamespace(get_filings=lambda form: (_ for _ in ()).throw(ValueError())), "0630") == "0630"

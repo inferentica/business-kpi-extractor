@@ -127,7 +127,7 @@ def company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
 
 def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
     company = Company(symbol)
-    fiscal_year_end = str(getattr(company, "fiscal_year_end", None) or "1231").zfill(4)
+    fiscal_year_end = annual_report_year_end(company, str(getattr(company, "fiscal_year_end", None) or "1231").zfill(4))
     profile = CompanyProfile(
         symbol=symbol,
         cik=int(company.cik),
@@ -136,6 +136,27 @@ def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
         foreign=bool(getattr(company, "is_foreign", False)),
     )
     return profile, company
+
+
+def annual_report_year_end(company: Company, stated: str) -> str:
+    """The fiscal year end, checked against the newest annual report's period: SEC's own record can be wrong (Sun
+    Communities' "0513" for a December year, which failed every quarter's label). A year end within ten days of the
+    report's stands (a 52/53-week year moves a few days); a further one gives way to the report's month and day."""
+    try:
+        latest = company.get_filings(form=["10-K", "20-F", "40-F"]).latest(1)
+        period = date.fromisoformat(str(getattr(latest, "period_of_report", "") or "")[:10])
+    except Exception:  # noqa: BLE001 - no annual report yet, or SEC unreachable: keep what SEC states
+        return stated
+    return stated if year_ends_agree(stated, period) else period.strftime("%m%d")
+
+
+def year_ends_agree(stated: str, period: date) -> bool:
+    """Whether a stated MMDD year end is within ten days of a period end, across a year boundary too (1231 and 0102)."""
+    try:
+        anchor = date(period.year, int(stated[:2]), int(stated[2:]))
+    except ValueError:
+        return False
+    return any(abs((anchor.replace(year=anchor.year + shift) - period).days) <= 10 for shift in (-1, 0, 1))
 
 
 def periodic_reports(company: Company, since: date, known_urls: dict[str, str] | None = None) -> list[FilingRef]:

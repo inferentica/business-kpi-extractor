@@ -52,7 +52,10 @@ class ControlPlane:
                         raise ControlError(f"{operation} failed: reply cut off after {len(body)} bytes") from error
             except urllib.error.HTTPError as error:
                 detail = error.read().decode(errors="replace")[:500]
-                if error.code not in _RETRYABLE_STATUS or attempt == attempts:
+                # The control plane checks the runner's token against GitHub's published keys; when fetching them times
+                # out it answers 401 though the token is good (Philips and Grifols filings, 2026-11-06): asked again.
+                transient = error.code == 401 and "timed out" in detail.lower()
+                if (error.code not in _RETRYABLE_STATUS and not transient) or attempt == attempts:
                     raise ControlError(f"{operation} failed ({error.code}): {detail}") from error
             except (urllib.error.URLError, TimeoutError) as error:
                 if attempt == attempts:
