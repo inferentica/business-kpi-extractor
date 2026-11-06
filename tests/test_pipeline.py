@@ -1888,3 +1888,15 @@ def test_prompt_scores_count_what_production_would_keep():
     assert summary["review"]["right"] == 1 and summary["review"]["planted"] == 1
     assert summary["explain"]["plantedSaidReal"] == 1 and summary["explain"]["plantedStands"] == 0 and summary["explain"]["genuineStands"] == 1
     assert summary["select"]["documentsComplete"] == 1
+
+
+def test_an_explanation_must_give_a_cause_and_not_show_a_small_change():
+    from kpi_extractor.extract import explanation_supports, previous_from_jump
+    assert previous_from_jump("changed 1.9x in a quarter", 190) == 100
+    assert previous_from_jump("moved +3.0 points in a quarter", 40) == 37
+    restated = "AUM was $233.8 billion as of September 30, 2020 compared to $221.8 billion as of June 30, 2020."
+    assert not explanation_supports(restated, "Assets Under Management (AUM)", 233.8e9, 123e9)
+    assert explanation_supports(restated, "Assets Under Management (AUM)", 233.8e9, 123e9, strict=False)  # reader 5's rule
+    cause = "In real estate, we raised $7.1 billion of capital, including $5.9 billion for the fifth vintage of our flagship fund."
+    assert explanation_supports(cause, "Real Estate Fundraising", 7.1e9, 2.0e9)
+    assert not explanation_supports("Unit case volume declined 1% for the quarter.", "Unit Case Volume Growth", -1, -5)

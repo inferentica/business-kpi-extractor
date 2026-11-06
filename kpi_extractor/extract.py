@@ -233,11 +233,54 @@ def _figure_forms(value: float) -> set[str]:
     return forms
 
 
-def explanation_supports(quote: str, kpi_label: str, value: float) -> bool:
-    """Whether a quote can explain a sharp change in this figure: it states the figure or names the KPI, does not speak of
-    the future, and is not about another period. Broadcom's "We expect revenue from AI to be $12 billion for fiscal year
-    2024" once cleared a quarter; Apollo's "Pension Group Annuities: ..." cleared its Other Spread Products."""
+_CAUSE = re.compile(r"driven|due to|because|as a result|result(?:ed|ing)? (?:of|from)|reflect|includ|exclud|acqui|divest|"
+                    r"dispos|sale of|sold|reorgani|realign|recast|restat|split|reclass|refranchis|transfer|launch|ramp|impact|"
+                    r"primarily|led by|attributable|following|completion|closing|consolidat|merger|spin|separation|reduction|"
+                    r"workforce|hired|change in|methodolog|definition|recovery|weather|pandemic|coronavirus|covid|strike|"
+                    r"inflow|outflow|issuance|redemption|offset|beginning|now report|higher level|lower level|record", re.I)
+_COMPARED = re.compile(r"compared (?:to|with)|\bversus\b|\bvs\.?\s|\bfrom \$?\d", re.I)
+_NUMBER = re.compile(r"(?<![\w.])\(?\$?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\)?")
+
+
+def previous_from_jump(note: str, value: float) -> float | None:
+    """The previous quarter's figure a jump note was measured against ("changed 1.9x in a quarter", "moved +3.0
+    points in a quarter")."""
+    if match := re.match(r"changed ([\d.]+)x", note):
+        ratio = float(match.group(1))
+        return value / ratio if ratio else None
+    if match := re.match(r"moved ([+-][\d.]+)", note):
+        return value - float(match.group(1))
+    return None
+
+
+def _compares_to_a_small_change(quote: str, value: float, previous: float | None) -> bool:
+    """A quote whose own comparison ("AUM was $233.8 billion ... compared to $221.8 billion") shows a small change
+    where the jump says a large one: it restates the figure, and contradicts the jump."""
+    if previous is None or not value or not previous or 0.67 < value / previous < 1.5 or not _COMPARED.search(quote):
+        return False
+    for form in _figure_forms(value):
+        at = re.search(r"(?<![\d,.])" + re.escape(form) + r"(?![\d,])", quote)
+        number = float(form.replace(",", "")) if at else 0
+        if not number:
+            continue
+        rest = quote[:at.start()] + " " + quote[at.end():]
+        others = [float(n.replace(",", "")) * value / number for n in _NUMBER.findall(rest)]
+        if any(other and 0.8 < value / other < 1.25 and not 0.8 < previous / other < 1.25 for other in others):
+            return True
+    return False
+
+
+def explanation_supports(quote: str, kpi_label: str, value: float, previous: float | None = None, strict: bool = True) -> bool:
+    """Whether a quote can explain a sharp change in this figure: it states the figure or names the KPI, gives a cause
+    (an acquisition, a reorganisation, a definition change, what drove it: not the figure restated), does not speak of
+    the future, is not about another period, and does not itself show a small change. Broadcom's "We expect revenue
+    from AI to be $12 billion for fiscal year 2024" once cleared a quarter; Apollo's "Pension Group Annuities: ..."
+    cleared its Other Spread Products; planted false jumps passed on KKR's "AUM was $233.8 billion ... compared to
+    $221.8 billion". strict=False is reader 5's rule, which decides re-reads of stored figures: unchanged, so this
+    rule re-reads nothing."""
     if len(quote) < 20 or forward_looking(quote) or _OTHER_PERIOD.search(quote):
+        return False
+    if strict and (not _CAUSE.search(quote) or _compares_to_a_small_change(quote, value, previous)):
         return False
     if any(re.search(r"(?<![\d,.])" + re.escape(form) + r"(?![\d,])", quote) for form in _figure_forms(value)):
         return True

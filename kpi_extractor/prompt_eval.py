@@ -27,7 +27,7 @@ from . import ai
 from .ai import AiResponseError, Spec
 from .control import ControlPlane
 from .document import Document, clean, parse_document, parse_number
-from .extract import _row_label, describe, explanation_supports
+from .extract import _row_label, describe, explanation_supports, previous_from_jump
 from .sec import company_profile, configure_identity
 from .steps.ai_reading import MAX_DOCUMENT_CHARS, AiReading
 from .steps.shared import _document_text
@@ -122,7 +122,9 @@ class Runner:
         for index, case in enumerate(cases):
             key = f"{case['kpi']['group']}.{case['kpi']['key']}#{index}"
             keys[key] = case
-            lines.append(f"- {key} ({case['kpi']['group_label']} / {case['kpi']['label']}): now {case['value']:g}; {case['jump']}")
+            previous = previous_from_jump(case["jump"], case["value"])
+            shown = f", previous {previous:.4g}" if previous is not None else ""
+            lines.append(f"- {key} ({case['kpi']['group_label']} / {case['kpi']['label']}): now {case['value']:g}{shown}; {case['jump']}")
         text = ai.prompt(self.company(cases[0]["symbol"]), body, ai.EXPLAIN_TASK, "\n".join(lines))
         answer = self.ask(cases[0]["symbol"], "explain", text, ai.Explanations, thinking_first=True)
         haystack = _document_text(document)
@@ -132,9 +134,11 @@ class Runner:
             quote = clean(verdict.quote or "") if verdict else ""
             said = bool(verdict and verdict.legitimate)
             # What production keeps: a yes with a quote found in the document that supports the figure.
-            stands = said and bool(quote) and quote in haystack and explanation_supports(quote, case["kpi"]["label"], case["value"])
+            previous = previous_from_jump(case["jump"], case["value"])
+            stands = said and bool(quote) and quote in haystack and explanation_supports(quote, case["kpi"]["label"], case["value"], previous)
             outcomes.append({"symbol": case["symbol"], "period_end": case["period_end"], "kpi": case["kpi"]["label"],
-                             "planted": case["planted"], "said_real": said, "stands": stands, "quote": quote[:160]})
+                             "planted": case["planted"], "said_real": said, "stands": stands, "quote": quote[:160],
+                             "growth": "growth" in case["kpi"]["label"].lower()})
         return outcomes
 
     # --- select -------------------------------------------------------------------------------------------------
@@ -162,7 +166,8 @@ def summarize(results: dict[str, list[dict]]) -> dict:
     by_kind = defaultdict(Counter)
     for item in review:
         by_kind[item["wrong_kind"]][item["outcome"]] += 1
-    planted = [item for item in explain if item["planted"]]
+    planted = [item for item in explain if item["planted"] and not item.get("growth")]
+    growth = [item for item in explain if item["planted"] and item.get("growth")]
     genuine = [item for item in explain if not item["planted"]]
     needed = sum(item["needed"] for item in select)
     return {
@@ -171,7 +176,8 @@ def summarize(results: dict[str, list[dict]]) -> dict:
                    "none": sum(1 for i in review if i["outcome"] == "none"), "byKind": {k: dict(v) for k, v in by_kind.items()}},
         "explain": {"planted": len(planted), "plantedSaidReal": sum(1 for i in planted if i["said_real"]),
                     "plantedStands": sum(1 for i in planted if i["stands"]), "genuine": len(genuine),
-                    "genuineStands": sum(1 for i in genuine if i["stands"])},
+                    "genuineStands": sum(1 for i in genuine if i["stands"]),
+                    "growthPlanted": len(growth), "growthPlantedStands": sum(1 for i in growth if i["stands"])},
         "select": {"documents": len(select), "tablesNeeded": needed, "selectKept": sum(i["select_kept"] for i in select),
                    "withNamesKept": sum(i["with_names_kept"] for i in select),
                    "documentsComplete": sum(1 for i in select if i["with_names_kept"] == i["needed"])},
@@ -185,7 +191,8 @@ def lines_of(summary: dict, calls: int) -> list[str]:
            f"Review: {r['right']}/{r['cases']} right ({pct(r['right'], r['cases'])}), {r['planted']} took the planted cell, {r['none']} kept neither"]
     out += [f"  {kind}: {dict(counts)}" for kind, counts in r["byKind"].items()]
     out += [f"Explain: planted false jumps passed {e['plantedStands']}/{e['planted']} ({pct(e['plantedStands'], e['planted'])}); "
-            f"said real before the quote checks {e['plantedSaidReal']}; genuine changes kept {e['genuineStands']}/{e['genuine']}",
+            f"said real before the quote checks {e['plantedSaidReal']}; genuine changes kept {e['genuineStands']}/{e['genuine']}; "
+            f"growth-rate KPIs (a planted jump may be real there) passed {e['growthPlantedStands']}/{e['growthPlanted']}",
             f"Select: kept {s['selectKept']}/{s['tablesNeeded']} needed tables alone, {s['withNamesKept']} with the KPI-name rule; "
             f"{s['documentsComplete']}/{s['documents']} documents complete"]
     return out

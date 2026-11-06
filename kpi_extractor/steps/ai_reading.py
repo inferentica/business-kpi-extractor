@@ -10,7 +10,8 @@ from ..ai import AiResponseError, Located, Spec
 from ..control import ControlError
 from ..document import Document, clean
 from ..checks import check_period, far_above_quarter, looks_like_part_of_table, validate_groups
-from ..extract import ReadValue, describe, explanation_supports, header_contradicts, locator_hint, read_values
+from ..extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
+                       read_values)
 from ..replay import replay
 from .shared import (AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
@@ -58,6 +59,15 @@ def _explain_pointer(problem: str, document: Document) -> str:
         return f"{problem}: the document's tables are {', '.join(list(document.tables)[:40]) or 'none'}"
     return problem
 
+
+
+def _previous_of(notes: list[str], value: float) -> float | None:
+    return next((previous for note in notes if _is_jump(note) and (previous := previous_from_jump(note, value)) is not None), None)
+
+
+def _previous_text(item) -> str:
+    previous = _previous_of(item.notes, item.value)
+    return f", previous {previous:.4g}" if previous is not None else ""
 
 
 class AiReading:
@@ -403,7 +413,7 @@ class AiReading:
         if not flagged:
             return
         lines = "\n".join(f"- {item.group.key}.{item.kpi.key} ({item.group.label} / {item.kpi.label}): now {item.value:g}"
-                          f"; {'; '.join(item.notes)}" for item in flagged)
+                          f"{_previous_text(item)}; {'; '.join(item.notes)}" for item in flagged)
         try:
             answer = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.EXPLAIN_TASK, lines),
                                "explain", ai.Explanations, thinking_first=True, model="flash")
@@ -413,7 +423,8 @@ class AiReading:
         for item in flagged:
             verdict = answer.items.get(f"{item.group.key}.{item.kpi.key}")
             quote = clean(verdict.quote or "") if verdict else ""
-            if verdict and verdict.legitimate and quote in haystack and explanation_supports(quote, item.kpi.label, item.value):
+            if verdict and verdict.legitimate and quote in haystack and explanation_supports(
+                    quote, item.kpi.label, item.value, _previous_of(item.notes, item.value)):
                 item.status = "verified"
                 item.notes = [*item.notes, f"change explained: {quote[:200]}"]
                 if call := self._call_of(answer):

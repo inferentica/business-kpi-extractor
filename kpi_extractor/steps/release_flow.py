@@ -8,7 +8,7 @@ from .. import ai
 from ..ai import Spec
 from ..document import Document, clean
 from ..checks import check_period, date_order_findings, validate_groups
-from ..extract import ReadValue, explanation_supports, falls, forward_looking, net_gross_mismatch
+from ..extract import ReadValue, explanation_supports, falls, forward_looking, net_gross_mismatch, previous_from_jump
 from ..fiscal import fiscal_label
 from ..sec import FilingRef
 from ..xbrl import member_key
@@ -46,6 +46,15 @@ def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
             if kpi.key != group.total_kpi and f"{group.key}.{kpi.key}" not in found]
 
 
+def _previous_of(notes: list[str], value: float) -> float | None:
+    return next((previous for note in notes if _is_jump(note) and (previous := previous_from_jump(note, value)) is not None), None)
+
+
+def _previous_text(row: dict) -> str:
+    previous = _previous_of(row.get("notes") or [], float(row["value"]))
+    return f", previous {previous:.4g}" if previous is not None else ""
+
+
 def stored_reading_fails(value: dict, read_by: int = 0) -> bool:
     """Whether a served AI reading is one reader 3 rejects or reads differently: a fall stored as a rise ("decreased by
     16%" served as 16), or a net figure under a gross KPI. Its release is read again once, stamped or not."""
@@ -74,7 +83,8 @@ def _reader5_rejects(value: dict) -> bool:
     if quote and value_text and value_text in quote and forward_looking(quote[:quote.find(value_text)]):
         return True
     explained = next((note.removeprefix("change explained: ") for note in value.get("notes") or [] if note.startswith("change explained: ")), None)
-    return explained is not None and not explanation_supports(clean(explained), str(value.get("kpi_label") or ""), float(value.get("value") or 0))
+    return explained is not None and not explanation_supports(clean(explained), str(value.get("kpi_label") or ""),
+                                                              float(value.get("value") or 0), strict=False)
 
 
 def release_reread_due(previous: dict | None) -> bool:
@@ -319,7 +329,8 @@ class ReleaseFlow:
                 document = self._document(by_accession[accession])
                 lines = "\n".join(
                     f"- {v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']} ({v['group_label']} / {v['kpi_label']}): "
-                    f"now {float(v['value']):g}; {'; '.join(n for n in v.get('notes') or [] if _is_jump(n))}" for v in rows)
+                    f"now {float(v['value']):g}{_previous_text(v)}; {'; '.join(n for n in v.get('notes') or [] if _is_jump(n))}"
+                    for v in rows)
                 answer = self._ask(ai.prompt(self.company, self._prompt_document(document, None), ai.EXPLAIN_TASK, lines),
                                    "explain", ai.Explanations, thinking_first=True, model="flash")
                 return rows, document, answer
@@ -336,7 +347,8 @@ class ReleaseFlow:
             for v in rows:
                 verdict = answer.items.get(f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}")
                 quote = clean(verdict.quote or "") if verdict else ""
-                if verdict and verdict.legitimate and quote in haystack and explanation_supports(quote, v["kpi_label"], float(v["value"])):
+                if verdict and verdict.legitimate and quote in haystack and explanation_supports(
+                        quote, v["kpi_label"], float(v["value"]), _previous_of(v.get("notes") or [], float(v["value"]))):
                     call = self._call_of(answer)
                     cleared.append({**v, "validation_status": "verified",
                                     "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"],
