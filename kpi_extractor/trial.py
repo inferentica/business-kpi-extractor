@@ -17,6 +17,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from .ai import MISSING_REASONS
 from .cli import company_pool, normalize_symbols
 from .control import ControlPlane
 from .evaluate import EvalControl
@@ -26,7 +27,8 @@ from .steps.shared import AI_GROUP_PREFIX, value_key
 
 AUDIT_SAMPLE = 60  # accepted figures drawn for the hand audit
 _MISSING = re.compile(r"^missing reasons: (.*)$")
-_CODE = re.compile(r"^[a-z_]+$")
+# A note cut at 300 characters can end in half a code ("unsta"), so only whole codes count.
+_CODES = frozenset((*MISSING_REASONS, "unstated", "left_out_names_it"))
 # Notes a held figure carries that are not why it is held.
 _NOT_A_REASON = {"confirmed by review", "settled by the checks"}
 _SECOND = re.compile(r"^second read: (\w+)")
@@ -78,7 +80,7 @@ def company_report(symbol: str, result: SymbolResult, values: list[dict], filing
             if match := _MISSING.match(note):
                 for pair in match.group(1).split(", "):
                     code = pair.rsplit("=", 1)[-1] if "=" in pair else ""
-                    if _CODE.match(code):  # a note cut at 300 characters ends in half a pair
+                    if code in _CODES:
                         missing[code] += 1
             if match := _SECOND.match(note):
                 second[match.group(1)] += 1
