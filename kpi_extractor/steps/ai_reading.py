@@ -137,6 +137,8 @@ class AiReading:
                     problems.append(f"{key}: readings disagree and review kept neither")
                     continue
                 chosen.notes.append("confirmed by review")
+                if call := self._call_of(review):
+                    chosen.locator["review_call"] = call
                 agreed.append(chosen)
         located = flash if flash.period_end else pro
         return agreed, problems, located
@@ -222,6 +224,9 @@ class AiReading:
                 f"- {_explain_pointer(problem, document)}" for problem in invalid[:20])
             located = self._ask(retry_text, "locate", Located, thinking_first=thinking_first, model=model)
             read, problems = read_values(document, spec, located, currency)
+        if call := self._call_of(located):
+            for item in read:
+                item.locator["ai_call"] = call
         return located, read, problems
 
     def _replay_groups(self, document: Document, spec: Spec, expected: date, currency: str | None):
@@ -386,19 +391,31 @@ class AiReading:
             if verdict and verdict.legitimate and quote in haystack and explanation_supports(quote, item.kpi.label, item.value):
                 item.status = "verified"
                 item.notes = [*item.notes, f"change explained: {quote[:200]}"]
+                if call := self._call_of(answer):
+                    item.locator["explain_call"] = call
 
     def _ask(self, text: str, purpose: str, schema, thinking_first: bool, model: str = "flash"):
         last_error = None
         for thinking in (thinking_first, True):
-            answer = self._waiting(lambda: self.control.ai(self.symbol, purpose, ai.SYSTEM, text, thinking, model))
+            answer = self._waiting(lambda: self.control.ai(self.symbol, purpose, ai.SYSTEM, text, thinking, model,
+                                                           prompt_version=ai.prompt_version(purpose)))
             self.result.ai_calls += 1
             if not answer:
                 raise AiResponseError("AI is unavailable")
             try:
-                return ai.parse(answer, schema)
+                parsed = ai.parse(answer, schema)
             except AiResponseError as error:
                 last_error = error
+                continue
+            if getattr(answer, "call_id", None):
+                calls = self.__dict__.setdefault("_ai_calls", {})
+                calls[id(parsed)] = (parsed, answer.call_id)  # the answer is kept, so its id is never reused
+            return parsed
         raise last_error
+
+    def _call_of(self, answer) -> str | None:
+        """The id of the AI call an answer came from: stored with the figures it located, reviewed or explained."""
+        return (self.__dict__.get("_ai_calls", {}).get(id(answer)) or (None, None))[1]
 
     def _prompt_document(self, document: Document, spec: Spec | None) -> str:
         """The document as the AI reads it: whole when it fits, else the sections Flash picks from its outline."""

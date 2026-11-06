@@ -8,6 +8,7 @@ reading, review, audit and explanations) hit DeepSeek's context cache and cost a
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import Literal
@@ -424,6 +425,16 @@ figure) and this quarter: never guidance or an outlook, never another period's f
 document gives no such reason, answer false.
 
 JSON shape: {"items": {"<group>.<kpi>": {"legitimate": true, "quote": "..."}}}"""
+
+
+_TASKS = {"propose": PROPOSE_TASK, "maintain": MAINTAIN_TASK, "locate": LOCATE_TASK, "review": REVIEW_TASK,
+          "classify": CLASSIFY_TASK, "select": SELECT_TASK, "curate": CURATE_TASK, "explain": EXPLAIN_TASK, "tags": TAG_TASK}
+
+
+def prompt_version(purpose: str) -> str:
+    """The version of a task's prompt: a hash of the system message and the task's instructions. Stored with each call,
+    so a change of accuracy can be traced to a change of prompt and the figures it produced found again."""
+    return hashlib.sha1((SYSTEM + "\n" + _TASKS.get(purpose, purpose)).encode()).hexdigest()[:12]
 
 
 def propose_data(covered: list[str], to_name: list[str], current: "Spec | None" = None) -> str:

@@ -62,7 +62,7 @@ class NoAi:
         self.answers = answers or {}
         self.calls = []
 
-    def ai(self, symbol, purpose, system, user, thinking, model="flash"):
+    def ai(self, symbol, purpose, system, user, thinking, model="flash", prompt_version=None):
         # Every call is Flash; a reasoning call (the second reading, a review) answers as "reasoning".
         reader = "reasoning" if thinking else model
         self.calls.append((purpose, reader))

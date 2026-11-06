@@ -329,8 +329,10 @@ class ReleaseFlow:
                 verdict = answer.items.get(f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}")
                 quote = clean(verdict.quote or "") if verdict else ""
                 if verdict and verdict.legitimate and quote in haystack and explanation_supports(quote, v["kpi_label"], float(v["value"])):
+                    call = self._call_of(answer)
                     cleared.append({**v, "validation_status": "verified",
-                                    "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"]})
+                                    "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"],
+                                    **({"locator": {**(v.get("locator") or {}), "explain_call": call}} if call else {})})
         return cleared
 
     def _release_records(self, read: list[ReadValue], spec: Spec, ref: FilingRef, document: Document, fiscal_year: str,

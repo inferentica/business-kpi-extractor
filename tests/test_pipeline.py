@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from kpi_extractor import ai
 from kpi_extractor.ai import KpiSpec, Spec
+from kpi_extractor.control import Reply
 from kpi_extractor.document import parse_document
 from kpi_extractor.evaluate import score
 from kpi_extractor.extract import read_values
@@ -44,11 +45,12 @@ class FakeControl:
         self.answers = answers
         self.calls = []
 
-    def ai(self, symbol, purpose, system, user, thinking, model="flash"):
+    def ai(self, symbol, purpose, system, user, thinking, model="flash", prompt_version=None):
         # Every call is Flash; a reasoning call (the second reading, a review) answers as "reasoning".
         reader = "reasoning" if thinking else model
         self.calls.append((purpose, reader))
-        return json.dumps(self.answers[(purpose, reader)])
+        self.versions = [*getattr(self, "versions", []), prompt_version]
+        return Reply(json.dumps(self.answers[(purpose, reader)]), f"call-{len(self.calls)}")
 
     def call(self, operation, **payload):
         self.calls.append((operation, None))
@@ -117,6 +119,21 @@ def test_review_rejecting_both_readings_drops_the_kpi():
     read, problems, _ = _pipeline(control)._read("prompt", document, SPEC, EXPECTED)
     assert read == []
     assert any("kept neither" in problem for problem in problems)
+
+
+def test_figures_keep_the_ai_calls_that_read_and_reviewed_them():
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    control = FakeControl({
+        ("locate", "flash"): _answer(document, "3-nanometer accounted for 20%", "20%"),
+        ("locate", "reasoning"): {"period_end": "2026-06-30", "values": [_quote(document, "technology.n3", "3-nanometer accounted for 20%", "20%")]},
+        ("review", "reasoning"): {"choices": {"technology.n3": "A"}},
+    })
+    history = _history(document, _answer(document))
+    history[0]["locator"] = {"block": "P9", "quote": "Leading-edge 3-nanometer share: 29%", "value_text": "29%"}
+    read, _, _ = _pipeline(control, history)._read("prompt", document, SPEC, EXPECTED)
+    assert all(item.locator.get("ai_call", "").startswith("call-") for item in read)
+    assert control.versions[0] == ai.prompt_version("locate") and len(control.versions[0]) == 12
+    assert ai.prompt_version("locate") != ai.prompt_version("review")
 
 
 def test_quote_templates_ignore_numbers_and_period_words():

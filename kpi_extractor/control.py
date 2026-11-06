@@ -17,6 +17,16 @@ class ControlError(RuntimeError):
     pass
 
 
+class Reply(str):
+    """An AI reply with the id of the call that produced it (logged with the reply and its prompt version)."""
+    call_id: str | None = None
+
+    def __new__(cls, text: str, call_id: str | None = None):
+        reply = super().__new__(cls, text)
+        reply.call_id = call_id
+        return reply
+
+
 class ControlPlane:
     def __init__(self, url: str):
         self.url = url
@@ -50,15 +60,17 @@ class ControlPlane:
             time.sleep(2 ** attempt)
         raise ControlError(f"{operation} failed")
 
-    def ai(self, symbol: str, purpose: str, system: str, user: str, thinking: bool, model: str = "flash") -> str:
+    def ai(self, symbol: str, purpose: str, system: str, user: str, thinking: bool, model: str = "flash",
+           prompt_version: str | None = None) -> str:
         model, thinking, effort = ai_profile(model, thinking)
         # The reply streams keep-alive spaces before its JSON, so a long reasoning call outlasts the gateway's idle
         # limit; a failure after the first byte arrives as {"error": ...} and is retried once.
         for attempt in (1, 2):
             response = self.call("ai", timeout=390, attempts=2, symbol=symbol, purpose=purpose, model=model,
-                                 system=system, user=user, thinking=thinking, **({"effort": effort} if effort else {}))
+                                 system=system, user=user, thinking=thinking, **({"effort": effort} if effort else {}),
+                                 **({"promptVersion": prompt_version} if prompt_version else {}))
             if not response.get("error"):
-                return str(response.get("content") or "")
+                return Reply(str(response.get("content") or ""), response.get("callId"))
             if attempt == 2:
                 raise ControlError(f"ai failed: {str(response['error'])[:300]}")
             time.sleep(5)
@@ -116,5 +128,5 @@ class DryRunControl:
             return {"stored": len(values)}
         return {}
 
-    def ai(self, symbol: str, purpose: str, system: str, user: str, thinking: bool, model: str = "flash") -> str:
+    def ai(self, symbol: str, purpose: str, system: str, user: str, thinking: bool, model: str = "flash", **_trace) -> str:
         return ""
