@@ -91,8 +91,19 @@ class ControlPlane:
             f"{request_url}{separator}audience={urllib.parse.quote(OIDC_AUDIENCE)}",
             headers={"Authorization": f"Bearer {request_token}"},
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            token = json.loads(response.read())["value"]
+        # GitHub's token service has its own outages (a 503 failed a whole Evaluate run, 2026-11-07): asked again.
+        for attempt in range(1, 5):
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    token = json.loads(response.read())["value"]
+                break
+            except urllib.error.HTTPError as error:
+                if error.code not in _RETRYABLE_STATUS or attempt == 4:
+                    raise ControlError(f"GitHub OIDC token failed ({error.code})") from error
+            except (urllib.error.URLError, TimeoutError) as error:
+                if attempt == 4:
+                    raise ControlError(f"GitHub OIDC token failed: {error}") from error
+            time.sleep(2 ** attempt)
         self._token = (token, time.monotonic() + _TOKEN_LIFETIME_SECONDS)
         return token
 

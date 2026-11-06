@@ -38,3 +38,19 @@ def test_a_refused_token_still_fails_at_once(monkeypatch):
     with pytest.raises(ControlError):
         plane.call("store", symbol="PHG")
     assert len(calls) == 1
+
+
+def test_githubs_token_service_is_asked_again_after_an_outage(monkeypatch):
+    plane = ControlPlane("https://example.test/functions/v1/business-kpi-workflow")
+    monkeypatch.setenv("ACTIONS_ID_TOKEN_REQUEST_URL", "https://token.example.test/?x=1")
+    monkeypatch.setenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "t")
+    monkeypatch.setattr(control_module.time, "sleep", lambda _seconds: None)
+    replies = [_http(503, "unavailable"), io.BytesIO(json.dumps({"value": "oidc"}).encode())]
+
+    def urlopen(request, timeout=None):
+        reply = replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+    monkeypatch.setattr(control_module.urllib.request, "urlopen", urlopen)
+    assert plane._oidc_token() == "oidc"
