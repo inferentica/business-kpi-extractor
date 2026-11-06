@@ -10,7 +10,7 @@ from ..ai import AiResponseError, Located, Spec
 from ..control import ControlError
 from ..document import Document, clean
 from ..checks import check_period, far_above_quarter, looks_like_part_of_table, validate_groups
-from ..extract import ReadValue, describe, explanation_supports, locator_hint, read_values
+from ..extract import ReadValue, describe, explanation_supports, header_contradicts, locator_hint, read_values
 from ..replay import replay
 from .shared import (AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
@@ -93,6 +93,7 @@ class AiReading:
                 return text()  # a prompt that does not take a part of the list
         full_text = build(spec if partial else None)
         flash, flash_read, flash_problems = self._locate(full_text, document, spec, currency, model="flash", thinking_first=False)
+        flash_read, flash_problems = self._drop_wrong_columns(flash_read, flash_problems, document, flash, expected)
         self._local.second_read = None
         why = self._why_not_alone(flash, flash_read, spec, expected, document)
         if why is None or (
@@ -114,6 +115,7 @@ class AiReading:
         # The second reader: Flash, reasoning first, reading the document on its own.
         pro, pro_read, pro_problems = self._locate(full_text if subset is spec else build(subset), document, subset,
                                                    currency, model="flash", thinking_first=True)
+        pro_read, pro_problems = self._drop_wrong_columns(pro_read, pro_problems, document, pro, expected)
         open_keys = {group.key for group in open_groups}
         by_flash = {f"{item.group.key}.{item.kpi.key}": item for item in flash_read if item.group.key in open_keys}
         by_pro = {f"{item.group.key}.{item.kpi.key}": item for item in pro_read}
@@ -274,6 +276,7 @@ class AiReading:
                 continue
             read, problems = read_values(document, spec, located, currency)
             read = [item for item in read if item.group.key == group.key]
+            read, problems = self._drop_wrong_columns(read, problems, document, located, expected)
             if problems or not read or self._far_above_quarters(read, expected):
                 continue
             if group.key not in self._confirmed_groups(located, read, spec, expected, document):
@@ -463,6 +466,25 @@ class AiReading:
             text = document.render_ids(ids, MAX_DOCUMENT_CHARS, first=named) if ids else document.render_for_prompt(MAX_DOCUMENT_CHARS)
         self._prompt_documents[key] = text
         return text
+
+    @staticmethod
+    def _drop_wrong_columns(read: list[ReadValue], problems: list[str], document: Document, located: Located,
+                            expected: date) -> tuple[list[ReadValue], list[str]]:
+        """Values whose column header names another period (the year-ago column of a "2026 | 2025" table, which
+        column_header's blanked dates make look identical) are dropped before any check, so a second reader or the
+        review reads them again. The quarter's end is the filing's own, or the reading's when its period checks."""
+        ends = [date.fromisoformat(located.period_end[:10])] if located.period_end and not check_period(located, expected) else []
+        kept, problems = [], list(problems)
+        for item in read:
+            table = document.tables.get(str(item.locator.get("table")))
+            row, col = item.locator.get("row"), item.locator.get("col")
+            why = header_contradicts(table, int(row), int(col), expected, *ends) if table is not None and row is not None \
+                and col is not None else None
+            if why:
+                problems.append(f"{item.group.key}.{item.kpi.key}: {why}")
+            else:
+                kept.append(item)
+        return kept, problems
 
     def _left_out_naming(self, document: Document, spec: Spec, keys: list[str]) -> set[str]:
         """The KPIs among `keys` that a part of a long document left out of the reading names: a table row with the

@@ -1828,3 +1828,33 @@ def test_a_missing_kpi_named_in_a_left_out_part_is_marked_by_code():
     whole = parse_document(RELEASE, "https://www.sec.gov/x.htm")
     pipeline._prompt_documents[str(id(whole))] = whole.render()
     assert pipeline._left_out_naming(whole, spec, ["technology.n5"]) == set()
+
+
+YEAR_TABLE = """
+<p>Results for the quarter ended June 30, 2026.</p>
+<table><tr><td></td><td>Three Months Ended June 30,</td><td></td></tr>
+<tr><td></td><td>2026</td><td>2025</td></tr>
+<tr><td>3nm</td><td>30%</td><td>20%</td></tr><tr><td>5nm</td><td>33%</td><td>40%</td></tr><tr><td>Other</td><td>37%</td><td>40%</td></tr></table>
+"""
+
+
+def test_a_year_ago_column_is_dropped_by_its_header_and_read_again():
+    from kpi_extractor.extract import header_contradicts
+    document = parse_document(YEAR_TABLE, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables.values()))
+    assert header_contradicts(table, 2, 2, EXPECTED).startswith("column headed 2025-06-30")
+    assert header_contradicts(table, 2, 1, EXPECTED) is None
+    cells = lambda col: {"period_end": "2026-06-30", "values": [
+        {"kpi": f"technology.{key}", "table": table.id, "row": row, "col": col, "scale": 1} for key, row in (("n3", 2), ("n5", 3), ("other", 4))]}
+    control = FakeControl({("locate", "flash"): cells(2), ("locate", "reasoning"): cells(1)})
+    read, problems, _ = _pipeline(control)._read("prompt", document, SPEC, EXPECTED)
+    assert {item.kpi.key: item.value for item in read} == {"n3": 30, "n5": 33, "other": 37}
+    assert any("column headed 2025-06-30" in problem for problem in problems)
+
+
+def test_fiscal_years_named_ahead_of_the_calendar_never_contradict():
+    from kpi_extractor.extract import header_contradicts
+    html = "<table><tr><td></td><td>Q1 FY2027</td><td>Q1 FY2026</td></tr><tr><td>iPhone</td><td>80</td><td>70</td></tr></table>"
+    table = next(iter(parse_document(html, "https://www.sec.gov/x.htm").tables.values()))
+    assert header_contradicts(table, 1, 1, date(2026, 12, 26)) is None
+    assert header_contradicts(table, 1, 2, date(2026, 12, 26)) is None  # FY2026 is the quarter's calendar year: not proof

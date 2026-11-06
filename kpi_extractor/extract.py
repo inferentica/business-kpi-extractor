@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 from dataclasses import dataclass, field
 
 from .ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
@@ -625,17 +626,19 @@ def _currency(text: str | None, kpi: KpiSpec, default_currency: str | None, cont
     return default_currency if kpi.unit == "currency" else None
 
 
+def _heading(row: list[str], col: int) -> str:
+    # A header spanning several columns sits on the first of them ("Quarter Ended December 31," over 2022 and 2023):
+    # an empty header cell takes the nearest one to its left, never the row-label column.
+    for index in range(min(col, len(row) - 1), 0, -1):
+        if row[index].strip():
+            return row[index]
+    return ""
+
+
 def column_header(table: Table, first_data_row: int, col: int) -> str:
     """The words heading a column ("Three Months Ended @ #") with dates and numbers blanked, so a quarter's column and a
     six-month or prior-year column never pass for one another when a reading is replayed."""
-    def heading(row: list[str]) -> str:
-        # A header spanning several columns sits on the first of them ("Quarter Ended December 31," over 2022 and 2023):
-        # an empty header cell takes the nearest one to its left, never the row-label column.
-        for index in range(min(col, len(row) - 1), 0, -1):
-            if row[index].strip():
-                return row[index]
-        return ""
-    cells = [cell for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row) and re.search(r"[A-Za-z]", cell := heading(row))]
+    cells = [cell for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row) and re.search(r"[A-Za-z]", cell := _heading(row, col))]
     text = clean(" ".join(cells)).lower()
     text = re.sub(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
                   r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b", "@", text)
@@ -685,3 +688,43 @@ def describe(document: Document, item: ReadValue) -> str:
         return (f"{cell!r} in {locator['table']} row {locator.get('row_label')!r}, column {' / '.join(headers)!r}"
                 f" (read as {item.value:g})")
     return f"{locator.get('value_text')!r} in {locator.get('block')}: {locator.get('quote')!r} (read as {item.value:g})"
+
+
+_MONTHS = {name: index for index, names in enumerate(
+    [("january", "jan"), ("february", "feb"), ("march", "mar"), ("april", "apr"), ("may",), ("june", "jun"), ("july", "jul"),
+     ("august", "aug"), ("september", "sep", "sept"), ("october", "oct"), ("november", "nov"), ("december", "dec")], 1)
+    for name in names}
+_FULL_DATE = re.compile(r"\b(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")\.?\s+(\d{1,2}),?\s+((?:19|20)\d{2})\b")
+_YEAR = re.compile(r"(?<![\d$.,])(?:fy\s?)?'?((?:19|20)\d{2})(?![\d%]|[,.]\d)|\b[1-4]q'?(\d{2})\b|\bq[1-4]\s?'?(\d{2}|(?:19|20)\d{2})\b")
+
+
+def column_dates(table: Table, first_data_row: int, col: int) -> tuple[list[date], list[int]]:
+    """The dates and years a column's own header cells name, read from the header rows above the first data row
+    (the words column_header keeps, here with their dates): "Three Months Ended September 30," over "2026" gives
+    2026-09-30. A two-digit year ("3Q25", "Q3'25") counts as 20xx."""
+    cells = [_heading(row, col) for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row)]
+    text = clean(" ".join(cell for cell in cells if cell)).lower()
+    dates = []
+    for month, day, year in _FULL_DATE.findall(text):
+        try:
+            dates.append(date(int(year), _MONTHS[month], int(day)))
+        except ValueError:
+            continue
+    years = sorted({int(full) if full else 2000 + int(short or quarter[-2:]) for full, short, quarter in _YEAR.findall(text)
+                    if (full or short or quarter)})
+    return dates, years
+
+
+def header_contradicts(table: Table, row: int, col: int, expected: date, *also: date) -> str | None:
+    """Why a value's column is not the reported quarter's, from the dates its header names; None when the header
+    agrees or names none. A full date must be within ten days of the quarter's end. A header naming only years
+    contradicts only when every year is before the quarter's own (the year-ago column): fiscal years named ahead of
+    the calendar (Apple's Q1 FY2027 ends in December 2026) never do."""
+    dates, years = column_dates(table, row, col)
+    if dates:
+        if any(abs((day - end).days) <= 10 for day in dates for end in (expected, *also)):
+            return None
+        return f"column headed {max(dates).isoformat()}, not the quarter ended {expected.isoformat()}"
+    if years and max(years) < (expected - timedelta(days=10)).year:
+        return f"column headed {max(years)}, not the quarter ended {expected.isoformat()}"
+    return None
