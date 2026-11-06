@@ -94,6 +94,9 @@ class GroupSpec(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     kind: GroupKind
     total_kpi: str | None = None
+    # The name the owner gave the view on /kpi-templates, shown wherever the view is (the label stays what the readers
+    # are told, so renaming a view never changes a prompt).
+    name: str | None = Field(default=None, max_length=80)
     kpis: list[KpiSpec] = Field(min_length=1, max_length=MAX_KPIS_PER_GROUP)
 
     @field_validator("key")
