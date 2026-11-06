@@ -51,6 +51,8 @@ class SymbolResult:
     needs_review: int = 0
     ai_calls: int = 0
     second_reads: int = 0
+    # Why each second read was needed: period, annual, repeats_earlier, checks_failed, not_placed, missing_now, moved.
+    second_read_reasons: dict = field(default_factory=dict)
     flash_only_reads: int = 0
     replayed_reads: int = 0
     # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.

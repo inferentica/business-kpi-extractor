@@ -56,6 +56,14 @@ def process_symbol(control, symbol: str, quarters: int, force: bool, wait_for_lo
         print(f"{symbol}: this process has held at most {peak_gb():.1f} GB", flush=True)
 
 
+def _tally(counts) -> dict[str, int]:
+    total: dict[str, int] = {}
+    for count in counts:
+        for key, number in count.items():
+            total[key] = total.get(key, 0) + number
+    return dict(sorted(total.items()))
+
+
 def company_pool(workers: int) -> ProcessPoolExecutor:
     """One process per company at a time, so parsing filings uses every core. SEC allows ten requests a second per
     machine; each process gets its share (edgartools reads the limit when a process starts)."""
@@ -92,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
             "aiCalls": sum(result.ai_calls for result in results),
             "flashOnlyReads": sum(result.flash_only_reads for result in results),
             "secondReads": sum(result.second_reads for result in results),
+            "secondReadReasons": _tally(result.second_read_reasons for result in results),
             "replayedReads": sum(result.replayed_reads for result in results),
             "q4Gaps": {result.symbol: result.q4_gaps[:10] for result in results if result.q4_gaps},
             # Companies whose earnings-document values are mostly unverified: a list or reading that needs attention.

@@ -23,6 +23,9 @@ _READ_BY_REPLAY = "read by replay"
 _RELEASE_READER = "release reader 5"
 # Stamped on a release read without some of the list's groups (see _readable): read again once they are read once more.
 _GROUPS_NOT_READ = "groups not read: "
+# Why the AI found no value for each unreported KPI (Locate's reason codes), and what sent a reading to a second reader.
+_MISSING_WHY = "missing reasons: "
+_SECOND_READ = "second read: "
 _RELEASE_READER_PREFIX = "release reader "
 # Releases a company's run reads at once, after its newest (see _process_releases).
 RELEASE_READERS = 4
@@ -143,7 +146,11 @@ class ReleaseFlow:
             verified = sum(1 for record in records if record["validation_status"] == "verified")
             status = "processed" if verified else "needs_review" if records else "skipped"
             unreported = _unreported(spec, read)
+            reasons = {key: located.missing_reasons.get(key, "unstated") for key in unreported} if how == _READ_BY_AI else {}
+            second = getattr(self._local, "second_read", None) if how == _READ_BY_AI else None
             notes = [how, _RELEASE_READER, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []),
+                     *([_MISSING_WHY + ", ".join(f"{key}={code}" for key, code in reasons.items())] if reasons else []),
+                     *([_SECOND_READ + second] if second else []),
                      *([_GROUPS_NOT_READ + ", ".join(skipped)] if skipped else []), *problems[:20]]
             return FilingReading(ref, status, records=records, spec_version=version, period_end=period_end,
                                  fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)

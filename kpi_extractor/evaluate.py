@@ -138,6 +138,8 @@ def main(argv: list[str] | None = None) -> int:
     report["aiCalls"] = sum(result.ai_calls for result in results)
     report["flashOnlyReads"] = sum(result.flash_only_reads for result in results)
     report["secondReads"] = sum(result.second_reads for result in results)
+    report["secondReadReasons"] = {reason: sum(r.second_read_reasons.get(reason, 0) for r in results)
+                                   for reason in sorted({k for r in results for k in r.second_read_reasons})}
     report["replayedReads"] = sum(result.replayed_reads for result in results)
     report["errors"] = {result.symbol: result.errors[:5] for result in results if result.errors}
     # Kept with the run, so a score can be compared with any earlier one; the workflow's artifact expires in 30 days.

@@ -71,6 +71,7 @@ class AiReading:
         rest."""
         currency = self._default_currency()
         self._local.replayed = False
+        self._local.second_read = None
         replayed, replay_located, done = self._replay_groups(document, spec, expected, currency)
         if done and all(group.key in done for group in spec.groups):
             self._local.replayed = True
@@ -92,7 +93,9 @@ class AiReading:
                 return text()  # a prompt that does not take a part of the list
         full_text = build(spec if partial else None)
         flash, flash_read, flash_problems = self._locate(full_text, document, spec, currency, model="flash", thinking_first=False)
-        if self._flash_is_enough(flash, flash_read, spec, expected, document) or (
+        self._local.second_read = None
+        why = self._why_not_alone(flash, flash_read, spec, expected, document)
+        if why is None or (
                 not flash.tables and not flash.values and self._kind_reports_nothing(document, expected, version)):
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
@@ -106,6 +109,8 @@ class AiReading:
         subset = spec if not confirmed else Spec.model_validate({"groups": [g.model_dump() for g in open_groups],
                                                                  "names": {}})
         self.result.second_reads += 1
+        self._local.second_read = why
+        self.result.second_read_reasons[why] = self.result.second_read_reasons.get(why, 0) + 1
         # The second reader: Flash, reasoning first, reading the document on its own.
         pro, pro_read, pro_problems = self._locate(full_text if subset is spec else build(subset), document, subset,
                                                    currency, model="flash", thinking_first=True)
@@ -133,14 +138,18 @@ class AiReading:
                                "review", ai.Review, thinking_first=True, model="flash")
             for key, (a, b) in disputed.items():
                 chosen = {"A": a, "B": b}.get(review.choices.get(key, "none"))
+                reason = review.reasons.get(key, "unstated")
                 if chosen is None:
-                    problems.append(f"{key}: readings disagree and review kept neither")
+                    problems.append(f"{key}: readings disagree and review kept neither ({reason})")
                     continue
                 chosen.notes.append("confirmed by review")
+                chosen.locator["review_reason"] = reason
                 if call := self._call_of(review):
                     chosen.locator["review_call"] = call
                 agreed.append(chosen)
         located = flash if flash.period_end else pro
+        # Why each KPI was not found: the reading that stands, then the other reader's for KPIs it gives none.
+        located.missing_reasons = {**(pro if located is flash else flash).missing_reasons, **located.missing_reasons}
         return agreed, problems, located
 
     def _confirmed_groups(self, located: Located, read: list[ReadValue], spec: Spec, expected: date,
@@ -293,22 +302,35 @@ class AiReading:
 
     def _flash_is_enough(self, located: Located, read: list[ReadValue], spec: Spec, expected: date,
                          document: Document) -> bool:
-        """Whether one reading stands without a second: its period checks, no value repeats an earlier period's number,
-        every check passes, and either every KPI sits where it sat last quarter or the year-ago column confirms it."""
-        if check_period(located, expected) or located.annual or self._reports_full_year(read, expected):
-            return False
+        return self._why_not_alone(located, read, spec, expected, document) is None
+
+    def _why_not_alone(self, located: Located, read: list[ReadValue], spec: Spec, expected: date,
+                       document: Document) -> str | None:
+        """Why one reading does not stand without a second (None when it does): its period must check, no value may
+        repeat an earlier period's number, every check must pass, and either every KPI sits where it sat last quarter
+        or the year-ago column confirms it. The reason is logged with the filing and counted in the run summary."""
+        if check_period(located, expected):
+            return "period"
+        if located.annual or self._reports_full_year(read, expected):
+            return "annual"
         earlier = self._earlier_values(expected)
         for item in read:
             key = f"{item.group.key}.{item.kpi.key}"
             if item.is_total or item.kpi.key == item.group.total_kpi:
                 continue  # totals are not stored; the parts must still add up to them
             if item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in earlier.get(key, [])):
-                return False  # the same number as an earlier period: likely a prior-period column
+                return "repeats_earlier"  # the same number as an earlier period: likely a prior-period column
         trial = copy.deepcopy(read)
         validate_groups(trial, self._previous(expected))
         if not all(item.status == "verified" for item in trial):
-            return False
-        return self._where_it_was(read, expected, document) or self._year_ago_confirms(read, document, expected)
+            return "checks_failed"
+        if self._where_it_was(read, expected, document) or self._year_ago_confirms(read, document, expected):
+            return None
+        last = self._last_locators(expected, _source_template(document.source_url))
+        if not last:
+            return "not_placed"  # a company's first quarters, or a new kind of document
+        keys = {f"{item.group.key}.{item.kpi.key}" for item in read}
+        return "missing_now" if any(key not in keys for key in last) else "moved"
 
     def _same_place_as_last(self, item: ReadValue, expected: date, document: Document) -> bool:
         last = self._last_locators(expected, _source_template(document.source_url))

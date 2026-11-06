@@ -163,6 +163,17 @@ class TableLocator(BaseModel):
         return self
 
 
+# Why a reader found no value for a KPI (Locate) or why a reading is not the quarter's value (Review). Anything else a
+# reader answers is kept as "unstated", so a new wording never fails a reading.
+MISSING_REASONS = ("not_reported", "not_in_excerpt", "related_only", "guidance_only")
+REVIEW_REASONS = ("prior_period", "year_to_date", "full_year", "guidance", "different_metric", "wrong_row", "wrong_scale",
+                  "not_reported")
+
+
+def _codes(raw: dict, allowed: tuple[str, ...]) -> dict[str, str]:
+    return {str(key): (str(code) if str(code) in allowed else "unstated") for key, code in (raw or {}).items()}
+
+
 class Located(BaseModel):
     period_end: str | None = None
     # The document reports only the full fiscal year (an annual report); its values are for the year, not a quarter.
@@ -170,11 +181,24 @@ class Located(BaseModel):
     tables: list[TableLocator] = Field(default_factory=list)
     values: list[Locator] = Field(default_factory=list)
     missing: list[str] = Field(default_factory=list)
+    missing_reasons: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("missing_reasons", mode="before")
+    @classmethod
+    def _missing_codes(cls, raw):
+        return _codes(raw if isinstance(raw, dict) else {}, MISSING_REASONS)
 
 
 class Review(BaseModel):
-    """The reasoning reader's verdict on KPIs the two readings disagree on: "A", "B" or "none" per KPI key."""
+    """The reasoning reader's verdict on KPIs the two readings disagree on: "A", "B" or "none" per KPI key, with the
+    reason the reading it turned down (or both, for "none") is not the quarter's value."""
     choices: dict[str, Literal["A", "B", "none"]] = Field(default_factory=dict)
+    reasons: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("reasons", mode="before")
+    @classmethod
+    def _review_codes(cls, raw):
+        return _codes(raw if isinstance(raw, dict) else {}, REVIEW_REASONS)
 
 
 class Classification(BaseModel):
@@ -351,7 +375,10 @@ Rules:
 for a company whose quarters are counted in weeks), never the prior-year quarter, the prior quarter, year-to-date \
 or full-year columns.
 - For a percentage, point to the percentage itself, not an amount.
-- If a KPI is not reported for this quarter, list its key in "missing". Do not guess.
+- If a KPI is not reported for this quarter, list its key in "missing". Do not guess. Give each missing key a reason in \
+"missing_reasons": "not_reported" (the document does not report it), "not_in_excerpt" (the document is cut short or \
+the figure is likely in a part not shown), "related_only" (only a related measure under another name is reported), or \
+"guidance_only" (only an outlook or forecast mentions it).
 - Never point to guidance, an outlook or any statement of what the company expects ("We expect revenue from AI to be \
 $12 billion for fiscal year 2024"): only to what it reports for the period.
 - The value must be the measure the KPI names, not a related one under another name: one app's daily active users \
@@ -360,14 +387,20 @@ $12 billion for fiscal year 2024"): only to what it reports for the period.
 - If the document reports only full-year figures for the period (an annual report with no three-month column), use \
 the full-year column, set "annual": true, and use the fiscal year end as "period_end".
 
-JSON shape: {{"period_end": "2026-06-30", "annual": false, "tables": [...], "values": [...], "missing": ["operating.dap"]}}"""
+JSON shape: {{"period_end": "2026-06-30", "annual": false, "tables": [...], "values": [...], "missing": ["operating.dap"], \
+"missing_reasons": {{"operating.dap": "related_only"}}}}"""
 
 REVIEW_TASK = """Two independent readings of this document disagree on the KPIs below. For each, decide which reading \
 is the value for the reported quarter, checking the document yourself. Answer "A" or "B", or "none" if neither is the \
 reported quarter's value for that KPI (a prior-year column, a year-to-date figure, a different metric such as an \
 app's DAUs for a family's DAP, or a KPI the document does not report).
 
-JSON shape: {"choices": {"<group>.<kpi>": "A"}}"""
+For each KPI also give in "reasons" why the reading you turned down (both, for "none") is not the quarter's value: \
+"prior_period" (a prior-year or prior-quarter column), "year_to_date", "full_year", "guidance" (an outlook), \
+"different_metric" (a related measure under another name), "wrong_row" (another line of the same table), "wrong_scale" \
+(the right figure in the wrong unit), or "not_reported" (that reading found nothing, or the document does not report it).
+
+JSON shape: {"choices": {"<group>.<kpi>": "A"}, "reasons": {"<group>.<kpi>": "prior_period"}}"""
 
 CLASSIFY_TASK = """Classify this furnished filing by what it is:
 - "earnings_release": the company's quarterly or annual results announcement (press release, shareholder letter, \

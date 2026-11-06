@@ -1779,3 +1779,37 @@ def test_reader_5_re_reads_a_release_whose_change_was_explained_by_another_sente
     forecast = {"method": "ai", "validation_status": "verified", "unit": "currency", "value": 12e9, "kpi_label": "AI Semiconductor Revenue",
                 "locator": {"quote": "We expect revenue from AI to be $12 billion for fiscal year 2024", "value_text": "$12 billion"}}
     assert stored_reading_fails(forecast)
+
+
+def test_reason_codes_are_kept_and_unknown_ones_marked_unstated():
+    located = ai.Located.model_validate({"missing": ["a.b", "a.c"], "missing_reasons": {"a.b": "related_only", "a.c": "lost"}})
+    assert located.missing_reasons == {"a.b": "related_only", "a.c": "unstated"}
+    review = ai.Review.model_validate({"choices": {"a.b": "none"}, "reasons": {"a.b": "year_to_date", "a.c": 3}})
+    assert review.reasons == {"a.b": "year_to_date", "a.c": "unstated"}
+    assert ai.Located.model_validate({"missing": []}).missing_reasons == {}
+
+
+def test_second_reads_and_reviews_record_why():
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    flash = {"period_end": "2026-06-30", "values": [_quote(document, "technology.n3", "3-nanometer accounted for 20%", "20%")],
+             "missing": ["technology.n5"], "missing_reasons": {"technology.n5": "not_in_excerpt"}}
+    control = FakeControl({
+        ("locate", "flash"): flash,
+        ("locate", "reasoning"): {"period_end": "2026-06-30", "values": [], "missing": ["technology.n3"],
+                                  "missing_reasons": {"technology.n3": "not_reported", "technology.n5": "not_reported"}},
+        ("review", "reasoning"): {"choices": {"technology.n3": "none"}, "reasons": {"technology.n3": "prior_period"}},
+    })
+    pipeline = _pipeline(control)
+    _read, problems, located = pipeline._read("prompt", document, SPEC, EXPECTED)
+    assert pipeline.result.second_read_reasons == {"checks_failed": 1}
+    assert any("kept neither (prior_period)" in problem for problem in problems)
+    # The standing reading's reason wins; the other reader's fills the KPIs it gave none for.
+    assert located.missing_reasons == {"technology.n3": "not_reported", "technology.n5": "not_in_excerpt"}
+
+
+def test_a_first_quarter_goes_to_the_second_reader_as_not_placed():
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    control = FakeControl({("locate", "flash"): _answer(document), ("locate", "reasoning"): _answer(document)})
+    pipeline = _pipeline(control)
+    pipeline._read("prompt", document, SPEC, EXPECTED)
+    assert pipeline.result.second_read_reasons == {"not_placed": 1}
