@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, timedelta
 
 from .. import ai
 from ..ai import Spec
@@ -13,6 +13,7 @@ from ..fiscal import fiscal_label
 from ..sec import FilingRef
 from ..xbrl import member_key
 from ..store import FilingReading, failed_reading
+from .ai_reading import AiReading
 from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI, _annual_header, _chain_of, _days, _document_text, _is_jump, value_key)
 
 _READ_BY_REPLAY = "read by replay"
@@ -156,6 +157,7 @@ class ReleaseFlow:
                                                           year_offset=self.offset)
             validate_groups(read, self._previous(period_end, annual=located.annual))
             self._flag_scale_outliers(read, period_end, annual=located.annual)
+            self._mark_year_ago_agreement(read, document, period_end, annual=located.annual)
             self._flag_partial_tables(read, period_end, document)
             self._explain_jumps(read, document, spec)
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
@@ -196,6 +198,24 @@ class ReleaseFlow:
             if off or tiny:
                 item.status = "needs_review"
                 item.notes.append(SCALE_OUTLIER)
+
+    def _mark_year_ago_agreement(self, read: list[ReadValue], document, period_end: date, annual: bool = False) -> None:
+        """A breakdown whose every line's year-ago cell equals what last year's release gave for that quarter: two
+        filings agree on the table, so its total need not be a figure tagged in XBRL (Disney's Disney+ and Hulu revenue,
+        Morgan Stanley's investment banking lines: parts of a segment nobody tags). Marked on each line."""
+        target = (period_end - timedelta(days=365)).isoformat()
+        before = {(v["group_key"], v["kpi_key"]): float(v["value"]) for v in self.values.values()
+                  if v["method"] in ("ai", "derived") and v["validation_status"] != "rejected" and (v["fiscal_period"] == "FY") == annual
+                  and abs(_days(v["period_end"], target)) <= 12}
+        groups: dict[str, list[ReadValue]] = {}
+        for item in read:
+            if item.group.kind == "revenue_breakdown" and not item.is_total and item.kpi.key != item.group.total_kpi:
+                groups.setdefault(item.group.key, []).append(item)
+        for key, items in groups.items():
+            if len(items) >= 2 and all(AiReading._year_ago_cell_matches(item, document, before.get((f"{AI_GROUP_PREFIX}{key}", item.kpi.key)))
+                                       for item in items):
+                for item in items:
+                    item.locator["year_ago_agrees"] = True
 
     def _period_revenue(self, period_end: date, annual: bool) -> float | None:
         """The company's revenue for a period of this length, from its XBRL breakdowns' totals: the quarter's, else a

@@ -68,8 +68,10 @@ class SeriesChecks:
             if (v["method"] == "ai" and v["group_kind"] == "revenue_breakdown" and v["validation_status"] == "verified"
                     and (v.get("locator") or {}).get("total")):
                 groups.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), []).append(v)
-        # Parts each proven on their own stand, whatever their read total row says.
-        groups = {key: rows for key, rows in groups.items() if not all(_proven(v) for v in rows)}
+        # Parts each proven on their own stand, whatever their read total row says; so does a breakdown whose year-ago
+        # column repeats last year's release line for line (two filings agree on the table).
+        groups = {key: rows for key, rows in groups.items()
+                  if not all(_proven(v) for v in rows) and not all((v.get("locator") or {}).get("year_ago_agrees") for v in rows)}
         flagged = []
         segment_of: dict[str, set[str]] = {}
         for (group, _year, period), rows in groups.items():

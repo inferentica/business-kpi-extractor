@@ -2047,3 +2047,15 @@ def test_an_amount_off_by_an_unstated_scale_is_held():
     read = [ReadValue(group, beauty, 3477.0, "EUR", {}), ReadValue(group, foods, 7e6, "EUR", {})]
     pipeline._flag_scale_outliers(read, date(2026, 9, 30))
     assert [item.status for item in read] == ["needs_review", "verified"]
+
+
+def test_a_breakdown_its_year_ago_column_confirms_needs_no_xbrl_total():
+    def row(kpi, value, agrees, group="kpi_streaming", method="ai", kind="revenue_breakdown", total=5486e6, label="Subscription"):
+        return {"group_key": group, "group_label": "Streaming", "group_kind": kind, "kpi_key": kpi, "kpi_label": label, "fiscal_year": "2026",
+                "fiscal_period": "Q2", "period_end": "2026-03-28", "method": method, "validation_status": "verified", "value": value,
+                "notes": [], "locator": {"total": total, **({"year_ago_agrees": True} if agrees else {})}}
+    revenue = row("total", 23.6e9, False, group="segments", method="xbrl", total=23.6e9, label="Entertainment")
+    held = _pipeline(FakeControl({}), [revenue, row("subs", 4708e6, False), row("ads", 778e6, False)])._anchor_ai_breakdowns()
+    assert len(held) == 2 and all(v["validation_status"] == "needs_review" for v in held)
+    agreed = _pipeline(FakeControl({}), [revenue, row("subs", 4708e6, True), row("ads", 778e6, True)])._anchor_ai_breakdowns()
+    assert agreed == []
