@@ -71,12 +71,16 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
                 if other := net_gross_mismatch(row_label, kpi.label):
                     raise LocateError(f"{locator.table} r{locator.row} is the {other} figure {row_label!r}, not {kpi.label!r}")
             value, currency, notes = _read(document, locator, kpi, default_currency)
+            if locator.table is not None and locator.table in document.tables and group.kind == "metric":
+                if unnamed := _place_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
+                    notes.append(f"{PLACE_NOT_NAMED}: {unnamed}")
         except LocateError as error:
             problems.append(f"{locator.kpi}: {error}")
             continue
         seen.add(locator.kpi)
+        held = SCALE_NOT_STATED in notes or any(note.startswith(PLACE_NOT_NAMED) for note in notes)
         values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator), notes,
-                                status="needs_review" if SCALE_NOT_STATED in notes else "verified"))
+                                status="needs_review" if held else "verified"))
     # One gate for every reading (replay, Flash, the reasoning reader): the column's own header outranks a period the AI states.
     kept = []
     for item in values:
@@ -426,6 +430,11 @@ _PER_UNIT_KPI = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\b(?:p
 def _row_scale(text: str) -> float | None:
     if _PER_UNIT.search(text):
         return 1.0
+    # A label naming two measures ("Leases renewed Kilowatt / NRSF (in thousands)"): the scale after the slash is the
+    # second's, so the row states none for the first. Digital Realty's 92,670 kilowatts are not 92.7 million.
+    if (slash := re.search(r"\w\s+/\s+\w", text)) and (scaled := re.search(r"\(([^()]*\b(?:thousand|million|billion)s?\b[^()]*)\)", text, re.I)) \
+            and scaled.start() > slash.start():
+        return None
     if match := _ROW_SCALE.search(text):
         return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(match.group("word") or match.group("within")).lower()]
     if match := _ROW_SCALE_SHORT.search(text):
@@ -867,6 +876,35 @@ def labels_agree(named: str | None, actual: str) -> bool:
         return True
     shared = set(named_words) & set(actual_words)
     return len(shared) >= 0.5 * min(len(set(named_words)), len(set(actual_words)))
+
+
+# A metric whose name gives a place ("Japan Policyholder Account Balances") read from a row that names no such place,
+# under no heading or caption that does (Prudential's "International Businesses" total): held for review.
+PLACE_NOT_NAMED = "the row and its headings name no"
+_PLACE = re.compile(r"\b(Japan|China|U\.?S\.?|United States|North America|Latin America|Americas|Europe|EMEA|APAC|"
+                    r"Asia Pacific|Asia|Canada|Mexico|Brazil|Germany|U\.?K\.?|United Kingdom|India|Korea|Taiwan|France|"
+                    r"Australia|Africa|Middle East|Peru|Colombia|Chile|Türkiye|Turkey|Spain|Italy)\b", re.I)
+# A place a name leaves out ("Excluding Intra-Europe") is not the figure's own.
+_NOT_THE_PLACE = re.compile(r"(?:excluding|excl\.?|ex|intra|non|outside|other than)[- ]\s*$", re.I)
+
+
+def _places(text: str, own: bool = False) -> set[str]:
+    return {match.group(0).replace(".", "").upper() for match in _PLACE.finditer(text)
+            if not (own and _NOT_THE_PLACE.search(text[:match.start()][-16:]))}
+
+
+def _place_not_named(label: str, table: Table, row: int, col: int) -> str | None:
+    """The place a metric's name gives that its row, its section headings, its column and its table's caption all
+    leave unnamed, if any."""
+    places = _places(label, own=True)
+    if not places:
+        return None
+    around = " ".join([" ".join(table.rows[row]) if row < len(table.rows) else "", _section_heading(table, row),
+                       " ".join(_heading(header, col) for header in table.rows[:row][:6] if col < len(header)),
+                       table.context[-200:]])
+    named = _places(around)
+    missing = places - named
+    return ", ".join(sorted(missing)) if missing else None
 
 
 # A figure whose scale only the AI gives: held for review, never served on the AI's word.

@@ -17,7 +17,7 @@ _TEXT_BLOCK_CHARS = 600
 _CONTEXT_CHARS = 300
 
 _NUMBER = re.compile(r"(?P<neg>[-−])?\(?\s*(?:[A-Z]{0,3}\$|€|£|¥)?\s*(?P<int>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?P<frac>\d+))?")
-_SCALE_WORDS = {"thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12, "mn": 1e6, "bn": 1e9}
+_SCALE_WORDS = {"thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12, "mn": 1e6, "mm": 1e6, "bn": 1e9}
 _SCALE_AFTER = re.compile(r"^(?:\s*(?P<word>thousand|million|billion|trillion)s?\b|(?P<abbr>bn|B|M|K)\b)", re.I)
 _SCALE_ABBREVIATIONS = {"bn": "billion", "b": "billion", "m": "million", "k": "thousand"}
 _RELEVANT = re.compile(r"revenue|net sales|\bsales\b|shipment|subscri|users|members|platform|technolog|geograph|region",
@@ -27,7 +27,7 @@ _AMOUNT = re.compile(r"[^\w]*\d[\d,.]*\s*[%)]*")
 _AMOUNT_WORDS = re.compile(r"revenue|net sales|\bsales\b|amounts?|dollars?|\$\s*$", re.I)
 # "(in millions)", "amounts in thousands", and a heading without "in": Morgan Stanley's "($ millions)".
 _TABLE_SCALE = re.compile(r"(?:\b(?:in|amounts in)\s+|\(\s*(?:in\s+)?)(?:[A-Z]{0,3}\$\s*|NT\$\s*|US\$\s*)?(?:in\s+)?"
-                          r"(?P<word>thousands|millions|billions|mn|bn)\b", re.I)
+                          r"(?P<word>thousands|millions|billions|mn|mm|bn)\b", re.I)
 
 
 _DECLARED_CURRENCIES = (

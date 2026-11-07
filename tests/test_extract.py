@@ -371,6 +371,43 @@ def test_a_footnote_letter_is_no_column_scale_and_mn_is_millions():
     assert _column_scale(table, 1, 1) == 1e9 and _column_scale(table, 1, 2) == 1e9
 
 
+def test_mm_reads_as_millions_in_a_table_caption():
+    # Axia's "Table 4 - Income Statement IFRS (R$ mm)".
+    html = """<p>Table 4 - Income Statement IFRS (R$ mm)</p><table><tr><td></td><td>2Q25</td></tr>
+<tr><td>Transmission</td><td>5,079</td></tr></table>"""
+    assert next(iter(parse_document(html, "https://example.com/x.htm").tables.values())).declared_scale() == 1e6
+
+
+def test_a_scale_after_a_slash_belongs_to_the_second_measure():
+    from kpi_extractor.extract import _row_scale
+    assert _row_scale("Leases renewed Kilowatt / NRSF (in thousands) 42,412 92,670") is None
+    assert _row_scale("Paid memberships (in millions) 301.6") == 1e6
+    renewed = _read_one("""<table><tr><td></td><td>3Q26</td></tr>
+<tr><td>Leases renewed Kilowatt / NRSF (in thousands)</td><td>92,670</td></tr></table>""", "Renewal Leasing Volume (kW)", "count", 1, 1)
+    assert renewed.value == 92_670
+
+
+def test_a_metric_named_for_a_place_its_row_never_names_is_held():
+    html = """<table><tr><td>INTERNATIONAL BUSINESSES</td><td>3Q25</td></tr>
+<tr><td>Policyholder Account Balances at end of period (in millions):</td><td></td></tr>
+<tr><td>International Businesses</td><td>53,903</td></tr>
+<tr><td>Japan</td><td>537</td></tr></table>"""
+    document = parse_document(html, "https://example.com/x.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "japan", "label": "Japan Policyholder Account Balances", "unit": "currency"},
+        {"key": "jp", "label": "Japan Life Planners", "unit": "count"}]}]})
+    located = Located.model_validate({"period_end": "2025-09-30", "values": [
+        {"kpi": "ops.japan", "table": table, "row": 2, "col": 1, "scale": 1e6, "scale_text": "in millions"},
+        {"kpi": "ops.jp", "table": table, "row": 3, "col": 1}]})
+    values, _problems = read_values(document, spec, located, "USD")
+    status = {item.kpi.key: item.status for item in values}
+    assert status == {"japan": "needs_review", "jp": "verified"}
+    from kpi_extractor.extract import _places
+    assert _places("Cross-Border Volume Growth Excluding Intra-Europe", own=True) == set()
+    assert _places("8 ASIA PACIFIC") == {"ASIA PACIFIC"} and _places("Asia Pacific Unit Case Volume", own=True) == {"ASIA PACIFIC"}
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>
