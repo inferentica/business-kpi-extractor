@@ -367,7 +367,7 @@ or of one segment's revenue; never income-statement lines such as net interest i
 noninterest revenue listed together.
 
 Rules:
-- kind "revenue_breakdown": currency amounts that together make up revenue. Include the table's total row as a KPI and \
+- kind "revenue_breakdown": currency amounts that together make up revenue. Amounts that are not revenue (annualized rent, loans, deposits, client assets, backlog, bookings) are operating metrics, never a revenue_breakdown. Include the table's total row as a KPI and \
 name it in "total_kpi", with at least two parts beside it; a single amount (e.g. AI revenue) is a metric, not a \
 breakdown. Skip any breakdown listed under "Already covered by XBRL".
 - kind "mix": percentages that add up to about 100.

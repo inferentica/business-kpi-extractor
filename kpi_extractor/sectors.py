@@ -77,8 +77,7 @@ SECTORS = {
     "consumer": Sector("consumer", "Consumer products and retail",
                        "comparable or same-store sales, store count, openings and closings, selling square footage, "
                        "e-commerce share, volume and price/mix, units sold, active customers, transactions, "
-                       "average ticket",
-                       "comparable or same-store sales growth and price/mix contributions"),
+                       "average ticket"),
     "healthcare": Sector("healthcare", "Healthcare",
                          "revenue by product, franchise, segment or region, patients, members or plans, procedures or "
                          "visits, bed or capacity utilization, revenue per member, prescriptions, pipeline milestones",
@@ -142,9 +141,11 @@ def sector_hint(sector: Sector | None) -> str:
     if sector is None:
         return ""
     lines = [f"Industry hints ({sector.name}): companies in this industry often report {sector.examples}. These are "
-             "examples of what to look for, not a list to fill: track only what this company itself gives as a number "
-             "for the quarter, never invent or rename a KPI to match a hint, and also track any other KPI that drives "
-             "this company's business even if it is not named here."]
+             "examples of what to look for, not a list to fill, and they add to the Track list above, never replace it: "
+             "still track every revenue breakdown and operating metric it asks for (a quarterly breakdown too when its "
+             "XBRL version is annual). Track only what this company itself gives as a number for the quarter, never "
+             "invent or rename a KPI to match a hint, and also track any other KPI that drives this company's business "
+             "even if it is not named here."]
     if sector.allowed:
         lines.append(f"For this industry, track these despite the general \"Never track\" list: {sector.allowed}.")
     return "\n".join(lines)

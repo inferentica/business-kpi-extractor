@@ -15,8 +15,10 @@ def test_sic_codes_name_their_industry():
 def test_a_hint_is_examples_never_a_list_to_fill():
     hint = sector_hint(sector_of(6021))
     assert "not a list to fill" in hint and "never invent" in hint and "even if it is not named here" in hint
+    assert "never replace it" in hint and "every revenue breakdown" in hint
     assert "net interest margin" in hint and 'despite the general "Never track" list' in hint
     assert "despite" not in sector_hint(sector_of(7372))  # software lifts no rule
+    assert "despite" not in sector_hint(sector_of(2840))  # consumer: overall growth rates stay out
     assert sector_hint(None) == ""
 
 
