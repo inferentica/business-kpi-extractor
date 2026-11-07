@@ -195,8 +195,10 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         raise LocateError("the quote is a forecast or guidance, not the reported figure")
     if other := net_gross_mismatch(before[-80:], kpi.label):
         raise LocateError(f"the quote gives the {other} figure, not {kpi.label!r}")
-    if kpi.unit == "percent" and value > 0 and falls(quote, value_text):
-        # "The average price per ad decreased by 16%" is a change of -16%: the sentence carries the sign, not the number.
+    if value > 0 and (kpi.unit == "percent" or (kpi.unit == "count" and _CHANGE_KPI.search(kpi.label))) \
+            and falls(quote, value_text):
+        # "The average price per ad decreased by 16%" is a change of -16%, and Vodafone's "contract customer base
+        # declined by 46,000" is net additions of -46,000: the sentence carries the sign, not the number.
         value = -value
         notes.append("a fall, as the quote says")
     if kpi.unit == "count" and parsed.scale_word is None:
@@ -205,7 +207,10 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
     if kpi.unit == "currency" and parsed.scale_word is None:
         # The last scale heading before the quote in its block: Apollo's highlights page heads its earnings "($ in
         # millions …)" and, further on, its AUM and business drivers "($ in billions)".
-        declared = _preceding_scale(block.text, block.text.find(quote)) or block.declared_scale() or document.default_scale()
+        # A per-unit amount keeps its units, as in a table: UTI's "$7,300" revenue per student under "($ in millions,
+        # except revenue per student amounts)".
+        declared = 1.0 if _PER_UNIT_KPI.search(kpi.label) else \
+            _preceding_scale(block.text, block.text.find(quote)) or block.declared_scale() or document.default_scale()
         if declared is None and locator.scale in (1, 1e3, 1e6, 1e9):
             declared = locator.scale
             notes.extend(_ai_scale_notes(document, block, locator.scale_text, locator.scale, value * declared))
@@ -214,6 +219,10 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         elif value < 1_000:
             raise LocateError(f"{value_text!r} has no amount scale")
     return value, _currency(f"{value_text} {quote}", kpi, default_currency, block.text), notes
+
+
+# A count that is a change over the quarter (net additions, net change), which a fall makes negative.
+_CHANGE_KPI = re.compile(r"\bnet\s+(?:additions?|adds|change|gains?|increase)\b|\bchange\b", re.I)
 
 
 # A fall named just before the number: "decreased by 16%", "a decrease of 1%", "down 5%", "the decline on a

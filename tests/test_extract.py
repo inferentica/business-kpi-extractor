@@ -329,6 +329,33 @@ def test_a_column_spanning_january_to_june_is_not_a_quarter():
         == "three months ended @ # #"
 
 
+def _read_quote(text, label, unit, quote, value_text):
+    document = parse_document(f"<p>{text}</p>", "https://example.com/ex99.htm")
+    block = next(iter(document.blocks))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "k", "label": label, "unit": unit}]}]})
+    located = Located.model_validate({"period_end": "2026-03-31", "values": [
+        {"kpi": "ops.k", "block": block, "quote": quote, "value_text": value_text}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == []
+    return values[0].value
+
+
+def test_a_quoted_fall_makes_a_net_change_count_negative():
+    text = "In mobile, our contract customer base declined by 46,000 in the quarter."
+    assert _read_quote(text, "UK Mobile Contract Net Additions", "count", "our contract customer base declined by 46,000 "
+                       "in the quarter", "46,000") == -46_000
+    # A level is never a change: a store count that "declined to 380" stays 380.
+    assert _read_quote("Stores declined to 380 at quarter end.", "Stores", "count", "Stores declined to 380 at quarter end",
+                       "380") == 380
+
+
+def test_a_quoted_per_unit_amount_keeps_its_units_under_a_millions_heading():
+    text = "($ in millions, except revenue per student amounts) Revenue per student $7,300 $7,400"
+    assert _read_quote(text, "Revenue per Student (Concorde)", "currency", "Revenue per student $7,300 $7,400", "$7,300") == 7300
+    assert _read_quote("($ in millions) Revenue $7,300", "Revenue", "currency", "Revenue $7,300", "$7,300") == 7_300_000_000
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>
