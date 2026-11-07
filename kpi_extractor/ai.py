@@ -382,6 +382,8 @@ Platform, Technology, Geography, Region, End Market, Customer. Never "Revenue by
 "Revenue by Google Services Product": say "Revenue by Segment" or "Revenue by Product".
 - Row labels use the company's own names and casing (iPhone, HPC, Family of Apps, 3nm), never XBRL words such as \
 "Member", "Segment" suffixes the company does not use, or "srt"/"us-gaap" prefixes.
+- A KPI tracked every quarter never names a year or a quarter: a measure the company restates for the year in progress \
+is "Current-Year Contract Coverage", not "Full-Year 2026 Contract Coverage", which would be wrong in every other year.
 - Metric labels are short Title Case nouns: "Employees", "Daily Active People (DAP)", "Paid Memberships", "AWS Revenue \
 Run Rate", "Satellites in Orbit". Spell out internal shorthand (WW → Worldwide, Y/Y → Year over Year, 3P → \
 Third-Party). Avoid the word "mix" unless it is the company's own term; describe a share plainly ("Third-Party Seller \
