@@ -11,7 +11,7 @@ from .document import _DECLARED_CURRENCIES, Document, Table, TextBlock, clean, d
 from .xbrl import member_key, remove_subtotals
 
 _CURRENCY_MARKERS = (("NT$", "TWD"), ("US$", "USD"), ("HK$", "HKD"), ("C$", "CAD"), ("A$", "AUD"), ("RMB", "CNY"),
-                     ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("S/", "PEN"), ("$", "USD"))
+                     ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("S/", "PEN"), ("R$", "BRL"), ("$", "USD"))
 
 
 class LocateError(ValueError):
@@ -709,10 +709,15 @@ def _currency(text: str | None, kpi: KpiSpec, default_currency: str | None, cont
 
 
 def _column_currency(table: Table, row: int, col: int, text: str | None) -> str | None:
-    """The one currency a column's own header names, when its table gives each figure in two: Auna's "2Q'25 (USD)"
-    beside "2Q'25" under "(Figures in millions of Soles and millions of US Dollars)". A marker on the value comes first."""
+    """The one currency a row label or a column's own header names, when its table gives each figure in two: Auna's
+    "2Q'25 (USD)" beside "2Q'25" under "(Figures in millions of Soles and millions of US Dollars)". A marker on the value
+    comes first."""
     if text and any(marker != "$" and marker in text for marker, _ in _CURRENCY_MARKERS):
         return None
+    # A row label's own currency, Axia's "Average ACL Price (R$/MWh)".
+    label = table.rows[row][0] if 0 <= row < len(table.rows) and table.rows[row] else ""
+    if marked := next((code for marker, code in _CURRENCY_MARKERS if marker != "$" and marker in label), None):
+        return marked
     cells = " ".join(_heading(header, col) for header in table.rows[:max(row, 1)][:6] if col < len(header))
     found = {code for pattern, code in _DECLARED_CURRENCIES if pattern.search(cells)}
     return found.pop() if len(found) == 1 else None
@@ -727,15 +732,24 @@ def _heading(row: list[str], col: int) -> str:
     return ""
 
 
+_MONTHS = {name: number for number, name in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct",
+                                                          "nov", "dec"), start=1)}
+_MONTH_NAME = r"(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|" \
+              r"jul|aug|sept?|oct|nov|dec)\.?"
+_MONTH_SPAN = re.compile(rf"\b{_MONTH_NAME}\s*(?:to|through|thru|-|–|—)\s*{_MONTH_NAME}(?![\w])")
+
+
 def column_header(table: Table, first_data_row: int, col: int) -> str:
     """The words heading a column ("Three Months Ended @ #") with dates and numbers blanked, so a quarter's column and a
     six-month or prior-year column never pass for one another when a reading is replayed."""
     cells = [cell for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row) and re.search(r"[A-Za-z]", cell := _heading(row, col))]
     text = clean(" ".join(cells)).lower()
+    # A span of months names its length: Philips' "January to June" is a half-year, "April to June" a quarter.
+    text = _MONTH_SPAN.sub(lambda m: f"<{(_MONTHS[m.group(2)[:3]] - _MONTHS[m.group(1)[:3]]) % 12 + 1} months>", text)
     text = re.sub(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
                   r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b", "@", text)
     # A duration names the column ("3 months", "six months", "26 weeks"), so its number is kept; dates and years blank.
-    text = re.sub(r"\b(\d{1,2})(\s*-?\s*)(months?|weeks?|quarters?)\b", r"<\1 \3>", text)
+    text = re.sub(r"(?<!<)\b(\d{1,2})(\s*-?\s*)(months?|weeks?|quarters?)\b(?!>)", r"<\1 \3>", text)
     return re.sub(r"(?<![<\d])[\d.,]+(?![\d]* (?:months?|weeks?|quarters?)>)", "#", text)[:120]
 
 

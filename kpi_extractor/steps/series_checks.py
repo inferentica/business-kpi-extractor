@@ -1,6 +1,8 @@
 """Checks across periods: proving or clearing flagged figures, scale runs, and working out derived periods."""
 from __future__ import annotations
 
+from collections import Counter
+
 import math
 import re
 from datetime import date, timedelta
@@ -488,8 +490,13 @@ class SeriesChecks:
         return {key: float(value["value"]) for key, value in latest.items()}
 
     def _default_currency(self) -> str | None:
+        """The company's reporting currency: its tagged figures' first, else the one most of its other figures carry, so
+        a bank with no tagged segments (Stock Yards, Meridian) still reads its unmarked amounts as dollars."""
         currencies = [value.get("currency") for value in self.values.values() if value["method"] == "xbrl"]
-        return next((currency for currency in reversed(currencies) if currency), None)
+        if tagged := next((currency for currency in reversed(currencies) if currency), None):
+            return tagged
+        others = Counter(value.get("currency") for value in self.values.values() if value.get("currency"))
+        return others.most_common(1)[0][0] if others else None
 
     def _derive(self, spec: Spec | None = None) -> list[dict]:
         changed = []

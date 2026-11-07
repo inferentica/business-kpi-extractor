@@ -307,6 +307,28 @@ def test_a_scale_quoted_beside_the_table_beats_the_caption_it_inherits():
     assert read_values(document, spec, unquoted, "USD")[0][0].value == -1_000_000
 
 
+def test_a_row_label_names_its_currency():
+    # Axia: "Average ACL Price (R$/MWh) 193.02" in a table with no declared currency.
+    price = _read_one("""<table><tr><td>Generation</td><td>1Q26</td></tr>
+<tr><td>Average ACL Price (R$/MWh)</td><td>193.02</td></tr></table>""", "Average ACL Price", "currency", 1, 1, currency=None)
+    assert (price.value, price.currency) == (193.02, "BRL")
+
+
+def test_a_column_spanning_january_to_june_is_not_a_quarter():
+    # Philips' sales by country are given only "January to June": never its second quarter.
+    from kpi_extractor.extract import column_duration_problem, column_header
+    for span, months in (("January to June", 6), ("April to June", 3), ("January–September", 9), ("Oct - Dec", 3)):
+        document = parse_document(f"""<table><tr><td>in millions of EUR</td><td>{span}</td><td></td></tr>
+<tr><td></td><td>2026</td><td>2025</td></tr><tr><td>United States</td><td>3,281</td><td>3,476</td></tr></table>""",
+                                  "https://example.com/ex99.htm")
+        header = column_header(next(iter(document.tables.values())), 2, 1)
+        assert header.startswith(f"<{months} months>") and "<<" not in header
+        assert (column_duration_problem(header, False) is None) == (months == 3)
+    assert column_header(parse_document("""<table><tr><td></td><td>Three Months Ended June 30, 2026</td></tr>
+<tr><td>Sales</td><td>5</td></tr></table>""", "https://example.com/ex99.htm").tables.values().__iter__().__next__(), 1, 1) \
+        == "three months ended @ # #"
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>
