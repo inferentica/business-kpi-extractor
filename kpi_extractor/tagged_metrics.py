@@ -68,12 +68,25 @@ def year_ago_facts(facts: pd.DataFrame, period_end: date, days: tuple[int, int] 
 
 
 def _tolerance(value: float) -> float:
-    """Half a unit of the figure's own rounding ("$677 billion" is 676.5 to 677.5 billion), at least one unit."""
+    """Half a unit of the figure's own rounding: "$677 billion" is 676.5 to 677.5 billion, and a margin of 3.65% is
+    3.645 to 3.655. A figure with decimals is never matched to a whole unit: a tolerance of one let UCB's 3.65% margin
+    match its 3 interest-rate derivatives, and FedEx's $1.21 revenue per pound its $1.45 dividend."""
+    decimals = _decimals(value)
+    if decimals:
+        return 0.5 * 10 ** -decimals
     whole = abs(int(round(value)))
     step = 1
     while whole and whole % (step * 10) == 0 and step < 10 ** 12:
         step *= 10
-    return max(step / 2, 1.0)
+    return max(step / 2, 0.5)
+
+
+def _decimals(value: float) -> int:
+    """The decimals a figure is stated to (3.65: 2; 32.3: 1; 677e9: 0), up to six."""
+    for decimals in range(7):
+        if abs(value * 10 ** decimals - round(value * 10 ** decimals)) < 1e-6 * max(1.0, abs(value) * 10 ** decimals):
+            return decimals
+    return 6
 
 
 def agrees(fact: float, value: float) -> bool:
@@ -132,10 +145,17 @@ def fact_lines(facts: pd.DataFrame, period_end: date) -> list[tuple[Tag, float, 
     return lines
 
 
-def unit_fits(kpi_unit: str, fact_unit: str) -> bool:
-    """A currency KPI is a monetary figure; a count is shares or a pure number; a percentage or ratio is pure."""
+def unit_fits(kpi_unit: str, fact_unit: str, kpi_label: str = "", concept: str = "") -> bool:
+    """A currency KPI is a monetary figure; a count is shares or a pure number; a percentage or ratio is pure. An amount
+    per share fits only a KPI per share (FedEx's dividend is no revenue per pound), and a count of things ("Number of
+    reportable segments") fits only a count."""
     fact = fact_unit.lower()
     money = "iso4217" in fact or fact in ("usd", "eur", "jpy", "twd", "gbp", "cny") or fact.startswith("usd")
+    per_share = "share" in fact and ("/" in fact or "per" in fact)
+    if per_share and "per share" not in kpi_label.lower():
+        return False
+    if concept.split(":")[-1].startswith("NumberOf") and kpi_unit != "count":
+        return False
     if kpi_unit == "currency":
         return money
     return not money

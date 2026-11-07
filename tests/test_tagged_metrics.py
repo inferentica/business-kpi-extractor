@@ -363,3 +363,32 @@ def test_no_fitting_tag_is_remembered_so_the_same_report_is_not_asked_again():
     pipeline._ask = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("asked again"))
     pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))  # the next run: the same report, the same KPIs
     assert not stored
+
+
+def test_a_figure_with_decimals_matches_only_to_its_own_rounding():
+    from kpi_extractor.tagged_metrics import agrees
+    assert not agrees(3, 3.65)          # UCB: 3 interest-rate derivatives are no 3.65% margin
+    assert not agrees(1.45, 1.21)       # FedEx: a $1.45 dividend is no $1.21 revenue per pound
+    assert not agrees(32.79, 32.3)      # TSMC: a closing rate is no 32.30 average rate
+    assert not agrees(10.21, 10.3)
+    assert agrees(3.652, 3.65) and agrees(32.27, 32.3)
+    assert agrees(676_800_000_000, 677_000_000_000) and agrees(7_643_972_000, 7_640_000_000)
+
+
+def test_a_per_share_amount_or_a_count_of_things_fits_only_its_own_kind_of_kpi():
+    from kpi_extractor.tagged_metrics import unit_fits
+    assert not unit_fits("currency", "USD/share", "International Revenue per Pound", "us-gaap:CommonStockDividendsPerShareDeclared")
+    assert unit_fits("currency", "USD/share", "Dividends per Share", "us-gaap:CommonStockDividendsPerShareDeclared")
+    assert not unit_fits("percent", "pure", "Net Interest Margin", "us-gaap:NumberOfInterestRateDerivativesHeld")
+    assert not unit_fits("currency", "pure", "U.S. Freight Revenue per Pound", "us-gaap:NumberOfReportableSegments")
+    assert unit_fits("count", "pure", "Reportable Segments", "us-gaap:NumberOfReportableSegments")
+    assert unit_fits("currency", "USD", "Total Deposits", "us-gaap:Deposits")
+
+
+def test_a_ratio_tagged_as_a_decimal_reads_as_a_percentage():
+    from kpi_extractor.steps.tagged_kpis import _percent_scale
+    from kpi_extractor.tagged_metrics import Tag
+    cet1 = Tag("mcbs:CommonEquityTierOneCapitalToRiskWeightedAssets", (), True)
+    deposits = Tag("us-gaap:Deposits", (), True)
+    scaled = _percent_scale({cet1: 0.1747, deposits: 1.2})
+    assert round(scaled[cet1], 4) == 17.47 and scaled[deposits] == 1.2

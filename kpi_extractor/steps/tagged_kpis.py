@@ -1,6 +1,8 @@
 """KPIs filled from a report's XBRL tags, and breakdown periods settled by exact tagged figures."""
 from __future__ import annotations
 
+import re
+
 from datetime import date
 
 from .. import ai
@@ -14,6 +16,19 @@ from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _UNANCHORED, _is_jump, _rou
 
 # Where the AI's tag picks are kept between runs, beside the XBRL row curations.
 TAG_PICKS = "xbrl_tags"
+
+
+_RATIO_CONCEPT = re.compile(r"Ratio|Percent|Rate|Margin|Yield|To[A-Z]")
+
+
+def _percent_scale(found: dict) -> dict:
+    """A quarter's facts as a percent KPI reads them: a ratio concept's decimal (0.1747) as a percentage (17.47)."""
+    return {tag: (value * 100 if abs(value) <= 1.5 and _RATIO_CONCEPT.search(tag.concept.split(":")[-1]) else value)
+            for tag, value in found.items()}
+
+
+def _percent_view(facts_of):
+    return lambda quarter: _percent_scale(facts_of(quarter))
 
 
 class TaggedKpiReading:
@@ -97,7 +112,8 @@ class TaggedKpiReading:
         earlier = next((quarter for quarter in newest_first[1:] if facts_of(quarter)), None)
         for _group, kpi, _key in unread:
             line = ids.get(answer.picks.get(kpi.key) or "")
-            if line is None or not unit_fits(kpi.unit, line[3]) or earlier is None or line[0] not in facts_of(earlier):
+            if line is None or not unit_fits(kpi.unit, line[3], kpi.label, line[0].concept) or earlier is None \
+                    or line[0] not in facts_of(earlier):
                 continue
             picked[kpi.key] = line[0]
         if picked:
@@ -119,12 +135,15 @@ class TaggedKpiReading:
                 continue
             key = f"{AI_GROUP_PREFIX}{group.key}"
             for kpi in group.kpis:
+                # XBRL states a ratio as a decimal (Meridian's CET1 0.1747): a percent KPI reads it as 17.47.
+                kfacts = _percent_view(facts_of) if kpi.unit == "percent" else facts_of
+                kopened = {quarter: _percent_scale(found) for quarter, found in opened.items()} if kpi.unit == "percent" else opened
                 held = {(v["fiscal_year"], v["fiscal_period"]): v for v in self.values.values()
                         if v["group_key"] == key and v["kpi_key"] == kpi.key and v["fiscal_period"] != "FY"}
                 readings = {quarter: float(v["value"]) for quarter, v in held.items()
                             if v["validation_status"] == "verified" and not (v.get("locator") or {}).get("tagged")}
                 if split:
-                    records += self._exact_lines(held, readings, quarters, facts_of)
+                    records += self._exact_lines(held, readings, quarters, facts_of)  # currency lines: no percent view
                     continue
                 missing = [quarter for quarter in newest_first if quarter not in held
                            or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
@@ -136,12 +155,12 @@ class TaggedKpiReading:
                 how = "tagged as in the quarters the release states it"
                 if tag is None and kpi.key in picked:
                     tag, how = picked[kpi.key], "the releases do not state it"
-                    if any(quarter in quarters and tag in facts_of(quarter) and not agrees(facts_of(quarter)[tag], value)
+                    if any(quarter in quarters and tag in kfacts(quarter) and not agrees(kfacts(quarter)[tag], value)
                            for quarter, value in readings.items()):
                         continue  # a release gave a different figure: not this tag
                 elif tag is None and len(readings) >= 2:
                     known = [quarter for quarter in newest_first if quarter in readings and quarter in quarters][:6]
-                    tag = learn_tag({quarter: readings[quarter] for quarter in known}, {quarter: facts_of(quarter) for quarter in known})
+                    tag = learn_tag({quarter: readings[quarter] for quarter in known}, {quarter: kfacts(quarter) for quarter in known})
                 elif tag is None:
                     unread.append((group, kpi, key))
                     continue
@@ -152,15 +171,16 @@ class TaggedKpiReading:
                 for quarter in newest_first:
                     if quarter not in missing:
                         # Never past a quarter whose report (when already opened) tags a different figure.
-                        if quarter in readings and tag in opened.get(quarter, {}) and not agrees(opened[quarter][tag], readings[quarter]):
+                        if quarter in readings and tag in kopened.get(quarter, {}) and not agrees(kopened[quarter][tag], readings[quarter]):
                             break
                         gaps = 0
                         # A release's rounded figure ("over $460 billion") gives way to the report's exact one.
-                        fact = ((facts_of(quarter) if quarter in newest_first[:4] else opened.get(quarter, {})).get(tag)
+                        fact = ((kfacts(quarter) if quarter in newest_first[:4] else kopened.get(quarter, {})).get(tag)
                                 if quarter in quarters else None)
                         reading = held.get(quarter)
+                        # Only the same figure, more exactly: a release's 3.65% never gives way to a report's 3.
                         if (fact is not None and quarter in readings and fact != readings[quarter] and reading
-                                and not reading.get("owner_decision")):
+                                and agrees(fact, readings[quarter]) and not reading.get("owner_decision")):
                             ref, end = quarters[quarter]
                             records.append({**reading, "value": fact, "source_accession": ref.accession, "source_url": ref.source_url,
                                             "filed_at": ref.filed.isoformat(),
@@ -168,7 +188,7 @@ class TaggedKpiReading:
                                             "locator": {"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
                                                         "instant": tag.instant}})
                         continue
-                    fact = facts_of(quarter).get(tag)
+                    fact = kfacts(quarter).get(tag)
                     if fact is None:
                         gaps += 1
                         if gaps >= 2:
