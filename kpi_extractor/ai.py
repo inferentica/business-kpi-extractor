@@ -345,7 +345,7 @@ documents. {DOCUMENT_FORMAT}
 
 Track:
 - Revenue breakdowns reported as amounts: by segment, product line, platform, technology, customer type, geography.
-- Percentage mixes that split revenue or shipments, e.g. revenue by technology node or by platform.
+- Percentage mixes that split revenue, rent or shipments, e.g. revenue by technology node or by platform, or a REIT's rent by tenant industry. Never overall growth or its parts (underlying, organic, volume or price growth for the whole company).
 - Operating metrics that drive the business: users (DAU, MAU, DAP), paid members or subscribers, ARPU/ARPP, units \
 shipped or deliveries, wafer shipments, backlog or remaining performance obligations, bookings, gross bookings/GMV, \
 trips, same-store sales, store count, net revenue retention, ARR, ad impressions and price per ad growth.

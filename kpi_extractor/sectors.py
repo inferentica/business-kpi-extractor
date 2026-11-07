@@ -43,7 +43,8 @@ SECTORS = {
                             "fee-related earnings and fee rates"),
     "reit": Sector("reit", "Real estate",
                    "occupancy, same-property or same-store NOI growth, leasing volume and spreads, rent per unit or "
-                   "square foot, properties, sites or square feet owned, annualized base rent, development pipeline, "
+                   "square foot, properties, sites or square feet owned, annualized base rent and its shares by tenant "
+                   "industry, credit rating or region (as a mix), development pipeline, "
                    "bookings, megawatts or kilowatts leased",
                    "same-property NOI and its growth, occupancy, annualized rent and leasing spreads"),
     "energy": Sector("energy", "Energy",
@@ -76,15 +77,14 @@ SECTORS = {
                    "business awards, average selling price, subscriptions"),
     "consumer": Sector("consumer", "Consumer products and retail",
                        "comparable or same-store sales, store count, openings and closings, selling square footage, "
-                       "e-commerce share, volume and price/mix, units sold, active customers, transactions, "
+                       "e-commerce share, units sold, active customers, transactions, "
                        "average ticket"),
     "healthcare": Sector("healthcare", "Healthcare",
                          "revenue by product, franchise, segment or region, patients, members or plans, procedures or "
                          "visits, bed or capacity utilization, revenue per member, prescriptions, pipeline milestones",
                          "medical cost and loss ratios, and capacity utilization"),
     "materials": Sector("materials", "Materials and mining",
-                        "production and sales volumes by product, realized prices, capacity utilization, shipments, "
-                        "volume and price contributions",
+                        "production and sales volumes by product, realized prices, capacity utilization, shipments",
                         "realized prices per unit"),
     "telecom_media": Sector("telecom_media", "Telecom and media",
                             "subscribers or customers (mobile, broadband, TV) and their net additions, churn, ARPU, "
