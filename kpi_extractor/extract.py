@@ -871,12 +871,17 @@ def labels_agree(named: str | None, actual: str) -> bool:
 
 # A figure whose scale only the AI gives: held for review, never served on the AI's word.
 SCALE_NOT_STATED = "scale not stated in the document"
-_COLUMN_SCALE = re.compile(r"\(\s*(?:US)?\$?\s*(?P<word>bil|bn|b|billions?|mil|mm|m|millions?|thous|thousands?|k|000s?)\.?\s*\)", re.I)
-_SCALE_OF = (("bil", 1e9), ("bn", 1e9), ("b", 1e9), ("mil", 1e6), ("mm", 1e6), ("m", 1e6), ("thous", 1e3), ("k", 1e3),
+# A column's own scale: Mastercard's "(Bil.)" and "(Mil.)", Axia's "(R$ mn)". A single letter counts only beside a
+# currency sign ("($B)"): a bare "(b)" is a footnote mark, as in Axia's "Regulatory Revenue (c) = (a) x (b)".
+_COLUMN_SCALE = re.compile(r"\(\s*(?:[A-Z]{1,3})?\$?\s*(?P<word>bil|bn|billions?|mil|mm|mn|millions?|thous|thousands?|000s?)\.?\s*\)"
+                           r"|\(\s*(?:[A-Z]{1,3})?\$\s*(?P<letter>[bmk])\.?\s*\)", re.I)
+_SCALE_OF = (("bil", 1e9), ("bn", 1e9), ("b", 1e9), ("mil", 1e6), ("mm", 1e6), ("mn", 1e6), ("m", 1e6), ("thous", 1e3), ("k", 1e3),
              ("000", 1e3))
 
 
-def _scale_word(word: str) -> float | None:
+def _scale_word(word: str | None) -> float | None:
+    if not word:
+        return None
     word = word.lower()
     return next((scale for prefix, scale in _SCALE_OF if word.startswith(prefix)), None)
 
@@ -884,7 +889,7 @@ def _scale_word(word: str) -> float | None:
 def _column_scale(table: Table, row: int, col: int) -> float | None:
     """The scale a column's own header states: Mastercard's "GDV (Bil.)" and "Purchase Trans. (Mil.)"."""
     cells = [_heading(header, col) for header in table.rows[:max(row, 1)][:6] if col < len(header)]
-    found = {_scale_word(match.group("word")) for cell in cells for match in _COLUMN_SCALE.finditer(cell)} - {None}
+    found = {_scale_word(match.group("word") or match.group("letter")) for cell in cells for match in _COLUMN_SCALE.finditer(cell)} - {None}
     return found.pop() if len(found) == 1 else None
 
 
@@ -895,7 +900,7 @@ def _scale_quoted(document: Document, part, scale_text: str | None, scale: float
     if not words:
         return False
     stated = {_SCALE_WORDS_OF[match.group("word").lower().rstrip("s")] for match in _ANY_SCALE.finditer(words)}
-    stated |= {_scale_word(match.group("word")) for match in _COLUMN_SCALE.finditer(words)} - {None}
+    stated |= {_scale_word(match.group("word") or match.group("letter")) for match in _COLUMN_SCALE.finditer(words)} - {None}
     if stated != {scale}:
         return False
     if isinstance(part, Table):

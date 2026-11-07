@@ -356,6 +356,21 @@ def test_a_quoted_per_unit_amount_keeps_its_units_under_a_millions_heading():
     assert _read_quote("($ in millions) Revenue $7,300", "Revenue", "currency", "Revenue $7,300", "$7,300") == 7_300_000_000
 
 
+def test_a_footnote_letter_is_no_column_scale_and_mn_is_millions():
+    # Axia: "Generation revenue by contracting environment (R$ mn)", a column "Regulatory Revenue (c) = (a) x (b)".
+    html = """<p>Table 17 - Generation revenue by contracting environment (R$ mn)</p><table>
+<tr><td>Revenue Generation</td><td>Volume (aMW) (a)</td><td>Price (R$/MWh) (b)</td><td>Regulatory Revenue (c) = (a) x (b)</td></tr>
+<tr><td></td><td>2Q26</td><td>2Q26</td><td>2Q26</td></tr>
+<tr><td>(+) O&amp;M (Quotas)</td><td>1,192</td><td>109</td><td>283</td></tr></table>"""
+    quotas = _read_one(html, "O&M (Quotas)", "currency", 2, 3, scale=1e6, currency="BRL")
+    assert quotas.value == 283_000_000
+    from kpi_extractor.extract import _column_scale
+    from kpi_extractor.document import parse_document as parse
+    table = next(iter(parse("<table><tr><td></td><td>GDV (Bil.)</td><td>Sales ($B)</td></tr><tr><td>x</td><td>1</td><td>2</td></tr></table>",
+                            "https://example.com/x.htm").tables.values()))
+    assert _column_scale(table, 1, 1) == 1e9 and _column_scale(table, 1, 2) == 1e9
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>
