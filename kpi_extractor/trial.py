@@ -211,7 +211,30 @@ def main(argv: list[str] | None = None) -> int:
                                                 "lists": {s: o[3] for s, o in zip(symbols, outcomes)},
                                                 "filings": {s: o[2] for s, o in zip(symbols, outcomes)}}, default=str, indent=1))
     (out / "audit_sample.json").write_text(json.dumps(sample, default=str, indent=1))
+    (out / "patterns.json").write_text(json.dumps(reading_patterns({s: o[1] for s, o in zip(symbols, outcomes)}),
+                                                  default=str, indent=1))
     return 0
+
+
+def reading_patterns(values_by_symbol: dict[str, list[dict]]) -> list[dict]:
+    """What each accepted AI reading proves, kept for the learning loop: the KPI, the row label it was found under, its
+    column's heading, the scale and currency wording, and how it was located. Only verified figures count: a held
+    reading proves nothing yet. Records only; nothing reads them back in Phase 2."""
+    patterns = []
+    for symbol, values in sorted(values_by_symbol.items()):
+        for v in values:
+            if not v["group_key"].startswith(AI_GROUP_PREFIX) or v["validation_status"] != "verified" or v.get("method") != "ai":
+                continue
+            locator = v.get("locator") or {}
+            patterns.append({
+                "symbol": symbol, "group": v.get("group_label"), "kind": v.get("group_kind"), "kpi": v.get("kpi_label"),
+                "unit": v.get("unit"), "currency": v.get("currency"), "period_end": v.get("period_end"),
+                "how": "tag" if locator.get("tagged") else "quote" if locator.get("quote") else "table" if locator.get("table") else "other",
+                "row_label": locator.get("row_label"), "header": locator.get("header"), "context": locator.get("context"),
+                "scale": locator.get("scale"), "scale_text": locator.get("scale_text"), "concept": locator.get("concept"),
+                "quote": locator.get("quote"),
+            })
+    return patterns
 
 
 if __name__ == "__main__":

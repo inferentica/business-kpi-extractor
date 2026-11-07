@@ -2019,6 +2019,10 @@ def test_a_trial_scores_what_a_new_company_would_store():
     summary = summarize([report])
     assert summary["autoAccepted"] == 0.75 and summary["companyQuarters"] == 2 and summary["aiCalls"] == 7
     assert summary["codeShare"] == 0.5 and summary["aiCallsPerCompany"] == 7 and summary["aiCallsPerQuarter"] == 3.5
+    from kpi_extractor.trial import reading_patterns
+    patterns = reading_patterns({"X": values})
+    assert len(patterns) == sum(1 for v in values if v["group_key"].startswith("kpi_") and v["validation_status"] == "verified"
+                                and v.get("method") == "ai")
     sample = audit_sample({"X": values}, 2, seed=1)
     assert len(sample) == 2 and all(item["symbol"] == "X" and item["where"] == "q" for item in sample)
 
