@@ -79,7 +79,8 @@ class AiReading:
         changed groups to the AI. The rest goes to Flash. A group Flash's reading confirms stands alone; the reasoning reader reads the
         others independently, values stand where the two agree or where the checks settle them, and the reasoning reader reviews the
         rest."""
-        currency = self._default_currency()
+        # A company that tags no segments has no reporting currency yet: its release's own "$" amounts say it.
+        currency = self._default_currency() or document.declared_currency() or document.marked_currency()
         self._local.replayed = False
         self._local.second_read = None
         replayed, replay_located, done = self._replay_groups(document, spec, expected, currency)

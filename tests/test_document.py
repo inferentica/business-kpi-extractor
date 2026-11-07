@@ -183,3 +183,12 @@ def test_ordinary_tables_are_left_alone():
     from kpi_extractor.document import parse_document
     document = parse_document("<table><tr><td>Revenue</td><td>10</td></tr></table>", "https://www.sec.gov/x.htm")
     assert next(iter(document.tables.values())).rows == [["Revenue", "10"]]
+
+
+def test_a_document_marked_in_dollars_reads_as_dollars():
+    # Stock Yards' release declares no currency, but its amounts carry "$"; a mixed or sparse document says nothing.
+    rows = "".join(f"<tr><td>Line {i}</td><td>$ {i},000</td></tr>" for i in range(12))
+    assert parse_document(f"<table>{rows}</table>", "https://example.com/ex99.htm").marked_currency() == "USD"
+    mixed = rows + "".join(f"<tr><td>Euro {i}</td><td>€{i},000</td></tr>" for i in range(6))
+    assert parse_document(f"<table>{mixed}</table>", "https://example.com/ex99.htm").marked_currency() is None
+    assert parse_document("<table><tr><td>A</td><td>$ 5</td></tr></table>", "https://example.com/ex99.htm").marked_currency() is None

@@ -1,6 +1,8 @@
 """Earnings documents as numbered tables and text blocks the AI can point into, and the numbers code reads back."""
 from __future__ import annotations
 
+from collections import Counter
+
 import re
 from dataclasses import dataclass, field
 
@@ -131,6 +133,24 @@ class Document:
             for match in _TABLE_SCALE.finditer(text):
                 found.add(_SCALE_WORDS[match.group("word").lower().rstrip("s")])
         return found.pop() if len(found) == 1 else None
+
+    def marked_currency(self) -> str | None:
+        """The currency nearly all of a document's marked amounts carry ("$ 22,717", "€1,838"), or None when they are
+        mixed or few: a US bank's release marks its amounts with "$" and declares no currency."""
+        markers = (("NT$", "TWD"), ("US$", "USD"), ("HK$", "HKD"), ("C$", "CAD"), ("A$", "AUD"), ("R$", "BRL"), ("S/", "PEN"),
+                   ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("$", "USD"))
+        found: Counter = Counter()
+        for table in self.tables.values():
+            for row in table.rows:
+                for cell in row[1:]:
+                    if cell and re.search(r"\d", cell):
+                        if code := next((code for marker, code in markers if marker in cell), None):
+                            found[code] += 1
+        total = sum(found.values())
+        if total < 10:
+            return None
+        code, count = found.most_common(1)[0]
+        return code if count >= 0.9 * total else None
 
     def declared_currency(self) -> str | None:
         """The one currency a document's amount declarations name, if any."""
