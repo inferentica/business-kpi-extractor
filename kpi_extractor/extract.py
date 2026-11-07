@@ -403,8 +403,8 @@ def _preceding_scale(text: str, at: int) -> float | None:
 _ROW_SCALE_SHORT = re.compile(r"\(\s*(?P<word>bil|bn|mil|mm|mn|thous)\.?\s*\)", re.I)
 # A KPI priced per unit is in units, whatever its table's "$ Millions, Except as Indicated" or "In thousands, except
 # yield amounts" says: FedEx's "Revenue per Package" and "Package Yield", ConocoPhillips' "Realized Price ($/MCF)". Apollo's
-# "Yield" is an asset class, so a yield counts only per package, pound, piece, shipment, passenger or unit.
-_PER_UNIT_KPI = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\b(?:package|pound|piece|shipment|passenger|unit)\s+yields?\b|\bARP[AU]\b|\bASP\b", re.I)
+# "Yield" is an asset class, so a yield counts only for packages, freight, pounds, pieces, shipments, passengers or units.
+_PER_UNIT_KPI = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\b(?:package|freight|pound|piece|shipment|passenger|unit)\s+yields?\b|\bARP[AU]\b|\bASP\b", re.I)
 
 
 def _row_scale(text: str) -> float | None:

@@ -284,7 +284,10 @@ def test_a_per_unit_kpi_keeps_its_units_in_a_table_in_millions():
 <tr><td>Total</td><td>5.70</td></tr></table>""", "Natural Gas Realized Price ($/MCF)", "currency", 1, 1, scale=1)
     revenue = _read_one("""<table><tr><td>($ Millions, Except as Indicated)</td><td>3Q26</td></tr>
 <tr><td>Total revenues</td><td>20,057</td></tr></table>""", "Total Revenues", "currency", 1, 1)
-    assert (yield_.value, price.value, revenue.value) == (15.32, 5.70, 20_057_000_000)
+    freight = _read_one("""<table><tr><td>In millions, except yield amounts</td><td>Q3 2026</td></tr>
+<tr><td>International export composite freight</td><td>$ 1.21</td></tr></table>""", "International Composite Freight Yield",
+                        "currency", 1, 1, scale=1)
+    assert (yield_.value, price.value, revenue.value, freight.value) == (15.32, 5.70, 20_057_000_000, 1.21)
 
 
 def test_a_row_label_with_a_short_scale_scales_its_count():
