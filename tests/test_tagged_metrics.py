@@ -391,4 +391,4 @@ def test_a_ratio_tagged_as_a_decimal_reads_as_a_percentage():
     cet1 = Tag("mcbs:CommonEquityTierOneCapitalToRiskWeightedAssets", (), True)
     deposits = Tag("us-gaap:Deposits", (), True)
     scaled = _percent_scale({cet1: 0.1747, deposits: 1.2})
-    assert round(scaled[cet1], 4) == 17.47 and scaled[deposits] == 1.2
+    assert scaled[cet1] == 17.47 and scaled[deposits] == 1.2

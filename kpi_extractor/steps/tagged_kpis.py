@@ -23,7 +23,7 @@ _RATIO_CONCEPT = re.compile(r"Ratio|Percent|Rate|Margin|Yield|To[A-Z]")
 
 def _percent_scale(found: dict) -> dict:
     """A quarter's facts as a percent KPI reads them: a ratio concept's decimal (0.1747) as a percentage (17.47)."""
-    return {tag: (value * 100 if abs(value) <= 1.5 and _RATIO_CONCEPT.search(tag.concept.split(":")[-1]) else value)
+    return {tag: (round(value * 100, 8) if abs(value) <= 1.5 and _RATIO_CONCEPT.search(tag.concept.split(":")[-1]) else value)
             for tag, value in found.items()}
 
 
