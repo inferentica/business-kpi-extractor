@@ -290,6 +290,23 @@ def test_a_per_unit_kpi_keeps_its_units_in_a_table_in_millions():
     assert (yield_.value, price.value, revenue.value, freight.value) == (15.32, 5.70, 20_057_000_000, 1.21)
 
 
+def test_a_scale_quoted_beside_the_table_beats_the_caption_it_inherits():
+    # Goldman 2017: the assets under supervision table follows the VaR table "$ in millions" but is "$ in billions".
+    document = parse_document("""<p>Average Daily VaR $ in millions</p><p>Assets Under Supervision $ in billions</p>
+<table><tr><td>$ in millions</td><td>Three Months Ended December 31, 2017</td></tr>
+<tr><td>Total long-term AUS net inflows / (outflows)</td><td>(1)</td></tr></table>""", "https://example.com/ex99.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "k", "label": "Long-Term AUS Net Inflows", "unit": "currency"}]}]})
+    located = Located.model_validate({"period_end": "2017-12-31", "values": [
+        {"kpi": "ops.k", "table": table, "row": 1, "col": 1, "scale": 1e9, "scale_text": "$ in billions"}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == [] and values[0].value == -1_000_000_000
+    unquoted = Located.model_validate({"period_end": "2017-12-31", "values": [
+        {"kpi": "ops.k", "table": table, "row": 1, "col": 1, "scale": 1e9}]})
+    assert read_values(document, spec, unquoted, "USD")[0][0].value == -1_000_000
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>

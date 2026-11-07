@@ -151,11 +151,18 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         if kpi.unit == "currency" and parsed.scale_word is None:
             # A row that states its own scale overrides the table's: JPM's "Debit and credit card sales volume (in
             # billions)" in a table "(in millions)".
-            declared = _row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col) \
-                or (1.0 if _PER_UNIT_KPI.search(kpi.label) else None) or table.declared_scale()
+            own = _row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col) \
+                or (1.0 if _PER_UNIT_KPI.search(kpi.label) else None)
+            declared = own or table.declared_scale()
             if declared is None:
                 declared = document.default_scale()
-            if declared is not None:
+            if own is None and declared is not None and locator.scale in (1e3, 1e6, 1e9) and locator.scale != declared \
+                    and _scale_quoted(document, table, locator.scale_text, locator.scale):
+                # Wording the reader quotes from beside the table beats a caption the table only inherits from the
+                # one before it: Goldman's "$ in billions" assets under supervision after its VaR table "$ in millions".
+                notes.append(f"scale quoted: {clean(locator.scale_text or '')[:40]!r} over the table's {declared:g}")
+                value *= locator.scale
+            elif declared is not None:
                 if locator.scale not in (None, declared):
                     notes.append(f"table declares scale {declared:g}, AI said {locator.scale:g}")
                 value *= declared
