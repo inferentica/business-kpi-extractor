@@ -95,13 +95,16 @@ class AiReading:
 
     def _read_ai(self, text, document: Document, spec: Spec, expected: date, version: int | None, currency: str | None,
                  partial: bool = False):
-        def build(subset: Spec | None = None) -> str:
+        def build(subset: Spec | None = None, hints: bool = True) -> str:
             if not callable(text):
                 return text
             try:
-                return text(subset) if subset is not None else text()
-            except TypeError:
-                return text()  # a prompt that does not take a part of the list
+                return text(subset, hints=hints)
+            except TypeError:  # a prompt without the hints switch, or without a part of the list
+                try:
+                    return text(subset) if subset is not None else text()
+                except TypeError:
+                    return text()
         full_text = build(spec if partial else None)
         flash, flash_read, flash_problems = self._locate(full_text, document, spec, currency, model="flash", thinking_first=False)
         flash_read, flash_problems = self._drop_wrong_columns(flash_read, flash_problems, document, flash, expected)
@@ -123,9 +126,11 @@ class AiReading:
         self.result.second_reads += 1
         self._local.second_read = why
         self.result.second_read_reasons[why] = self.result.second_read_reasons.get(why, 0) + 1
-        # The second reader: Flash, reasoning first, reading the document on its own.
-        pro, pro_read, pro_problems = self._locate(full_text if subset is spec else build(subset), document, subset,
-                                                   currency, model="flash", thinking_first=True)
+        # The second reader: Flash, reasoning first, reading the document on its own, without the hints of where each KPI
+        # was found before: given them, it could repeat the first reading's mistake instead of catching it. The hints sit
+        # after the document, so the prompt cache the two readings share is unchanged.
+        second_text = build((spec if partial else None) if subset is spec else subset, hints=False)
+        pro, pro_read, pro_problems = self._locate(second_text, document, subset, currency, model="flash", thinking_first=True)
         pro_read, pro_problems = self._drop_wrong_columns(pro_read, pro_problems, document, pro, expected)
         open_keys = {group.key for group in open_groups}
         by_flash = {f"{item.group.key}.{item.kpi.key}": item for item in flash_read if item.group.key in open_keys}

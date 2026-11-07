@@ -49,6 +49,7 @@ class FakeControl:
         # Every call is Flash; a reasoning call (the second reading, a review) answers as "reasoning".
         reader = "reasoning" if thinking else model
         self.calls.append((purpose, reader))
+        self.users = [*getattr(self, "users", []), (purpose, reader, user)]
         self.versions = [*getattr(self, "versions", []), prompt_version]
         return Reply(json.dumps(self.answers[(purpose, reader)]), f"call-{len(self.calls)}")
 
@@ -1805,6 +1806,16 @@ def test_second_reads_and_reviews_record_why():
     assert any("kept neither (prior_period)" in problem for problem in problems)
     # The standing reading's reason wins; the other reader's fills the KPIs it gave none for.
     assert located.missing_reasons == {"technology.n3": "not_reported", "technology.n5": "elsewhere"}
+
+
+def test_the_second_reader_reads_without_the_first_readings_hints():
+    document = parse_document(RELEASE, "https://www.sec.gov/x.htm")
+    control = FakeControl({("locate", "flash"): _answer(document), ("locate", "reasoning"): _answer(document)})
+    pipeline = _pipeline(control)
+    pipeline._read(lambda subset=None, hints=True: f"prompt hints={hints}", document, SPEC, EXPECTED)
+    locates = [(reader, user) for purpose, reader, user in control.users if purpose == "locate"]
+    assert [reader for reader, _ in locates] == ["flash", "reasoning"]
+    assert "hints=True" in locates[0][1] and "hints=False" in locates[1][1]
 
 
 def test_a_first_quarter_goes_to_the_second_reader_as_not_placed():

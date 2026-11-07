@@ -132,9 +132,9 @@ class ReleaseFlow:
             document = self._document(ref)
             period_hint = f"quarter ended about {expected} (fiscal {fiscal_period} {fiscal_year})"
 
-            def text(subset: Spec | None = None) -> str:  # built only when the AI reads: a replayed quarter costs none
+            def text(subset: Spec | None = None, hints: bool = True) -> str:  # built only when the AI reads
                 return ai.prompt(self.company, self._prompt_document(document, spec), ai.LOCATE_TASK,
-                                 ai.locate_data(period_hint, subset or spec, self._hints(expected)))
+                                 ai.locate_data(period_hint, subset or spec, self._hints(expected) if hints else {}))
 
             read, problems, located = self._read(text, document, spec, expected, version)
             self._keep_listed_series(read)
