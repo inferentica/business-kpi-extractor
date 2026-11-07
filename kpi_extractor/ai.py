@@ -353,7 +353,7 @@ trips, same-store sales, store count, net revenue retention, ARR, ad impressions
 Never track: total revenue on its own, revenue or profit growth rates (including FX-neutral or constant-currency \
 growth), costs, margins, operating or net income, EPS, cash flow or balance sheet lines, content, purchase or lease \
 obligations, non-GAAP adjustments, guidance or outlook, dividends and buybacks, or anything not given as a number for \
-the reported quarter.
+the reported quarter. Industry hints, when given after this task, lift this list only for the measures they name.
 
 When the documents give a breakdown as amounts (for example a financial report's revenue by technology in NT$), track \
 the amounts as a revenue_breakdown and do not also track its percentage shares: shares are computed from amounts. \
@@ -527,13 +527,13 @@ def prompt_version(purpose: str) -> str:
     return hashlib.sha1((SYSTEM + "\n" + _TASKS.get(purpose, purpose)).encode()).hexdigest()[:12]
 
 
-def propose_data(covered: list[str], to_name: list[str], current: "Spec | None" = None) -> str:
+def propose_data(covered: list[str], to_name: list[str], current: "Spec | None" = None, industry: str = "") -> str:
     covered_text = "\n".join(f"- {label}" for label in covered) or "- none"
     naming_text = "\n".join(to_name) or "- none"
     current_text = ("" if current is None or not current.groups else
                     "\n\nCurrent list (keep every group and key the documents still report; improve labels and add "
                     f"what is missing, but never rename a key):\n{kpi_lines(current)}")
-    return (f"Already covered by XBRL (do not repeat):\n{covered_text}\n\n"
+    return ((f"{industry}\n\n" if industry else "") + f"Already covered by XBRL (do not repeat):\n{covered_text}\n\n"
             f"Name these XBRL breakdowns (key: current title; member key = current label):\n{naming_text}{current_text}")
 
 

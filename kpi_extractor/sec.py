@@ -45,6 +45,7 @@ class CompanyProfile:
     name: str
     fiscal_year_end: str
     foreign: bool
+    sic: int | None = None
 
 
 @dataclass
@@ -125,6 +126,13 @@ def company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
     return _with_retries(lambda: _company_profile(symbol))
 
 
+def _sic(company) -> int | None:
+    try:
+        return int(str(getattr(company, "sic", None)).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
     company = Company(symbol)
     latest = _latest_annual_report(company)
@@ -135,6 +143,7 @@ def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
         name=str(company.name),
         fiscal_year_end=fiscal_year_end,
         foreign=files_as_foreign(company, latest),
+        sic=_sic(company),
     )
     return profile, company
 

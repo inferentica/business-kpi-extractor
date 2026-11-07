@@ -5,6 +5,7 @@ import re
 from datetime import date, timedelta
 
 from .. import ai
+from ..sectors import sector_hint, sector_of
 from ..ai import AiResponseError, Spec
 from ..control import ControlError
 from ..extract import _listed_kpi
@@ -191,7 +192,7 @@ class KpiListUpkeep:
             text = self._prompt_document(document, None)
             # Reasoning first: the KPI list and names shape every later quarter.
             current = Spec.model_validate({"groups": row["groups"]}) if row else None
-            spec = self._ask(ai.prompt(self.company, text, ai.PROPOSE_TASK, ai.propose_data(covered, to_name, current)),
+            spec = self._ask(ai.prompt(self.company, text, ai.PROPOSE_TASK, ai.propose_data(covered, to_name, current, sector_hint(sector_of(self.profile.sic)))),
                              "propose", Spec, thinking_first=True, model="flash")
         except Exception as error:  # noqa: BLE001
             self.result.errors.append(f"KPI list: {error}"[:300])
