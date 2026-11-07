@@ -263,6 +263,52 @@ def test_a_per_unit_row_in_a_table_in_millions_is_not_scaled():
     assert _row_scale("Consumer revenues $3,121") is None
 
 
+def _read_one(html, label, unit, row, col, scale=None, currency="USD"):
+    document = parse_document(html, "https://example.com/ex99.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "k", "label": label, "unit": unit}]}]})
+    located = Located.model_validate({"period_end": "2026-09-30", "values": [
+        {"kpi": "ops.k", "table": table, "row": row, "col": col, **({"scale": scale} if scale else {})}]})
+    values, problems = read_values(document, spec, located, currency)
+    assert problems == []
+    return values[0]
+
+
+def test_a_per_unit_kpi_keeps_its_units_in_a_table_in_millions():
+    # FedEx's "In thousands, except yield amounts" and ConocoPhillips' "$ Millions, Except as Indicated".
+    yield_ = _read_one("""<table><tr><td>In millions, except yield amounts</td><td>Q3 2026</td></tr>
+<tr><td>U.S. domestic composite</td><td>$ 15.32</td></tr></table>""", "U.S. Domestic Composite Revenue per Package",
+                       "currency", 1, 1, scale=1)
+    price = _read_one("""<table><tr><td>($ Millions, Except as Indicated)</td><td>3Q26</td></tr>
+<tr><td>Total</td><td>5.70</td></tr></table>""", "Natural Gas Realized Price ($/MCF)", "currency", 1, 1, scale=1)
+    revenue = _read_one("""<table><tr><td>($ Millions, Except as Indicated)</td><td>3Q26</td></tr>
+<tr><td>Total revenues</td><td>20,057</td></tr></table>""", "Total Revenues", "currency", 1, 1)
+    assert (yield_.value, price.value, revenue.value) == (15.32, 5.70, 20_057_000_000)
+
+
+def test_a_row_label_with_a_short_scale_scales_its_count():
+    # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
+    fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>
+<tr><td>Active FSD Subscriptions (mil)</td><td>1.1</td></tr></table>""", "Active FSD Subscriptions", "count", 1, 1)
+    assert round(fsd.value) == 1_100_000
+    from kpi_extractor.extract import _row_scale
+    assert _row_scale("Stores (b) 381") is None
+
+
+def test_a_table_in_two_currencies_takes_each_columns_own():
+    # Auna: "(Figures in millions of Soles and millions of US Dollars)" with a "2Q'25 (USD)" column beside "2Q'25".
+    html = """<table><tr><td>(Figures in millions of Soles and millions of US Dollars)</td><td>2Q'25 (USD)</td><td>2Q'25</td></tr>
+<tr><td>Holding and eliminations</td><td>(23)</td><td>(81)</td></tr>
+<tr><td>Average monthly revenue per plan member</td><td>18.02</td><td>S/ 62.90</td></tr></table>"""
+    soles = _read_one(html, "Holding and Eliminations", "currency", 1, 2, currency="PEN")
+    dollars = _read_one(html, "Holding and Eliminations", "currency", 1, 1, currency="PEN")
+    per_member = _read_one(html, "Average Monthly Revenue per Plan Member", "currency", 2, 2, currency="USD")
+    assert (soles.value, soles.currency) == (-81_000_000, "PEN")
+    assert (dollars.value, dollars.currency) == (-23_000_000, "USD")
+    assert (per_member.value, per_member.currency) == (62.90, "PEN")
+
+
 def test_a_count_spelled_out_is_read():
     from kpi_extractor.document import parse_number, word_number
     assert word_number("nine countries").value == 9 and word_number("twenty-five").value == 25

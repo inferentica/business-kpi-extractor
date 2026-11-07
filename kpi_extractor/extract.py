@@ -7,11 +7,11 @@ from dataclasses import dataclass, field
 
 from .ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
 from .checks import MIX_TOLERANCE
-from .document import Document, Table, TextBlock, clean, declared_currency, parse_number, word_number
+from .document import _DECLARED_CURRENCIES, Document, Table, TextBlock, clean, declared_currency, parse_number, word_number
 from .xbrl import member_key, remove_subtotals
 
 _CURRENCY_MARKERS = (("NT$", "TWD"), ("US$", "USD"), ("HK$", "HKD"), ("C$", "CAD"), ("A$", "AUD"), ("RMB", "CNY"),
-                     ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("$", "USD"))
+                     ("€", "EUR"), ("£", "GBP"), ("¥", "JPY"), ("S/", "PEN"), ("$", "USD"))
 
 
 class LocateError(ValueError):
@@ -152,7 +152,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
             # A row that states its own scale overrides the table's: JPM's "Debit and credit card sales volume (in
             # billions)" in a table "(in millions)".
             declared = _row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col) \
-                or table.declared_scale()
+                or (1.0 if _PER_UNIT_KPI.search(kpi.label) else None) or table.declared_scale()
             if declared is None:
                 declared = document.default_scale()
             if declared is not None:
@@ -165,7 +165,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
             else:
                 raise LocateError("amount scale unknown")
         context = f"{table.context} {' '.join(' '.join(row) for row in table.rows[:4])}"
-        return value, _currency(text, kpi, default_currency, context), notes
+        return value, _column_currency(table, locator.row, locator.col, text) or _currency(text, kpi, default_currency, context), notes
     block = document.blocks.get(locator.block or "") or _table_as_text(document, locator.block)
     if block is None:
         raise LocateError(f"unknown text block {locator.block}")
@@ -399,11 +399,22 @@ def _preceding_scale(text: str, at: int) -> float | None:
     return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(last.group("word") or last.group("within")).lower()]
 
 
+# A row label's short scale, Tesla's "Active FSD Subscriptions (mil)". Never a single letter: "(b)" is a footnote.
+_ROW_SCALE_SHORT = re.compile(r"\(\s*(?P<word>bil|bn|mil|mm|mn|thous)\.?\s*\)", re.I)
+# A KPI priced per unit is in units, whatever its table's "$ Millions, Except as Indicated" or "In thousands, except
+# yield amounts" says: FedEx's "Revenue per Package" and "Package Yield", ConocoPhillips' "Realized Price ($/MCF)". Apollo's
+# "Yield" is an asset class, so a yield counts only per package, pound, piece, shipment, passenger or unit.
+_PER_UNIT_KPI = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\b(?:package|pound|piece|shipment|passenger|unit)\s+yields?\b|\bARP[AU]\b|\bASP\b", re.I)
+
+
 def _row_scale(text: str) -> float | None:
     if _PER_UNIT.search(text):
         return 1.0
-    match = _ROW_SCALE.search(text)
-    return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(match.group("word") or match.group("within")).lower()] if match else None
+    if match := _ROW_SCALE.search(text):
+        return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(match.group("word") or match.group("within")).lower()]
+    if match := _ROW_SCALE_SHORT.search(text):
+        return {"bil": 1e9, "bn": 1e9, "mil": 1e6, "mm": 1e6, "mn": 1e6, "thous": 1e3}[match.group("word").lower()]
+    return None
 
 
 def _read_table(document: Document, locator: TableLocator, group: GroupSpec, default_currency: str | None) -> list[ReadValue]:
@@ -501,7 +512,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     if len(kept) < 2:
         raise LocateError("fewer than two rows")
     context = f"{table.context} {header}"
-    currency = _currency(total_row[2] if total_row else table.cell(locator.first_row, locator.col),
+    currency = _column_currency(table, locator.first_row, locator.col, table.cell(locator.first_row, locator.col)) if unit == "currency" else None
+    currency = currency or _currency(total_row[2] if total_row else table.cell(locator.first_row, locator.col),
                          KpiSpec(key="x", label="x", unit="currency"), default_currency,
                          context if declared_currency(context) else document.declared_currency()) if unit == "currency" else None
     # What the next quarter's replay needs: the total row's label (None when the table has none) and the scale used.
@@ -687,6 +699,16 @@ def _currency(text: str | None, kpi: KpiSpec, default_currency: str | None, cont
     if text and "$" in text:
         return default_currency or "USD"
     return default_currency if kpi.unit == "currency" else None
+
+
+def _column_currency(table: Table, row: int, col: int, text: str | None) -> str | None:
+    """The one currency a column's own header names, when its table gives each figure in two: Auna's "2Q'25 (USD)"
+    beside "2Q'25" under "(Figures in millions of Soles and millions of US Dollars)". A marker on the value comes first."""
+    if text and any(marker != "$" and marker in text for marker, _ in _CURRENCY_MARKERS):
+        return None
+    cells = " ".join(_heading(header, col) for header in table.rows[:max(row, 1)][:6] if col < len(header))
+    found = {code for pattern, code in _DECLARED_CURRENCIES if pattern.search(cells)}
+    return found.pop() if len(found) == 1 else None
 
 
 def _heading(row: list[str], col: int) -> str:

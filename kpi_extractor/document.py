@@ -36,6 +36,7 @@ _DECLARED_CURRENCIES = (
     (re.compile(r"hong kong dollars?|\bHK\$", re.I), "HKD"),
     (re.compile(r"pounds? sterling|£", re.I), "GBP"),
     (re.compile(r"\bU\.?S\.? dollars?\b|\bUS\$|\bUSD\b", re.I), "USD"),
+    (re.compile(r"(?i:\bsoles\b)|\bPEN\b"), "PEN"),
 )
 
 
