@@ -2010,13 +2010,15 @@ def test_a_trial_scores_what_a_new_company_would_store():
     filings = [{"accession": "1", "status": "processed", "notes": ["read by AI", "missing reasons: operating.d=elsewhere, operating.e=not_reported",
                                                                    "second read: not_placed"]}]
     spec = {"groups": [{"label": "Operating", "kpis": [{"key": "a"}, {"key": "b"}]}]}
-    report = company_report("X", SymbolResult("X", ai_calls=7), values, filings, spec)
+    report = company_report("X", SymbolResult("X", ai_calls=7, replayed_reads=2, flash_only_reads=1, second_reads=1), values, filings, spec)
+    assert report["reads"] == {"code": 2, "oneAi": 1, "twoAi": 1}
     assert report["aiFigures"] == {"verified": 3, "needs_review": 1, "rejected": 1} and report["xbrlFigures"] == 1
     assert report["autoAccepted"] == 0.75 and report["quarters"] == 2 and report["reviewItemsPerQuarter"] == 0.5
     assert report["reviewReasons"] == {"changed # in a quarter": 1}
     assert report["missingReasons"] == {"elsewhere": 1, "not_reported": 1} and report["secondReadReasons"] == {"not_placed": 1}
     summary = summarize([report])
     assert summary["autoAccepted"] == 0.75 and summary["companyQuarters"] == 2 and summary["aiCalls"] == 7
+    assert summary["codeShare"] == 0.5 and summary["aiCallsPerCompany"] == 7 and summary["aiCallsPerQuarter"] == 3.5
     sample = audit_sample({"X": values}, 2, seed=1)
     assert len(sample) == 2 and all(item["symbol"] == "X" and item["where"] == "q" for item in sample)
 

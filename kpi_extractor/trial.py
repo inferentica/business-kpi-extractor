@@ -101,6 +101,8 @@ def company_report(symbol: str, result: SymbolResult, values: list[dict], filing
         "missingReasons": dict(missing),
         "secondReadReasons": dict(result.second_read_reasons or second),
         "aiCalls": result.ai_calls,
+        # How each release was read: by code alone (the way it was read before), by one AI reading, or by two.
+        "reads": {"code": result.replayed_reads, "oneAi": result.flash_only_reads, "twoAi": result.second_reads},
         "errors": result.errors[:5],
     }
 
@@ -134,8 +136,9 @@ def summarize(companies: list[dict]) -> dict:
         status.update(company["aiFigures"])
     accepted = status["verified"] + status["needs_review"]
     quarters = sum(company["quarters"] for company in companies)
-    missing, reasons, second = Counter(), Counter(), Counter()
+    missing, reasons, second, reads = Counter(), Counter(), Counter(), Counter()
     for company in companies:
+        reads.update(company.get("reads") or {})
         missing.update(company["missingReasons"])
         reasons.update(company["reviewReasons"])
         second.update(company["secondReadReasons"])
@@ -151,6 +154,11 @@ def summarize(companies: list[dict]) -> dict:
         "topReviewReasons": reasons.most_common(12),
         "missingReasons": dict(missing),
         "secondReadReasons": dict(second),
+        "reads": dict(reads),
+        # The learning measures: the share of releases read by code alone, and AI calls per company and per quarter.
+        "codeShare": reads["code"] / sum(reads.values()) if sum(reads.values()) else None,
+        "aiCallsPerCompany": sum(company["aiCalls"] for company in companies) / len(companies) if companies else None,
+        "aiCallsPerQuarter": sum(company["aiCalls"] for company in companies) / quarters if quarters else None,
     }
 
 
@@ -179,14 +187,18 @@ def main(argv: list[str] | None = None) -> int:
              f"auto-accepted {pct(summary['autoAccepted'])}; review items per company-quarter "
              f"{summary['reviewItemsPerQuarter']:.2f}; AI calls {summary['aiCalls']}" if summary["reviewItemsPerQuarter"] is not None
              else f"Trial: {summary['companies']} companies, no figures",
+             f"Reads: {summary['reads'].get('code', 0)} by code, {summary['reads'].get('oneAi', 0)} by one AI reading, "
+             f"{summary['reads'].get('twoAi', 0)} by two (code share {pct(summary['codeShare'])}); AI calls per company "
+             f"{summary['aiCallsPerCompany'] or 0:.1f}, per company-quarter {summary['aiCallsPerQuarter'] or 0:.2f}",
              f"Missing reasons: {summary['missingReasons']}", f"Second reads: {summary['secondReadReasons']}",
-             f"Failed companies: {summary['failed']}", "", "| Company | KPIs | Accepted | Held | Auto | Items/quarter | AI calls | Errors |",
-             "|---|---|---|---|---|---|---|---|"]
+             f"Failed companies: {summary['failed']}", "", "| Company | KPIs | Accepted | Held | Auto | Items/quarter | AI calls | Code / 1 AI / 2 AI | Errors |",
+             "|---|---|---|---|---|---|---|---|---|"]
     for company in companies:
         lines.append(f"| {company['symbol']} | {company['kpis']} | {company['aiFigures'].get('verified', 0)} | "
                      f"{company['aiFigures'].get('needs_review', 0)} | {pct(company['autoAccepted'])} | "
                      f"{company['reviewItemsPerQuarter'] if company['reviewItemsPerQuarter'] is None else round(company['reviewItemsPerQuarter'], 2)} | "
-                     f"{company['aiCalls']} | {'; '.join(company['errors'])[:80]} |")
+                     f"{company['aiCalls']} | {company['reads']['code']} / {company['reads']['oneAi']} / {company['reads']['twoAi']} | "
+                     f"{'; '.join(company['errors'])[:80]} |")
     lines += ["", "Top review reasons:"] + [f"- {count} × {reason}" for reason, count in summary["topReviewReasons"]]
     text = "\n".join(lines)
     print(text)
