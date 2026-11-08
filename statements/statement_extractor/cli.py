@@ -18,6 +18,7 @@ from pathlib import Path
 from .base import company_profile, configure_identity, learn_year_offset, load_submission, periodic_reports
 from .choose import choose, mixed_vintage_q4s
 from .golden import report_text, score
+from .html_reader import read_document
 from .xbrl_reader import read_filing
 
 # AI calls this package makes, by design: none. Reported in every summary so a run's cost is on record.
@@ -52,8 +53,17 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
             filings.append(record)
             continue
         if xbrl is None:
-            record["note"] = "no XBRL"
+            found, notes, kinds = _read_printed(ref, profile.fiscal_year_end, offset or 0)
+            own = [reading for reading in found if reading.own]
+            record.update({"note": "no XBRL", "printed": kinds, "columns": len(found), "notes": notes,
+                           "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
+                           **_own_period(own, ref.form)})
             filings.append(record)
+            readings.extend(found)
+            log(f"{symbol}: {ref.form} {ref.filed} printed ({','.join(kinds) or 'nothing readable'}) {len(found)} columns, "
+                f"own {[f'{s}/{d}:{st}' for s, d, st in record['own']]}")
+            ref.filing = None
+            gc.collect()
             continue
         entity = xbrl.entity_info or {}
         if offset is None:
@@ -86,6 +96,41 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     return summary
 
 
+_PRINTED_DOCUMENTS = ("10-K", "10-K405", "10-Q", "20-F", "40-F", "10-KT", "EX-13")
+
+
+def _read_printed(ref, fiscal_year_end: str, year_offset: int) -> tuple[list, list[str], list[str]]:
+    """A filing without XBRL, read from its printed documents: the report itself and an annual report exhibit that
+    holds its statements (EX-13). Plain-text filings (about 1993-2000) are a later reader's."""
+    found, notes, kinds = [], [], []
+    raw_end = getattr(ref.filing, "period_of_report", None)
+    try:
+        document_end = date.fromisoformat(str(raw_end)[:10]) if raw_end else None
+    except ValueError:
+        document_end = None
+    for attachment in ref.filing.attachments:
+        kind = str(attachment.document_type or "").upper()
+        if not kind.startswith(_PRINTED_DOCUMENTS):
+            continue
+        extension = str(attachment.extension or "").lower()
+        if extension not in (".htm", ".html"):
+            if extension == ".txt":
+                kinds.append("text")
+            continue
+        try:
+            readings, document_notes = read_document(attachment.content, accession=ref.accession, form=ref.form,
+                                                     filed=ref.filed, document_end=document_end,
+                                                     fiscal_year_end=fiscal_year_end, year_offset=year_offset)
+        except Exception as error:  # noqa: BLE001 - one unreadable document never stops the filing
+            notes.append(f"{attachment.document}: unreadable ({type(error).__name__})")
+            continue
+        held = {reading.key for reading in found}
+        found.extend(reading for reading in readings if reading.key not in held)
+        notes.extend(f"{attachment.document}: {note}" for note in document_notes)
+        kinds.append("html")
+    return found, notes, sorted(set(kinds))
+
+
 def _own_period(own: list, form: str) -> dict:
     """The filing's own fiscal year and period: its balance sheet's, else any of its own columns' (a year for an annual
     report)."""
@@ -105,7 +150,7 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
     expected = found = 0
     missing = []
     for filing in filings:
-        if not filing.get("xbrl") or not filing.get("fiscal_period"):
+        if not filing.get("fiscal_period"):
             continue
         for statement, duration in expected_own(filing["form"], filing["fiscal_period"]):
             expected += 1
@@ -119,6 +164,9 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
         "foreign": profile.foreign, "since": since.isoformat(),
         "filings": len(filings), "xbrl_filings": sum(1 for f in filings if f.get("xbrl")),
         "no_xbrl_filings": [f"{f['form']} {f['filed']}" for f in filings if not f.get("xbrl")],
+        "printed_filings": sum(1 for f in filings if "html" in (f.get("printed") or [])),
+        "text_filings": [f"{f['form']} {f['filed']}" for f in filings if "text" in (f.get("printed") or []) and "html" not in (f.get("printed") or [])],
+        "unread_filings": [f"{f['form']} {f['filed']}" for f in filings if not f.get("xbrl") and not f.get("fiscal_period")],
         "periods": len(chosen), "by_status": by_status,
         "own_expected": expected, "own_kept": found, "own_missing": missing[:40],
         "comparative_only_periods": sum(1 for item in chosen if item["status"] == "kept"
@@ -162,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     read = commands.add_parser("read", help="Read one company's statements into files")
     read.add_argument("--symbol", required=True)
-    read.add_argument("--since", default="2009-01-01")
+    read.add_argument("--since", default="2001-01-01")
     read.add_argument("--out", required=True)
     scored = commands.add_parser("report", help="Score a set of reads")
     scored.add_argument("folders", nargs="+")
