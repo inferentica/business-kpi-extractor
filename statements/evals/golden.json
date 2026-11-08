@@ -8830,6 +8830,62 @@
    "era": "html",
    "checked": "read by hand",
    "basis": "ROC GAAP"
+  },
+  {
+   "symbol": "PRU",
+   "statement": "income",
+   "fiscal_year": "2009",
+   "fiscal_period": "Q2",
+   "duration": "quarter",
+   "label": "^total revenues$",
+   "value": 6879000000.0,
+   "scale": 1000000.0,
+   "source_accession": "0001193125-10-181360",
+   "era": "html",
+   "checked": "read by hand",
+   "note": "Q2 2010 10-Q comparative columns; run 9 had read the quarter as the six months"
+  },
+  {
+   "symbol": "PRU",
+   "statement": "income",
+   "fiscal_year": "2009",
+   "fiscal_period": "Q2",
+   "duration": "quarter",
+   "label": "^net income$",
+   "value": 180000000.0,
+   "scale": 1000000.0,
+   "source_accession": "0001193125-10-181360",
+   "era": "html",
+   "checked": "read by hand",
+   "note": "Q2 2010 10-Q comparative columns; run 9 had read the quarter as the six months"
+  },
+  {
+   "symbol": "PRU",
+   "statement": "income",
+   "fiscal_year": "2009",
+   "fiscal_period": "Q2",
+   "duration": "ytd",
+   "label": "^total revenues$",
+   "value": 15404000000.0,
+   "scale": 1000000.0,
+   "source_accession": "0001193125-10-181360",
+   "era": "html",
+   "checked": "read by hand",
+   "note": "Q2 2010 10-Q comparative columns; run 9 had read the quarter as the six months"
+  },
+  {
+   "symbol": "PRU",
+   "statement": "income",
+   "fiscal_year": "2009",
+   "fiscal_period": "Q2",
+   "duration": "ytd",
+   "label": "^net income$",
+   "value": 183000000.0,
+   "scale": 1000000.0,
+   "source_accession": "0001193125-10-181360",
+   "era": "html",
+   "checked": "read by hand",
+   "note": "Q2 2010 10-Q comparative columns; run 9 had read the quarter as the six months"
   }
  ]
 }
