@@ -164,6 +164,14 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
             results.append({**item, "outcome": "wrong" if candidates else "correct", "methods": sorted({str(v.get("method")) for v in candidates}),
                             "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates]})
             continue
+        if "wrong_value" in item:
+            # A figure an audit found wrong whose true value the filing never states for the quarter (Philips gives only
+            # January to June): serving that wrong value again is wrong; any other value is not scored.
+            bad = float(item["wrong_value"])
+            again = [value for value in candidates if abs(float(value["value"]) - bad) <= max(abs(bad) * 1e-6, 1e-9)]
+            results.append({**item, "outcome": "wrong" if again else "optional", "methods": sorted({str(v.get("method")) for v in again}),
+                            "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates][:3]})
+            continue
         expected = float(item["value"])
         tolerance = float(item.get("tolerance", 1e-6))
         # The whole observation must match: the number, and its currency where the golden value names one.

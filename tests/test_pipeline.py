@@ -1714,6 +1714,17 @@ def test_a_figure_that_must_not_be_served_scores_wrong_when_it_is():
     assert score(golden, {"X": [{**row, "group_label": "Costs"}]})["results"][0]["outcome"] == "correct"
 
 
+def test_a_wrong_value_served_again_scores_wrong_and_any_other_is_not_scored():
+    golden = [{"symbol": "X", "period_end": "2026-06-30", "fiscal_period": "Q2", "label": "^United States$", "unit": "currency",
+               "wrong_value": 3_281_000_000.0}]
+    row = {"group_key": "g", "kpi_key": "us", "fiscal_year": "2026", "fiscal_period": "Q2", "unit": "currency", "validation_status": "verified",
+           "period_end": "2026-06-30", "kpi_label": "United States", "group_label": "Revenue by Country", "value": 3_281_000_000.0, "method": "ai"}
+    again = score(golden, {"X": [row]})
+    assert again["results"][0]["outcome"] == "wrong" and again["wrong"] == 1
+    other = score(golden, {"X": [{**row, "value": 1_700_000_000.0}]})
+    assert other["results"][0]["outcome"] == "optional" and other["wrong"] == other["correct"] == other["missing"] == 0
+
+
 def test_a_release_that_left_out_a_group_now_read_is_read_again_once():
     from types import SimpleNamespace
 

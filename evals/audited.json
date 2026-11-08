@@ -14529,6 +14529,8 @@
     "label": "^Wealth\\ management\\ fees$",
     "unit": "currency",
     "value": 4629000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926045714/tm2612164d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -14549,6 +14551,8 @@
     "label": "^ROW$",
     "unit": "currency",
     "value": 339000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926056966/tm2613942d1_6k.htm",
     "audited": "audit300e"
   },
@@ -14559,6 +14563,8 @@
     "label": "^Service\\ charges\\ on\\ deposit\\ accounts$",
     "unit": "currency",
     "value": 848000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926048536/mcbs-20260424xex99d1.htm",
     "audited": "audit300e"
   },
@@ -14579,6 +14585,8 @@
     "label": "^Mortgage\\ servicing\\ income,\\ net$",
     "unit": "currency",
     "value": 781000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000047/mcbs-20250718xex99d1.htm",
     "audited": "audit300e"
   },
@@ -14609,6 +14617,8 @@
     "label": "^Total\\ Client\\ Assets\\ Under\\ Administration$",
     "unit": "currency",
     "value": 503000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026048244/q22026financialhighlightsa.htm",
     "audited": "audit300e"
   },
@@ -14669,6 +14679,8 @@
     "label": "^Lending\\ and\\ loan\\ servicing\\ fees$",
     "unit": "currency",
     "value": 3690000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465925069783/tm2521430d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -14689,6 +14701,8 @@
     "label": "^Net\\ gain\\ \\(loss\\)\\ on\\ investment\\ securities$",
     "unit": "currency",
     "value": 247000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895526000195/a8k3q26earningsreleaseex991.htm",
     "audited": "audit300e"
   },
@@ -14699,6 +14713,8 @@
     "label": "^Power\\ supply\\ to\\ non\\-end\\ consumers$",
     "unit": "currency",
     "value": 4235000000.0,
+    "currency": "BRL",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281425003897/ebrpr3q25_6k.htm",
     "audited": "audit300e"
   },
@@ -14709,6 +14725,8 @@
     "label": "^Total\\ Loans$",
     "unit": "currency",
     "value": 7987664000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/835324/000083532426000004/sybt-20260930.htm",
     "audited": "audit300e"
   },
@@ -14719,6 +14737,8 @@
     "label": "^WM\\&T\\ Assets\\ Under\\ Management$",
     "unit": "currency",
     "value": 7480000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184325006747/exh_991.htm",
     "audited": "audit300e"
   },
@@ -14739,6 +14759,8 @@
     "label": "^Foreign\\ Exchange$",
     "unit": "currency",
     "value": 16666000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895525000097/a8k3q25earningsreleaseex991.htm",
     "audited": "audit300e"
   },
@@ -14769,6 +14791,8 @@
     "label": "^Commercial\\ \\&\\ Industrial\\ Loans$",
     "unit": "currency",
     "value": 2516000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465925069783/tm2521430d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -14809,6 +14833,8 @@
     "label": "^RV\\ Average\\ Monthly\\ Base\\ Rent\\ per\\ Site$",
     "unit": "currency",
     "value": 697.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000156/exhibit991pressreleaseands.htm",
     "audited": "audit300e"
   },
@@ -14849,6 +14875,8 @@
     "label": "^Wealth\\ Management$",
     "unit": "currency",
     "value": 7351000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895525000097/a8k3q25earningsreleaseex991.htm",
     "audited": "audit300e"
   },
@@ -14859,6 +14887,8 @@
     "label": "^Net\\ investment\\ product\\ sales\\ commissions\\ and\\ fees$",
     "unit": "currency",
     "value": 1112000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184325006747/exh_991.htm",
     "audited": "audit300e"
   },
@@ -14869,6 +14899,8 @@
     "label": "^WM\\&T\\ Assets\\ Under\\ Management$",
     "unit": "currency",
     "value": 7193000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184325004628/exh_991.htm",
     "audited": "audit300e"
   },
@@ -14879,6 +14911,8 @@
     "label": "^Dayrate\\ Equivalent\\ Backlog$",
     "unit": "currency",
     "value": 1170000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126022412/ef20074577_ex99-2.htm",
     "audited": "audit300e"
   },
@@ -14889,6 +14923,8 @@
     "label": "^Direct\\-to\\-Consumer$",
     "unit": "currency",
     "value": 316600000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315226007955/ex99-1.htm",
     "audited": "audit300e"
   },
@@ -14899,6 +14935,8 @@
     "label": "^Germany$",
     "unit": "currency",
     "value": 2979000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495425008453/a3187s.htm",
     "audited": "audit300e"
   },
@@ -14919,6 +14957,8 @@
     "label": "^Owner\\ Occupied\\ Commercial\\ RE\\ Loans$",
     "unit": "currency",
     "value": 4041000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926045714/tm2612164d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -14939,6 +14979,8 @@
     "label": "^West\\ Africa$",
     "unit": "currency",
     "value": 71900000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828025049534/q320256-k.htm",
     "audited": "audit300e"
   },
@@ -14969,6 +15011,8 @@
     "label": "^Other\\ Europe$",
     "unit": "currency",
     "value": 1509000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495426000933/a7811rtst.htm",
     "audited": "audit300e"
   },
@@ -14979,6 +15023,8 @@
     "label": "^Asset\\ Management\\ Fees$",
     "unit": "currency",
     "value": 858000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000012/exhibit992-4q25qfs.htm",
     "audited": "audit300e"
   },
@@ -14989,6 +15035,8 @@
     "label": "^Other$",
     "unit": "currency",
     "value": 753000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184326004978/exh_991.htm",
     "audited": "audit300e"
   },
@@ -14999,6 +15047,8 @@
     "label": "^Bareboat\\ charter\\ revenue$",
     "unit": "currency",
     "value": 26700000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036125040727/ef20058406_ex99-2.htm",
     "audited": "audit300e"
   },
@@ -15019,6 +15069,8 @@
     "label": "^ROW$",
     "unit": "currency",
     "value": 401612000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465925106104/tm2530212d1_6k.htm",
     "audited": "audit300e"
   },
@@ -15029,6 +15081,8 @@
     "label": "^Healthcare\\ Services\\ Colombia$",
     "unit": "currency",
     "value": 346000000.0,
+    "currency": "PEN",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010325010462/dp233186_ex9901.htm",
     "audited": "audit300e"
   },
@@ -15039,6 +15093,8 @@
     "label": "^International\\ Priority\\ Freight$",
     "unit": "currency",
     "value": 784000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
     "audited": "audit300e"
   },
@@ -15049,6 +15105,8 @@
     "label": "^Bookings\\ at\\ 100%\\ Share$",
     "unit": "currency",
     "value": 400330000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926010887/dlr-20260205xex99d1.htm",
     "audited": "audit300e"
   },
@@ -15069,6 +15127,8 @@
     "label": "^Dayrate\\ revenue$",
     "unit": "currency",
     "value": 187700000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126032598/ef20080031_ex99-2.htm",
     "audited": "audit300e"
   },
@@ -15129,6 +15189,8 @@
     "label": "^Management\\ contract\\ revenue$",
     "unit": "currency",
     "value": 10800000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126006137/ef20066099_ex99-2.htm",
     "audited": "audit300e"
   },
@@ -15159,6 +15221,8 @@
     "label": "^Gain\\ on\\ sale\\ of\\ SBA\\ loans$",
     "unit": "currency",
     "value": 643000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000047/mcbs-20250718xex99d1.htm",
     "audited": "audit300e"
   },
@@ -15179,6 +15243,8 @@
     "label": "^Commercial\\ Loan\\ Outstanding\\ Face\\ Amount$",
     "unit": "currency",
     "value": 167000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1786117/000110465926086260/pine-20260723xex99d1.htm",
     "audited": "audit300e"
   },
@@ -15209,6 +15275,8 @@
     "label": "^Non\\-Interest\\ Bearing\\ Deposits$",
     "unit": "currency",
     "value": 1435846000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184326000445/exh_991.htm",
     "audited": "audit300e"
   },
@@ -15219,6 +15287,8 @@
     "label": "^Noninterest\\-Bearing\\ Demand\\ Deposits$",
     "unit": "currency",
     "value": 6444067000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465925101399/tm2529198d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -15239,6 +15309,8 @@
     "label": "^U\\.S\\.\\ Priority$",
     "unit": "currency",
     "value": 3142000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
     "audited": "audit300e"
   },
@@ -15269,6 +15341,8 @@
     "label": "^Net\\ investment\\ product\\ sales\\ commissions\\ and\\ fees$",
     "unit": "currency",
     "value": 980000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184325004628/exh_991.htm",
     "audited": "audit300e"
   },
@@ -15279,6 +15353,8 @@
     "label": "^Average\\ Home\\ Selling\\ Price$",
     "unit": "currency",
     "value": 91117.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000272/exhibit991pressreleaseands.htm",
     "audited": "audit300e"
   },
@@ -15289,6 +15365,8 @@
     "label": "^Healthcare\\ Services\\ Peru$",
     "unit": "currency",
     "value": 279000000.0,
+    "currency": "PEN",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010325015107/dp237728_ex9901.htm",
     "audited": "audit300e"
   },
@@ -15299,6 +15377,8 @@
     "label": "^Lending\\ and\\ loan\\ servicing\\ fees$",
     "unit": "currency",
     "value": 3332000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926117113/tm2627820d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -15329,6 +15409,8 @@
     "label": "^Commercial\\ Construction\\ \\&\\ Land\\ Loans$",
     "unit": "currency",
     "value": 1143000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926085229/tm2620881d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -15339,6 +15421,8 @@
     "label": "^Commercial\\ Real\\ Estate\\ Loans$",
     "unit": "currency",
     "value": 814464000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000058/mcbs-20251017xex99d1.htm",
     "audited": "audit300e"
   },
@@ -15409,6 +15493,8 @@
     "label": "^Commercial\\ Real\\ Estate\\ Loans$",
     "unit": "currency",
     "value": 1479506000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926118460/mcbs-ex99d1.htm",
     "audited": "audit300e"
   },
@@ -15419,6 +15505,8 @@
     "label": "^Aeronautics\\ Backlog$",
     "unit": "currency",
     "value": 55032000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026026683/ex991q12026.htm",
     "audited": "audit300e"
   },
@@ -15429,6 +15517,8 @@
     "label": "^U\\.S\\.\\ Priority$",
     "unit": "currency",
     "value": 2843000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891125000076/fdx-earningsreleasefy2026q2.htm",
     "audited": "audit300e"
   },
@@ -15509,6 +15599,8 @@
     "label": "^Japan\\ Face\\ Amount\\ of\\ Individual\\ Policies\\ in\\ Force$",
     "unit": "currency",
     "value": 506000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000093/exhibit992-1q26qfs.htm",
     "audited": "audit300e"
   },
@@ -15519,6 +15611,8 @@
     "label": "^Net\\ gains\\ from\\ sales\\ of\\ other\\ loans$",
     "unit": "currency",
     "value": 947000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926085229/tm2620881d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -15529,6 +15623,8 @@
     "label": "^Residential\\ and\\ Commercial\\ Mortgage$",
     "unit": "currency",
     "value": 148000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000006/q42025financialhighlightsa.htm",
     "audited": "audit300e"
   },
@@ -15549,6 +15645,8 @@
     "label": "^Natural\\ Gas\\ Realized\\ Price$",
     "unit": "currency",
     "value": 4.28,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316525000056/cop-20251106x8kexx992.htm",
     "audited": "audit300e"
   },
@@ -15559,6 +15657,8 @@
     "label": "^ROW$",
     "unit": "currency",
     "value": 368000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926121154/tm2628724d1_6k.htm",
     "audited": "audit300e"
   },
@@ -15589,6 +15689,8 @@
     "label": "^Bareboat\\ charter\\ revenue$",
     "unit": "currency",
     "value": 26600000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828026036988/q120266-k.htm",
     "audited": "audit300e"
   },
@@ -15609,6 +15711,8 @@
     "label": "^Other\\ service\\ charges,\\ commissions\\ and\\ fees$",
     "unit": "currency",
     "value": 1428000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926086635/mcbs-20260724xex99d1.htm",
     "audited": "audit300e"
   },
@@ -15619,6 +15723,8 @@
     "label": "^Generation$",
     "unit": "currency",
     "value": 7021000000.0,
+    "currency": "BRL",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426000554/axiapr4q25_6k.htm",
     "audited": "audit300e"
   },
@@ -15639,6 +15745,8 @@
     "label": "^International\\ Priority\\ Package$",
     "unit": "currency",
     "value": 2677000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
     "audited": "audit300e"
   },
@@ -15659,6 +15767,8 @@
     "label": "^Assets\\ Under\\ Administration$",
     "unit": "currency",
     "value": 190900000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000093/exhibit992-1q26qfs.htm",
     "audited": "audit300e"
   },
@@ -15669,6 +15779,8 @@
     "label": "^Discretionary\\ Client\\ AUM$",
     "unit": "currency",
     "value": 247000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026048244/q22026financialhighlightsa.htm",
     "audited": "audit300e"
   },
@@ -15679,6 +15791,8 @@
     "label": "^Africa$",
     "unit": "currency",
     "value": 1932000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495425008453/a3187s.htm",
     "audited": "audit300e"
   },
@@ -15729,6 +15843,8 @@
     "label": "^Realized\\ Price\\ per\\ BOE$",
     "unit": "currency",
     "value": 50.36,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000016/cop-20260430x8kexx992.htm",
     "audited": "audit300e"
   },
@@ -15769,6 +15885,8 @@
     "label": "^Commercial\\ \\&\\ Industrial\\ Loans$",
     "unit": "currency",
     "value": 2771000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926045714/tm2612164d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -15829,6 +15947,8 @@
     "label": "^Gross\\ Loans\\ Held\\ for\\ Investment$",
     "unit": "currency",
     "value": 2967492000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000058/mcbs-20251017xex99d1.htm",
     "audited": "audit300e"
   },
@@ -15839,6 +15959,8 @@
     "label": "^UK$",
     "unit": "currency",
     "value": 1934000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495425008453/a3187s.htm",
     "audited": "audit300e"
   },
@@ -15849,6 +15971,8 @@
     "label": "^Bookings\\ at\\ DLR\\ Share$",
     "unit": "currency",
     "value": 208000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926086270/dlr-20260723xex99d1.htm",
     "audited": "audit300e"
   },
@@ -15879,6 +16003,8 @@
     "label": "^Bookings\\ at\\ DLR\\ Share$",
     "unit": "currency",
     "value": 161804000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465925101827/dlr-20251023xex99d1.htm",
     "audited": "audit300e"
   },
@@ -15889,6 +16015,8 @@
     "label": "^Average\\ Home\\ Selling\\ Price$",
     "unit": "currency",
     "value": 96396.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000073/exhibit991pressreleaseands.htm",
     "audited": "audit300e"
   },
@@ -15909,6 +16037,8 @@
     "label": "^Fixed\\ Backlog$",
     "unit": "currency",
     "value": 4985900000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000007/prim-20260217xex99.htm",
     "audited": "audit300e"
   },
@@ -15919,6 +16049,8 @@
     "label": "^O\\&M\\ revenue$",
     "unit": "currency",
     "value": 475000000.0,
+    "currency": "BRL",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426000554/axiapr4q25_6k.htm",
     "audited": "audit300e"
   },
@@ -15949,6 +16081,8 @@
     "label": "^Retail\\ Customers\\ \\-\\ Third\\ Party$",
     "unit": "currency",
     "value": 224000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000170/exhibit992-2q26qfs.htm",
     "audited": "audit300e"
   },
@@ -15969,6 +16103,8 @@
     "label": "^Transmission\\ RAP$",
     "unit": "currency",
     "value": 16839000000.0,
+    "currency": "BRL",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426004087/axiapr2q26_6k.htm",
     "audited": "audit300e"
   },
@@ -15999,6 +16135,8 @@
     "label": "^Institutional\\ Customers\\ \\-\\ Third\\ Party$",
     "unit": "currency",
     "value": 402000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000170/exhibit992-2q26qfs.htm",
     "audited": "audit300e"
   },
@@ -16019,6 +16157,8 @@
     "label": "^Transmission\\ RAP$",
     "unit": "currency",
     "value": 16733000000.0,
+    "currency": "BRL",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426000554/axiapr4q25_6k.htm",
     "audited": "audit300e"
   },
@@ -16029,6 +16169,8 @@
     "label": "^Holding\\ and\\ Eliminations$",
     "unit": "currency",
     "value": -96444000.0,
+    "currency": "PEN",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010326007438/dp246930_ex9902.htm",
     "audited": "audit300e"
   },
@@ -16039,6 +16181,8 @@
     "label": "^Others$",
     "unit": "currency",
     "value": 60512000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465925071915/tm2521924d2_6k.htm",
     "audited": "audit300e"
   },
@@ -16059,6 +16203,8 @@
     "label": "^U\\.S\\.\\ Ground$",
     "unit": "currency",
     "value": 9173000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891125000076/fdx-earningsreleasefy2026q2.htm",
     "audited": "audit300e"
   },
@@ -16089,6 +16235,8 @@
     "label": "^Concorde\\ Revenue\\ per\\ Student$",
     "unit": "currency",
     "value": 7400.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000003/q12026financialsupplemen.htm",
     "audited": "audit300e"
   },
@@ -16099,6 +16247,8 @@
     "label": "^Europe$",
     "unit": "currency",
     "value": 17600000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828026036988/q120266-k.htm",
     "audited": "audit300e"
   },
@@ -16119,6 +16269,8 @@
     "label": "^Point\\ in\\ time$",
     "unit": "currency",
     "value": 8800000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828026055957/borr-20260630.htm",
     "audited": "audit300e"
   },
@@ -16129,6 +16281,8 @@
     "label": "^Refining\\ \\&\\ Marketing\\ Adjusted\\ EBITDA\\ per\\ Barrel$",
     "unit": "currency",
     "value": 7.15,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000003/mpcq42025earningsrelease.htm",
     "audited": "audit300e"
   },
@@ -16169,6 +16323,8 @@
     "label": "^U\\.S\\.\\ Ground$",
     "unit": "currency",
     "value": 9545000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
     "audited": "audit300e"
   },
@@ -16179,6 +16335,8 @@
     "label": "^Backlog$",
     "unit": "currency",
     "value": 15700000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/68505/000006850526000006/msiq42025pressrelease.htm",
     "audited": "audit300e"
   },
@@ -16209,6 +16367,8 @@
     "label": "^Bookings\\ at\\ 100%\\ Share$",
     "unit": "currency",
     "value": 706883000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926047702/dlr-20260423xex99d1.htm",
     "audited": "audit300e"
   },
@@ -16259,6 +16419,8 @@
     "label": "^EU$",
     "unit": "currency",
     "value": 393000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926056966/tm2613942d1_6k.htm",
     "audited": "audit300e"
   },
@@ -16269,6 +16431,8 @@
     "label": "^U\\.S\\.\\ Deferred$",
     "unit": "currency",
     "value": 1396000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891125000076/fdx-earningsreleasefy2026q2.htm",
     "audited": "audit300e"
   },
@@ -16289,6 +16453,8 @@
     "label": "^Canadian\\ Banking$",
     "unit": "currency",
     "value": 3646000000.0,
+    "currency": "CAD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312526364115/d93977dex991.htm",
     "audited": "audit300e"
   },
@@ -16299,6 +16465,8 @@
     "label": "^Global\\ Wealth\\ Management$",
     "unit": "currency",
     "value": 1897000000.0,
+    "currency": "CAD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312526364115/d93977dex991.htm",
     "audited": "audit300e"
   },
@@ -16319,6 +16487,8 @@
     "label": "^Deposits$",
     "unit": "currency",
     "value": 966279000000.0,
+    "currency": "CAD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312525304589/d849316dex991.htm",
     "audited": "audit300e"
   },
@@ -16329,6 +16499,8 @@
     "label": "^EU$",
     "unit": "currency",
     "value": 394914000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465925106104/tm2530212d1_6k.htm",
     "audited": "audit300e"
   },
@@ -16339,6 +16511,8 @@
     "label": "^UTI\\ Revenue\\ per\\ Student$",
     "unit": "currency",
     "value": 9200.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000009/q22026financialsupplemen.htm",
     "audited": "audit300e"
   },
@@ -16349,6 +16523,8 @@
     "label": "^Global\\ Wealth\\ Management$",
     "unit": "currency",
     "value": 1801000000.0,
+    "currency": "CAD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312526065249/d93621dex991.htm",
     "audited": "audit300e"
   },
@@ -16359,6 +16535,8 @@
     "label": "^Africa$",
     "unit": "currency",
     "value": 2208000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495426000933/a7811rtst.htm",
     "audited": "audit300e"
   },
@@ -16439,6 +16617,8 @@
     "label": "^The\\ Americas$",
     "unit": "currency",
     "value": 5000000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741026000061/a2026-10x28xunileverq320.htm",
     "audited": "audit300e"
   },
@@ -16459,6 +16639,8 @@
     "label": "^UTI\\ Revenue\\ per\\ Student$",
     "unit": "currency",
     "value": 8700.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000003/q12026financialsupplemen.htm",
     "audited": "audit300e"
   },
@@ -16519,6 +16701,8 @@
     "label": "^Biopharma$",
     "unit": "currency",
     "value": 1632629000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465925071915/tm2521924d2_6k.htm",
     "audited": "audit300e"
   },
@@ -16539,6 +16723,8 @@
     "label": "^New\\ Awards\\ for\\ Battery\\ Electric\\ or\\ Full\\-Hybrid\\ Platforms$",
     "unit": "currency",
     "value": 36600000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1320461/000132046126000110/q22026earningsrelease.htm",
     "audited": "audit300e"
   },
@@ -16549,6 +16735,8 @@
     "label": "^Missiles\\ and\\ Fire\\ Control\\ Backlog$",
     "unit": "currency",
     "value": 142517000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026066780/ex991q32026.htm",
     "audited": "audit300e"
   },
@@ -16569,6 +16757,8 @@
     "label": "^Space\\ Backlog$",
     "unit": "currency",
     "value": 38390000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828025045582/ex991q32025.htm",
     "audited": "audit300e"
   },
@@ -16609,6 +16799,8 @@
     "label": "^MSA\\ Backlog$",
     "unit": "currency",
     "value": 6960100000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153825000038/prim-20251029xex99.htm",
     "audited": "audit300e"
   },
@@ -16619,6 +16811,8 @@
     "label": "^Aeronautics\\ Backlog$",
     "unit": "currency",
     "value": 54356000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026049277/ex991q22026.htm",
     "audited": "audit300e"
   },
@@ -16629,6 +16823,8 @@
     "label": "^ROW$",
     "unit": "currency",
     "value": 463308000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926020526/tm267368d1_6k.htm",
     "audited": "audit300e"
   },
@@ -16639,6 +16835,8 @@
     "label": "^MSA\\ Backlog$",
     "unit": "currency",
     "value": 8498799999.999999,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000035/prim-ex99.htm",
     "audited": "audit300e"
   },
@@ -16659,6 +16857,8 @@
     "label": "^Asia\\ Pacific\\ Africa$",
     "unit": "currency",
     "value": 6000000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741026000061/a2026-10x28xunileverq320.htm",
     "audited": "audit300e"
   },
@@ -16669,6 +16869,8 @@
     "label": "^The\\ Americas$",
     "unit": "currency",
     "value": 5200000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741025000058/q32025tradingstatement.htm",
     "audited": "audit300e"
   },
@@ -16689,6 +16891,8 @@
     "label": "^Total\\ Backlog$",
     "unit": "currency",
     "value": 271000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182926000009/a2026-04x218xkerexhibit99.htm",
     "audited": "audit300e"
   },
@@ -16709,6 +16913,8 @@
     "label": "^Wholesale$",
     "unit": "currency",
     "value": 433300000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315226007955/ex99-1.htm",
     "audited": "audit300e"
   },
@@ -16719,6 +16925,8 @@
     "label": "^Commercial\\ and\\ Defense\\ Awards$",
     "unit": "currency",
     "value": 37000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182925000040/a2025-10x218xkerexhibit99.htm",
     "audited": "audit300e"
   },
@@ -16729,6 +16937,8 @@
     "label": "^Asia\\ Pacific\\ Africa$",
     "unit": "currency",
     "value": 6200000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741025000058/q32025tradingstatement.htm",
     "audited": "audit300e"
   },
@@ -16739,6 +16949,8 @@
     "label": "^Space\\ Backlog$",
     "unit": "currency",
     "value": 38990000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026026683/ex991q12026.htm",
     "audited": "audit300e"
   },
@@ -16759,6 +16971,8 @@
     "label": "^New\\ Awards\\ for\\ Battery\\ Electric\\ or\\ Full\\-Hybrid\\ Platforms$",
     "unit": "currency",
     "value": 28200000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1320461/000132046126000138/q32026earningsrelease.htm",
     "audited": "audit300e"
   },
@@ -16779,6 +16993,8 @@
     "label": "^Rotary\\ and\\ Mission\\ Systems\\ Backlog$",
     "unit": "currency",
     "value": 47269000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828025045582/ex991q32025.htm",
     "audited": "audit300e"
   },
@@ -16819,6 +17035,8 @@
     "label": "^New\\ Awards\\ for\\ Battery\\ Electric\\ or\\ Full\\-Hybrid\\ Platforms$",
     "unit": "currency",
     "value": 31800000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1320461/000132046126000078/q12026earningsrelease.htm",
     "audited": "audit300e"
   },
@@ -16829,6 +17047,8 @@
     "label": "^Total\\ Backlog$",
     "unit": "currency",
     "value": 230416000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026049277/ex991q22026.htm",
     "audited": "audit300e"
   },
@@ -16849,6 +17069,8 @@
     "label": "^Cloud\\ Revenue$",
     "unit": "currency",
     "value": 70200000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1800667/000119312526048726/frog-ex99_1.htm",
     "audited": "audit300e"
   },
@@ -16869,6 +17091,8 @@
     "label": "^Missiles\\ and\\ Fire\\ Control\\ Backlog$",
     "unit": "currency",
     "value": 40250000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828025035502/ex991q22025.htm",
     "audited": "audit300e"
   },
@@ -16879,6 +17103,8 @@
     "label": "^Fixed\\ Backlog$",
     "unit": "currency",
     "value": 5024900000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153825000030/prim-20250730xex99.htm",
     "audited": "audit300e"
   },
@@ -16889,6 +17115,8 @@
     "label": "^MSA\\ Backlog$",
     "unit": "currency",
     "value": 8152000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000021/prim-20260731xex99d1.htm",
     "audited": "audit300e"
   },
@@ -16909,6 +17137,8 @@
     "label": "^MSA\\ Backlog$",
     "unit": "currency",
     "value": 7458300000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000014/prim-20260430xex99.htm",
     "audited": "audit300e"
   },
@@ -16959,6 +17189,8 @@
     "label": "^Fixed\\ Backlog$",
     "unit": "currency",
     "value": 4182800000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000014/prim-20260430xex99.htm",
     "audited": "audit300e"
   },
@@ -16979,6 +17211,8 @@
     "label": "^Remaining\\ Performance\\ Obligations$",
     "unit": "currency",
     "value": 565700000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1800667/000119312526048726/frog-ex99_1.htm",
     "audited": "audit300e"
   },
@@ -17009,6 +17243,8 @@
     "label": "^Fixed\\ Backlog$",
     "unit": "currency",
     "value": 5569100000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000035/prim-ex99.htm",
     "audited": "audit300e"
   },
@@ -17019,6 +17255,8 @@
     "label": "^Backlog$",
     "unit": "currency",
     "value": 14100000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/68505/000006850525000038/msiq22025pressrelease.htm",
     "audited": "audit300e"
   },
@@ -17049,6 +17287,8 @@
     "label": "^MSA\\ Backlog$",
     "unit": "currency",
     "value": 6468600000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153825000030/prim-20250730xex99.htm",
     "audited": "audit300e"
   },
@@ -17089,6 +17329,8 @@
     "label": "^Europe$",
     "unit": "currency",
     "value": 2300000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741026000061/a2026-10x28xunileverq320.htm",
     "audited": "audit300e"
   },
@@ -17109,6 +17351,8 @@
     "label": "^Europe$",
     "unit": "currency",
     "value": 3300000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741025000058/q32025tradingstatement.htm",
     "audited": "audit300e"
   },
@@ -17129,6 +17373,8 @@
     "label": "^Commercial\\ and\\ Defense\\ Awards$",
     "unit": "currency",
     "value": 81000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182926000030/a2026-10x208xkerexhibit99.htm",
     "audited": "audit300e"
   },
@@ -17149,6 +17395,8 @@
     "label": "^Total\\ Backlog$",
     "unit": "currency",
     "value": 289000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182926000025/a2026-07x238xkerexhibit99.htm",
     "audited": "audit300e"
   },
@@ -17159,6 +17407,8 @@
     "label": "^SiPho\\ Revenue\\ Run\\ Rate$",
     "unit": "currency",
     "value": 680000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/928876/000117891326003776/exhibit_99-1.htm",
     "audited": "audit300e"
   },
@@ -17169,6 +17419,8 @@
     "label": "^WM\\&T\\ Assets\\ Under\\ Management$",
     "unit": "currency",
     "value": 8949000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184326006885/exh_991.htm",
     "audited": "audit300e"
   },
@@ -17179,6 +17431,8 @@
     "label": "^Assets\\ Under\\ Management$",
     "unit": "currency",
     "value": 4000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895525000097/a8k3q25earningsreleaseex991.htm",
     "audited": "audit300e"
   },
@@ -17189,6 +17443,8 @@
     "label": "^Securities\\ gains,\\ net$",
     "unit": "currency",
     "value": 133000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926045714/tm2612164d1_ex99-1.htm",
     "audited": "audit300e"
   },
@@ -17199,6 +17455,8 @@
     "label": "^Total\\ Client\\ Assets\\ Under\\ Administration$",
     "unit": "currency",
     "value": 421000000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialhighlightsa.htm",
     "audited": "audit300e"
   },
@@ -17219,6 +17477,8 @@
     "label": "^Natural\\ Gas\\ Realized\\ Price$",
     "unit": "currency",
     "value": 3.72,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000005/cop-20260205x8kexx992.htm",
     "audited": "audit300e"
   },
@@ -17229,6 +17489,8 @@
     "label": "^Institutional\\ Customers\\ \\-\\ Third\\ Party$",
     "unit": "currency",
     "value": 387000000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777425000104/exhibit992-2q25qfs.htm",
     "audited": "audit300e"
   },
@@ -17239,6 +17501,8 @@
     "label": "^Other\\ service\\ charges,\\ commissions\\ and\\ fees$",
     "unit": "currency",
     "value": 1581000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926048536/mcbs-20260424xex99d1.htm",
     "audited": "audit300e"
   },
@@ -17299,6 +17563,8 @@
     "label": "^Bareboat\\ charter\\ revenue$",
     "unit": "currency",
     "value": 32900000.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126032598/ef20080031_ex99-2.htm",
     "audited": "audit300e"
   },
@@ -17319,6 +17585,8 @@
     "label": "^U\\.S\\.\\ Domestic\\ Revenue\\ per\\ Package$",
     "unit": "currency",
     "value": 14.7,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000010/fdx-earningsreleasefy2026q3.htm",
     "audited": "audit300e"
   },
@@ -17349,6 +17617,8 @@
     "label": "^Concorde\\ Revenue\\ per\\ Student$",
     "unit": "currency",
     "value": 7900.0,
+    "currency": "USD",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165425000022/q42025financialsupplemen.htm",
     "audited": "audit300e"
   },
@@ -17369,7 +17639,500 @@
     "label": "^US\\ \\+\\ Canada$",
     "unit": "currency",
     "value": 968000000.0,
+    "currency": "EUR",
+    "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926056966/tm2613942d1_6k.htm",
     "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Active\\ FSD\\ Subscriptions$",
+    "unit": "count",
+    "value": 1100000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026003837/exhibit991.htm",
+    "audited": "audit_sample",
+    "found_wrong": "Row says (mil): 1.1 million, read as 1.1"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Natural\\ Gas\\ Realized\\ Price\\ \\(\\$/MCF\\)$",
+    "unit": "currency",
+    "value": 5.7,
+    "currency": "USD",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000043/cop-20261105x8kexx992.htm",
+    "audited": "audit_sample",
+    "found_wrong": "Price $5.70/mcf scaled by the table's millions"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Holding\\ and\\ Eliminations$",
+    "unit": "currency",
+    "value": -81000000.0,
+    "currency": "PEN",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010325010462/dp233186_ex9901.htm",
+    "audited": "audit_sample",
+    "found_wrong": "Soles column labelled USD"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2025-11-30",
+    "fiscal_period": "Q2",
+    "label": "^International\\ Composite\\ Package\\ Yield$",
+    "unit": "currency",
+    "value": 53.15,
+    "currency": "USD",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891125000076/fdx-earningsreleasefy2026q2.htm",
+    "audited": "audit_sample",
+    "found_wrong": "Yield $53.15 scaled by millions"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Average\\ Monthly\\ Revenue\\ per\\ Plan\\ Member$",
+    "unit": "currency",
+    "value": 62.9,
+    "currency": "PEN",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010326007438/dp246930_ex9901.htm",
+    "audited": "audit_sample",
+    "found_wrong": "S/ 62.90 per member scaled by millions and labelled USD"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q1",
+    "label": "^U\\.S\\.\\ Domestic\\ Composite\\ Revenue\\ per\\ Package$",
+    "unit": "currency",
+    "value": 15.32,
+    "currency": "USD",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
+    "audited": "audit_sample",
+    "found_wrong": "Revenue per package $15.32 scaled by millions"
+  },
+  {
+    "symbol": "PHG",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^United\\ States$",
+    "unit": "currency",
+    "wrong_value": 3281000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/313216/000162828026049913/a2026q2-philipsquarterlyen.htm",
+    "audited": "audit2",
+    "found_wrong": "January-to-June sales read as Q2 2026"
+  },
+  {
+    "symbol": "PHG",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Other\\ countries$",
+    "unit": "currency",
+    "wrong_value": 2500000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/313216/000162828026049913/a2026q2-philipsquarterlyen.htm",
+    "audited": "audit2",
+    "found_wrong": "January-to-June sales read as Q2 2026"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q2",
+    "label": "^Revenue\\ per\\ Student\\ \\(Concorde\\)$",
+    "unit": "currency",
+    "value": 7300.0,
+    "currency": "USD",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000009/q22026financialsupplemen.htm",
+    "audited": "audit3",
+    "found_wrong": "$7,300 per student read as $7.3 billion (text quote under a millions heading)"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q1",
+    "label": "^UK\\ Mobile\\ Contract\\ Net\\ Additions$",
+    "unit": "count",
+    "value": -46000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495425008453/a3187s.htm",
+    "audited": "audit3",
+    "found_wrong": "'declined by 46,000' read as +46,000"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Net\\ Interest\\ Margin$",
+    "unit": "percent",
+    "value": 3.65,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000085785526000017/ucbi-20260331.htm",
+    "audited": "audit300",
+    "found_wrong": "XBRL tag: interest-rate derivative count replaced the release's 3.65% margin"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^O\\&M\\ \\(Quotas\\)$",
+    "unit": "currency",
+    "value": 283000000.0,
+    "currency": "BRL",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426004087/axiapr2q26_6k.htm",
+    "audited": "audit300",
+    "found_wrong": "footnote '(b)' in the column heading read as billions"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-02-28",
+    "fiscal_period": "Q3",
+    "label": "^International\\ Revenue\\ per\\ Pound$",
+    "unit": "currency",
+    "wrong_value": 1.45,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000011/fdx-20260228.htm",
+    "audited": "audit300",
+    "found_wrong": "XBRL tag: dividend per share as revenue per pound"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^CET1\\ Ratio$",
+    "unit": "percent",
+    "value": 17.47,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926123380/mcbs-20260930x10q.htm",
+    "audited": "audit300",
+    "found_wrong": "XBRL ratio as a decimal (0.1747 for 17.47%)"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2025-11-30",
+    "fiscal_period": "Q2",
+    "label": "^U\\.S\\.\\ Freight\\ Revenue\\ per\\ Pound$",
+    "unit": "currency",
+    "value": 2.26,
+    "currency": "USD",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891125000078/fdx-20251130.htm",
+    "audited": "audit300",
+    "found_wrong": "XBRL tag: number of segments as revenue per pound"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q1",
+    "label": "^International\\ Revenue\\ per\\ Pound$",
+    "unit": "currency",
+    "wrong_value": 1.22,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000131/fdx-20260930.htm",
+    "audited": "audit300",
+    "found_wrong": "XBRL tag: dividend per share as revenue per pound"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Full\\-Year\\ 2026\\ Contract\\ Coverage$",
+    "unit": "percent",
+    "wrong_value": 85.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036125040869/ef20058523_ex99-2.htm",
+    "audited": "audit300",
+    "found_wrong": "2025 coverage stored under a KPI named for 2026"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^REO\\ Production\\ Volume$",
+    "unit": "count",
+    "value": 12887.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000056/mpmcq32026er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Japan\\ Policyholder\\ Account\\ Balances$",
+    "unit": "currency",
+    "wrong_value": 53903000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777425000174/exhibit992-3q25qfs.htm",
+    "audited": "audit300b",
+    "found_wrong": "Prudential International Businesses total stored as Japan account balances"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^REO\\ Production\\ Volume$",
+    "unit": "count",
+    "value": 12983.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000027/mpmcq12026er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Transmission$",
+    "unit": "currency",
+    "value": 5079000000.0,
+    "currency": "BRL",
+    "tolerance": 0.005,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281425002951/ebr20250806_6k1.htm",
+    "audited": "audit300b",
+    "found_wrong": "Axia (R$ mm) read in billions: 'mm' not known as millions"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^NdPr\\ Sales\\ Volume$",
+    "unit": "count",
+    "value": 1006.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000047/mpmcq22026er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^NdPr\\ Production\\ Volume$",
+    "unit": "count",
+    "value": 1018.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000056/mpmcq32026er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Renewal\\ Leasing\\ Volume\\ \\(kW\\)$",
+    "unit": "count",
+    "value": 92670.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926120212/dlr-ex99d1.htm",
+    "audited": "audit300b",
+    "found_wrong": "Digital Realty kW renewals took NRSF's '(in thousands)' after a slash"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^NdPr\\ Production\\ Volume$",
+    "unit": "count",
+    "value": 718.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000007/mpmcq42025er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^NdPr\\ Sales\\ Volume$",
+    "unit": "count",
+    "value": 525.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000052/mpmcq32025er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^REO\\ Production\\ Volume$",
+    "unit": "count",
+    "value": 13145.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^NdPr\\ Production\\ Volume$",
+    "unit": "count",
+    "value": 721.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000052/mpmcq32025er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^NdPr\\ Sales\\ Volume$",
+    "unit": "count",
+    "value": 443.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
+    "audited": "audit300b",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Contract\\ Commitments\\ Awarded$",
+    "unit": "count",
+    "wrong_value": 14.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036125031411/ef20053984_ex99-2.htm",
+    "audited": "audit300c",
+    "found_wrong": "year-to-date count stored as the quarter's"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Pre\\-Owned\\ Home\\ Sales$",
+    "unit": "count",
+    "wrong_value": 1210.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000073/exhibit991pressreleaseands.htm",
+    "audited": "audit300c",
+    "found_wrong": "full-year 2025 figure (table rows are years) stored as Q4 2025"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^NdPr\\ Production\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 597.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
+    "audited": "audit300c",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Contract\\ Commitments\\ Awarded$",
+    "unit": "count",
+    "wrong_value": 22.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036125040869/ef20058523_ex99-2.htm",
+    "audited": "audit300c",
+    "found_wrong": "year-to-date count stored as the quarter's"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 1006.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000047/mpmcq22026er.htm",
+    "audited": "audit300c",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^REO\\ Production\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 11072.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000047/mpmcq22026er.htm",
+    "audited": "audit300c",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^NdPr\\ Production\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 840.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000047/mpmcq22026er.htm",
+    "audited": "audit300c",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 1020.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000056/mpmcq32026er.htm",
+    "audited": "audit300c",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 562.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000007/mpmcq42025er.htm",
+    "audited": "audit300c",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^REO\\ Production\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 13145.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
+    "audited": "audit300c",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 1006.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000027/mpmcq12026er.htm",
+    "audited": "audit300c",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^NdPr\\ Production\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 718.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000007/mpmcq42025er.htm",
+    "audited": "audit300d",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "MP",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
+    "unit": "count",
+    "value": 443.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
+    "audited": "audit300d",
+    "found_wrong": "\u00d71000: a section row's '(in thousands)' read as the column's scale (e962b89; fixed e33c638)"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q4",
+    "label": "^UK\\ Mobile\\ Contract\\ Net\\ Additions$",
+    "unit": "count",
+    "value": -22000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495426004689/a9489d.htm",
+    "audited": "audit300e",
+    "found_wrong": "wrong: the filing says the base declined by 22,000 in Q4; net additions are -22,000. The sign rule saw no fall inside the bracketed list"
   }
 ]
