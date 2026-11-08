@@ -44,10 +44,11 @@ LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
 EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’]?\s+)?equity(\s*\(deficit\))?$", re.I)
 
 
-OPENING = re.compile(r"\bcash\b.*\b(beginning|start)\b", re.I)
+# Stock Yards: "Beginning cash and cash equivalents", "Ending cash and cash equivalents".
+OPENING = re.compile(r"\bcash\b.*\b(beginning|start)\b|^(beginning|opening)\b.*\bcash\b", re.I)
 
 
-CLOSING = re.compile(r"\bcash\b.*\bend\b", re.I)
+CLOSING = re.compile(r"\bcash\b.*\bend\b|^(ending|closing)\b.*\bcash\b", re.I)
 
 
 CHANGE = re.compile(r"(increase|decrease|change).*\bcash\b|\bcash\b.*(increase|decrease)|^total\s+cash\s+(generated|provided|used)", re.I)

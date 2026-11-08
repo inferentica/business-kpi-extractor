@@ -80,6 +80,9 @@ def _row(cells: list[Cell]) -> Row | None:
 def parse_html(html: str | bytes) -> list[Table]:
     """Every table of a document with rows, its header rows and the text before it."""
     raw = html.encode("utf-8") if isinstance(html, str) else html
+    # A block break separates words: PepsiCo's title cell holds "Condensed Consolidated Balance Sheet" and "PepsiCo,
+    # Inc." in two divs, which would otherwise read as "Balance SheetPepsiCo".
+    raw = re.sub(rb"(?i)(</(?:div|p|li|h[1-6])>|<br\s*/?>)", rb"\1 ", raw)
     tree = lxml.html.fromstring(raw)
     found = []
     previous_text: list[str] = []
@@ -108,8 +111,15 @@ def parse_html(html: str | bytes) -> list[Table]:
                     rows.append(row)
             context = " ".join(previous_text)[-600:]
             found.append(Table(rows=rows, header=header, context=context, index=len(found)))
-            previous_text = []
-        elif element.tag in ("p", "div", "font", "b", "center", "h1", "h2", "h3", "h4", "span", "td") and \
+            if seen_figures:
+                previous_text = []
+            else:
+                # A table without figures is the page's layout: its words lead into the next table (Morgan Stanley
+                # titles each statement in a one-row table beside its logo).
+                words = [clean(" ".join(cell.text for cell in _cells(tr))) for tr in element.iter("tr")]
+                previous_text = (previous_text + [word for word in words if word])[-40:]
+        elif element.tag in ("p", "div", "font", "b", "i", "em", "strong", "u", "small", "a", "center", "h1", "h2", "h3",
+                             "h4", "span", "td") and \
                 not any(a.tag == "table" for a in element.iterancestors()):
             if element.text and element.text.strip():
                 previous_text.append(clean(element.text))

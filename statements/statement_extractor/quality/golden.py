@@ -26,13 +26,24 @@ def _golden_path() -> Path:
 GOLDEN = _golden_path()
 
 
+def _key(label: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", label.lower().replace("’", "'")).strip()
+
+
 def _line(entry: dict, lines: list[dict]) -> dict | None:
     candidates = [line for line in lines if not line["is_heading"] and line["value"] is not None]
     if entry.get("concept"):
-        found = next((line for line in candidates if line["concept"] == entry["concept"]
-                      and line.get("member") == entry.get("member")), None)
-        if found is not None or entry.get("era") == "xbrl":
+        same = [line for line in candidates if line["concept"] == entry["concept"] and line.get("member") == entry.get("member")]
+        # Opening and closing cash share a concept (Costco): the line printed with the entry's label is the one.
+        found = next((line for line in same if _key(line["label"]) == _key(entry["label"])), same[0] if same else None)
+        if found is not None:
             return found
+        if entry.get("era") == "xbrl":
+            # Served from the filing's printed statement (its XBRL failed its checks: PepsiCo's FY2011 equity), the
+            # line is the one printed with the entry's label.
+            wording = {_key(entry["label"]), _key(entry.get("printed_label") or entry["label"])}
+            return next((line for line in candidates if _key(line["label"]) in wording
+                         or entry.get("printed_label") and _key(line["label"]).startswith(_key(entry["printed_label"]))), None)
     pattern = re.compile(entry["label"] if not entry.get("concept") else re.escape(entry["label"]), re.I)
     return next((line for line in candidates if pattern.search(line["label"].replace("’", "'"))), None)
 

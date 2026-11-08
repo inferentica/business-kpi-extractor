@@ -187,3 +187,29 @@ def test_week_spans_numeric_dates_and_par_values_per_share():
     values = {line["label"]: line["value"] for line in balance.lines}
     assert values["Common stock, $1 par per share, 955 shares issued"] == 955e6
     assert balance.status == "kept"
+
+
+def test_titles_in_layout_tables_in_the_tables_own_rows_and_scales_in_italics():
+    # Morgan Stanley titles a statement in a one-row layout table; PepsiCo prints the title as the table's first row in
+    # divs; Stock Yards puts its scale in italics; "Beginning cash" and "Ending cash" open and close.
+    rows = [("Net cash provided by operating activities", "900", "800"), ("Net cash used in investing activities", "(500)", "(400)"),
+            ("Net cash used in financing activities", "(300)", "(300)"), ("Net change in cash and cash equivalents", "100", "100"),
+            ("Beginning cash and cash equivalents", "1,000", "900"), ("Ending cash and cash equivalents", "1,100", "1,000")]
+    body = "".join("<tr>" + cells(label, "", now, "", before) + "</tr>" for label, now, before in rows) + "</table>"
+    header = """<tr><td></td><td colspan="4">Six Months Ended June 30,</td></tr>
+<tr><td></td><td colspan="2">2026</td><td colspan="2">2025</td></tr>"""
+    layout = """<table><tr><td><b>Consolidated Cash Flow Statements</b></td><td><img src="logo.jpg"></td></tr></table>
+<p><i>(in thousands)</i></p><table>""" + header + body
+    own_row = """<p><i>(in thousands)</i></p><table><tr><td colspan="5"><div>Condensed Consolidated Statement of Cash
+Flows</div><div>PepsiCo, Inc. and Subsidiaries</div></td></tr>""" + header + body
+    for html in (layout, own_row):
+        readings, notes = read_document(html, accession="a", form="10-Q", filed=date(2026, 8, 4),
+                                        document_end=date(2026, 6, 30), fiscal_year_end="1231", year_offset=0)
+        flows = next(r for r in readings if r.statement == "cash_flow" and r.own)
+        assert flows.status == "kept" and flows.duration == "ytd" and flows.lines[0]["value"] == 900e3, notes
+
+
+def test_a_comprehensive_income_statement_is_not_the_income_statement():
+    from statement_extractor.readers.printed.find import TITLES
+    income = dict(TITLES)["income"]
+    assert income.search("Consolidated Income Statements") and not income.search("Consolidated Comprehensive Income Statements")
