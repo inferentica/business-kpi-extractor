@@ -213,3 +213,14 @@ def test_a_comprehensive_income_statement_is_not_the_income_statement():
     from statement_extractor.readers.printed.find import TITLES
     income = dict(TITLES)["income"]
     assert income.search("Consolidated Income Statements") and not income.search("Consolidated Comprehensive Income Statements")
+
+
+def test_a_data_caption_in_a_tables_first_rows_is_not_a_title():
+    # Prudential's selected financial data: its first row reads "Income Statement Data".
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements
+    html = """<p>Item 6. Five-year data</p><table><tr><td>Income Statement Data:</td></tr>
+<tr><td></td><td>2003</td><td>2002</td></tr>""" + "".join(
+        "<tr>" + cells(label, "1,000", "900") + "</tr>" for label in ("Total revenues", "Income before income taxes",
+                                                                      "Income taxes", "Net income", "Total assets"))
+    assert find_statements(parse_html(html + "</table>")) == []
