@@ -8711,7 +8711,7 @@
    "fiscal_year": "2005",
    "fiscal_period": "FY",
    "duration": "year",
-   "label": "operating activities$",
+   "label": "operating activities( from total operations)?$",
    "value": 711493000.0,
    "scale": 1000.0,
    "source_accession": "0001156973-08-000096",

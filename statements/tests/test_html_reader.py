@@ -96,3 +96,9 @@ def test_a_statement_never_runs_into_the_equity_statement_after_it():
     flows = readings[("cash_flow", "2006")]
     assert flows.status == "kept"
     assert not any("SHAREOWNERS" in line["label"] for line in flows.lines)
+
+
+def test_note_references_beside_a_label_are_not_part_of_it():
+    html = INCOME.replace("<td>Net sales</td>", "<td>Net sales</td><td>2, 26</td>").replace("""<td colspan="3">Three""", """<td colspan="4">Three""")
+    readings, _ = read(html, "0929", date(2007, 9, 29))
+    assert readings[("income", "2007")].lines[0]["label"] == "Net sales"

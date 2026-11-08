@@ -115,12 +115,13 @@ def _row(cells: list[Cell]) -> Row | None:
             continue
         if figures:
             continue  # text after the figures (a footnote mark)
-        if not label_parts and re.fullmatch(r"\d{1,2}(\s*,\s*\d{1,2})*", text):
-            continue  # a note reference before the label (ASML's "Notes" column)
+        if re.fullmatch(r"\d{1,2}(\s*,\s*\d{1,2})*", text):
+            continue  # a note reference before or after the label (ASML's and TSMC's "Notes" columns)
         if level is None:
             level = cell.start
         label_parts.append(text)
     label = _NOTE_MARK.sub("", " ".join(label_parts)).strip()
+    label = re.sub(r"\s+\d{1,2}(\s*,\s*\d{1,2})+$|\s+\d{1,2},$", "", label)  # "NET SALES 2, 26" in one cell
     if not label and not figures:
         return None
     return Row(label=label, level=level if level is not None else 0, figures=figures, cells=cells)
