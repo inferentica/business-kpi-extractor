@@ -107,15 +107,20 @@ def _read_column(kind, layout, period, scale, labelled) -> Reading | None:
             value = _figure(row, column, columns) if row.figures else None
             if row.figures and value is None:
                 continue
-            per_share = bool(PER_SHARE.search(row.label))
+            # A balance sheet has no per-share lines; "per share" there is a par value in a stock line's label (Kroger's
+            # "Common stock, $1 par per share … 955").
+            per_share = kind != "balance" and bool(PER_SHARE.search(row.label))
             shares = not per_share and bool(SHARE_COUNT.search(row.label)) and kind == "income"
             amount = None if value is None else value if per_share else value * (1 if shares else scale)
             lines.append({"line": len(lines), "concept": _concept(row.label, kind), "label": row.label[:300],
                           "level": max(0, min(20, row.level - base)), "is_heading": not row.figures, "value": amount})
             meaning = named.get(id(row), row.label)
-            if re.match(r"^(balance|net\s*\(?(increase|decrease)|increase|decrease)\b", row.label, re.I) and "cash" not in row.label.lower() \
+            if re.match(r"^(balance|net\s*\(?(increase|decrease)|increase|decrease|beginning|end|start)\b", row.label, re.I) \
+                    and "cash" not in row.label.lower() \
                     and CASH_HEADING.match(heading):
-                meaning = f"{heading} {row.label}"  # Coca-Cola: CASH AND CASH EQUIVALENTS / Balance at beginning of year
+                # Coca-Cola: CASH AND CASH EQUIVALENTS / Balance at beginning of year; Kroger: Cash and temporary cash
+                # investments: / Beginning of year
+                meaning = f"{heading} {row.label}"
             if not row.figures:
                 printed.append((row.label, row.level, None))
             elif not (per_share or shares):

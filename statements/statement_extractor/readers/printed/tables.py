@@ -69,7 +69,8 @@ YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
 
 COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)\s+ended\b|\bended\b|"
                            r"^(\s*(first|second|third|fourth)\s+quarter|\s*(three|six|nine|twelve)\s+months)\b|"
-                           r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b", re.I)
+                           r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|"
+                           r"\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b", re.I)  # PepsiCo's "3/21/09"
 
 
 def is_header_figures(row: Row) -> bool:

@@ -21,7 +21,8 @@ def subtotals(printed) -> dict[int, int]:
     (an unlabelled net figure). An earlier subtotal counts as one line."""
     starts: dict[int, int] = {}
     for index, (label, _level, value) in enumerate(printed):
-        if not _SUBTOTAL_LABEL.search(label):
+        if not _SUBTOTAL_LABEL.search(label) and not _repeats_its_heading(printed, index) \
+                and not _totals_its_others(printed, index):
             continue  # a line of its own ("Retained earnings"), however its figure happens to add up
         if value is None:
             continue
@@ -33,7 +34,7 @@ def subtotals(printed) -> dict[int, int]:
                     position -= 1
                     continue  # a subtotal over several headed blocks (TSMC's other comprehensive income for the year)
                 break
-            total += -earlier_value if re.match(r"^less\b", earlier_label, re.I) else earlier_value
+            total += -abs(earlier_value) if re.match(r"^less\b", earlier_label, re.I) else earlier_value
             sums.append((position, total))
             position = block_start(starts, position) - 1
         for count, (start, running) in enumerate(sums, 1):
@@ -57,3 +58,24 @@ def block_start(starts: dict[int, int], index: int) -> int:
         seen.add(index)
         index = starts[index]
     return index
+
+
+def _repeats_its_heading(printed, index: int) -> bool:
+    """A line labelled as the heading its block opens with sums that block: Kroger's "Long-term debt including
+    obligations under capital leases" heads its face value and hedge adjustment, and its total repeats the words."""
+    key = re.sub(r"[^a-z0-9]+", " ", printed[index][0].lower()).strip()
+    for position in range(index - 1, -1, -1):
+        earlier_label, _level, earlier_value = printed[position]
+        if earlier_value is None:
+            return bool(key) and re.sub(r"[^a-z0-9]+", " ", earlier_label.lower()).strip() == key and index - position > 2
+    return False
+
+
+def _totals_its_others(printed, index: int) -> bool:
+    """A line named as the "Other …" line just above it, less "Other", totals its block: PepsiCo's goodwill and "Other
+    nonamortizable intangible assets", then "Nonamortizable intangible assets"."""
+    if index < 2:
+        return False
+    key = re.sub(r"[^a-z0-9]+", " ", printed[index][0].lower()).strip()
+    above = re.sub(r"[^a-z0-9]+", " ", printed[index - 1][0].lower()).strip()
+    return bool(key) and above == f"other {key}"

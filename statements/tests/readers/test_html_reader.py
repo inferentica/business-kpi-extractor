@@ -152,3 +152,38 @@ def test_a_statement_named_inside_a_sentence_is_not_a_title():
     assert not readings and not notes
     readings, _ = read("<p>CONSOLIDATED STATEMENT OF INCOME</p>" + as_titled, "0929", date(2007, 9, 29))
     assert readings
+
+
+def test_week_spans_numeric_dates_and_par_values_per_share():
+    # PepsiCo's 2009 10-Q: "12 Weeks Ended" over "3/21/09 | 3/22/08"; Kroger's stock line names a par value per share.
+    html = """<p>Condensed Consolidated Statement of Income</p><p>(in millions)</p><table>
+<tr><td></td><td colspan="4">12 Weeks Ended</td></tr>
+<tr><td></td><td colspan="2">3/21/09</td><td colspan="2">3/22/08</td></tr>
+<tr>""" + cells("Net Revenue", "$", "8,263", "$", "8,333") + """</tr>
+<tr>""" + cells("Cost of sales", "", "3,744", "", "3,834") + """</tr>
+<tr>""" + cells("Income before income taxes", "", "1,500", "", "1,600") + """</tr>
+<tr>""" + cells("Provision for income taxes", "", "400", "", "420") + """</tr>
+<tr>""" + cells("Net Income", "$", "1,100", "$", "1,180") + """</tr></table>
+<p>Condensed Consolidated Balance Sheet</p><p>(in millions)</p><table>
+<tr><td></td><td colspan="2">3/21/09</td><td colspan="2">12/27/08</td></tr>
+<tr>""" + cells("Cash", "$", "2,000", "$", "1,900") + """</tr>
+<tr>""" + cells("Property, plant and equipment", "", "1,500", "", "1,400") + """</tr>
+<tr>""" + cells("Accumulated depreciation", "", "(500", ")", "(400") + """)</tr>
+<tr><td></td><td></td><td>1,000</td><td></td><td>1,000</td></tr>
+<tr>""" + cells("Total Assets", "$", "3,000", "$", "2,900") + """</tr>
+<tr><td>Liabilities</td></tr>
+<tr>""" + cells("Accounts payable", "", "1,045", "", "945") + """</tr>
+<tr>""" + cells("Long-term debt", "", "1,000", "", "1,000") + """</tr>
+<tr>""" + cells("Total Liabilities", "", "2,045", "", "1,945") + """</tr>
+<tr><td>Equity</td></tr>
+<tr>""" + cells("Common stock, $1 par per share, 955 shares issued", "", "955", "", "955") + """</tr>
+<tr>""" + cells("Total Equity", "", "955", "", "955") + """</tr>
+<tr>""" + cells("Total Liabilities and Equity", "$", "3,000", "$", "2,900") + """</tr></table>"""
+    readings, _ = read_document(html, accession="a", form="10-Q", filed=date(2009, 4, 22), document_end=date(2009, 3, 21),
+                                fiscal_year_end="1226", year_offset=0)
+    income = next(r for r in readings if r.statement == "income" and r.own)
+    assert income.duration == "quarter" and income.period_end == date(2009, 3, 21) and income.status == "kept"
+    balance = next(r for r in readings if r.statement == "balance" and r.own)
+    values = {line["label"]: line["value"] for line in balance.lines}
+    assert values["Common stock, $1 par per share, 955 shares issued"] == 955e6
+    assert balance.status == "kept"
