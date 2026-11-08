@@ -83,8 +83,10 @@ def parse_html(html: str | bytes) -> list[Table]:
     # A block break separates words: PepsiCo's title cell holds "Condensed Consolidated Balance Sheet" and "PepsiCo,
     # Inc." in two divs, which would otherwise read as "Balance SheetPepsiCo".
     raw = re.sub(rb"(?i)(</(?:div|p|li|h[1-6])>|<br\s*/?>)", rb"\1 ", raw)
-    # A footnote mark in superscript is not part of the figure or year beside it (Intel's "2008<sup>1</sup>").
-    raw = re.sub(rb"(?is)<sup[^>]*>\s*(?:<[^>]+>\s*)*(?:[\w*]|\xe2\x80[\xa0\xa1]){1,2}\s*(?:</[^>]+>\s*)*</sup>", b"", raw)
+    # A footnote mark in superscript is not part of the figure or year beside it (Intel's "2008<sup>1</sup>"); a
+    # superscript before "/" is a fraction's numerator (PepsiCo's "1<sup>2</sup>/3¢" par value) and stays.
+    raw = re.sub(rb"(?is)<sup[^>]*>\s*(?:<[^>]+>\s*)*(?:[\w*]|\xe2\x80[\xa0\xa1]){1,2}\s*(?:</[^>]+>\s*)*</sup>(?!\s*(?:<[^>]+>\s*)*[/\xe2\x81\x84])",
+                 b"", raw)
     tree = lxml.html.fromstring(raw)
     found = []
     previous_text: list[str] = []

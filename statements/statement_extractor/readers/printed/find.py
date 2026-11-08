@@ -22,7 +22,7 @@ TITLES = (
 _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
                             r"guarantor|pro\s+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
-                            r"(income\s+statement|balance\s+sheet|cash\s+flows?)\s+data\b", re.I)
+                            r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b", re.I)
 
 
 # Statements of the set that are none of the three: a table under one of these titles never continues another.
