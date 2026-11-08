@@ -84,3 +84,15 @@ def test_cash_balances_take_their_heading_and_brackets_in_their_own_cell_are_neg
 def test_no_scale_no_statement():
     readings, notes = read(INCOME.replace("(In millions, except share and per share amounts)", ""), "0929", date(2007, 9, 29))
     assert not readings and any("scale" in note for note in notes)
+
+
+def test_a_statement_never_runs_into_the_equity_statement_after_it():
+    equity = """<p>CONSOLIDATED STATEMENTS OF SHAREOWNERS' EQUITY</p><table>
+<tr><td>Year Ended December 31,</td><td>2006</td><td>2005</td></tr>
+<tr><td>Balance at beginning of year</td><td>16,355</td><td>15,935</td></tr>
+<tr><td>Net income</td><td>5,080</td><td>4,872</td></tr>
+<tr><td>TOTAL SHAREOWNERS' EQUITY</td><td>16,920</td><td>16,355</td></tr></table>"""
+    readings, _ = read(CASH + equity, "1231", date(2006, 12, 31))
+    flows = readings[("cash_flow", "2006")]
+    assert flows.status == "kept"
+    assert not any("SHAREOWNERS" in line["label"] for line in flows.lines)

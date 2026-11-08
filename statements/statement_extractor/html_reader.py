@@ -61,6 +61,9 @@ _KNOWN = (
     (re.compile(r"investing\s+activities$", re.I), "us-gaap_NetCashProvidedByUsedInInvestingActivities"),
     (re.compile(r"financing\s+activities$", re.I), "us-gaap_NetCashProvidedByUsedInFinancingActivities"),
 )
+# Statements of the set that are none of the three: a table under one of these titles never continues another.
+_OTHER_STATEMENT = re.compile(r"statements?\s+of\s+(changes\s+in\s+)?(consolidated\s+)?((share|stock)(holders|owners)['’]?|"
+                              r"shareowners['’]?)\s+equity|changes\s+in\s+equity|statements?\s+of\s+comprehensive\s+income", re.I)
 _ASSETS = re.compile(r"^total\s+assets$", re.I)
 _LIABILITIES_AND_EQUITY = re.compile(r"^total\s+liabilities.*\b(equity|investment|deficit|capital)$", re.I)
 _LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
@@ -93,11 +96,11 @@ def find_statements(html: str | bytes) -> list[tuple[str, list[Table]]]:
                 break
             later_title = later.context[-200:]
             other = next((name for name, pattern in _TITLES if pattern.search(later_title)), None)
-            if other is not None and other != kind and "continued" not in later_title.lower():
+            if (other is not None and other != kind or _OTHER_STATEMENT.search(later_title)) and "continued" not in later_title.lower():
                 break
             group.append(later)
-        if _complete(kind, group) or (kind == "cash_flow" and sum(bool(_SECTIONS.search(row.label)) for table in group
-                                                                   for row in table.rows) >= 3):
+        if _complete(kind, group) or (kind == "cash_flow" and sum(bool(_SECTIONS.search(label))
+                                                                   for label in _labels_in_context(group)) >= 3):
             found.append((kind, group))
     return found
 
@@ -107,8 +110,23 @@ def _is_contents(table: Table) -> bool:
     return "notes to consolidated financial statements" in labels and len(table.rows) < 15
 
 
+def _labels_in_context(group: list[Table]) -> list[str]:
+    """Each line's label, a balance line read under its heading ("CASH AND CASH EQUIVALENTS / Balance at end of year")."""
+    labels, heading = [], ""
+    for table in group:
+        for row in table.rows:
+            if not row.figures:
+                heading = row.label
+                continue
+            if re.match(r"^(balance|net\s*\(?(increase|decrease))", row.label, re.I) and "cash" in heading.lower():
+                labels.append(f"{heading} {row.label}")
+            else:
+                labels.append(row.label)
+    return labels
+
+
 def _complete(kind: str, group: list[Table]) -> bool:
-    labels = [row.label for table in group for row in table.rows if row.figures]
+    labels = _labels_in_context(group)
     if kind == "balance":
         return any(_ASSETS.match(label) for label in labels) and any(
             _LIABILITIES_AND_EQUITY.match(label) or _EQUITY.match(label) for label in labels)
