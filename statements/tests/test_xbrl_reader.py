@@ -1,0 +1,109 @@
+from datetime import date
+from types import SimpleNamespace
+
+from statement_extractor.xbrl_reader import read_filing
+
+LABEL = "http://www.xbrl.org/2003/role/label"
+TOTAL = "http://www.xbrl.org/2003/role/totalLabel"
+START = "http://www.xbrl.org/2003/role/periodStartLabel"
+END = "http://www.xbrl.org/2003/role/periodEndLabel"
+NEGATED = "http://xbrl.us/us-gaap/role/label/negated"
+FY09, FY08 = "duration_2008-09-28_2009-09-26", "duration_2007-09-30_2008-09-27"
+
+
+def row(concept, values, level=4, abstract=False, role=None, signs=None, label="edgartools label", **extra):
+    return {"concept": concept, "label": label, "values": values, "decimals": {key: -6 for key in values},
+            "preferred_signs": signs or {}, "level": level, "is_abstract": abstract, "preferred_label": role, **extra}
+
+
+class Statement:
+    def __init__(self, role, rows):
+        self.role_or_type, self.rows = role, rows
+
+    def get_raw_data(self):
+        return self.rows
+
+
+def fake_xbrl():
+    income = Statement("income", [
+        row("us-gaap_IncomeStatementAbstract", {}, level=0, abstract=True, label="Income Statement [Abstract]"),
+        row("us-gaap_StatementLineItems", {}, level=2, abstract=True, label="Statement [Line Items]"),
+        row("us-gaap_SalesRevenueNet", {FY09: 36_537e6, FY08: 32_479e6}),
+        row("us-gaap_CostOfGoodsSold", {FY09: 23_397e6, FY08: 21_334e6}),
+        row("us-gaap_GrossProfit", {FY09: 13_140e6, FY08: 11_145e6}, role=TOTAL),
+        row("us-gaap_NetIncomeLoss", {FY09: 5_704e6}, dimension=True),  # a breakdown inside the statement
+    ])
+    balance = Statement("balance", [
+        row("us-gaap_AssetsAbstract", {}, level=3, abstract=True),
+        row("us-gaap_AvailableForSaleSecuritiesCurrent", {"instant_2009-09-26": 18_201e6, "instant_2008-09-27": 10_236e6},
+            level=5, label="Cash and Cash Equivalents"),
+        row("us-gaap_Assets", {"instant_2009-09-26": 53_851e6, "instant_2008-09-27": 39_572e6}),
+        row("us-gaap_LiabilitiesAndStockholdersEquity", {"instant_2009-09-26": 53_851e6, "instant_2008-09-27": 39_000e6}),
+    ])
+    cash = Statement("cash", [
+        row("us-gaap_CashAndCashEquivalentsAtCarryingValue",
+            {"instant_2008-09-27": 11_875e6, "instant_2009-09-26": 5_263e6, "instant_2007-09-29": 9_352e6}, role=START),
+        row("us-gaap_PaymentsToAcquireProductiveAssets", {FY09: 1_144e6, FY08: 1_091e6}, role=NEGATED,
+            signs={FY09: -1, FY08: -1}),
+        row("us-gaap_CashAndCashEquivalentsPeriodIncreaseDecrease", {FY09: -6_612e6, FY08: 2_523e6}),
+        row("us-gaap_CashAndCashEquivalentsAtCarryingValue",
+            {"instant_2008-09-27": 11_875e6, "instant_2009-09-26": 5_263e6, "instant_2007-09-29": 9_352e6}, role=END),
+    ])
+    catalog = {
+        "us-gaap_SalesRevenueNet": SimpleNamespace(labels={LABEL: "Net sales"}),
+        "us-gaap_GrossProfit": SimpleNamespace(labels={LABEL: "Gross profit", TOTAL: "Gross margin"}),
+        "us-gaap_AvailableForSaleSecuritiesCurrent": SimpleNamespace(labels={LABEL: "Short-term marketable securities"}),
+        "us-gaap_CashAndCashEquivalentsAtCarryingValue": SimpleNamespace(labels={
+            LABEL: "Cash", START: "Cash and cash equivalents, beginning of the year",
+            END: "Cash and cash equivalents, end of the year"}),
+        "us-gaap_PaymentsToAcquireProductiveAssets": SimpleNamespace(labels={
+            LABEL: "Payments for PP&E", NEGATED: "Payment for acquisition of property, plant and equipment"}),
+    }
+    arcs = {"income": SimpleNamespace(all_arcs=[
+        SimpleNamespace(parent_id="us-gaap_GrossProfit", child_id="us-gaap_SalesRevenueNet", weight=1.0),
+        SimpleNamespace(parent_id="us-gaap_GrossProfit", child_id="us-gaap_CostOfGoodsSold", weight=-1.0)])}
+    statements = SimpleNamespace(income_statement=lambda: income, balance_sheet=lambda: balance,
+                                 cash_flow_statement=lambda: cash)
+    facts = SimpleNamespace(to_dataframe=lambda: None)
+    return SimpleNamespace(entity_info={"document_period_end_date": "2009-09-26"}, statements=statements,
+                           element_catalog=catalog, calculation_trees=arcs, facts=facts)
+
+
+def read():
+    readings, notes = read_filing(fake_xbrl(), accession="a", form="10-K", filed=date(2009, 10, 27),
+                                  fiscal_year_end="0926", year_offset=0)
+    return {(r.statement, r.fiscal_year, r.duration): r for r in readings}, notes
+
+
+def test_every_column_is_read_and_only_the_documents_own_period_is_own():
+    readings, notes = read()
+    assert set(readings) == {("income", "2009", "year"), ("income", "2008", "year"), ("balance", "2009", "instant"),
+                             ("balance", "2008", "instant"), ("cash_flow", "2009", "year"), ("cash_flow", "2008", "year")}
+    assert readings[("income", "2009", "year")].own and not readings[("income", "2008", "year")].own
+    assert notes == []
+
+
+def test_lines_carry_the_filers_own_labels_in_their_role_and_skip_scaffolding_and_breakdowns():
+    readings, _ = read()
+    income = readings[("income", "2009", "year")]
+    assert [line["label"] for line in income.lines] == ["Net sales", "edgartools label", "Gross margin"]
+    assert [line["level"] for line in income.lines] == [0, 0, 0]
+    balance = readings[("balance", "2009", "instant")]
+    assert balance.lines[1]["label"] == "Short-term marketable securities"
+
+
+def test_flows_show_signs_as_presented_and_open_with_the_prior_closing_balance():
+    readings, _ = read()
+    cash = readings[("cash_flow", "2009", "year")]
+    values = [(line["label"], line["value"]) for line in cash.lines]
+    assert values[0] == ("Cash and cash equivalents, beginning of the year", 11_875e6)
+    assert values[1] == ("Payment for acquisition of property, plant and equipment", -1_144e6)
+    assert values[-1] == ("Cash and cash equivalents, end of the year", 5_263e6)
+    assert cash.status == "kept"
+
+
+def test_arithmetic_decides_what_is_kept():
+    readings, _ = read()
+    assert readings[("income", "2009", "year")].status == "kept"
+    assert readings[("balance", "2009", "instant")].status == "kept"
+    assert readings[("balance", "2008", "instant")].status == "rejected"  # 39,572 vs 39,000

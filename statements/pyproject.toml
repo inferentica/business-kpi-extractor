@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "statement-extractor"
+version = "0.1.0"
+description = "Reads the three financial statements from SEC filings, by rules only, back to a company's first filing."
+requires-python = ">=3.12"
+# EDGAR access, fiscal labels and document parsing come from the KPI extractor installed beside it (`pip install .
+# ./statements` from the repository root); this package never edits that code and reaches it only through base.py.
+dependencies = ["business-kpi-extractor"]
+
+[project.optional-dependencies]
+test = ["pytest==8.4.2"]
+
+[project.scripts]
+statement-extractor = "statement_extractor.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.packages.find]
+include = ["statement_extractor*"]

@@ -1,0 +1,118 @@
+name: Statements
+
+# The three financial statements, read by rules only (statements/). A pilot reads each company into files and hands
+# them back as this run's artifacts; it stores nothing anywhere else, holds no secrets and calls no AI.
+on:
+  push:
+    branches: ["statements/**"]
+    paths:
+      - "statements/**"
+      - ".github/workflows/statements.yml"
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated tickers; the pilot set (statements/pilot.json) when empty"
+        required: false
+        type: string
+      since:
+        description: "Earliest filing date to read (YYYY-MM-DD); the pilot set's when empty"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: statements-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . './statements[test]'
+      - run: pytest
+        working-directory: statements
+
+  plan:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      symbols: ${{ steps.list.outputs.symbols }}
+      since: ${{ steps.list.outputs.since }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: list
+        env:
+          SYMBOLS: ${{ inputs.symbols }}
+          SINCE: ${{ inputs.since }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os
+          pilot = json.load(open("statements/pilot.json"))
+          symbols = [s.strip().upper() for s in os.environ.get("SYMBOLS", "").split(",") if s.strip()] or pilot["symbols"]
+          print("symbols=" + json.dumps(symbols))
+          print("since=" + (os.environ.get("SINCE") or pilot["since"]))
+          EOF
+
+  read:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        symbol: ${{ fromJSON(needs.plan.outputs.symbols) }}
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - run: python -m statement_extractor read --symbol "${{ matrix.symbol }}" --since "${{ needs.plan.outputs.since }}" --out "out/${{ matrix.symbol }}"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: statements-${{ matrix.symbol }}
+          path: out/
+          retention-days: 30
+
+  report:
+    needs: read
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: statements-*
+          path: out
+          merge-multiple: true
+      - run: python -m statement_extractor report out/*
