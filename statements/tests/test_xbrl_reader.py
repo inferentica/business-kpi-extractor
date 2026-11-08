@@ -141,3 +141,32 @@ def test_a_figure_only_tagged_for_part_of_the_company_is_not_a_line():
     readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
     balance = next(r for r in readings if r.statement == "balance" and r.own)
     assert "us-gaap_OtherLiabilities" not in {line["concept"] for line in balance.lines}
+
+
+def test_a_flow_statements_balance_tagged_under_a_stray_dimension_still_opens_and_closes_it():
+    import pandas as pd
+    x = fake_xbrl()
+    facts = []
+    for statement in (x.statements.income_statement(), x.statements.balance_sheet(), x.statements.cash_flow_statement()):
+        for item in statement.rows:
+            for key in item["values"]:
+                stray = item["concept"] == "us-gaap_CashAndCashEquivalentsAtCarryingValue"  # Prudential 2026
+                facts.append({"concept": item["concept"].replace("_", ":", 1), "period_key": key, "is_dimensioned": stray})
+    x.facts = SimpleNamespace(to_dataframe=lambda: pd.DataFrame(facts))
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    flows = next(r for r in readings if r.statement == "cash_flow" and r.own)
+    assert flows.status == "kept"
+
+
+def test_every_beginning_balance_opens_the_period_and_the_main_one_shown_again_closes_it():
+    # TSMC 2015: cash held for sale at the beginning, then cash at the beginning; cash at the end closes.
+    x = fake_xbrl()
+    cash = x.statements.cash_flow_statement()
+    cash.rows.insert(0, row("ifrs-full_CashAndCashEquivalentsClassifiedAsPartOfDisposalGroupHeldForSale",
+                            {"instant_2008-09-27": 100e6}, role=START))
+    for line in cash.rows:
+        if line["concept"] == "us-gaap_CashAndCashEquivalentsPeriodIncreaseDecrease":
+            line["values"][FY09] = -6_712e6  # 11,875 + 100 - 6,712 = 5,263
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    flows = next(r for r in readings if r.statement == "cash_flow" and r.own)
+    assert flows.status == "kept"

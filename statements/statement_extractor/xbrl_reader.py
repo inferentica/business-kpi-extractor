@@ -152,22 +152,29 @@ def _annotated(xbrl, rows: list[dict], flows: bool) -> list[dict]:
     "less restricted cash" down to the balance sheet's cash). Each other balance is shown at the period's end."""
     balances = [index for index, row in enumerate(rows) if flows and _is_instant_line(row)]
     concept_of = {index: str(rows[index]["concept"]) for index in balances}
-    opening = next((index for index in balances if "periodStart" in str(rows[index].get("preferred_label") or "")), None)
-    if opening is None:
-        opening = next((index for index in balances
-                        if sum(1 for other in balances if concept_of[other] == concept_of[index]) > 1), None)
+    starts = [index for index in balances if "periodStart" in str(rows[index].get("preferred_label") or "")]
+    if not starts:
+        starts = [next((index for index in balances
+                        if sum(1 for other in balances if concept_of[other] == concept_of[index]) > 1), None)]
+        starts = [index for index in starts if index is not None]
+    # The main opening balance is the one shown again at the end; others open beside it (TSMC's 2015 cash held for
+    # sale) and count towards the opening cash.
+    shown_again = [index for index in starts
+                   if any(other > index and concept_of[other] == concept_of[index] for other in balances)]
+    main = shown_again[0] if shown_again else (starts[0] if starts else None)
     closing = None
-    if opening is not None:
+    if main is not None:
         closing = next((index for index in reversed(balances)
-                        if index > opening and concept_of[index] == concept_of[opening]), None)
+                        if index > main and concept_of[index] == concept_of[main]), None)
     if closing is None:
         closing = next((index for index in reversed(balances)
                         if "periodEnd" in str(rows[index].get("preferred_label") or "")), balances[-1] if balances else None)
+    opening = set(starts) - {closing}
     annotated = []
     for index, row in enumerate(rows):
         balance = None
         if index in concept_of:
-            balance = "opening" if index == opening else "closing" if index == closing else "other"
+            balance = "opening" if index in opening else "closing" if index == closing else "other"
         annotated.append({**row, "_labels": _labels(xbrl, str(row["concept"])), "_balance": balance, "_index": index})
     return annotated
 
@@ -240,15 +247,20 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
             if raw is None:
                 column.blank.add(concept)
                 continue  # a line this period does not report
-            if consolidated and (concept, key) not in consolidated:
-                continue  # a figure for part of the company only (a memo of consolidated VIEs)
+            if consolidated and (concept, key) not in consolidated and not (
+                    period.start is not None and row.get("_balance") in ("opening", "closing")):
+                # A figure for part of the company only: a memo of consolidated VIEs, a breakdown of cash by kind. The
+                # opening and closing balances of a flow statement are kept: a filer can tag the company's own balance
+                # under a stray dimension (Prudential's 2026 cash), and the cash roll-forward checks them anyway.
+                continue
             when = parse_period(key).end.isoformat()
             raw = currency.value(concept, when, raw)
             figure = Figure(raw, _decimals((row.get("decimals") or {}).get(key)))
             sign = _number((row.get("preferred_signs") or {}).get(key)) or 1.0
             value = raw * sign
             if period.start is not None and row.get("_balance") == "opening":
-                column.opening = column.opening or figure
+                column.opening = figure if column.opening is None else Figure(
+                    column.opening.value + figure.value, _coarser(column.opening.decimals, figure.decimals))
             elif period.start is not None and row.get("_balance") == "closing":
                 column.closing = figure
             elif not (period.start is not None and row.get("_balance") == "other"):
@@ -273,6 +285,11 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
         accession="", form="", filed=date.min, own=False, source="xbrl",
         lines=lines, checks=checks_for(name, column, arcs),
     )
+
+
+def _coarser(left: int | None, right: int | None) -> int | None:
+    known = [value for value in (left, right) if value is not None]
+    return min(known) if known else None
 
 
 def _labels_for(row: dict) -> str:
