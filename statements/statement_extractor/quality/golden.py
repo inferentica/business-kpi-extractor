@@ -29,7 +29,8 @@ GOLDEN = _golden_path()
 def _line(entry: dict, lines: list[dict]) -> dict | None:
     candidates = [line for line in lines if not line["is_heading"] and line["value"] is not None]
     if entry.get("concept"):
-        found = next((line for line in candidates if line["concept"] == entry["concept"]), None)
+        found = next((line for line in candidates if line["concept"] == entry["concept"]
+                      and line.get("member") == entry.get("member")), None)
         if found is not None or entry.get("era") == "xbrl":
             return found
     pattern = re.compile(entry["label"] if not entry.get("concept") else re.escape(entry["label"]), re.I)

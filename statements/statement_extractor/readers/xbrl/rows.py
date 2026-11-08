@@ -1,5 +1,6 @@
 """A statement's presented lines from its XBRL presentation: the filer's own rows in order, without taxonomy
-scaffolding or breakdowns, each with the filer's label and, in a flow statement, which balance a balance line is."""
+scaffolding, each with the filer's label and, in a flow statement, which balance a balance line is. A breakdown is a
+line only where the statement itself prints it."""
 from __future__ import annotations
 
 import re
@@ -49,11 +50,18 @@ def _labels(xbrl, concept: str) -> dict[str, str]:
     return dict(getattr(element, "labels", None) or {})
 
 
-def presented_rows(statement) -> list[dict]:
+def presented_rows(statement, shown: set[str] | None = None) -> list[dict]:
+    """The statement's rows. A row under a dimension is kept, marked with its members, when the statement's own
+    presentation shows every axis and member it carries (Visa's earnings per share by class of stock, KKR's revenues
+    by segment, Apple's products and services); edgartools also attaches breakdowns from the notes (Apple's revenue by
+    segment and by country, JPM's VIEs), which the statement does not print."""
     rows = []
     for row in statement.get_raw_data() or []:
         if row.get("is_dimension") or row.get("dimension"):
-            continue  # a breakdown some filers tag inside a statement, not one of its own lines
+            member = _printed_member(row, shown or set())
+            if member is None:
+                continue
+            row = {**row, "_member": member}
         concept, label = str(row.get("concept") or ""), str(row.get("label") or "")
         if row.get("is_abstract") and (_STRUCTURAL_LABEL.search(label) or _STRUCTURAL_CONCEPT.search(concept)):
             continue
@@ -61,6 +69,18 @@ def presented_rows(statement) -> list[dict]:
             continue
         rows.append(row)
     return rows
+
+
+def _printed_member(row: dict, shown: set[str]) -> str | None:
+    dimensions = row.get("dimension_metadata") or []
+    if not dimensions:
+        return None
+    for dimension in dimensions:
+        axis = str(dimension.get("dimension") or "").replace(":", "_", 1)
+        member = str(dimension.get("member") or "").replace(":", "_", 1)
+        if axis not in shown or member not in shown:
+            return None
+    return " - ".join(clean_label(str(dimension.get("member_label") or dimension.get("member"))) for dimension in dimensions)
 
 
 def is_instant_line(row: dict) -> bool:
@@ -73,7 +93,7 @@ def annotated(xbrl, rows: list[dict], flows: bool) -> list[dict]:
     the role its presentation gives it, "beginning of period", else the first of a balance shown twice), the closing
     one (that same line shown again at the end), or another (a reconciliation after the closing balance: Coca-Cola's
     "less restricted cash" down to the balance sheet's cash). Each other balance is shown at the period's end."""
-    balances = [index for index, row in enumerate(rows) if flows and is_instant_line(row)]
+    balances = [index for index, row in enumerate(rows) if flows and is_instant_line(row) and not row.get("_member")]
     concept_of = {index: str(rows[index]["concept"]) for index in balances}
     starts = [index for index in balances if "periodStart" in str(rows[index].get("preferred_label") or "")]
     if not starts:
@@ -94,11 +114,16 @@ def annotated(xbrl, rows: list[dict], flows: bool) -> list[dict]:
                         if "periodEnd" in str(rows[index].get("preferred_label") or "")), balances[-1] if balances else None)
     opening = set(starts) - {closing}
     annotated = []
+    last: dict[str, str | None] = {}  # each concept's latest balance role, which its breakdowns below it share
     for index, row in enumerate(rows):
-        balance = None
+        balance, broken_down = None, None
         if index in concept_of:
             balance = "opening" if index in opening else "closing" if index == closing else "other"
-        annotated.append({**row, "_labels": _labels(xbrl, str(row["concept"])), "_balance": balance, "_index": index})
+            last[concept_of[index]] = balance
+        elif row.get("_member") and flows and is_instant_line(row):
+            broken_down = last.get(str(row["concept"]))  # KKR's opening and closing cash by segment
+        annotated.append({**row, "_labels": _labels(xbrl, str(row["concept"])), "_balance": balance,
+                          "_member_balance": broken_down, "_index": index})
     return annotated
 
 

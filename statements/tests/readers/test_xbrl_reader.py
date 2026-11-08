@@ -178,3 +178,46 @@ def test_a_balance_sheet_ends_at_total_liabilities_and_equity():
     readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
     balance = next(r for r in readings if r.statement == "balance" and r.own)
     assert balance.lines[-1]["concept"] == "us-gaap_LiabilitiesAndStockholdersEquity"
+
+
+def _member(axis, member, label):
+    return [{"dimension": axis, "member": member, "member_label": label}]
+
+
+def test_a_breakdown_is_a_line_only_where_the_statement_prints_it():
+    # Apple prints net sales of products and services; edgartools also attaches its revenue by segment from a note.
+    x = fake_xbrl()
+    income = x.statements.income_statement()
+    income.rows[3:3] = [
+        row("us-gaap_SalesRevenueNet", {FY09: 30_000e6}, level=5, label="Products", is_dimension=True,
+            dimension_metadata=_member("srt:ProductOrServiceAxis", "us-gaap_ProductMember", "Products")),
+        row("us-gaap_SalesRevenueNet", {FY09: 6_537e6}, level=5, label="Services", is_dimension=True,
+            dimension_metadata=_member("srt:ProductOrServiceAxis", "us-gaap_ServiceMember", "Services")),
+        row("us-gaap_SalesRevenueNet", {FY09: 99e6}, level=5, label="Americas", is_dimension=True,
+            dimension_metadata=_member("us-gaap:StatementBusinessSegmentsAxis", "aapl_AmericasSegmentMember", "Americas")),
+    ]
+    x.presentation_trees = {"income": SimpleNamespace(all_nodes={
+        "us-gaap_SalesRevenueNet": 1, "srt_ProductOrServiceAxis": 1, "us-gaap_ProductMember": 1, "us-gaap_ServiceMember": 1})}
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    income = next(r for r in readings if r.statement == "income" and r.own)
+    shown = [(line["label"], line.get("member"), line["value"]) for line in income.lines if line["concept"] == "us-gaap_SalesRevenueNet"]
+    assert shown == [("Net sales", None, 36_537e6), ("Products", "Products", 30_000e6), ("Services", "Services", 6_537e6)]
+    assert income.status == "kept"  # breakdowns stay out of the arithmetic
+
+
+def test_a_balance_broken_down_in_a_flow_statement_opens_or_closes_with_its_line():
+    # KKR 2021: cash at the beginning and at the end of the period, each by segment.
+    x = fake_xbrl()
+    cash = x.statements.cash_flow_statement()
+    segment = _member("us-gaap:StatementBusinessSegmentsAxis", "kkr_InsuranceSegmentMember", "Insurance")
+    balances = {"instant_2008-09-27": 1_000e6, "instant_2009-09-26": 2_000e6, "instant_2007-09-29": 500e6}
+    cash.rows.insert(1, row("us-gaap_CashAndCashEquivalentsAtCarryingValue", dict(balances), level=5, role=TOTAL,
+                            label="Insurance", is_dimension=True, dimension_metadata=segment))
+    cash.rows.append(row("us-gaap_CashAndCashEquivalentsAtCarryingValue", dict(balances), level=5, role=TOTAL,
+                         label="Insurance", is_dimension=True, dimension_metadata=segment))
+    x.presentation_trees = {"cash": SimpleNamespace(all_nodes={
+        "us-gaap_StatementBusinessSegmentsAxis": 1, "kkr_InsuranceSegmentMember": 1})}
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    flows = next(r for r in readings if r.statement == "cash_flow" and r.own)
+    assert [line["value"] for line in flows.lines if line.get("member")] == [1_000e6, 2_000e6]
+    assert flows.status == "kept"

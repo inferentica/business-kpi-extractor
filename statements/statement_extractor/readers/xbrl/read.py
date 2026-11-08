@@ -14,9 +14,10 @@ from datetime import date
 
 from ...checks.reported import Column, Figure, checks_for
 from ...domain.model import Reading
-from ...domain.periods import OWN_SLACK, Period, label_period, parse_period, presented_periods
+from ...domain.periods import OWN_SLACK, Period, label_period, opening_instant, parse_period, presented_periods
 from .facts import ReportingCurrency, consolidated_figures, decimals, load_facts, number
-from .rows import STATEMENT_METHODS, annotated, clean_label, key_for, label_for, presented_rows, statement_of
+from .rows import (STATEMENT_METHODS, annotated, clean_label, is_instant_line, key_for, label_for, presented_rows,
+                   statement_of)
 
 
 def _arcs(xbrl, role: str | None) -> dict[str, list[tuple[str, float]]]:
@@ -25,6 +26,13 @@ def _arcs(xbrl, role: str | None) -> dict[str, list[tuple[str, float]]]:
     for arc in getattr(tree, "all_arcs", None) or []:
         arcs.setdefault(arc.parent_id, []).append((arc.child_id, float(arc.weight)))
     return arcs
+
+
+def _shown(xbrl, role: str | None) -> set[str]:
+    """The axes and members a statement's own presentation shows."""
+    tree = (getattr(xbrl, "presentation_trees", None) or {}).get(role) if role else None
+    nodes = getattr(tree, "all_nodes", None) or {}
+    return {str(node) for node in nodes if str(node).endswith(("Axis", "Member"))}
 
 
 def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end: str,
@@ -46,7 +54,8 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
             notes.append(f"{name}: not found")
             continue
         try:
-            rows = annotated(xbrl, presented_rows(statement), flows=name != "balance")
+            shown = _shown(xbrl, getattr(statement, "role_or_type", None))
+            rows = annotated(xbrl, presented_rows(statement, shown), flows=name != "balance")
         except Exception as error:  # noqa: BLE001
             notes.append(f"{name}: unreadable ({type(error).__name__})")
             continue
@@ -78,8 +87,19 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
     for row in rows:
         concept = str(row["concept"])
         heading = bool(row.get("is_abstract"))
+        member = row.get("_member")
         value = None
-        if not heading:
+        if member and not heading:
+            key = period.key
+            if period.start is not None and is_instant_line(row):  # a balance by segment in a flow statement
+                opens = row.get("_member_balance") == "opening"
+                key = opening_instant(period, instants) if opens else f"instant_{period.end}"
+            raw = number((row.get("values") or {}).get(key)) if key else None
+            if raw is None:
+                continue  # a breakdown this period does not print
+            raw = currency.value(concept, parse_period(key).end.isoformat(), raw)
+            value = raw * (number((row.get("preferred_signs") or {}).get(key)) or 1.0)
+        elif not heading:
             key = key_for(row, period, instants)
             raw = number((row.get("values") or {}).get(key)) if key else None
             if raw is None:
@@ -105,12 +125,12 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
                 if concept not in column.figures:
                     column.figures[concept] = figure
                     column.presented.append((concept, str(row.get("parent") or ""), sign))
-        labels = label_for(row)
+        labels = str(row.get("label") or member) if member else label_for(row)  # a breakdown's label is its member
         level = number(row.get("level"))
         lines.append({
             "line": len(lines), "concept": concept[:200], "label": clean_label(labels),
             "level": max(0, min(20, int(level) - base)) if level is not None else 0,
-            "is_heading": heading, "value": value,
+            "is_heading": heading, "value": value, **({"member": member} if member else {}),
         })
     if name == "balance":
         lines = _through_grand_total(lines)
