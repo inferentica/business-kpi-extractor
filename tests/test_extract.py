@@ -505,6 +505,22 @@ def test_a_section_rows_in_thousands_is_no_column_scale_for_the_volumes_below():
     assert _column_scale(table, 1, 1) == 1e6
 
 
+def test_a_count_is_never_read_from_a_currency_column():
+    # Auna: "2Q'25 (USD) | 2Q'25 | YTD 25" with "Patients treated # (000) 17 54".
+    html = """<table><tr><td>Key Operating Metrics</td><td>2Q'25 (USD)</td><td>2Q'25</td></tr>
+<tr><td>Patients treated # (000)</td><td>17</td><td>54</td></tr></table>"""
+    document = parse_document(html, "https://example.com/x.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "k", "label": "Patients Treated", "unit": "count"}]}]})
+    wrong = Located.model_validate({"period_end": "2025-06-30", "values": [{"kpi": "ops.k", "table": table, "row": 1, "col": 1}]})
+    values, problems = read_values(document, spec, wrong, "PEN")
+    assert values == [] and "currency's column" in problems[0]
+    right = Located.model_validate({"period_end": "2025-06-30", "values": [{"kpi": "ops.k", "table": table, "row": 1, "col": 2}]})
+    values, problems = read_values(document, spec, right, "PEN")
+    assert problems == [] and values[0].value == 54_000
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>

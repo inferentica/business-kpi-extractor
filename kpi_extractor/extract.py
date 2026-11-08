@@ -74,6 +74,11 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
                 first_cell = (row_cells[0] if row_cells else "").strip()  # a bare year has no letters
                 if not located.annual and _YEAR_ROW.match(first_cell) and not _LONG_SPAN_KPI.search(kpi.label):
                     raise LocateError(f"{locator.table} r{locator.row} is the year {first_cell!r}, not a quarter")
+            # A count is never read from a column a currency heads: Auna's "2Q'25 (USD)" column beside its quarter's
+            # gave 17 (thousand) patients treated for the quarter's 54.
+            if (kpi.unit == "count" and locator.table is not None and locator.table in document.tables
+                    and _column_currency(document.tables[locator.table], locator.row, locator.col, None)):
+                raise LocateError(f"{locator.table} c{locator.col} is a currency's column, not the count's")
             value, currency, notes = _read(document, locator, kpi, default_currency)
             if locator.table is not None and locator.table in document.tables and group.kind == "metric":
                 if unnamed := _place_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
