@@ -1,7 +1,7 @@
 from datetime import date
 
-from statement_extractor.html_reader import read_document
-from statement_extractor.html_tables import number
+from statement_extractor.readers.html.read import read_document
+from statement_extractor.readers.html.tables import number
 
 
 def test_printed_figures():

@@ -1,7 +1,7 @@
 from datetime import date
 from types import SimpleNamespace
 
-from statement_extractor.xbrl_reader import read_filing
+from statement_extractor.readers.xbrl.read import read_filing
 
 LABEL = "http://www.xbrl.org/2003/role/label"
 TOTAL = "http://www.xbrl.org/2003/role/totalLabel"

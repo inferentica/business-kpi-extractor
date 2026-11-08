@@ -12,8 +12,13 @@ from dataclasses import dataclass, field
 
 import lxml.html
 
+
 _NUMBER = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*\)?$")
+
+
 _DASH = re.compile(r"^[—–\-−]+$")
+
+
 _NOTE_MARK = re.compile(r"\s*(\(\d{1,2}\)|\([a-z]\)|\*+)$")
 
 
@@ -171,6 +176,8 @@ def tables(html: str | bytes) -> list[Table]:
 
 
 _YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
+
+
 _COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)\s+ended\b|\bended\b|"
                            r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b", re.I)
 

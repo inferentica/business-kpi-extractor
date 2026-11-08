@@ -1,6 +1,6 @@
 from datetime import date
 
-from statement_extractor.periods import Period, label_period, opening_instant, parse_period, presented_periods
+from statement_extractor.domain.periods import Period, label_period, opening_instant, parse_period, presented_periods
 
 
 def test_parse_and_durations():

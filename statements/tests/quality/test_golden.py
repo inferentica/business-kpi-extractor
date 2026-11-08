@@ -1,6 +1,6 @@
 import json
 
-from statement_extractor.golden import GOLDEN, score
+from statement_extractor.quality.golden import GOLDEN, score
 
 
 def chosen(folder, lines, period=("income", "2009", "FY", "year")):

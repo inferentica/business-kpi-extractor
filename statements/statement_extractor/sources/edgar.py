@@ -5,6 +5,7 @@ Nothing here may import the KPI extractor's AI, readers or pipeline (tests/test_
 """
 from __future__ import annotations
 
+
 from kpi_extractor.fiscal import FiscalCalendarError, fiscal_label, learn_year_offset
 from kpi_extractor.sec import (
     PERIODIC_FORMS,

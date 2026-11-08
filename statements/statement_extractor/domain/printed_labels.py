@@ -1,0 +1,68 @@
+"""The wording printed statements use for the lines their checks and pairing rely on: totals, cash balances,
+income before taxes, net income, per-share lines and share counts."""
+from __future__ import annotations
+
+import re
+
+
+PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+)?share|per\s+ads|^(basic|diluted)\b|earnings\s+per|\beps\b", re.I)
+
+
+SHARE_COUNT = re.compile(r"\bshares\b|weighted[-\s]average", re.I)
+
+
+# Lines a statement's checks and later eras pair by: the concept XBRL gives the same line.
+KNOWN = (
+    (re.compile(r"^total\s+assets$", re.I), "us-gaap_Assets"),
+    (re.compile(r"^total\s+liabilities\s+and\s+(stockholders|shareholders|shareowners)['’]?\s+(equity|investment)$|^total\s+liabilities\s+and\s+(total\s+)?equity$|"
+                r"^total\s+liabilities,.*and\s+(stockholders|shareholders|shareowners)['’]?\s+equity$", re.I), "us-gaap_LiabilitiesAndStockholdersEquity"),
+    (re.compile(r"^total\s+liabilities$", re.I), "us-gaap_Liabilities"),
+    (re.compile(r"^total\s+(stockholders|shareholders|shareowners)['’]?\s+equity$", re.I), "us-gaap_StockholdersEquity"),
+    (re.compile(r"^total\s+current\s+assets$", re.I), "us-gaap_AssetsCurrent"),
+    (re.compile(r"^total\s+current\s+liabilities$", re.I), "us-gaap_LiabilitiesCurrent"),
+    (re.compile(r"^(net|total net)\s+(sales|revenues?|operating revenues)$|^(total\s+)?revenues?$", re.I), "us-gaap_Revenues"),
+    (re.compile(r"^gross\s+(margin|profit)(\s+on\s+sales)?$", re.I), "us-gaap_GrossProfit"),
+    (re.compile(r"^operating\s+income(\s+\(loss\))?$|^income(\s+\(loss\))?\s+from\s+operations$", re.I), "us-gaap_OperatingIncomeLoss"),
+    (re.compile(r"^net\s+(income|earnings)(\s+\(loss\))?$|^net\s+loss$", re.I), "us-gaap_NetIncomeLoss"),
+    (re.compile(r"cash\s+(generated\s+by|provided\s+by|used\s+(in|for)|from)(\s+\(used\s+(in|for)\))?\s+operating\s+activities$|"
+                r"operating\s+activities$", re.I), "us-gaap_NetCashProvidedByUsedInOperatingActivities"),
+    (re.compile(r"investing\s+activities$", re.I), "us-gaap_NetCashProvidedByUsedInInvestingActivities"),
+    (re.compile(r"financing\s+activities$", re.I), "us-gaap_NetCashProvidedByUsedInFinancingActivities"),
+)
+
+
+ASSETS = re.compile(r"^total\s+assets$", re.I)
+
+
+LIABILITIES_AND_EQUITY = re.compile(r"^total\s+liabilities.*\b(equity|investment|deficit|capital)$", re.I)
+
+
+LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
+
+
+EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’]?\s+)?equity$", re.I)
+
+
+OPENING = re.compile(r"\bcash\b.*\b(beginning|start)\b", re.I)
+
+
+CLOSING = re.compile(r"\bcash\b.*\bend\b", re.I)
+
+
+CHANGE = re.compile(r"(increase|decrease|change).*\bcash\b|\bcash\b.*(increase|decrease)|^total\s+cash\s+(generated|provided|used)", re.I)
+
+
+EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translation", re.I)
+
+
+SECTIONS = re.compile(r"(operating|investing|financing)\s+activities$", re.I)
+
+
+PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax", re.I)
+
+
+NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
+                         r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit\s+for\s+the\s+(year|period)$", re.I)
+
+
+TOTAL = re.compile(r"^total\b", re.I)

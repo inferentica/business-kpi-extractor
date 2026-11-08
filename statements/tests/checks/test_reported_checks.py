@@ -1,4 +1,4 @@
-from statement_extractor.checks import Column, Figure, balance_check, calc_check, cash_check, rounding
+from statement_extractor.checks.reported import Column, Figure, balance_check, calc_check, cash_check, rounding
 
 
 def figure(value, decimals=-6):

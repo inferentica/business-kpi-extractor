@@ -4,9 +4,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import date
 
+
 STATEMENTS = ("income", "balance", "cash_flow")
+
+
 # quarter: three months; ytd: the year to date (six or nine months); year: a fiscal year; instant: a balance sheet date.
 DURATIONS = ("quarter", "ytd", "year", "instant")
+
 
 PASS, FAIL, NONE = "pass", "fail", "none"  # a check held, failed, or had nothing it could test
 

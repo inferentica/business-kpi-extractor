@@ -5,8 +5,23 @@ company's first filing. It works by rules only and never calls an AI.
 
 It is separate from the business KPI extractor in this repository, with its own package, tests and workflow
 (`.github/workflows/statements.yml`). It reaches the KPI extractor's base layer (EDGAR access, fiscal labels) only
-through `statement_extractor/base.py`, and `tests/test_isolation.py` fails if anything else does. It edits no KPI
+through `statement_extractor/sources/edgar.py`, and `tests/test_isolation.py` fails if anything else does. It edits no KPI
 extractor file.
+
+## Layout
+
+One concern per file, no module over 300 lines, and each folder imports only the folders below it
+(`tests/test_layout.py` enforces all three):
+
+| Folder | Holds |
+|---|---|
+| `sources/` | EDGAR access (the only bridge to the KPI extractor) and which documents hold the statements |
+| `domain/` | Readings, periods and fiscal labels, the wording printed statements use |
+| `checks/` | Arithmetic on reported XBRL figures, arithmetic on printed figures, subtotal detection |
+| `readers/xbrl/`, `readers/html/` | One reader per format; a reader never imports another. Later: `text/`, `release/` |
+| `selection/` | Newest filing wins, sign settlement, mixed-vintage fourth quarters |
+| `quality/` | Golden set scoring, coverage, the run report |
+| `pipeline/` | One company's run and the command line |
 
 ## How a period is read
 

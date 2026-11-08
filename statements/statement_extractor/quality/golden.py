@@ -16,7 +16,7 @@ from pathlib import Path
 
 def _golden_path() -> Path:
     """The golden set beside the package (an editable install), else in the checkout it runs from."""
-    for path in (Path(__file__).resolve().parents[1] / "evals" / "golden.json", Path.cwd() / "statements" / "evals" / "golden.json",
+    for path in (Path(__file__).resolve().parents[2] / "evals" / "golden.json", Path.cwd() / "statements" / "evals" / "golden.json",
                  Path.cwd() / "evals" / "golden.json"):
         if path.exists():
             return path

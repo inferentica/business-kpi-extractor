@@ -1,7 +1,8 @@
 from datetime import date
 
-from statement_extractor.choose import choose, mixed_vintage_q4s
-from statement_extractor.model import Check, Reading
+from statement_extractor.selection.choose import choose
+from statement_extractor.selection.vintage import mixed_vintage_q4s
+from statement_extractor.domain.model import Check, Reading
 
 
 def reading(accession, filed, value, own, result="pass", statement="income", period="FY", duration="year"):

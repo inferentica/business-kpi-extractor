@@ -10,13 +10,22 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .model import FAIL, NONE, PASS, Check
+from ..domain.model import FAIL, NONE, PASS, Check
+
 
 _ASSETS = re.compile(r"^(us-gaap|ifrs-full)_Assets$")
+
+
 _LIABILITIES_AND_EQUITY = re.compile(r"^(us-gaap_LiabilitiesAndStockholdersEquity|ifrs-full_EquityAndLiabilities)$")
+
+
 _CASH_CHANGE = re.compile(r"PeriodIncreaseDecrease|IncreaseDecreaseInCashAndCashEquivalents|NetIncreaseDecreaseInCash", re.I)
+
+
 # The exchange-rate line itself ("EffectOfExchangeRateOnCash…"), not a change line named for coming before it.
 _EXCHANGE_EFFECT = re.compile(r"_EffectOfExchangeRate", re.I)
+
+
 _SECTION_FLOWS = re.compile(r"NetCashProvidedByUsedIn(Operating|Investing|Financing)Activities$|"
                             r"CashFlowsFrom(?:UsedIn)?(Operating|Investing|Financing)Activities$")
 
