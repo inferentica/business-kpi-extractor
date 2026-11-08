@@ -446,6 +446,10 @@ def test_a_row_that_is_a_year_is_not_a_quarter():
     quarter = Located.model_validate({"period_end": "2025-12-31", "values": [{"kpi": "ops.k", "table": table, "row": 1, "col": 2}]})
     values, problems = read_values(document, spec, quarter, "USD")
     assert values == [] and "is the year '2025'" in problems[0]
+    # A reading that points past the table's last row is a problem for that KPI, never a failed filing.
+    beyond = Located.model_validate({"period_end": "2025-12-31", "values": [{"kpi": "ops.k", "table": table, "row": 9, "col": 2}]})
+    values, problems = read_values(document, spec, beyond, "USD")
+    assert values == [] and problems
     annual = Located.model_validate({"period_end": "2025-12-31", "annual": True, "values": [{"kpi": "ops.k", "table": table, "row": 1, "col": 2}]})
     values, problems = read_values(document, spec, annual, "USD")
     assert problems == [] and values[0].value == 1210

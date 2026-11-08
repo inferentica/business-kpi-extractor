@@ -70,7 +70,8 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
                                       f"{kpi.label!r}: point at the row for {kpi.label} itself")
                 if other := net_gross_mismatch(row_label, kpi.label):
                     raise LocateError(f"{locator.table} r{locator.row} is the {other} figure {row_label!r}, not {kpi.label!r}")
-                first_cell = (table.rows[locator.row][0] if table.rows[locator.row] else "").strip()  # a bare year has no letters
+                row_cells = table.rows[locator.row] if locator.row < len(table.rows) else []
+                first_cell = (row_cells[0] if row_cells else "").strip()  # a bare year has no letters
                 if not located.annual and _YEAR_ROW.match(first_cell) and not _LONG_SPAN_KPI.search(kpi.label):
                     raise LocateError(f"{locator.table} r{locator.row} is the year {first_cell!r}, not a quarter")
             value, currency, notes = _read(document, locator, kpi, default_currency)
