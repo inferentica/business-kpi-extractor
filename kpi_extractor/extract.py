@@ -203,7 +203,12 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
     # "YTD 2025, the company was awarded 14 new contract commitments" is the year to date, not the quarter's count,
     # unless the KPI itself is defined over the longer span (Tesla's cumulative deliveries, PGIM's trailing flows).
     if (span := _OTHER_PERIOD.search(before[-120:])) and not _LONG_SPAN_KPI.search(kpi.label):
-        raise LocateError(f"the quote gives the figure {span.group(0).lower()!r}, not the quarter's")
+        # GE Vernova's "backlog increased $6.5 billion year-to-date, to approximately $26 billion" states a change over
+        # the year and then the level at quarter end: the level of a stock measure is the quarter's figure.
+        between = before[-120:][span.end():]
+        level = re.search(r"\b(?:to|reached|reaching|stood at|stands at|as of|at the end|ended the quarter with|now)\b", between)
+        if not (level and _STOCK_KPI.search(kpi.label)):
+            raise LocateError(f"the quote gives the figure {span.group(0).lower()!r}, not the quarter's")
     if other := net_gross_mismatch(before[-80:], kpi.label):
         raise LocateError(f"the quote gives the {other} figure, not {kpi.label!r}")
     if value > 0 and (kpi.unit == "percent" or (kpi.unit == "count" and _CHANGE_KPI.search(kpi.label))) \
@@ -253,6 +258,10 @@ _OTHER_PERIOD = re.compile(r"\bfirst (?:six|nine) months\b|\b(?:six|nine|twelve)
 # A KPI defined over a longer span than the quarter, which such wording describes rather than contradicts.
 _LONG_SPAN_KPI = re.compile(r"year[- ]to[- ]date|\bYTD\b|cumulative|all[- ]time|trailing|\bTTM\b|\bLTM\b|twelve months|full[- ]year|annual|"
                             r"since (?:inception|launch)|to date", re.I)
+# A KPI that is a level at period end (a stock), not a flow over it: a year-to-date change can lead to its level.
+_STOCK_KPI = re.compile(r"backlog|obligations?|\bRPO\b|\bcRPO\b|customers?|subscribers?|members?|users?|base\b|balances?|assets|"
+                        r"\bAU[MSA]\b|in force|count\b|sites|rigs|fleet|stores|locations|employees|headcount|deposits|loans|capacity|"
+                        r"properties|units in operation|policies", re.I)
 # A table row that is a year, not a quarter: Sun Communities' operating statistics by year (2025, 2024, 2023).
 _YEAR_ROW = re.compile(r"^\s*(?:FY\s?|fiscal\s+)?(?:19|20)\d\d\s*$", re.I)
 # Words of a KPI's name that say nothing on their own.

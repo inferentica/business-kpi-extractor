@@ -423,6 +423,10 @@ def test_a_quote_for_the_year_to_date_is_not_the_quarters_count():
     assert values == [] and "not the quarter's" in problems[0]
     values, problems = read("Year-to-Date Contract Commitments")
     assert problems == [] and values[0].value == 14
+    # A year-to-date change that leads to a stock measure's level: the level is the quarter's figure (GE Vernova).
+    assert _read_quote("Our Electrification equipment backlog increased $6.5 billion year-to-date, to approximately $26 billion.",
+                       "Electrification Equipment Backlog", "currency",
+                       "backlog increased $6.5 billion year-to-date, to approximately $26 billion", "$26 billion") == 26_000_000_000
     # A KPI defined over the longer span keeps its quote: cumulative deliveries, trailing flows.
     assert _read_quote("Cumulative deliveries (all-time; mil) 8.5 10.2", "Cumulative Deliveries", "count",
                        "Cumulative deliveries (all-time; mil) 8.5 10.2", "10.2") == 10.2
