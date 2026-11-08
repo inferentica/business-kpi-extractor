@@ -451,6 +451,33 @@ def test_a_row_that_is_a_year_is_not_a_quarter():
     assert problems == [] and values[0].value == 1210
 
 
+def test_stated_scales_in_more_forms_are_recognised():
+    from kpi_extractor.extract import _column_scale, _row_scale
+    assert _row_scale("Oncological Plans # (000) 1,005") == 1e3               # Auna's unit column
+    assert _row_scale("Paid memberships (Mil.) 301.6") == 1e6
+    # FedEx: "Avg. daily package volume (ADV) (000s)(1):" heads the rows under it.
+    adv = _read_one("""<table><tr><td>Package statistics</td><td>Q2 2026</td></tr>
+<tr><td>Avg. daily package volume (ADV) (000s)(1):</td><td></td></tr>
+<tr><td>Total U.S. domestic ADV</td><td>14,716</td></tr></table>""", "U.S. Domestic Average Daily Package Volume", "count", 2, 1)
+    assert adv.value == 14_716_000 and adv.status == "verified"
+    # Vodafone: a bare "€m" column heading.
+    document = parse_document("<table><tr><td></td><td>Q2 FY26</td></tr><tr><td></td><td>€m</td></tr><tr><td>UK</td><td>2,018</td></tr></table>",
+                              "https://example.com/x.htm")
+    assert _column_scale(next(iter(document.tables.values())), 2, 1) == 1e6
+    # Grifols: "In millions of euros" over a breakdown given as text.
+    assert _read_quote("In millions of euros Revenue by Business Unit Biopharma 1,653 1,633", "Biopharma", "currency",
+                       "Biopharma 1,653 1,633", "1,653") == 1_653_000_000
+
+
+def test_a_repeat_the_row_itself_prints_is_no_wrong_column():
+    from kpi_extractor.checks import _row_shows
+    # PNC's card and cash management: 737 in 3Q25 and 2Q25, side by side in the row.
+    current = {"locator": {"row_numbers": [737.0, 737.0, 698.0]}}
+    assert _row_shows(current, 737_000_000, 737_000_000)
+    assert not _row_shows(current, 698_500_000, 737_000_000)
+    assert not _row_shows({"locator": {}}, 737_000_000, 737_000_000)
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>

@@ -277,15 +277,27 @@ def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of:
             jump = _row_jump(current, before, now)
             if jump and not immaterial_row(current):
                 flagged[key_of(current)] = jump
-            elif current["unit"] == "currency" and _significant(now) and _same(now, before):
+            elif current["unit"] == "currency" and _significant(now) and _same(now, before) and not _row_shows(current, before, now):
                 flagged[key_of(current)] = "the same figure as the quarter before: check the column"
         by_end = {v["period_end"][:7]: v for v in rows}
         for current in rows:
             year_ago = by_end.get(f"{int(current['period_end'][:4]) - 1}{current['period_end'][4:7]}")
             if (judged(current) and year_ago and current["unit"] == "currency" and _significant(float(current["value"]))
-                    and _same(float(current["value"]), float(year_ago["value"]))):
+                    and _same(float(current["value"]), float(year_ago["value"]))
+                    and not _row_shows(current, float(year_ago["value"]), float(current["value"]))):
                 flagged[key_of(current)] = "the same figure as a year earlier: check the column"
     return flagged
+
+
+def _row_shows(current: dict, other: float, now: float) -> bool:
+    """Whether the row a figure was read from prints the other period's figure too, so the repeat is the company's own
+    (PNC's card and cash management, 737 in both quarters) and not a column read twice. The row's numbers travel with
+    the locator as printed; the read cell comes first, so the scale is their ratio."""
+    numbers = (current.get("locator") or {}).get("row_numbers") or []
+    if len(numbers) < 2 or not numbers[0]:
+        return False
+    scale = now / float(numbers[0])
+    return any(n is not None and abs(float(n) * scale - other) <= abs(other) * 1e-6 for n in numbers[1:])
 
 
 def reported_matches(total: float, end: str, reported: list[tuple[str, float, str | None]]) -> tuple[bool, list[str | None]]:

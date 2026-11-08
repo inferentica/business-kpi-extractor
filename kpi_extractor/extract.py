@@ -145,7 +145,9 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
             # A table's "(in millions, except employee data)" describes its amounts, not its counts: a count takes a
             # scale only from its own row label ("Paid memberships (in millions)"), its column's ("Purchase Trans.
             # (Mil.)"), or a scale the reading quotes from the document.
-            row_scale = _row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col)
+            # FedEx's "Avg. daily package volume (ADV) (000s):" heads the rows under it: a section heading's scale is theirs.
+            row_scale = (_row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col)
+                         or _row_scale(_section_heading(table, locator.row)))
             if row_scale is None and locator.scale in (1e3, 1e6, 1e9):
                 if _scale_quoted(document, table, locator.scale_text, locator.scale):
                     row_scale = locator.scale
@@ -433,11 +435,16 @@ _PER_UNIT = re.compile(r"\([^()]*\bper\s+(?:month|year|quarter|day|user|subscrib
 def _preceding_scale(text: str, at: int) -> float | None:
     """The scale of the last heading like "($ in billions)" before position `at` of a text."""
     # "($ in millions, except per share amounts)" is a scale heading too: a price per unit names no millions.
-    headings = list(_ROW_SCALE.finditer(text[:max(at, 0)]))
+    headings = list(_ROW_SCALE.finditer(text[:max(at, 0)])) + list(_BARE_SCALE.finditer(text[:max(at, 0)]))
     if not headings:
         return None
-    last = headings[-1]
-    return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(last.group("word") or last.group("within")).lower()]
+    last = max(headings, key=lambda match: match.start())
+    groups = last.groupdict()
+    return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(groups.get("word") or groups.get("within") or groups.get("bare")).lower()]
+
+
+# A scale stated without brackets, in the words of a passage: Grifols' "In millions of euros" over its breakdown.
+_BARE_SCALE = re.compile(r"\b(?:in|amounts in)\s+(?P<bare>thousands|millions|billions)\s+of\s+(?:euros?|dollars?|US\$|\w+ dollars)", re.I)
 
 
 # A row label's short scale, Tesla's "Active FSD Subscriptions (mil)". Never a single letter: "(b)" is a footnote.
@@ -460,6 +467,9 @@ def _row_scale(text: str) -> float | None:
         return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(match.group("word") or match.group("within")).lower()]
     if match := _ROW_SCALE_SHORT.search(text):
         return {"bil": 1e9, "bn": 1e9, "mil": 1e6, "mm": 1e6, "mn": 1e6, "thous": 1e3}[match.group("word").lower()]
+    # Auna's unit column "# (000)", a row's own "(Mil.)": the column-heading forms, in the row.
+    if (short := _COLUMN_SCALE.search(text)) and (found := _scale_word(short.group("word") or short.group("letter") or short.group("bare"))):
+        return found
     return None
 
 
@@ -797,9 +807,13 @@ def _locator_record(document: Document, locator: Locator) -> dict:
     if locator.table is not None:
         table = document.tables[locator.table]
         row = table.rows[locator.row] if locator.row < len(table.rows) else []
+        cells = [parse_number(cell) for cell in row]
         return {"table": locator.table, "row": locator.row, "col": locator.col,
                 "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:], "scale": locator.scale,
-                "header": column_header(table, locator.row, locator.col)}
+                "header": column_header(table, locator.row, locator.col),
+                # The row's own numbers as printed, the read cell first: a repeat the row itself shows is no wrong column.
+                "row_numbers": [cells[locator.col].value if locator.col < len(cells) and cells[locator.col] else None,
+                                *[c.value for i, c in enumerate(cells) if c is not None and i != locator.col][:8]]}
     return {"block": locator.block, "quote": clean(locator.quote or "")[:160], "value_text": locator.value_text}
 
 
@@ -933,7 +947,8 @@ SCALE_NOT_STATED = "scale not stated in the document"
 # A column's own scale: Mastercard's "(Bil.)" and "(Mil.)", Axia's "(R$ mn)". A single letter counts only beside a
 # currency sign ("($B)"): a bare "(b)" is a footnote mark, as in Axia's "Regulatory Revenue (c) = (a) x (b)".
 _COLUMN_SCALE = re.compile(r"\(\s*(?:[A-Z]{1,3})?\$?\s*(?P<word>bil|bn|billions?|mil|mm|mn|millions?|thous|thousands?|000s?)\.?\s*\)"
-                           r"|\(\s*(?:[A-Z]{1,3})?\$\s*(?P<letter>[bmk])\.?\s*\)", re.I)
+                           r"|\(\s*(?:[A-Z]{1,3})?\$\s*(?P<letter>[bmk])\.?\s*\)"
+                           r"|(?<![\w.])(?:€|\$|£|¥)\s*(?P<bare>bn|mn|mm|m|k)\b", re.I)  # Vodafone's "€m" column heading
 _SCALE_OF = (("bil", 1e9), ("bn", 1e9), ("b", 1e9), ("mil", 1e6), ("mm", 1e6), ("mn", 1e6), ("m", 1e6), ("thous", 1e3), ("k", 1e3),
              ("000", 1e3))
 
@@ -948,7 +963,7 @@ def _scale_word(word: str | None) -> float | None:
 def _column_scale(table: Table, row: int, col: int) -> float | None:
     """The scale a column's own header states: Mastercard's "GDV (Bil.)" and "Purchase Trans. (Mil.)"."""
     cells = [_heading(header, col) for header in table.rows[:max(row, 1)][:6] if col < len(header)]
-    found = {_scale_word(match.group("word") or match.group("letter")) for cell in cells for match in _COLUMN_SCALE.finditer(cell)} - {None}
+    found = {_scale_word(match.group("word") or match.group("letter") or match.group("bare")) for cell in cells for match in _COLUMN_SCALE.finditer(cell)} - {None}
     return found.pop() if len(found) == 1 else None
 
 
@@ -959,7 +974,7 @@ def _scale_quoted(document: Document, part, scale_text: str | None, scale: float
     if not words:
         return False
     stated = {_SCALE_WORDS_OF[match.group("word").lower().rstrip("s")] for match in _ANY_SCALE.finditer(words)}
-    stated |= {_scale_word(match.group("word") or match.group("letter")) for match in _COLUMN_SCALE.finditer(words)} - {None}
+    stated |= {_scale_word(match.group("word") or match.group("letter") or match.group("bare")) for match in _COLUMN_SCALE.finditer(words)} - {None}
     if stated != {scale}:
         return False
     if isinstance(part, Table):
