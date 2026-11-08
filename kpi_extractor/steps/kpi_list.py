@@ -5,12 +5,12 @@ import re
 from datetime import date, timedelta
 
 from .. import ai
-from ..sectors import sector_hint, sector_of
+from ..domain.sectors import sector_hint, sector_of
 from ..ai import AiResponseError, Spec
-from ..control import ControlError
-from ..extract import _listed_kpi
-from ..sec import FilingRef, classification_excerpt, is_own_document
-from ..segment_income import GROUP_KEY as INCOME_GROUP
+from ..ops.control import ControlError
+from ..readers.extract import _listed_kpi
+from ..sources.sec import FilingRef, classification_excerpt, is_own_document
+from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
 from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds

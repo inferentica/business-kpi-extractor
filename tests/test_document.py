@@ -1,6 +1,6 @@
 import pytest
 
-from kpi_extractor.document import parse_document, parse_number
+from kpi_extractor.documents.document import parse_document, parse_number
 
 RELEASE = """
 <html><body>
@@ -80,7 +80,7 @@ def test_large_documents_reach_the_ai_as_their_revenue_sections():
 
 
 def test_right_aligned_amounts_in_cells_of_different_widths_share_one_column():
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     document = parse_document("""<table>
       <tr><td colspan="3">Resolution</td><td colspan="3"></td><td colspan="12">2025</td><td colspan="3"></td><td colspan="12">2024</td></tr>
       <tr><td colspan="3">3-nanometer</td><td colspan="3"></td><td colspan="6">$</td><td colspan="3">160,180,187</td>
@@ -95,7 +95,7 @@ def test_right_aligned_amounts_in_cells_of_different_widths_share_one_column():
 
 
 def test_a_table_that_arrives_as_text_is_read_as_a_table():
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     text = ("<p>Three months ended Six months ended Jun 29, Jun 28, Jun 29, Jun 28, (Unaudited, €, in millions, except per "
             "share data) 2025 2026 2025 2026 Net system sales 5,596.1 6,564.8 11,336.5 12,844.2 Net service and field "
             "option sales 2,095.6 2,761.7 4,096.7 5,249.2 Total net sales 7,691.7 9,326.5 15,433.2 18,093.4 Total cost of "
@@ -163,7 +163,7 @@ def test_each_exhibit_of_a_filing_keeps_its_own_link():
 
 
 def test_a_page_of_placed_text_has_its_tables_rebuilt():
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     box = lambda left, top, text: f'<div style="position:absolute;left:{left}px;top:{top}px;">{text}</div>'
     boxes = [box(60, 100, "Revenue by business division"), box(60, 120, "USD m"), box(430, 120, "30.9.26"), box(485, 120, "30.6.26"),
              box(60, 140, "Global Wealth Management"), box(430, 140, "6,512"), box(495, 140, "640"),
@@ -180,7 +180,7 @@ def test_a_page_of_placed_text_has_its_tables_rebuilt():
 
 
 def test_ordinary_tables_are_left_alone():
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     document = parse_document("<table><tr><td>Revenue</td><td>10</td></tr></table>", "https://www.sec.gov/x.htm")
     assert next(iter(document.tables.values())).rows == [["Revenue", "10"]]
 

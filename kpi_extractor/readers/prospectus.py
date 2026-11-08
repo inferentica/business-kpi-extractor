@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from .document import Document, Table, clean, parse_number
+from ..documents.document import Document, Table, clean, parse_number
 from .release_breakdowns import line_key
 
 _MONTHS = {name: index + 1 for index, name in enumerate(

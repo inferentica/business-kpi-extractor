@@ -7,7 +7,7 @@ from edgar import Filing
 from edgar.exceptions import FilingNotFoundError, SECIdentityError
 from edgar.sgml.sgml_parser import SECHTMLResponseError
 
-from kpi_extractor import sec
+from kpi_extractor.sources import sec
 
 SUBMISSION = """<SEC-DOCUMENT>0000000001-26-000001.txt : 20260102
 <SEC-HEADER>0000000001-26-000001.hdr.sgml : 20260102

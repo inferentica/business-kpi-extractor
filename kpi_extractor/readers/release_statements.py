@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from .document import Document, Table, clean
+from ..documents.document import Document, Table, clean
 from .statements import _label
 
 _MONTHS = {name: index + 1 for index, name in enumerate(

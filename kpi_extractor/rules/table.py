@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..document import parse_number, Table
+from ..documents.document import parse_number, Table
 
 
 def _heading(row: list[str], col: int) -> str:

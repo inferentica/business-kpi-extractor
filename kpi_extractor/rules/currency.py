@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..ai import KpiSpec
-from ..document import _DECLARED_CURRENCIES, declared_currency, Table
+from ..documents.document import _DECLARED_CURRENCIES, declared_currency, Table
 from .table import _heading
 
 

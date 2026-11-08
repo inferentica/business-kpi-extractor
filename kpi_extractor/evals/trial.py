@@ -17,14 +17,14 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from .ai import MISSING_REASONS
-from .audit_check import check_sample, render
-from .cli import company_pool, normalize_symbols, run_symbol
-from .control import ControlPlane
+from ..ai import MISSING_REASONS
+from ..quality.audit_check import check_sample, render
+from ..ops.cli import company_pool, normalize_symbols, run_symbol
+from ..ops.control import ControlPlane
 from .evaluate import EvalControl
-from .pipeline import SymbolPipeline, SymbolResult
-from .sec import configure_identity
-from .steps.shared import AI_GROUP_PREFIX, value_key
+from ..pipeline import SymbolPipeline, SymbolResult
+from ..sources.sec import configure_identity
+from ..steps.shared import AI_GROUP_PREFIX, value_key
 
 AUDIT_SAMPLE = 60  # accepted figures drawn for the hand audit
 _MISSING = re.compile(r"^missing reasons: (.*)$")

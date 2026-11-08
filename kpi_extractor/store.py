@@ -7,7 +7,7 @@ from datetime import date
 from types import MappingProxyType
 
 from .ai import KpiSpec
-from .sec import FilingRef
+from .sources.sec import FilingRef
 from .steps.shared import AI_GROUP_PREFIX, CHART_METHOD, value_key
 
 # The most attempts the store accepts for a filing: a count past it would fail the company's whole store.

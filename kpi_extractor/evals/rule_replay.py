@@ -4,7 +4,7 @@ own filing, at the cell or quote its reading pointed to, and every figure whose 
 A rule change is tried here before any rerun: in seconds it shows what the change does to some two thousand figures the
 AI already placed (the period rule turned away Blue Bird's "second quarter of fiscal 2026" bookings, found this way).
 
-    python -m kpi_extractor.rule_replay eval-results/trial.json [--symbols MP,FDX] [--cache DIR] [--out replay.json]
+    python -m kpi_extractor.evals.rule_replay eval-results/trial.json [--symbols MP,FDX] [--cache DIR] [--out replay.json]
 """
 
 from __future__ import annotations
@@ -18,10 +18,10 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 
-from .ai import Located, Spec
-from .audit_check import Fetcher
-from .extract import SCALE_NOT_STATED, read_values
-from .steps.shared import AI_GROUP_PREFIX
+from ..ai import Located, Spec
+from ..quality.audit_check import Fetcher
+from ..readers.extract import SCALE_NOT_STATED, read_values
+from ..steps.shared import AI_GROUP_PREFIX
 
 # Each figure is read again under its own group's kind: rules that apply to metrics only (a place the table never
 # names) must not show up in the replay of a breakdown's row, nor be missed for a metric. A whole breakdown table's

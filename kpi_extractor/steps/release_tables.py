@@ -4,13 +4,13 @@ from __future__ import annotations
 import re
 from datetime import date
 
-from ..document import clean
-from ..fiscal import fiscal_label
-from ..release_breakdowns import release_breakdown
-from ..release_columns import amount, earlier_quarters, quarter_table_rows, release_grids, row_key, row_numbers
-from ..release_statements import release_headline, release_statements
-from ..sec import FilingRef
-from ..segment_income import GROUP_KEY as INCOME_GROUP
+from ..documents.document import clean
+from ..domain.fiscal import fiscal_label
+from ..readers.release_breakdowns import release_breakdown
+from ..readers.release_columns import amount, earlier_quarters, quarter_table_rows, release_grids, row_key, row_numbers
+from ..readers.release_statements import release_headline, release_statements
+from ..sources.sec import FilingRef
+from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from .shared import CHART_METHOD
 
 def _row_label(locator: dict) -> str | None:

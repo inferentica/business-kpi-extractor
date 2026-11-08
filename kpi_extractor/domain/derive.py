@@ -1,8 +1,8 @@
 """Periods no document reports on its own: Q4 from the annual report, and full years from four reported quarters."""
 from __future__ import annotations
 
-from .checks import derived_gap
-from .segment_income import GROUP_KEY as INCOME_GROUP
+from ..quality.checks import derived_gap
+from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 
 QUARTERS = ("Q1", "Q2", "Q3")
 # Rows that balance a split to revenue (intersegment eliminations, corporate and reconciling items, revenue outside every

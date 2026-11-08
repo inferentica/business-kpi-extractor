@@ -1,8 +1,8 @@
 """DeepSeek bills half outside its peak hours: 09:00-12:00 and 14:00-18:00 Beijing time, Monday to Friday (01:00-04:00 and
 06:00-10:00 UTC). Work that can wait (a backfill, a trial, the golden set) starts off-peak.
 
-    python -m kpi_extractor.offpeak          # sleeps until off-peak, printing how long
-    python -m kpi_extractor.offpeak --check  # prints the seconds to wait and exits
+    python -m kpi_extractor.ops.offpeak          # sleeps until off-peak, printing how long
+    python -m kpi_extractor.ops.offpeak --check  # prints the seconds to wait and exits
 """
 
 from __future__ import annotations

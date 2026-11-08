@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 from kpi_extractor import ai
 from kpi_extractor.ai import KpiSpec, Spec
-from kpi_extractor.control import Reply
-from kpi_extractor.document import parse_document
-from kpi_extractor.evaluate import score
-from kpi_extractor.extract import read_values
+from kpi_extractor.ops.control import Reply
+from kpi_extractor.documents.document import parse_document
+from kpi_extractor.evals.evaluate import score
+from kpi_extractor.readers.extract import read_values
 from kpi_extractor.pipeline import SymbolPipeline
 from kpi_extractor.store import FilingReading, failed_reading
 from kpi_extractor.steps.ai_reading import _template
@@ -280,7 +280,7 @@ def test_a_document_adding_up_to_full_year_revenue_is_annual():
 
 
 def test_an_unavailable_ai_does_not_cost_the_filing_or_the_company():
-    from kpi_extractor.control import ControlError
+    from kpi_extractor.ops.control import ControlError
 
     class DownControl(FakeControl):
         def ai(self, *args, **kwargs):
@@ -312,7 +312,7 @@ def test_a_text_block_cited_as_a_table_is_retried_with_how_to_quote_it():
 
 
 def test_a_re_read_withdraws_what_the_earlier_reading_of_that_filing_had():
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.sources.sec import FilingRef
     control = FakeControl({})
     old = {"group_key": "kpi_revenue_by_product", "kpi_key": "systems", "fiscal_year": "2026", "fiscal_period": "Q2",
            "period_end": "2026-06-30", "method": "ai", "validation_status": "verified", "value": 5.0,
@@ -432,7 +432,7 @@ def test_an_audit_that_only_adds_is_recognized():
 
 
 def test_a_failed_re_read_keeps_the_filings_good_values():
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.sources.sec import FilingRef
     good = {"group_key": "kpi_segments", "kpi_key": "cloud", "fiscal_year": "2026", "fiscal_period": "Q2",
             "period_end": "2026-06-30", "method": "ai", "validation_status": "verified", "value": 5.0,
             "source_accession": "a1", "group_label": "x", "kpi_label": "x"}
@@ -458,7 +458,7 @@ def test_a_big_q4_is_never_moved_to_the_year_by_size_alone():
 
 
 def test_carried_checkpoints_are_complete_for_the_request_check():
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.sources.sec import FilingRef
     sent = []
 
     class Capture(FakeControl):
@@ -476,8 +476,8 @@ def test_carried_checkpoints_are_complete_for_the_request_check():
 
 
 def test_one_flagged_part_flags_the_whole_breakdown():
-    from kpi_extractor.extract import ReadValue
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.readers.extract import ReadValue
+    from kpi_extractor.sources.sec import FilingRef
     group = SPEC.groups[0]
     read = [ReadValue(group, group.kpis[0], 30.0, None, {}), ReadValue(group, group.kpis[1], 33.0, None, {}),
             ReadValue(group, group.kpis[2], 37.0, None, {}, status="needs_review", notes=["moved 31 points"])]
@@ -949,7 +949,7 @@ def test_the_cap_never_drops_a_breakdown():
 
 
 def test_a_jump_alone_never_settles_a_dispute():
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
     spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Ops", "kind": "metric",
                                             "kpis": [{"key": "users", "label": "Users", "unit": "count"}]}]})
     group, kpi = spec.groups[0], spec.groups[0].kpis[0]
@@ -962,7 +962,7 @@ def test_a_jump_alone_never_settles_a_dispute():
 
 
 def test_a_breakdown_reading_that_repeats_an_earlier_period_loses():
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
     spec = Spec.model_validate({"groups": [{"key": "seg", "label": "Revenue by Segment", "kind": "revenue_breakdown", "total_kpi": "total",
                                             "kpis": [{"key": "a", "label": "A", "unit": "currency"}, {"key": "b", "label": "B", "unit": "currency"},
                                                      {"key": "total", "label": "Total", "unit": "currency"}]}]})
@@ -979,7 +979,7 @@ def test_a_breakdown_reading_that_repeats_an_earlier_period_loses():
 
 
 def test_a_breakdown_read_from_part_of_its_table_is_flagged():
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
     spec = Spec.model_validate({"groups": [{"key": "tech", "label": "Revenue by Technology", "kind": "revenue_breakdown", "total_kpi": "total",
                                             "kpis": [{"key": k, "label": k, "unit": "currency"} for k in ("n2", "n3", "n5", "n7", "total")]}]})
     group = spec.groups[0]
@@ -1012,8 +1012,8 @@ def test_a_release_an_older_reader_left_incomplete_is_read_again():
 def test_release_statements_go_to_the_newest_release_presenting_each_quarter():
     from datetime import date as day
 
-    from kpi_extractor.document import Document, TextBlock
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.documents.document import Document, TextBlock
+    from kpi_extractor.sources.sec import FilingRef
     from test_release_statements import BALANCE
 
     class Recorder(FakeControl):
@@ -1056,8 +1056,8 @@ def test_chart_slides_become_revenue_breakdowns_and_unit_metrics_checked_against
     from datetime import date as day
 
     from kpi_extractor.steps import chart_slides as module
-    from kpi_extractor.charts import Word
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.readers.charts import Word
+    from kpi_extractor.sources.sec import FilingRef
     from test_charts import SLIDE
 
     class Recorder(FakeControl):
@@ -1123,8 +1123,8 @@ def test_chart_slides_become_revenue_breakdowns_and_unit_metrics_checked_against
 def test_units_that_do_not_add_up_to_the_quarter_are_left_out_and_one_unread_bar_is_filled():
     from datetime import date as day
 
-    from kpi_extractor.charts import ChartUnits
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.readers.charts import ChartUnits
+    from kpi_extractor.sources.sec import FilingRef
 
     def reported(label, value):
         return {"group_key": "kpi_operating", "kpi_key": label.lower().replace(" ", "_"), "kpi_label": label, "fiscal_year": "2025",
@@ -1153,8 +1153,8 @@ def test_a_pie_a_point_off_100_is_stored_only_once_a_second_slide_shows_the_same
     from datetime import date as day
 
     from kpi_extractor.steps import chart_slides as module
-    from kpi_extractor.charts import Word
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.readers.charts import Word
+    from kpi_extractor.sources.sec import FilingRef
     from test_charts import SLIDE
 
     class Recorder(FakeControl):
@@ -1225,7 +1225,7 @@ def test_a_release_whose_quote_from_a_bullet_table_was_dropped_is_read_again_onc
 
 def test_a_report_without_xbrl_is_judged_once_and_never_counts_past_the_store():
     from kpi_extractor import pipeline
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.sources.sec import FilingRef
     from kpi_extractor.steps.shared import _XBRL_READER
 
     stored = []
@@ -1275,7 +1275,7 @@ def test_a_group_repeating_xbrl_with_a_subtotal_beside_its_parts_is_still_a_repe
 
 
 def test_every_call_is_flash_and_reasoning_runs_at_the_profiles_effort(monkeypatch):
-    from kpi_extractor.control import ai_profile
+    from kpi_extractor.ops.control import ai_profile
     monkeypatch.delenv("KPI_AI_PROFILE", raising=False)
     assert ai_profile("flash", True) == ("flash", True, "high")
     assert ai_profile("flash", False) == ("flash", False, None)  # the first reading stays without reasoning
@@ -1333,7 +1333,7 @@ def test_a_6k_named_for_its_form_is_never_assumed_empty_like_an_earlier_one():
 
 def test_a_table_naming_a_listed_kpi_is_always_shown_to_the_reader():
     # TSMC's Q1 2018 statements: technology under an "Application Type" table, with no row for every listed node.
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     html = ("<table><tr><td>Application Type</td><td>Three Months Ended March 31, 2018</td></tr>"
             "<tr><td>Communication</td><td>136,894,555</td></tr><tr><td>Resolution</td><td></td></tr>"
             "<tr><td>10-nanometer</td><td>40,853,554</td></tr></table><table><tr><td>Leases</td><td>5</td></tr></table>")
@@ -1346,7 +1346,7 @@ def test_a_table_naming_a_listed_kpi_is_always_shown_to_the_reader():
 
 
 def test_a_reserved_section_fits_before_earlier_choices_fill_the_budget():
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     html = "".join(f"<p>{'filler ' * 40}{i}</p>" for i in range(30)) + "<table><tr><td>10-nanometer</td><td>40,853,554</td></tr></table>"
     document = parse_document(html, "https://www.sec.gov/x.htm")
     table = next(iter(document.tables))
@@ -1466,7 +1466,7 @@ def test_a_quarter_moved_to_the_year_with_its_release_goes_back_to_q4():
 def test_a_years_remainder_takes_the_name_its_quarters_give_it():
     # AMD's FY2024 10-K tags "All Other" so that nothing tagged closes the gap; its 10-Qs name the line.
     import pandas as pd
-    from kpi_extractor.sec import FilingRef
+    from kpi_extractor.sources.sec import FilingRef
     seg, cons = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_ConsolidationItemsAxis"
     start, end = "2023-12-31", "2024-12-28"
 
@@ -1529,7 +1529,7 @@ def test_a_metrics_missing_quarters_come_from_the_releases_quarterly_tables():
     # releases. Each table is taken only where another column equals a figure held, and a filled quarter proves the next.
     from datetime import date as day
 
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     slides = {
         "q2": "Q4 2020 Q1 2021 Q2 2021 Net sales 1 2 3 Lithography systems sold (units) 1 80 76 72 Net bookings 2 9 9 9",
         "q3": "Q1 2021 Q2 2021 Q3 2021 New lithography systems sold (units) 70 66 75 Lithography systems sold (units) 1 76 72 79",
@@ -1578,7 +1578,7 @@ def test_a_metrics_gaps_come_from_rows_the_releases_repeat_in_a_learned_layout()
     # TSMC's management report: "Shipment (Kpcs, 12"-equiv. Wafer) <quarter> <quarter before> <year before> <QoQ> <YoY>".
     from datetime import date as day
 
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     label = 'Shipment (Kpcs, 12"-equiv. Wafer)'
 
     def reading(year, period, end, value, quote):
@@ -1641,9 +1641,9 @@ def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
 
 def test_a_worked_out_remainder_takes_the_name_the_reports_table_gives_it():
     # Salesforce's Q2 FY2027 10-Q tags no "Hedging gains", which its table lists beside its regions.
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     from kpi_extractor.steps.reports import _row_named
-    from kpi_extractor.release_breakdowns import line_key
+    from kpi_extractor.readers.release_breakdowns import line_key
     document = parse_document(
         "<p>Revenues by geographical region consisted of the following (in millions):</p><table>"
         "<tr><td></td><td>2026</td><td>2025</td></tr><tr><td>Americas</td><td>$ 7,404</td><td>$ 6,736</td></tr>"
@@ -1761,7 +1761,7 @@ def test_a_re_read_row_keeps_the_listed_series_its_label_was_stored_under():
     # the table whole labelled it by its own name and split the series.
     from types import SimpleNamespace
 
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
     from kpi_extractor.steps.release_flow import ReleaseFlow
 
     spec = Spec.model_validate({"groups": [{"key": "coverage", "label": "Banking & Payments Revenue by Client Coverage Segment",
@@ -1866,7 +1866,7 @@ YEAR_TABLE = """
 
 
 def test_a_year_ago_column_is_dropped_by_its_header_and_read_again():
-    from kpi_extractor.extract import header_contradicts
+    from kpi_extractor.readers.extract import header_contradicts
     document = parse_document(YEAR_TABLE, "https://www.sec.gov/x.htm")
     table = next(iter(document.tables.values()))
     assert header_contradicts(table, 2, 2, EXPECTED).startswith("column headed 2025-06-30")
@@ -1880,7 +1880,7 @@ def test_a_year_ago_column_is_dropped_by_its_header_and_read_again():
 
 
 def test_fiscal_years_named_ahead_of_the_calendar_never_contradict():
-    from kpi_extractor.extract import header_contradicts
+    from kpi_extractor.readers.extract import header_contradicts
     html = "<table><tr><td></td><td>Q1 FY2027</td><td>Q1 FY2026</td></tr><tr><td>iPhone</td><td>80</td><td>70</td></tr></table>"
     table = next(iter(parse_document(html, "https://www.sec.gov/x.htm").tables.values()))
     assert header_contradicts(table, 1, 1, date(2026, 12, 26)) is None
@@ -1888,7 +1888,7 @@ def test_fiscal_years_named_ahead_of_the_calendar_never_contradict():
 
 
 def test_row_labels_are_read_back_against_the_cell():
-    from kpi_extractor.extract import labels_agree
+    from kpi_extractor.readers.extract import labels_agree
     assert labels_agree("Wafer", "Wafer revenue") and labels_agree("High Performance Computing", "High performance computing (1)")
     assert labels_agree(None, "Wafer") and labels_agree("Wafer", "")
     assert not labels_agree("5nm", "3nm") and not labels_agree("Smartphone", "Internet of Things")
@@ -1907,7 +1907,7 @@ def test_row_labels_are_read_back_against_the_cell():
 
 
 def test_prompt_scores_count_what_production_would_keep():
-    from kpi_extractor.prompt_eval import summarize
+    from kpi_extractor.evals.prompt_eval import summarize
     summary = summarize({
         "review": [{"wrong_kind": "year-ago column", "outcome": "right"}, {"wrong_kind": "another row", "outcome": "planted"}],
         "explain": [{"planted": True, "said_real": True, "stands": False}, {"planted": False, "said_real": True, "stands": True}],
@@ -1918,7 +1918,7 @@ def test_prompt_scores_count_what_production_would_keep():
 
 
 def test_an_explanation_must_give_a_cause_and_not_show_a_small_change():
-    from kpi_extractor.extract import explanation_supports, previous_from_jump
+    from kpi_extractor.readers.extract import explanation_supports, previous_from_jump
     assert previous_from_jump("changed 1.9x in a quarter", 190) == 100
     assert previous_from_jump("moved +3.0 points in a quarter", 40) == 37
     restated = "AUM was $233.8 billion as of September 30, 2020 compared to $221.8 billion as of June 30, 2020."
@@ -1930,7 +1930,7 @@ def test_an_explanation_must_give_a_cause_and_not_show_a_small_change():
 
 
 def test_fresh_lists_are_scored_against_the_owners():
-    from kpi_extractor.evaluate import score_lists
+    from kpi_extractor.evals.evaluate import score_lists
     owner = {"X": {"groups": [{"key": "g", "kpis": [{"key": "a", "label": "Cloud"}, {"key": "b", "label": "Devices"}]}]}}
     fresh = {"X": {"groups": [{"key": "g", "kpis": [{"key": "a", "label": "Cloud (in millions)"}, {"key": "c", "label": "Operating income"}]}]}}
     lists = score_lists(fresh, owner)
@@ -1938,7 +1938,7 @@ def test_fresh_lists_are_scored_against_the_owners():
 
 
 def test_a_scale_must_be_stated_by_the_document():
-    from kpi_extractor.extract import SCALE_NOT_STATED
+    from kpi_extractor.readers.extract import SCALE_NOT_STATED
     html = """<table><tr><td></td><td>GDV (Bil.)</td><td>Purchase Trans. (Mil.)</td><td>Volume</td></tr>
     <tr><td>Worldwide</td><td>2,952</td><td>59,480</td><td>2,483</td></tr></table>"""
     document = parse_document(html, "https://www.sec.gov/x.htm")
@@ -1965,7 +1965,7 @@ def test_a_scale_must_be_stated_by_the_document():
 
 
 def test_a_removed_group_proposed_again_is_counted():
-    from kpi_extractor.evaluate import proposed_again
+    from kpi_extractor.evals.evaluate import proposed_again
     removed = [{"symbol": "X", "key": "seg", "label": "Revenue by Segment", "kpis": ["Optum Health", "Optum Insight", "Optum Rx"]}]
     owner = {"X": {"groups": [{"label": "Revenue by Customer Type", "kpis": []}]}}
     again = {"X": {"groups": [{"label": "Segment Revenue", "kpis": [{"label": "Optum Health"}, {"label": "Optum Rx"}]}]}}
@@ -2014,7 +2014,7 @@ def test_a_kpi_is_looked_for_and_kept_only_in_its_reported_periods():
 
 def test_a_trial_scores_what_a_new_company_would_store():
     from kpi_extractor.pipeline import SymbolResult
-    from kpi_extractor.trial import audit_sample, company_report, summarize
+    from kpi_extractor.evals.trial import audit_sample, company_report, summarize
 
     def value(kpi, period, status, notes=()):
         return {"group_key": "kpi_operating", "group_label": "Operating", "kpi_key": kpi, "kpi_label": kpi, "fiscal_year": "2026",
@@ -2035,7 +2035,7 @@ def test_a_trial_scores_what_a_new_company_would_store():
     summary = summarize([report])
     assert summary["autoAccepted"] == 0.75 and summary["companyQuarters"] == 2 and summary["aiCalls"] == 7
     assert summary["codeShare"] == 0.5 and summary["aiCallsPerCompany"] == 7 and summary["aiCallsPerQuarter"] == 3.5
-    from kpi_extractor.trial import reading_patterns
+    from kpi_extractor.evals.trial import reading_patterns
     patterns = reading_patterns({"X": values})
     assert len(patterns) == sum(1 for v in values if v["group_key"].startswith("kpi_") and v["validation_status"] == "verified"
                                 and v.get("method") == "ai")
@@ -2047,7 +2047,7 @@ def test_a_percentage_takes_its_sign_from_a_heading_row_above_it():
     html = """<table><tr><td></td><td>12 Weeks Ended 6/14/2025</td><td></td></tr><tr><td></td><td>PFNA</td><td>Total</td></tr>
     <tr><td>Organic Revenue % Change</td><td>(2)</td><td>2</td></tr><tr><td>Impact on % Change of:</td><td></td><td></td></tr>
     <tr><td>Organic volume change (d)</td><td>(1.5)</td><td>(1.5)</td></tr></table>"""
-    from kpi_extractor.extract import column_dates
+    from kpi_extractor.readers.extract import column_dates
     document = parse_document(html, "https://www.sec.gov/x.htm")
     table = next(iter(document.tables.values()))
     spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric", "kpis": [
@@ -2060,7 +2060,7 @@ def test_a_percentage_takes_its_sign_from_a_heading_row_above_it():
 
 
 def test_an_amount_off_by_an_unstated_scale_is_held():
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
     from kpi_extractor.steps.release_flow import SCALE_OUTLIER
     group = ai.GroupSpec.model_validate({"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown",
                                          "kpis": [{"key": "beauty", "label": "Beauty", "unit": "currency"}, {"key": "foods", "label": "Foods", "unit": "currency"}]})

@@ -3,11 +3,11 @@ import io
 import json
 import urllib.request
 
-from kpi_extractor import archive as archive_module
-from kpi_extractor.archive import Archive, exhibits_from_record, exhibits_record, filing_folder
+from kpi_extractor.sources import archive as archive_module
+from kpi_extractor.sources.archive import Archive, exhibits_from_record, exhibits_record, filing_folder
 
 FOLDER = filing_folder("2026-08-27", "10-Q", "0001045810-26-000123")
-from kpi_extractor.control import ControlError
+from kpi_extractor.ops.control import ControlError
 
 
 class Bucket:

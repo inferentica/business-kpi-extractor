@@ -2,7 +2,7 @@ from datetime import date
 
 import pandas as pd
 
-from kpi_extractor.statements import statement_lines
+from kpi_extractor.readers.statements import statement_lines
 
 
 class _Statement:

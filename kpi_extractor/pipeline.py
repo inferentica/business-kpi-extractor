@@ -17,10 +17,10 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from .archive import Archive
-from .control import ControlError
-from .document import Document
-from .sec import FilingRef, company_profile, earnings_releases, periodic_reports
+from .sources.archive import Archive
+from .ops.control import ControlError
+from .documents.document import Document
+from .sources.sec import FilingRef, company_profile, earnings_releases, periodic_reports
 from .steps.shared import RecordBuilding, _folder, list_parents, only_adds
 from .steps.loading import FilingLoading
 from .steps.reports import ReportReading

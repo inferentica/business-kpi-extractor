@@ -2,8 +2,8 @@
 dash, the header after the rows it heads) and the older HTML tables."""
 from datetime import date
 
-from kpi_extractor.document import Document, Table, TextBlock
-from kpi_extractor.release_statements import release_statements
+from kpi_extractor.documents.document import Document, Table, TextBlock
+from kpi_extractor.readers.release_statements import release_statements
 
 # ASML Q2 2026, Exhibit 99.3, as the hidden text reads: the quarterly summary balance sheet (two slides), complete,
 # and its cash flows abridged (fewer reconciling lines, one adjusted so the abridged statement still adds up).
@@ -261,7 +261,7 @@ def test_a_line_between_cost_and_gross_profit_adjusts_the_check_and_a_misread_st
 
 
 def test_reported_units_come_from_the_quarterly_ratios_row_in_either_layout():
-    from kpi_extractor.release_statements import reported_units
+    from kpi_extractor.readers.release_statements import reported_units
 
     text = ("Three months ended Jun 29, Sep 28, Dec 31, Mar 29, Jun 28, (Unaudited) 2025 2025 2025 2026 2026 Gross margin "
             "53.7 % 51.6 % 52.2 % 53.0 % 54.0 % Sales of lithography systems (in units) 1 76 72 102 79 91 Net bookings 2 5,541 "
@@ -285,7 +285,7 @@ def test_reported_units_come_from_the_quarterly_ratios_row_in_either_layout():
 
 
 def test_a_release_summary_gives_its_own_quarter_headline_lines():
-    from kpi_extractor.release_statements import release_headline
+    from kpi_extractor.readers.release_statements import release_headline
     rows = [
         ["", "3Q26Amounta", "3Q25Amount", "YoYInc. (Dec.) %", "2Q26Amount", "QoQInc. (Dec.) %"],
         ["Net sales", "1,494,243", "989,918", "50.9", "1,270,381", "17.6"],

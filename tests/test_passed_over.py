@@ -1,8 +1,8 @@
 from datetime import date, timedelta
 from types import SimpleNamespace
 
-from kpi_extractor import sec
-from kpi_extractor.sec import CompanyProfile, earnings_releases
+from kpi_extractor.sources import sec
+from kpi_extractor.sources.sec import CompanyProfile, earnings_releases
 
 
 def _filing(accession, filed):

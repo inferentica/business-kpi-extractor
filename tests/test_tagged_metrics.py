@@ -3,7 +3,7 @@ from datetime import date
 
 import pandas as pd
 
-from kpi_extractor.tagged_metrics import Tag, agrees, learn_tag, quarter_facts
+from kpi_extractor.readers.tagged_metrics import Tag, agrees, learn_tag, quarter_facts
 
 AXIS = "dim_srt_MajorCustomersAxis"
 
@@ -155,7 +155,7 @@ def test_a_pick_whose_unit_does_not_fit_is_refused_and_a_found_tag_needs_no_ai()
 
 
 def test_a_timing_axis_reads_as_a_note_not_a_part():
-    from kpi_extractor.tagged_metrics import fact_lines
+    from kpi_extractor.readers.tagged_metrics import fact_lines
     frame = pd.DataFrame([{"concept": "us-gaap:RevenueRemainingPerformanceObligation", "numeric_value": 496e9, "period_type": "instant",
                            "period_instant": "2026-06-30", "period_start": None, "period_end": None, "label": "2026-07-01", "unit_ref": "usd",
                            "dim_us-gaap_RevenueRemainingPerformanceObligationExpectedTimingOfSatisfactionStartDateAxis": "2026-07-01"}])
@@ -212,7 +212,7 @@ def test_a_breakdowns_year_before_comes_from_the_reports_comparative_columns():
 
     from kpi_extractor import ai
     from kpi_extractor.pipeline import SymbolPipeline
-    from kpi_extractor.tagged_metrics import year_ago_facts
+    from kpi_extractor.readers.tagged_metrics import year_ago_facts
     ends = {"q1": "2025-02-28", "q2": "2025-05-30", "q3": "2025-08-29", "k": "2025-11-28"}
     columns = {"q1": [("2024-12-02", "2025-02-28", 1_534e6, 3_922e6), ("2023-12-02", "2024-03-01", 1_339e6, 3_550e6)],
                "q2": [("2025-03-01", "2025-05-30", 1_595e6, 4_019e6), ("2024-03-02", "2024-05-31", 1_380e6, 3_650e6)],
@@ -366,7 +366,7 @@ def test_no_fitting_tag_is_remembered_so_the_same_report_is_not_asked_again():
 
 
 def test_a_figure_with_decimals_matches_only_to_its_own_rounding():
-    from kpi_extractor.tagged_metrics import agrees
+    from kpi_extractor.readers.tagged_metrics import agrees
     assert not agrees(3, 3.65)          # UCB: 3 interest-rate derivatives are no 3.65% margin
     assert not agrees(1.45, 1.21)       # FedEx: a $1.45 dividend is no $1.21 revenue per pound
     assert not agrees(32.79, 32.3)      # TSMC: a closing rate is no 32.30 average rate
@@ -376,7 +376,7 @@ def test_a_figure_with_decimals_matches_only_to_its_own_rounding():
 
 
 def test_a_per_share_amount_or_a_count_of_things_fits_only_its_own_kind_of_kpi():
-    from kpi_extractor.tagged_metrics import unit_fits
+    from kpi_extractor.readers.tagged_metrics import unit_fits
     assert not unit_fits("currency", "USD/share", "International Revenue per Pound", "us-gaap:CommonStockDividendsPerShareDeclared")
     assert unit_fits("currency", "USD/share", "Dividends per Share", "us-gaap:CommonStockDividendsPerShareDeclared")
     assert not unit_fits("percent", "pure", "Net Interest Margin", "us-gaap:NumberOfInterestRateDerivativesHeld")
@@ -387,7 +387,7 @@ def test_a_per_share_amount_or_a_count_of_things_fits_only_its_own_kind_of_kpi()
 
 def test_a_ratio_tagged_as_a_decimal_reads_as_a_percentage():
     from kpi_extractor.steps.tagged_kpis import _percent_scale
-    from kpi_extractor.tagged_metrics import Tag
+    from kpi_extractor.readers.tagged_metrics import Tag
     cet1 = Tag("mcbs:CommonEquityTierOneCapitalToRiskWeightedAssets", (), True)
     deposits = Tag("us-gaap:Deposits", (), True)
     scaled = _percent_scale({cet1: 0.1747, deposits: 1.2})
@@ -395,7 +395,7 @@ def test_a_ratio_tagged_as_a_decimal_reads_as_a_percentage():
 
 
 def test_a_tagged_figure_replaces_a_stated_one_only_to_more_places():
-    from kpi_extractor.tagged_metrics import refines
+    from kpi_extractor.readers.tagged_metrics import refines
     assert refines(4_651_000_000, 4_650_000_000)        # Adobe: $4.65 billion to the dollar
     assert not refines(4_650_000_000, 4_650_000_000)    # the same figure: nothing to refine
     assert not refines(3, 3.65)                         # UCB: a count is no margin

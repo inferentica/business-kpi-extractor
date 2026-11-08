@@ -1,8 +1,8 @@
 """Segment and product revenue read from Alphabet's Q3 2026 earnings release (Exhibit 99.1) before its 10-Q."""
 from datetime import date
 
-from kpi_extractor.document import Document, Table
-from kpi_extractor.release_breakdowns import line_key, release_breakdown
+from kpi_extractor.documents.document import Document, Table
+from kpi_extractor.readers.release_breakdowns import line_key, release_breakdown
 
 CONTEXT = "(in millions, except for number of employees; unaudited) Revenues, Traffic Acquisition Costs (TAC), and Number of Employees"
 REVENUES = Table("T1", CONTEXT, [
@@ -77,7 +77,7 @@ def test_a_restated_year_ago_or_a_missing_line_is_left_for_the_report():
 
 def test_a_segment_table_laid_out_by_heading_gives_revenue_and_operating_income():
     # Amazon's Q3 2026 release: each segment a heading over its net sales and operating income.
-    from kpi_extractor.document import Table
+    from kpi_extractor.documents.document import Table
     rows = [["", "Three Months Ended September 30,", "", "Nine Months Ended September 30,", ""], ["", "2025", "2026", "2025", "2026"]]
     for name, sales, income in (("North America", ("$106,267", "$112,852"), ("$4,789", "$8,723")), ("International", ("$40,896", "$43,108"), ("$1,199", "$1,580")),
                                 ("AWS", ("$33,006", "$45,984"), ("$11,434", "$17,773")), ("Consolidated", ("$180,169", "$201,944"), ("$17,422", "$28,076"))):
@@ -118,7 +118,7 @@ def test_a_segment_table_laid_out_by_column_with_its_year_ago_table():
 
 def test_a_summary_table_with_each_lines_change_on_the_year_ago():
     # Visa's Q4 FY2026 release: the quarter in USD beside "YoY Change", no year-ago amounts; its 10-K follows weeks later.
-    from kpi_extractor.document import parse_document
+    from kpi_extractor.documents.document import parse_document
     rows = [("Service revenue", "$5,255", "14%"), ("Data processing revenue", "6,245", "16%"),
             ("International transaction revenue", "4,115", "8%"), ("Other revenue", "1,647", "40%"),
             ("Client incentives", "(5,123)", "21%"), ("Net revenue", "$12,139", "13%")]

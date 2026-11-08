@@ -7,11 +7,11 @@ import re
 from collections import Counter
 from datetime import date
 
-from .ai import Located, Locator, TableLocator
-from .document import Document, Table, clean, parse_number
-from .checks import PERIOD_TOLERANCE_DAYS
+from ..ai import Located, Locator, TableLocator
+from ..documents.document import Document, Table, clean, parse_number
+from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from .extract import _row_label, column_header
-from .xbrl import member_key
+from ..xbrl import member_key
 
 _MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
            "november", "december")

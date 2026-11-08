@@ -1,9 +1,9 @@
 from kpi_extractor import ai
 from kpi_extractor.ai import Spec
-from kpi_extractor.document import parse_document
+from kpi_extractor.documents.document import parse_document
 from kpi_extractor.ai import KpiSpec
-from kpi_extractor.checks import validate_groups
-from kpi_extractor.extract import read_values
+from kpi_extractor.quality.checks import validate_groups
+from kpi_extractor.readers.extract import read_values
 
 REPORT = """
 <p>(Amounts in Thousands of New Taiwan Dollars)</p>
@@ -106,7 +106,7 @@ def test_a_bare_dollar_sign_follows_the_reports_declared_currency():
 
 
 def test_a_passing_mention_of_a_currency_is_not_a_declaration():
-    from kpi_extractor.document import declared_currency
+    from kpi_extractor.documents.document import declared_currency
     assert declared_currency("Sales to Europe are billed in euros. (In millions) Revenue $ 1,000") is None
     assert declared_currency("(Unaudited, €, in millions, except per share data)") == "EUR"
 
@@ -133,7 +133,7 @@ def test_only_the_rows_a_total_covers_are_kept():
 
 
 def test_table_rows_take_the_listed_kpi_keys():
-    from kpi_extractor.extract import _listed_kpi
+    from kpi_extractor.readers.extract import _listed_kpi
     group = SPEC.groups[0]
     assert _listed_kpi(group, "3-nanometer").key == "n3"
     listed = Spec.model_validate({"groups": [{"key": "p", "label": "Revenue by Product Type", "kind": "revenue_breakdown",
@@ -147,7 +147,7 @@ def test_table_rows_take_the_listed_kpi_keys():
 
 
 def test_every_reading_refuses_a_column_headed_for_another_period():
-    from kpi_extractor.extract import column_duration_problem
+    from kpi_extractor.readers.extract import column_duration_problem
     assert column_duration_problem("<6 months> ended @ # #", annual=False)
     assert column_duration_problem("six months ended @ #", annual=False)
     assert column_duration_problem("three months ended @ #", annual=True)
@@ -199,7 +199,7 @@ def test_a_third_quarter_table_carries_its_nine_months():
 
 
 def test_a_node_ramping_from_an_immaterial_base_is_not_a_jump():
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
     group = SPEC.groups[0]
     items = [ReadValue(group, group.kpis[0], 29.0, "TWD", {}), ReadValue(group, group.kpis[1], 444.0, "TWD", {}, is_total=True),
              ReadValue(group, KpiSpec(key="n5", label="5nm", unit="currency"), 415.0, "TWD", {})]
@@ -208,7 +208,7 @@ def test_a_node_ramping_from_an_immaterial_base_is_not_a_jump():
 
 
 def test_a_mix_total_row_is_not_a_share_and_q2_headers_are_quarters():
-    from kpi_extractor.extract import column_duration_problem
+    from kpi_extractor.readers.extract import column_duration_problem
     assert column_duration_problem("q2 fiscal year #", annual=False) is None
     html = """<table><tr><td></td><td>2Q26</td></tr><tr><td>3nm</td><td>30%</td></tr><tr><td>5nm</td><td>35%</td></tr>
       <tr><td>Others</td><td>35%</td></tr><tr><td>Total</td><td>100%</td></tr></table>"""
@@ -222,7 +222,7 @@ def test_a_mix_total_row_is_not_a_share_and_q2_headers_are_quarters():
 
 
 def test_a_row_label_carrying_the_business_name_takes_the_listed_key():
-    from kpi_extractor.extract import _listed_kpi
+    from kpi_extractor.readers.extract import _listed_kpi
     group = Spec.model_validate({"groups": [{"key": "customers", "label": "Revenue by Customer Type", "kind": "revenue_breakdown",
                                              "kpis": [{"key": "domestic", "label": "Employer & Individual - Domestic", "unit": "currency"},
                                                       {"key": "global", "label": "Employer & Individual - Global", "unit": "currency"},
@@ -233,7 +233,7 @@ def test_a_row_label_carrying_the_business_name_takes_the_listed_key():
 
 
 def test_a_combined_line_never_takes_the_listed_key_of_its_last_part():
-    from kpi_extractor.extract import _listed_kpi
+    from kpi_extractor.readers.extract import _listed_kpi
     group = Spec.model_validate({"groups": [{"key": "cib", "label": "CIB Revenue by Business", "kind": "revenue_breakdown",
                                              "kpis": [{"key": "securities", "label": "Securities Services", "unit": "currency"},
                                                       {"key": "markets", "label": "Fixed Income Markets", "unit": "currency"}]}]}).groups[0]
@@ -242,14 +242,14 @@ def test_a_combined_line_never_takes_the_listed_key_of_its_last_part():
 
 
 def test_footnote_markers_run_into_a_label_are_dropped():
-    from kpi_extractor.extract import _row_label
+    from kpi_extractor.readers.extract import _row_label
     assert _row_label(["Banking & Wealth Management14", "1"], 1) == "Banking & Wealth Management"
     assert _row_label(["Google subscriptions, platforms, and devices(1)", "1"], 1) == "Google subscriptions, platforms, and devices"
     assert _row_label(["Q4", "1"], 1) == "Q4"
 
 
 def test_a_pointer_at_a_combined_line_is_rejected():
-    from kpi_extractor.extract import _combined_line
+    from kpi_extractor.readers.extract import _combined_line
     assert _combined_line("Total Markets & Securities Services", "Securities Services")
     assert _combined_line("Markets & Securities Services", "Securities Services")
     assert not _combined_line("Securities Services", "Securities Services")
@@ -276,7 +276,7 @@ def test_a_total_row_is_never_a_part_even_with_a_negative_part_inside_it():
 
 
 def test_a_mixs_named_total_row_is_its_check_not_a_share():
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
     spec = Spec.model_validate({"groups": [{"key": "tech", "label": "Revenue by Technology", "kind": "mix", "total_kpi": "total", "kpis": [
         {"key": "n3", "label": "3nm", "unit": "percent"}, {"key": "n5", "label": "5nm", "unit": "percent"},
         {"key": "total", "label": "Total", "unit": "percent"}]}]})
@@ -288,7 +288,7 @@ def test_a_mixs_named_total_row_is_its_check_not_a_share():
 
 
 def test_small_counts_jump_by_how_far_they_move_not_by_ratio():
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
     spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Ops", "kind": "metric",
                                             "kpis": [{"key": "used", "label": "Used systems sold", "unit": "count"}]}]})
     group = spec.groups[0]

@@ -5,10 +5,10 @@ import string
 from concurrent.futures import Future
 from datetime import date
 
-from ..archive import xbrl_from_parts, xbrl_parts
-from ..document import Document, parse_document
-from ..fiscal import learn_year_offset
-from ..sec import FilingRef, exhibit_html, load_submission
+from ..sources.archive import xbrl_from_parts, xbrl_parts
+from ..documents.document import Document, parse_document
+from ..domain.fiscal import learn_year_offset
+from ..sources.sec import FilingRef, exhibit_html, load_submission
 from .shared import _DONE, _MAX_ATTEMPTS, _XBRL_READER, _folder
 
 _XBRL_KEPT = 6

@@ -5,28 +5,28 @@ import re
 from datetime import date, timedelta
 from dataclasses import dataclass, field
 
-from .ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
-from .checks import MIX_TOLERANCE
-from .document import _DECLARED_CURRENCIES, Document, Table, TextBlock, clean, declared_currency, parse_number, word_number
-from .xbrl import member_key, remove_subtotals
-from .rules.scale import (  # noqa: F401 - re-exported for callers of extract
+from ..ai import GroupSpec, KpiSpec, Located, Locator, Spec, TableLocator
+from ..quality.checks import MIX_TOLERANCE
+from ..documents.document import _DECLARED_CURRENCIES, Document, Table, TextBlock, clean, declared_currency, parse_number, word_number
+from ..xbrl import member_key, remove_subtotals
+from ..rules.scale import (  # noqa: F401 - re-exported for callers of extract
     _ai_scale_notes, _ANY_SCALE, _BARE_SCALE, _COLUMN_SCALE, _column_scale, _PER_UNIT,
     _PER_UNIT_KPI, _preceding_scale, _ROW_SCALE, _row_scale, _ROW_SCALE_SHORT, _SCALE_OF,
     _scale_quoted, _scale_word, _SCALE_WORDS_OF, SCALE_NOT_STATED)
-from .rules.table import (  # noqa: F401 - re-exported for callers of extract
+from ..rules.table import (  # noqa: F401 - re-exported for callers of extract
     _heading, _nearest_heading, _section_heading)
-from .rules.wording import (  # noqa: F401 - re-exported for callers of extract
+from ..rules.wording import (  # noqa: F401 - re-exported for callers of extract
     _CAUSE, _COMPARED, _compares_to_a_small_change, _FALL, _FALL_WORD, _figure_forms,
     _FORWARD, _NUMBER, _PERIOD_LIST, _PLAIN_WORDS, explanation_supports, falls,
     forward_looking, listed_after_fall, net_gross_mismatch, previous_from_jump, SIGN_NOT_STATED)
-from .rules.currency import (  # noqa: F401 - re-exported for callers of extract
+from ..rules.currency import (  # noqa: F401 - re-exported for callers of extract
     _column_currency, _currency, _CURRENCY_MARKERS)
-from .rules.period import (  # noqa: F401 - re-exported for callers of extract
+from ..rules.period import (  # noqa: F401 - re-exported for callers of extract
     _CHANGE_KPI, _FOURTH_QUARTER, _FULL_DATE, _LONG_SPAN_KPI, _LONGER, _MONTH_NAME,
     _MONTH_SPAN, _MONTHS, _NAMES_QUARTER, _NUMERIC_DATE, _ORDINAL, _OTHER_PERIOD,
     _QUARTER, _stands_at_period_end, _STOCK_KPI, _YEAR, _YEAR_ROW, _YTD_TITLE,
     column_dates, column_duration_problem, column_header, header_contradicts)
-from .rules.identity import (  # noqa: F401 - re-exported for callers of extract
+from ..rules.identity import (  # noqa: F401 - re-exported for callers of extract
     _combined_line, _FOOTNOTE, _identity, _label_words, _listed_kpi, _NOT_THE_PLACE,
     _PLACE, _place_not_named, _places, _plain_label, _row_label, _row_named_twice,
     _SPACED_FOOTNOTE, _SUB_ROW, _tail, _TOTAL_LABEL, _TWIN_REACH, labels_agree,

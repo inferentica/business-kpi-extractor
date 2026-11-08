@@ -4,8 +4,8 @@ import urllib.error
 
 import pytest
 
-from kpi_extractor import control as control_module
-from kpi_extractor.control import ControlError, ControlPlane
+from kpi_extractor.ops import control as control_module
+from kpi_extractor.ops.control import ControlError, ControlPlane
 
 
 def _plane(monkeypatch, replies):
@@ -58,7 +58,7 @@ def test_githubs_token_service_is_asked_again_after_an_outage(monkeypatch):
 
 def test_a_company_is_run_again_once_after_a_temporary_sec_failure(monkeypatch):
     import httpx
-    from kpi_extractor import cli
+    from kpi_extractor.ops import cli
     monkeypatch.setattr(cli, "COMPANY_RETRY_WAIT", 0)
     calls = []
 
@@ -76,7 +76,7 @@ def test_a_company_is_run_again_once_after_a_temporary_sec_failure(monkeypatch):
 
 def test_offpeak_waits_only_in_deepseek_peak_hours():
     from datetime import datetime, timezone
-    from kpi_extractor.offpeak import is_peak, seconds_until_offpeak
+    from kpi_extractor.ops.offpeak import is_peak, seconds_until_offpeak
     friday_peak = datetime(2026, 11, 6, 8, 30, tzinfo=timezone.utc)
     assert is_peak(friday_peak) and seconds_until_offpeak(friday_peak) == 90 * 60 + 1
     assert seconds_until_offpeak(datetime(2026, 11, 6, 3, 59, tzinfo=timezone.utc)) == 61
@@ -86,7 +86,7 @@ def test_offpeak_waits_only_in_deepseek_peak_hours():
 
 
 def test_the_checker_flags_a_per_unit_scale_a_year_row_and_an_unnamed_place():
-    from kpi_extractor.audit_check import Fetcher, check_figure
+    from kpi_extractor.quality.audit_check import Fetcher, check_figure
     html = """<table><tr><td>($ in millions)</td><td>Q3 2026</td></tr>
 <tr><td>Revenue per package</td><td>15.32</td></tr><tr><td>2025</td><td>1,210</td></tr>
 <tr><td>International Businesses</td><td>53,903</td></tr></table>"""
@@ -102,7 +102,7 @@ def test_the_checker_flags_a_per_unit_scale_a_year_row_and_an_unnamed_place():
 
 
 def test_the_checker_flags_a_count_scaled_with_no_scale_stated_for_it():
-    from kpi_extractor.audit_check import Fetcher, check_figure
+    from kpi_extractor.quality.audit_check import Fetcher, check_figure
     html = """<table><tr><td></td><td>2025</td></tr><tr><td>Revenue:</td><td>(in thousands)</td></tr>
 <tr><td>Separated NdPr products</td><td></td></tr><tr><td>NdPr Production Volume (MTs)</td><td>721</td></tr>
 <tr><td>Avg. daily package volume (000s):</td><td></td></tr><tr><td>Total U.S. domestic ADV</td><td>14,716</td></tr></table>"""
@@ -116,7 +116,7 @@ def test_the_checker_flags_a_count_scaled_with_no_scale_stated_for_it():
 
 
 def test_a_trial_given_a_list_serves_it_as_the_stored_row():
-    from kpi_extractor.evaluate import EvalControl
+    from kpi_extractor.evals.evaluate import EvalControl
     spec = {"version": 2, "groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric", "kpis": []}],
             "names": {}, "sourceAccession": "0001"}
     control = EvalControl(plane=None, fixed_lists={"MP": spec})
@@ -125,8 +125,8 @@ def test_a_trial_given_a_list_serves_it_as_the_stored_row():
 
 
 def test_the_rule_replay_reads_a_stored_figure_again_and_names_the_change():
-    from kpi_extractor.audit_check import Fetcher
-    from kpi_extractor.rule_replay import replay_value
+    from kpi_extractor.quality.audit_check import Fetcher
+    from kpi_extractor.evals.rule_replay import replay_value
     html = """<table><tr><td></td><td>2025</td></tr><tr><td>Revenue:</td><td>(in thousands)</td></tr>
 <tr><td>Separated NdPr products</td><td></td></tr><tr><td>NdPr Production Volume (MTs)</td><td>721</td></tr></table>"""
     fetcher = Fetcher(); fetcher.raw["https://example.com/x.htm"] = html

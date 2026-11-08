@@ -17,7 +17,7 @@ from typing import Callable
 
 import pandas as pd
 
-from .xbrl import _axis_name, _member_labels, humanize, local_name, member_key, remove_subtotals
+from ..xbrl import _axis_name, _member_labels, humanize, local_name, member_key, remove_subtotals
 
 INCOME_CONCEPT = "us-gaap:OperatingIncomeLoss"
 GROUP_KEY = "segment_income"

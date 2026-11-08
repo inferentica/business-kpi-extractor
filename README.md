@@ -65,7 +65,7 @@ against the ones the owner edited, and counts groups the owner removed that come
   `reports.py` (XBRL), `financial_statements.py`, `chart_slides.py`, `release_tables.py`, `tagged_kpis.py`,
   `listing_history.py`, `kpi_list.py`, `release_flow.py`, `ai_reading.py`, `series_identity.py`, `series_checks.py` and
   `shared.py`.
-- `kpi_extractor/checks.py` holds the checks on figures. Each declares what it applies to and answers with findings; the
+- `kpi_extractor/quality/checks.py` holds the checks on figures. Each declares what it applies to and answers with findings; the
   caller decides what comes of them. `audit_stored` reports what a wider check would say about the figures now served.
 - `kpi_extractor/store.py` is the one way to change a company's figures and filings. Steps read them read-only and hand
   back the rows they want written; `tests/test_store.py` keeps it that way.
@@ -86,11 +86,11 @@ gh workflow run evaluate.yml                                          # score ag
 Every change passes the regression net first, in one command:
 
 ```bash
-python -m kpi_extractor.verify --trial eval-results/trial.json --remote
+python -m kpi_extractor.evals.verify --trial eval-results/trial.json --remote
 ```
 
 1. All tests, by their real exit code.
-2. The rule replay (`kpi_extractor.rule_replay`): each figure the last trial accepted is read again from its own filing with
+2. The rule replay (`kpi_extractor.evals.rule_replay`): each figure the last trial accepted is read again from its own filing with
    the current code, no AI, and every figure whose value or status would change is listed. Each change must be one the
    change meant.
 3. With `--remote`, the 88-value golden set and the hand-audited set (`evals/audited.json`) on GitHub.

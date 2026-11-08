@@ -12,8 +12,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 from .control import ControlError, ControlPlane, DryRunControl
 from .memory import MemoryWatch, peak_gb
-from .pipeline import SymbolPipeline, SymbolResult
-from .sec import _temporary, configure_identity
+from ..pipeline import SymbolPipeline, SymbolResult
+from ..sources.sec import _temporary, configure_identity
 
 _SYMBOL = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 

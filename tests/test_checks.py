@@ -1,6 +1,6 @@
 from types import SimpleNamespace as NS
 
-from kpi_extractor.checks import READING_CHECKS, Figure, audit_stored, date_order_findings, findings, parts_add_up, row_path
+from kpi_extractor.quality.checks import READING_CHECKS, Figure, audit_stored, date_order_findings, findings, parts_add_up, row_path
 
 
 def _key(row):

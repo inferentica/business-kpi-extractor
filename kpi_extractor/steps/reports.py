@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 
-from ..control import ControlError
-from ..document import Document, clean, parse_document, parse_number
-from ..fiscal import fiscal_label
-from ..release_breakdowns import line_key
-from ..sec import FilingRef, load_submission
+from ..ops.control import ControlError
+from ..documents.document import Document, clean, parse_document, parse_number
+from ..domain.fiscal import fiscal_label
+from ..readers.release_breakdowns import line_key
+from ..sources.sec import FilingRef, load_submission
 from ..store import FilingReading, failed_reading
-from ..segment_income import (GROUP_KEY as INCOME_GROUP, LEFT_OVER_KEY, REVENUE_GROUP_KEY as OWN_REVENUE_GROUP,
+from ..readers.segment_income import (GROUP_KEY as INCOME_GROUP, LEFT_OVER_KEY, REVENUE_GROUP_KEY as OWN_REVENUE_GROUP,
                               segment_income, segment_revenue)
 from ..xbrl import extract_breakdowns, member_children, member_key, official_labels, presented_labels
 from .shared import _XBRL_READER, value_key

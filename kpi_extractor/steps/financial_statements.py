@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 
-from ..fiscal import fiscal_label
-from ..release_statements import release_headline, release_statements
-from ..sec import FilingRef
-from ..statements import statement_lines
+from ..domain.fiscal import fiscal_label
+from ..readers.release_statements import release_headline, release_statements
+from ..sources.sec import FilingRef
+from ..readers.statements import statement_lines
 
 class StatementReading:
     """The three financial statements, from XBRL or, for a filer without quarterly XBRL, from its releases."""

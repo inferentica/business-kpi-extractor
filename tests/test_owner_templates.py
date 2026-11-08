@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from kpi_extractor.ai import Spec
 from kpi_extractor.pipeline import SymbolPipeline
-from kpi_extractor.sec import FilingRef
+from kpi_extractor.sources.sec import FilingRef
 
 
 def _spec(*kpis: str) -> Spec:

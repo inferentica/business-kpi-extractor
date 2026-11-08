@@ -12,8 +12,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from .document import Document, Table, clean, parse_number
-from .xbrl import member_key
+from ..documents.document import Document, Table, clean, parse_number
+from ..xbrl import member_key
 
 _YEAR = re.compile(r"^\s*((?:19|20)\d{2})\s*$")
 _MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november",

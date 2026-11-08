@@ -1,5 +1,5 @@
 import pytest
-from kpi_extractor.derive import derive_periods
+from kpi_extractor.domain.derive import derive_periods
 
 
 def _value(period, kpi, value, *, method="xbrl", group="segments", status="verified", year="2026"):
@@ -151,7 +151,7 @@ def test_a_q4_that_one_source_leaves_negative_is_derived_from_the_next():
 
 
 def test_a_quarter_without_the_years_unallocated_row_counts_it_as_zero():
-    from kpi_extractor.derive import derive_periods
+    from kpi_extractor.domain.derive import derive_periods
     def row(period, key, value, end="2019-12-31", locator=None):
         return {"group_key": "segments", "group_kind": "revenue_breakdown", "kpi_key": key, "kpi_label": key, "fiscal_year": "2019",
                 "fiscal_period": period, "period_end": end, "value": value, "method": "xbrl", "validation_status": "verified",
@@ -165,7 +165,7 @@ def test_a_quarter_without_the_years_unallocated_row_counts_it_as_zero():
 
 
 def test_a_balancing_row_may_be_negative_in_a_derived_quarter():
-    from kpi_extractor.derive import _combine_year_to_date
+    from kpi_extractor.domain.derive import _combine_year_to_date
     year = {key: {"kpi_key": key, "value": value, "validation_status": "verified", "locator": {"total": 182527.0}, "notes": []}
             for key, value in (("googleservices", 168635.0), ("googlecloud", 13059.0), ("otherbets", 657.0), ("unallocated", 176.0))}
     nine = {"googleservices": 115762.0, "googlecloud": 9228.0, "otherbets": 461.0, "unallocated": 178.0}
@@ -176,7 +176,7 @@ def test_a_balancing_row_may_be_negative_in_a_derived_quarter():
 
 
 def test_a_hedging_line_may_turn_negative_in_a_derived_quarter():
-    from kpi_extractor.derive import balancing
+    from kpi_extractor.domain.derive import balancing
     assert balancing("hedginggains") and balancing("hedginggainslosses") and balancing("unallocated")
     assert not balancing("googlecloud")
 
@@ -197,7 +197,7 @@ def test_a_row_a_complete_quarter_does_not_list_was_nothing_then():
 
 
 def test_a_segment_operating_loss_in_q4_is_not_held_for_review():
-    from kpi_extractor.derive import _combine
+    from kpi_extractor.domain.derive import _combine
     def row(period, value):
         return {"group_key": "segment_income", "fiscal_year": "2025", "fiscal_period": period, "period_end": "2025-12-27",
                 "value": value, "validation_status": "verified", "locator": {}}

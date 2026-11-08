@@ -5,11 +5,11 @@ import re
 from datetime import date
 
 from ..ai import Spec
-from ..archive import filing_folder
-from ..checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
-from ..document import Document, clean, parse_number
-from ..extract import column_header
-from ..sec import FilingRef
+from ..sources.archive import filing_folder
+from ..quality.checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
+from ..documents.document import Document, clean, parse_number
+from ..readers.extract import column_header
+from ..sources.sec import FilingRef
 
 AI_GROUP_PREFIX = "kpi_"
 # Values read from a slide's chart: their own method, so a re-read of the release's text never withdraws them.

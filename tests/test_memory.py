@@ -1,7 +1,7 @@
 import os
 from types import SimpleNamespace
 
-from kpi_extractor.memory import MemoryWatch, available_gb, peak_gb, process_gb
+from kpi_extractor.ops.memory import MemoryWatch, available_gb, peak_gb, process_gb
 
 
 def test_available_memory_is_read_and_a_mac_has_none():
@@ -16,8 +16,8 @@ def test_a_process_that_has_ended_holds_nothing():
 
 def test_the_watch_keeps_the_lowest_and_logs_each_process(monkeypatch):
     readings = iter([5.0, 2.5, 4.0])
-    monkeypatch.setattr("kpi_extractor.memory.available_gb", lambda: next(readings))
-    monkeypatch.setattr("kpi_extractor.memory.process_gb", lambda pid: {1: 1.0, 2: 3.0}[pid])
+    monkeypatch.setattr("kpi_extractor.ops.memory.available_gb", lambda: next(readings))
+    monkeypatch.setattr("kpi_extractor.ops.memory.process_gb", lambda pid: {1: 1.0, 2: 3.0}[pid])
     lines = []
     watch = MemoryWatch(SimpleNamespace(_processes={1: None, 2: None}), log=lines.append)
     for _ in range(3):

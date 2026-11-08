@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 
-from ..document import clean, Document, Table
+from ..documents.document import clean, Document, Table
 from .table import _heading
 
 

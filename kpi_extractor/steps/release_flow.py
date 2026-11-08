@@ -6,12 +6,12 @@ from datetime import date, timedelta
 
 from .. import ai
 from ..ai import Spec
-from ..document import Document, clean
-from ..checks import check_period, date_order_findings, validate_groups
-from ..extract import (_FOURTH_QUARTER, ReadValue, _stands_at_period_end, column_duration_problem, explanation_supports, falls,
+from ..documents.document import Document, clean
+from ..quality.checks import check_period, date_order_findings, validate_groups
+from ..readers.extract import (_FOURTH_QUARTER, ReadValue, _stands_at_period_end, column_duration_problem, explanation_supports, falls,
                        forward_looking, net_gross_mismatch, previous_from_jump)
-from ..fiscal import fiscal_label
-from ..sec import FilingRef
+from ..domain.fiscal import fiscal_label
+from ..sources.sec import FilingRef
 from ..xbrl import member_key
 from ..store import FilingReading, failed_reading
 from .ai_reading import AiReading

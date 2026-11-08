@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from kpi_extractor.sec import FilingRef
+from kpi_extractor.sources.sec import FilingRef
 from kpi_extractor.store import CompanyStore, FilingReading, failed_reading
 
 # The only step files that may change rows or filings themselves: the KPI list changes its rows with the list, and the

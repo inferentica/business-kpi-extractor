@@ -7,7 +7,7 @@ from datetime import date, timedelta
 import re
 
 from ..ai import KpiSpec
-from ..document import clean, Table
+from ..documents.document import clean, Table
 from .scale import _PER_UNIT_KPI
 from .table import _heading
 

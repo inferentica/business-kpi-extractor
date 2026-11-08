@@ -1,5 +1,5 @@
 """ASML's "Net system sales breakdown" slide: pies whose labels and shares exist only in the picture."""
-from kpi_extractor.charts import Word, breakdown_slides, read_breakdowns, read_units
+from kpi_extractor.readers.charts import Word, breakdown_slides, read_breakdowns, read_units
 
 # The words a local OCR model reads on ASML's Q2 2026 slide 8, with their boxes [x0, y0, x1, y1, text].
 SLIDE = [
@@ -193,7 +193,7 @@ def test_a_region_label_cut_into_the_bar_chart_is_not_a_bar():
 
 def test_immersion_slice_keeps_one_name_across_slide_styles():
     # 2016-2019 slides print "ArF / Immersion / 74%" on three lines; later ones print "ArFi".
-    from kpi_extractor.charts import _name
+    from kpi_extractor.readers.charts import _name
 
     assert {_name("ArF Immersion"), _name("Immersion"), _name("ArF"), _name("ArFi")} == {"ArFi"}
     assert _name("ArF Dry") == "ArF Dry"
@@ -219,7 +219,7 @@ def test_a_label_of_the_pie_beside_it_is_not_this_pies_share():
 
 
 def test_a_pie_is_exact_only_when_its_shares_add_up_to_100():
-    from kpi_extractor.charts import ChartBreakdown
+    from kpi_extractor.readers.charts import ChartBreakdown
 
     assert ChartBreakdown("Net system sales", "end-use", "2026", "Q2", {"Logic": 51, "Memory": 49}).exact
     assert not ChartBreakdown("Net system sales", "end-use", "2026", "Q2", {"Logic": 51, "Memory": 48}).exact

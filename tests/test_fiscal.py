@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from kpi_extractor.fiscal import FiscalCalendarError, fiscal_label, learn_year_offset, nominal_quarter_end_before
+from kpi_extractor.domain.fiscal import FiscalCalendarError, fiscal_label, learn_year_offset, nominal_quarter_end_before
 
 
 @pytest.mark.parametrize(("period_end", "year_end", "annual", "expected"), [
@@ -75,7 +75,7 @@ def test_a_release_is_matched_to_the_companys_own_quarter_end():
 def test_report_period_ends_reads_the_filing_index():
     from types import SimpleNamespace
 
-    from kpi_extractor.sec import report_period_ends
+    from kpi_extractor.sources.sec import report_period_ends
 
     filings = [SimpleNamespace(period_of_report="2025-05-11"), SimpleNamespace(report_date=date(2024, 5, 12)), SimpleNamespace()]
     company = SimpleNamespace(get_filings=lambda **_: filings)
@@ -85,7 +85,7 @@ def test_report_period_ends_reads_the_filing_index():
 def test_a_stated_year_end_far_from_the_annual_reports_gives_way():
     from datetime import date as day
     from types import SimpleNamespace
-    from kpi_extractor.sec import annual_report_year_end, year_ends_agree
+    from kpi_extractor.sources.sec import annual_report_year_end, year_ends_agree
     report = lambda end: SimpleNamespace(get_filings=lambda form: SimpleNamespace(latest=lambda n: SimpleNamespace(period_of_report=end)))
     assert annual_report_year_end(report("2025-12-31"), "0513") == "1231"  # Sun Communities
     assert annual_report_year_end(report("2026-01-31"), "0130") == "0130"  # Dollar Tree's 52/53 weeks: a day off stands
@@ -96,7 +96,7 @@ def test_a_stated_year_end_far_from_the_annual_reports_gives_way():
 
 def test_the_annual_reports_form_decides_whether_results_come_on_6_k():
     from types import SimpleNamespace
-    from kpi_extractor.sec import files_as_foreign
+    from kpi_extractor.sources.sec import files_as_foreign
     assert files_as_foreign(SimpleNamespace(is_foreign=False), SimpleNamespace(form="40-F"))  # Bank of Nova Scotia
     assert not files_as_foreign(SimpleNamespace(is_foreign=True), SimpleNamespace(form="10-K"))  # JFrog, Tronox
     assert files_as_foreign(SimpleNamespace(is_foreign=True), SimpleNamespace(form="20-F"))
@@ -105,7 +105,7 @@ def test_the_annual_reports_form_decides_whether_results_come_on_6_k():
 
 def test_a_filing_days_after_a_quarter_closes_reports_that_quarter():
     from datetime import date as day
-    from kpi_extractor.sec import release_period
+    from kpi_extractor.sources.sec import release_period
     assert release_period(day(2025, 10, 2), "1231") == day(2025, 9, 30)    # Tesla's Q3 deliveries, two days on
     assert release_period(day(2025, 10, 22), "1231") == day(2025, 9, 30)   # an ordinary results release
     assert release_period(day(2025, 12, 10), "1231") == day(2025, 9, 30)   # late in the window, still the quarter before

@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 from kpi_extractor import ai
 from kpi_extractor.ai import Spec
-from kpi_extractor.document import parse_document
-from kpi_extractor.extract import read_values
+from kpi_extractor.documents.document import parse_document
+from kpi_extractor.readers.extract import read_values
 from kpi_extractor.pipeline import SymbolPipeline
-from kpi_extractor.replay import replay, reported_period
+from kpi_extractor.readers.replay import replay, reported_period
 
 URL = "https://www.sec.gov/Archives/q{n}report.htm"
 

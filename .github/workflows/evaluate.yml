@@ -59,8 +59,10 @@ on:
   push:
     branches: [main]
     paths:
-      - kpi_extractor/ai.py
-      - kpi_extractor/extract.py
+      # What ai.py and extract.py held before the restructure: the prompts and schemas, the reading rules, the reader.
+      - kpi_extractor/ai/**
+      - kpi_extractor/rules/**
+      - kpi_extractor/readers/extract.py
 
 permissions:
   contents: read
@@ -86,12 +88,12 @@ jobs:
       - run: uv pip install .
       - name: Wait for DeepSeek off-peak prices
         if: inputs.offpeak != false
-        run: python -m kpi_extractor.offpeak
+        run: python -m kpi_extractor.ops.offpeak
       - name: Score each prompt
         if: inputs.suite == 'prompts'
         env:
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
-        run: python -m kpi_extractor.prompt_eval
+        run: python -m kpi_extractor.evals.prompt_eval
       - name: Fetch the lists to reuse
         if: inputs.suite == 'trial' && inputs.lists_from != ''
         env:
@@ -108,7 +110,7 @@ jobs:
         run: |
           LISTS=""
           if [ -n "$LISTS_FROM" ]; then LISTS="--lists-from $(find lists-from -name trial.json | head -1)"; fi
-          python -m kpi_extractor.trial --symbols "$SYMBOLS" --quarters "$QUARTERS" $LISTS
+          python -m kpi_extractor.evals.trial --symbols "$SYMBOLS" --quarters "$QUARTERS" $LISTS
       - name: Score against the golden set
         if: inputs.suite != 'prompts' && inputs.suite != 'trial'
         env:
@@ -116,7 +118,7 @@ jobs:
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
           GOLDEN: ${{ inputs.golden || 'evals/golden.json' }}
-        run: python -m kpi_extractor.evaluate --quarters "$QUARTERS" --golden "$GOLDEN"
+        run: python -m kpi_extractor.evals.evaluate --quarters "$QUARTERS" --golden "$GOLDEN"
       - uses: actions/upload-artifact@v6
         if: always()
         with:

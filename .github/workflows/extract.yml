@@ -64,7 +64,7 @@ jobs:
       # A manual run is a backfill that can wait for half-price hours; a scheduled run reads a filing just published.
       - name: Wait for DeepSeek off-peak prices
         if: (inputs.trigger_type || 'manual') == 'manual'
-        run: python -m kpi_extractor.offpeak
+        run: python -m kpi_extractor.ops.offpeak
       - name: Read filings and store KPIs
         # Inputs reach the command as environment variables, never as interpolated shell text.
         env:

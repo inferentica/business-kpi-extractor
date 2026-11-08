@@ -13,11 +13,11 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from .cli import company_pool
-from .control import ControlPlane
-from .extract import labels_agree
-from .pipeline import SymbolPipeline, SymbolResult
-from .sec import configure_identity
+from ..ops.cli import company_pool
+from ..ops.control import ControlPlane
+from ..readers.extract import labels_agree
+from ..pipeline import SymbolPipeline, SymbolResult
+from ..sources.sec import configure_identity
 
 GOLDEN = Path("evals/golden.json")  # relative to the repository root, where the workflow runs
 

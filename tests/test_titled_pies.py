@@ -1,5 +1,5 @@
 """TSMC's platform pie: one quarter's pie on the left of a slide titled in its hidden text, growth rates on the right."""
-from kpi_extractor.charts import Word, read_titled_pie, titled_pie_slides
+from kpi_extractor.readers.charts import Word, read_titled_pie, titled_pie_slides
 
 # 3Q26 Revenue by Platform, as the OCR reads the slide (IoT comes back as "101"; the growth chart's signed rates and
 # its run-together labels stand on the right half).
@@ -58,7 +58,7 @@ def test_the_technology_pie_takes_apart_run_together_labels():
 
 
 def test_the_growth_chart_gives_each_platform_its_rate_left_to_right():
-    from kpi_extractor.charts import read_growth_rates
+    from kpi_extractor.readers.charts import read_growth_rates
     assert read_growth_rates(WORDS) == {"High Performance Computing": 22, "Smartphone": 10, "Internet of Things": 5,
                                         "Automotive": 23, "Digital Consumer Electronics": -12, "Others": -10}
     assert read_growth_rates([word for word in WORDS if word.text != "+5%"]) is None

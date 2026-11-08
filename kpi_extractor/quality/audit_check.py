@@ -4,7 +4,7 @@ a person to look, not a verdict: in three 300-figure audits the checker flagged 
 one that turned out wrong was among them.
 
 Run by the trial on its audit sample (eval-results/audit_flags.json), or by hand:
-    python -m kpi_extractor.audit_check eval-results/audit_sample.json eval-results/trial.json
+    python -m kpi_extractor.quality.audit_check eval-results/audit_sample.json eval-results/trial.json
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ import time
 import urllib.request
 from dataclasses import dataclass, field
 
-from .document import Document, parse_document, parse_number
-from .extract import _heading, _nearest_heading, _places
+from ..documents.document import Document, parse_document, parse_number
+from ..readers.extract import _heading, _nearest_heading, _places
 
 MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split()
 MONTH_NAMES = "january|february|march|april|may|june|july|august|september|october|november|december"

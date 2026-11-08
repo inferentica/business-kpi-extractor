@@ -7,12 +7,12 @@ from datetime import date, timedelta
 
 from .. import ai
 from ..ai import AiResponseError, Located, Spec
-from ..control import ControlError
-from ..document import Document, clean
-from ..checks import check_period, far_above_quarter, looks_like_part_of_table, validate_groups
-from ..extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
+from ..ops.control import ControlError
+from ..documents.document import Document, clean
+from ..quality.checks import check_period, far_above_quarter, looks_like_part_of_table, validate_groups
+from ..readers.extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
                        read_values)
-from ..replay import replay
+from ..readers.replay import replay
 from .shared import (AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
 

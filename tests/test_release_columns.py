@@ -2,8 +2,8 @@
 from datetime import date
 from types import SimpleNamespace
 
-from kpi_extractor.document import Document, Table, TextBlock
-from kpi_extractor.release_columns import earlier_quarters, release_grids, row_key
+from kpi_extractor.documents.document import Document, Table, TextBlock
+from kpi_extractor.readers.release_columns import earlier_quarters, release_grids, row_key
 
 Q2_TEXT = ("Connectivity Segment Operating and Financial Data $, in millions (except where noted) Three Months Ended Six Months "
            "Ended June 30, 2026 March 31, 2026 June 30, 2025 June 30, 2026 June 30, 2025 Starlink Subscribers (#, in millions, "

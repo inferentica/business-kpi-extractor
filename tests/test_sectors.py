@@ -1,5 +1,5 @@
 from kpi_extractor.ai import propose_data
-from kpi_extractor.sectors import sector_hint, sector_of
+from kpi_extractor.domain.sectors import sector_hint, sector_of
 
 
 def test_sic_codes_name_their_industry():

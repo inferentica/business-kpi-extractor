@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 
 from ..ai import GroupSpec, KpiSpec
-from ..document import clean, parse_number, Table
+from ..documents.document import clean, parse_number, Table
 from ..xbrl import member_key
 from .table import _heading, _section_heading
 

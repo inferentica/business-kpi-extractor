@@ -5,11 +5,11 @@ from dataclasses import replace
 from datetime import date
 
 from ..ai import Spec
-from ..fiscal import fiscal_label
-from ..prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
-from ..release_breakdowns import line_key
-from ..sec import FilingRef, ipo_prospectus
-from ..segment_income import GROUP_KEY as INCOME_GROUP
+from ..domain.fiscal import fiscal_label
+from ..readers.prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
+from ..readers.release_breakdowns import line_key
+from ..sources.sec import FilingRef, ipo_prospectus
+from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from ..store import FilingReading
 from .shared import AI_GROUP_PREFIX, _DONE
 

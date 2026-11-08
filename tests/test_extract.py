@@ -3,9 +3,9 @@ from datetime import date
 import pytest
 
 from kpi_extractor.ai import AiResponseError, Located, Spec, parse_located, parse_spec
-from kpi_extractor.document import parse_document
-from kpi_extractor.checks import check_period, validate_groups
-from kpi_extractor.extract import listed_after_fall, read_values
+from kpi_extractor.documents.document import parse_document
+from kpi_extractor.quality.checks import check_period, validate_groups
+from kpi_extractor.readers.extract import listed_after_fall, read_values
 
 RELEASE = """
 <p>In the second quarter, shipments of 3-nanometer accounted for 30% of total wafer revenue; 5-nanometer accounted
@@ -200,7 +200,7 @@ def _nested_spec():
 
 
 def test_a_parent_and_its_lines_are_checked_each_at_their_level():
-    from kpi_extractor.extract import ReadValue
+    from kpi_extractor.readers.extract import ReadValue
 
     group = _nested_spec().groups[0]
     kpi = {k.key: k for k in group.kpis}
@@ -230,7 +230,7 @@ def test_a_parent_must_be_another_kpi_of_the_group_and_never_loop():
 def test_a_row_with_a_footnote_mark_set_apart_is_its_listed_kpi():
     # ASML's Q1 2017 release: "Net system sales 3" was stored again as a KPI of its own, doubling the quarter.
     from kpi_extractor.ai import GroupSpec
-    from kpi_extractor.extract import _listed_kpi
+    from kpi_extractor.readers.extract import _listed_kpi
     group = GroupSpec.model_validate({"key": "product", "label": "Revenue by product", "kind": "revenue_breakdown", "kpis": [
         {"key": "net_system_sales", "label": "Net system sales", "unit": "currency"}]})
     assert _listed_kpi(group, "Net system sales 3").key == "net_system_sales"
@@ -239,7 +239,7 @@ def test_a_row_with_a_footnote_mark_set_apart_is_its_listed_kpi():
 
 def test_a_6k_read_from_its_own_document_is_classified_from_the_report_after_its_cover():
     # TSMC's 6-Ks until October 2019: the cover and signature, then the release itself.
-    from kpi_extractor.sec import _after_cover
+    from kpi_extractor.sources.sec import _after_cover
     text = ("FORM 6-K REPORT OF FOREIGN PRIVATE ISSUER ... Indicate by check mark whether the registrant files annual reports "
             "under cover of Form 20-F ... SIGNATURES Pursuant to the requirements of the Securities Exchange Act of 1934 ... "
             "By /s/ Lora Ho Lora Ho Senior Vice President & Chief Financial Officer TSMC Reports Third Quarter EPS of NT$3.44")
@@ -249,7 +249,7 @@ def test_a_6k_read_from_its_own_document_is_classified_from_the_report_after_its
 
 def test_a_cover_written_with_html_spaces_is_still_skipped():
     from types import SimpleNamespace
-    from kpi_extractor.sec import FilingRef, classification_excerpt
+    from kpi_extractor.sources.sec import FilingRef, classification_excerpt
     cover = "FORM&nbsp;6-K ... SIGNATURES ... By&nbsp;/s/&nbsp;Lora Ho Lora Ho Senior Vice President &amp; Chief Financial Officer"
     exhibit = SimpleNamespace(document_type="6-K", document="d6k.htm", description="FORM 6-K", content=f"<p>{cover}</p><p>TSMC Reports Third Quarter EPS</p>")
     ref = FilingRef(accession="a", form="6-K", filed=None, role="earnings_release", source_url="", exhibits=[exhibit])
@@ -257,7 +257,7 @@ def test_a_cover_written_with_html_spaces_is_still_skipped():
 
 
 def test_a_per_unit_row_in_a_table_in_millions_is_not_scaled():
-    from kpi_extractor.extract import _row_scale
+    from kpi_extractor.readers.extract import _row_scale
     assert _row_scale("Starlink consumer ARPU ($ per month) $69 $66") == 1.0
     assert _row_scale("Starlink consumer subscribers (# in millions, as of period end) 13.6") == 1e6
     assert _row_scale("Consumer revenues $3,121") is None
@@ -316,7 +316,7 @@ def test_a_row_label_names_its_currency():
 
 def test_a_column_spanning_january_to_june_is_not_a_quarter():
     # Philips' sales by country are given only "January to June": never its second quarter.
-    from kpi_extractor.extract import column_duration_problem, column_header
+    from kpi_extractor.readers.extract import column_duration_problem, column_header
     for span, months in (("January to June", 6), ("April to June", 3), ("January–September", 9), ("Oct - Dec", 3)):
         document = parse_document(f"""<table><tr><td>in millions of EUR</td><td>{span}</td><td></td></tr>
 <tr><td></td><td>2026</td><td>2025</td></tr><tr><td>United States</td><td>3,281</td><td>3,476</td></tr></table>""",
@@ -364,8 +364,8 @@ def test_a_footnote_letter_is_no_column_scale_and_mn_is_millions():
 <tr><td>(+) O&amp;M (Quotas)</td><td>1,192</td><td>109</td><td>283</td></tr></table>"""
     quotas = _read_one(html, "O&M (Quotas)", "currency", 2, 3, scale=1e6, currency="BRL")
     assert quotas.value == 283_000_000
-    from kpi_extractor.extract import _column_scale
-    from kpi_extractor.document import parse_document as parse
+    from kpi_extractor.readers.extract import _column_scale
+    from kpi_extractor.documents.document import parse_document as parse
     table = next(iter(parse("<table><tr><td></td><td>GDV (Bil.)</td><td>Sales ($B)</td></tr><tr><td>x</td><td>1</td><td>2</td></tr></table>",
                             "https://example.com/x.htm").tables.values()))
     assert _column_scale(table, 1, 1) == 1e9 and _column_scale(table, 1, 2) == 1e9
@@ -379,7 +379,7 @@ def test_mm_reads_as_millions_in_a_table_caption():
 
 
 def test_a_scale_after_a_slash_belongs_to_the_second_measure():
-    from kpi_extractor.extract import _row_scale
+    from kpi_extractor.readers.extract import _row_scale
     assert _row_scale("Leases renewed Kilowatt / NRSF (in thousands) 42,412 92,670") is None
     assert _row_scale("Paid memberships (in millions) 301.6") == 1e6
     renewed = _read_one("""<table><tr><td></td><td>3Q26</td></tr>
@@ -403,7 +403,7 @@ def test_a_metric_named_for_a_place_its_row_never_names_is_held():
     values, _problems = read_values(document, spec, located, "USD")
     status = {item.kpi.key: item.status for item in values}
     assert status == {"japan": "needs_review", "jp": "verified"}
-    from kpi_extractor.extract import _places
+    from kpi_extractor.readers.extract import _places
     assert _places("Cross-Border Volume Growth Excluding Intra-Europe", own=True) == set()
     assert _places("8 ASIA PACIFIC") == {"ASIA PACIFIC"} and _places("Asia Pacific Unit Case Volume", own=True) == {"ASIA PACIFIC"}
 
@@ -462,7 +462,7 @@ def test_a_row_that_is_a_year_is_not_a_quarter():
 
 
 def test_stated_scales_in_more_forms_are_recognised():
-    from kpi_extractor.extract import _column_scale, _row_scale
+    from kpi_extractor.readers.extract import _column_scale, _row_scale
     assert _row_scale("Oncological Plans # (000) 1,005") == 1e3               # Auna's unit column
     assert _row_scale("Paid memberships (Mil.) 301.6") == 1e6
     # FedEx: "Avg. daily package volume (ADV) (000s)(1):" heads the rows under it.
@@ -480,7 +480,7 @@ def test_stated_scales_in_more_forms_are_recognised():
 
 
 def test_a_repeat_the_row_itself_prints_is_no_wrong_column():
-    from kpi_extractor.checks import _row_shows
+    from kpi_extractor.quality.checks import _row_shows
     # PNC's card and cash management: 737 in 3Q25 and 2Q25, side by side in the row.
     current = {"locator": {"row_numbers": [737.0, 737.0, 698.0]}}
     assert _row_shows(current, 737_000_000, 737_000_000)
@@ -499,7 +499,7 @@ def test_a_section_rows_in_thousands_is_no_column_scale_for_the_volumes_below():
     stacked = """<table><tr><td></td><td>2025</td></tr><tr><td>Revenue: (in thousands)</td><td></td></tr>
 <tr><td>Volumes:</td><td></td></tr><tr><td>NdPr Production Volume (MTs)</td><td>721</td></tr></table>"""
     assert _read_one(stacked, "NdPr Production Volume (MTs)", "count", 3, 1).value == 721
-    from kpi_extractor.extract import _column_scale
+    from kpi_extractor.readers.extract import _column_scale
     table = next(iter(parse_document("<table><tr><td></td><td>2Q26 (R$ mn)</td></tr><tr><td>x</td><td>5</td></tr></table>",
                                      "https://example.com/x.htm").tables.values()))
     assert _column_scale(table, 1, 1) == 1e6
@@ -526,7 +526,7 @@ def test_a_row_label_with_a_short_scale_scales_its_count():
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>
 <tr><td>Active FSD Subscriptions (mil)</td><td>1.1</td></tr></table>""", "Active FSD Subscriptions", "count", 1, 1)
     assert round(fsd.value) == 1_100_000
-    from kpi_extractor.extract import _row_scale
+    from kpi_extractor.readers.extract import _row_scale
     assert _row_scale("Stores (b) 381") is None
 
 
@@ -544,7 +544,7 @@ def test_a_table_in_two_currencies_takes_each_columns_own():
 
 
 def test_a_count_spelled_out_is_read():
-    from kpi_extractor.document import parse_number, word_number
+    from kpi_extractor.documents.document import parse_number, word_number
     assert word_number("nine countries").value == 9 and word_number("twenty-five").value == 25
     assert word_number("two billion").value == 2e9
     assert parse_number("Three Months Ended") is None  # tables keep reading digits only
@@ -553,7 +553,7 @@ def test_a_count_spelled_out_is_read():
 def test_a_quote_takes_the_last_scale_heading_before_it_in_its_block():
     # Apollo's highlights page: earnings "($ in millions …)", then AUM and business drivers "($ in billions)".
     from kpi_extractor.ai import KpiSpec, Locator
-    from kpi_extractor.extract import _read_raw
+    from kpi_extractor.readers.extract import _read_raw
     document = parse_document(
         "<p>($ in millions, except per share amounts) Fee Related Earnings $785 Assets Under Management ($ in billions) "
         "Total Assets Under Management $1,047 Fee-Generating AUM $858 Business Drivers ($ in billions) Inflows $60</p>",
@@ -643,7 +643,7 @@ def test_a_release_holding_a_reading_reader_3_rejects_is_read_again_once():
 
 
 def test_week_based_columns_are_told_from_their_half_years():
-    from kpi_extractor.extract import column_duration_problem
+    from kpi_extractor.readers.extract import column_duration_problem
 
     assert column_duration_problem("<12 weeks> ended @ #", annual=False) is None
     assert column_duration_problem("<16 weeks> ended @ #", annual=False) is None
@@ -704,7 +704,7 @@ def test_a_forecast_is_never_read_as_the_quarter():
 
 
 def test_an_explanation_must_be_about_the_figure_and_the_quarter():
-    from kpi_extractor.extract import explanation_supports
+    from kpi_extractor.readers.extract import explanation_supports
 
     assert explanation_supports("Unit case volume declined 36% driven by India and South Africa due to the coronavirus.", "Bottling Investments Unit Case Volume Growth", -36)
     assert explanation_supports("The increase in Incentive fees was driven by fund distributions.", "Incentive fees", 587e6)
@@ -740,7 +740,7 @@ def test_an_unsigned_figure_listed_after_a_fall_is_held():
 
 
 def test_a_footnote_mark_after_a_place_still_names_it():
-    from kpi_extractor.extract import _places
+    from kpi_extractor.readers.extract import _places
     assert _places("Other Europe1") == {"EUROPE"}
     assert _places("Europeans") == set()
 
@@ -754,8 +754,8 @@ def test_a_dayrate_keeps_its_units_under_a_millions_heading():
 
 
 def test_a_quarter_label_keeps_its_meaning_in_a_column_header():
-    from kpi_extractor.extract import column_duration_problem, column_header
-    from kpi_extractor.document import Table
+    from kpi_extractor.readers.extract import column_duration_problem, column_header
+    from kpi_extractor.documents.document import Table
     table = Table(id="T1", rows=[["", "Q4", "Q3", "Fiscal 2025"], ["PCL ratio", "0.58", "0.55", "0.62"]], context="")
     # Scotiabank's fourth-quarter ratio is no fiscal year's figure, and a year-to-date column is no quarter's.
     assert column_duration_problem(column_header(table, 1, 1), annual=True)
@@ -768,7 +768,7 @@ def test_a_quarter_label_keeps_its_meaning_in_a_column_header():
 
 
 def test_a_level_at_the_period_end_may_come_from_a_year_to_date_column():
-    from kpi_extractor.extract import _stands_at_period_end
+    from kpi_extractor.readers.extract import _stands_at_period_end
     from kpi_extractor.ai import KpiSpec
     assert _stands_at_period_end(KpiSpec(key="b", label="Total Bed Capacity", unit="count"))
     assert not _stands_at_period_end(KpiSpec(key="m", label="Oncology Plan Medical Loss Ratio", unit="percent"))
@@ -777,8 +777,8 @@ def test_a_level_at_the_period_end_may_come_from_a_year_to_date_column():
 
 
 def test_a_sub_row_named_twice_under_two_parents_is_held():
-    from kpi_extractor.extract import _row_named_twice
-    from kpi_extractor.document import Table
+    from kpi_extractor.readers.extract import _row_named_twice
+    from kpi_extractor.documents.document import Table
     rows = [["", "2Q'26"], ["Healthcare Services Mexico", "300"], ["Healthcare Services Colombia", "426"],
             ["- Healthcare Services Colombia", "427"], ["- Holding and eliminations", "(1)"],
             ["Healthcare Services Peru & Oncosalud Peru", "512"], ["- Healthcare Services Peru", "296"],

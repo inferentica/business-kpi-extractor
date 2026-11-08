@@ -7,11 +7,11 @@ import urllib.request
 from dataclasses import replace
 from datetime import date, timedelta
 
-from ..charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_growth_rates,
+from ..readers.charts import (ChartBreakdown, ChartUnits, breakdown_slides, ocr_words, read_breakdowns, read_growth_rates,
                       read_titled_pie, read_units, titled_pie_slides, unit_region)
-from ..fiscal import fiscal_label
-from ..release_statements import release_statements, reported_units
-from ..sec import FilingRef
+from ..domain.fiscal import fiscal_label
+from ..readers.release_statements import release_statements, reported_units
+from ..sources.sec import FilingRef
 from ..xbrl import member_key
 from .shared import AI_GROUP_PREFIX, CHART_METHOD
 

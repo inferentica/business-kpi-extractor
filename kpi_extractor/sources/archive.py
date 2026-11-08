@@ -13,7 +13,7 @@ import threading
 import urllib.request
 from dataclasses import dataclass
 
-from .control import ControlError
+from ..ops.control import ControlError
 
 XBRL_PARTS = ("schema", "label", "presentation", "calculation", "definition", "instance")
 

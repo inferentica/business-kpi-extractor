@@ -3,8 +3,8 @@ SI by its second 10-Q."""
 from datetime import date
 from types import SimpleNamespace
 
-from kpi_extractor.document import Document, Table
-from kpi_extractor.prospectus import Period, interim_quarters, period_columns, prospectus_breakdowns, scale_for
+from kpi_extractor.documents.document import Document, Table
+from kpi_extractor.readers.prospectus import Period, interim_quarters, period_columns, prospectus_breakdowns, scale_for
 
 YEARS = Table("T68", "All of products revenue is attributable to the Connectivity segment. (in millions)", [
     ["", "Year Ended December 31,", "", ""],
@@ -91,8 +91,8 @@ def test_the_prospectus_name_of_a_renamed_line_joins_its_earlier_quarters():
 
 
 def test_a_quarters_reading_gets_the_passages_naming_a_kpi_and_that_quarter():
-    from kpi_extractor.document import TextBlock
-    from kpi_extractor.prospectus import quarter_sections
+    from kpi_extractor.documents.document import TextBlock
+    from kpi_extractor.readers.prospectus import quarter_sections
     blocks = {"B1": TextBlock("B1", "Starlink Subscribers may churn if service quality declines."),
               "B2": TextBlock("B2", "Starlink Subscribers totaled approximately 10.3 million and 5.0 million in the quarters ended March 31, 2026 and March 31, 2025."),
               "B3": TextBlock("B3", "As of March 31, 2026, we had 9,600 satellites in orbit.")}

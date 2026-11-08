@@ -17,7 +17,7 @@ from edgar.sgml import FilingSGML
 from edgar.settings import get_identity
 
 from .archive import exhibits_from_record, exhibits_record, filing_folder
-from .fiscal import nominal_quarter_end_before
+from ..domain.fiscal import nominal_quarter_end_before
 
 PERIODIC_FORMS = ("10-Q", "10-K", "20-F", "40-F")
 _EARNINGS_WINDOW = (timedelta(days=5), timedelta(days=75))

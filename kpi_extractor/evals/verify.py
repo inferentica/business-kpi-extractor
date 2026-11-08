@@ -1,6 +1,6 @@
 """The regression net a change passes before it is pushed, in one command:
 
-    python -m kpi_extractor.verify [--trial eval-results/trial.json] [--remote]
+    python -m kpi_extractor.evals.verify [--trial eval-results/trial.json] [--remote]
 
 1. Every test, by its real exit code.
 2. The rule replay over a trial's accepted figures (no AI): every figure whose value or status the change would alter.

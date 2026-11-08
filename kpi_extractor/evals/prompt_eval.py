@@ -23,14 +23,14 @@ from pathlib import Path
 from threading import Lock
 from types import SimpleNamespace
 
-from . import ai
-from .ai import AiResponseError, Spec
-from .control import ControlPlane
-from .document import Document, clean, parse_document, parse_number
-from .extract import _row_label, describe, explanation_supports, previous_from_jump
-from .sec import company_profile, configure_identity
-from .steps.ai_reading import MAX_DOCUMENT_CHARS, AiReading
-from .steps.shared import _document_text
+from .. import ai
+from ..ai import AiResponseError, Spec
+from ..ops.control import ControlPlane
+from ..documents.document import Document, clean, parse_document, parse_number
+from ..readers.extract import _row_label, describe, explanation_supports, previous_from_jump
+from ..sources.sec import company_profile, configure_identity
+from ..steps.ai_reading import MAX_DOCUMENT_CHARS, AiReading
+from ..steps.shared import _document_text
 
 CASES = Path("evals/prompts.json")
 _FETCH = Lock()

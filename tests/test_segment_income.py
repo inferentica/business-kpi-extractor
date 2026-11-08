@@ -3,7 +3,7 @@ from datetime import date
 
 import pandas as pd
 
-from kpi_extractor.segment_income import line_key, segment_income
+from kpi_extractor.readers.segment_income import line_key, segment_income
 
 SEG, CONS = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_ConsolidationItemsAxis"
 
@@ -83,7 +83,7 @@ def test_a_reconciling_item_on_the_segments_axis_keeps_its_name():
 def test_a_companys_own_segment_measures_stand_in_for_operating_income():
     # Brookfield Asset Management tags no operating income by segment; its "Segment Earnings" (fee-related earnings)
     # and "Segment Revenue" are its own measures, beside its GAAP revenue by segment.
-    from kpi_extractor.segment_income import segment_revenue
+    from kpi_extractor.readers.segment_income import segment_revenue
     start, end = "2026-04-01", "2026-06-30"
     members = ("bam:CreditSegmentMember", "bam:InfrastructureMember", "bam:RealEstateSegmentMember",
                "bam:EnergySegmentMember", "bam:PrivateEquityMember")
