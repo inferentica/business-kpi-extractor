@@ -39,6 +39,10 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
     missing = []
     for filing in filings:
         if not filing.get("fiscal_period"):
+            # A filing nothing could be read from has no period of its own to name, yet its three statements are
+            # missing all the same: counted as such, not left out of the coverage.
+            expected += 3
+            missing.append(f"{filing['form']} {filing['filed']} unread")
             continue
         for statement, duration in expected_own(filing["form"], filing["fiscal_period"]):
             expected += 1

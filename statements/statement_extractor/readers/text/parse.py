@@ -95,6 +95,10 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
     left = [chunk for chunk in chunks if chunk.end < columns[0] - 12]
     over = [chunk for chunk in chunks if chunk not in left]
     cells = [Cell(0, 1, " ".join(chunk.text for chunk in left))] if left else []
+    if len(over) == len(columns):
+        # One word over each column, in order: Apple's FY1997 "1997" sits four characters off its column and "1996"
+        # three, which nearest-word would give both columns to 1996.
+        return cells + [Cell(column, 1, chunk.text) for column, chunk in zip(columns, over)]
     owners: dict[int, list[int]] = {}
     for column in columns:
         def distance(chunk: _Chunk) -> int:
