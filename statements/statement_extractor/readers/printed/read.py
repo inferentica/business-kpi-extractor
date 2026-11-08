@@ -21,7 +21,7 @@ from ...domain.model import Reading
 from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
 from .dates import column_periods, statement_scale
-from .find import find_statements, unlabelled_totals
+from .find import TITLES, find_statements, unlabelled_totals
 from .tables import Table, figure_columns
 
 
@@ -104,6 +104,8 @@ def _read_column(kind, layout, period, scale, labelled) -> Reading | None:
                 heading = row.label
             if not row.label and not row.figures:
                 continue
+            if not row.figures and any(pattern.search(row.label) for _, pattern in TITLES):
+                continue  # the statement's title printed as a row of its own table (PepsiCo), not a line of it
             value = _figure(row, column, columns) if row.figures else None
             if row.figures and value is None:
                 continue

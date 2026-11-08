@@ -102,3 +102,16 @@ def test_cash_of_continuing_operations_rolls_forward():
     assert cash_check(kroger).result == "pass"
     del kroger.figures["us-gaap_NetCashProvidedByUsedInContinuingOperations"]
     assert cash_check(kroger).result == "pass"
+
+
+def test_a_sum_declared_twice_under_the_wrong_line_is_not_tested():
+    # Stock Yards 2026 Q2: the investing lines are declared under investing and, wrongly, under net change in deposits.
+    lines = {"us-gaap_PaymentsForProceedsFromLoansAndLeases": figure(-200e6),
+             "us-gaap_PaymentsToAcquirePropertyPlantAndEquipment": figure(-5e6)}
+    column = Column({**lines, "us-gaap_NetCashProvidedByUsedInInvestingActivities": figure(-205e6),
+                     "us-gaap_IncreaseDecreaseInDeposits": figure(-70e6)})
+    arcs = {"us-gaap_NetCashProvidedByUsedInInvestingActivities": [(concept, 1.0) for concept in lines],
+            "us-gaap_IncreaseDecreaseInDeposits": [(concept, 1.0) for concept in lines]}
+    assert calc_check(column, arcs).result == "pass"
+    column.figures["us-gaap_NetCashProvidedByUsedInInvestingActivities"] = figure(-300e6)  # neither adds up: a real failure
+    assert calc_check(column, arcs).result == "fail"

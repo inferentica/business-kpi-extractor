@@ -123,12 +123,32 @@ def calc_check(column: Column, arcs: dict[str, list[tuple[str, float]]]) -> Chec
         if _completed(column, arcs, parent, children, total.value - computed):
             completed += 1
             continue
+        if _declared_twice(column, arcs, parent, children):
+            verified -= 1
+            continue
         failures.append(f"{parent.split('_', 1)[-1]} {total.value:,.0f} vs lines {computed:,.0f}")
     if failures:
         return Check("calc", FAIL, "; ".join(failures[:3]) + (f" (+{len(failures) - 3})" if len(failures) > 3 else ""))
     if verified == 0:
         return Check("calc", NONE, "no subtotal to test")
     return Check("calc", PASS, f"{verified} subtotals" + (f", {completed} as printed" if completed else ""))
+
+
+def _declared_twice(column: Column, arcs: dict[str, list[tuple[str, float]]], parent: str,
+                    children: list[tuple[str, float]]) -> bool:
+    """Whether a failing sum's lines all belong to another declared total that adds up: the filer listed them under the
+    wrong line as well (Stock Yards' 2026 Q2 calculation file puts nine investing lines under net change in deposits,
+    as well as under net cash used in investing activities). Such a sum is not one the statement prints."""
+    mine = {child for child, _ in children}
+    for other, lines in arcs.items():
+        if other == parent or other not in column.figures or not mine <= {child for child, _ in lines}:
+            continue
+        present = [(column.figures[child], weight) for child, weight in lines if child in column.figures]
+        computed = sum(figure.value * weight for figure, weight in present)
+        if _agree(column.figures[other].value, computed, column.figures[other], *(figure for figure, _ in present)) \
+                or _completed(column, arcs, other, lines, column.figures[other].value - computed):
+            return True
+    return False
 
 
 def _completed(column: Column, arcs: dict[str, list[tuple[str, float]]], parent: str,

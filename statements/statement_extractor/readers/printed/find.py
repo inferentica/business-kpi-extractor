@@ -10,10 +10,11 @@ from .tables import Table, figure_columns
 
 
 TITLES = (
-    ("income", re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?(operations|income|earnings)(\s+and\s+comprehensive\s+income)?|income\s+statements?|"
+    ("income", re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?(operations|income|earnings)(\s+and\s+comprehensive\s+income)?|(?<!comprehensive )income\s+statements?|"
                           r"statements?\s+of\s+(consolidated\s+)?profit\s+or\s+loss(\s+and\s+(other\s+)?comprehensive\s+income)?)\b", re.I)),
     ("balance", re.compile(r"\b(consolidated\s+)?(balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?financial\s+(position|condition))\b", re.I)),
-    ("cash_flow", re.compile(r"\b(consolidated\s+)?statements?\s+of\s+(consolidated\s+)?cash\s+flows?\b", re.I)),
+    # Morgan Stanley: "Consolidated Cash Flow Statements".
+    ("cash_flow", re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?cash\s+flows?|cash\s+flows?\s+statements?)\b", re.I)),
 )
 
 
@@ -25,7 +26,8 @@ _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|conso
 
 # Statements of the set that are none of the three: a table under one of these titles never continues another.
 _OTHER_STATEMENT = re.compile(r"statements?\s+of\s+(changes\s+in\s+)?(consolidated\s+)?((share|stock)(holders|owners)['’]?|"
-                              r"shareowners['’]?)\s+equity|changes\s+in\s+equity|statements?\s+of\s+comprehensive\s+income", re.I)
+                              r"shareowners['’]?)\s+equity|changes\s+in\s+equity|statements?\s+of\s+comprehensive\s+income|"
+                              r"comprehensive\s+income\s+statements?", re.I)
 
 
 def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
@@ -33,6 +35,8 @@ def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
     found: list[tuple[str, list[Table]]] = []
     for position, table in enumerate(all_tables):
         title_text = table.context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in table.header[:2])
+        # A title printed as the table's own first rows, above its figures (PepsiCo's 2013 balance sheet).
+        title_text += " " + " ".join(row.label for row in _leading(table))
         kind = next((name for name, pattern in TITLES if _titled(pattern, title_text)), None)
         if kind is None or _NOT_STATEMENT.search(title_text[-260:]) or len([r for r in table.rows if r.figures]) < 4:
             continue
@@ -57,6 +61,15 @@ def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
                                                                    for label in labels_in_context(group)) >= 3):
             found.append((kind, group))
     return found
+
+
+def _leading(table: Table) -> list:
+    leading = []
+    for row in table.rows:
+        if row.figures:
+            break
+        leading.append(row)
+    return leading[:4]
 
 
 # Words that put a statement's name inside a sentence ("as reported on the Consolidated Statement of Income").
