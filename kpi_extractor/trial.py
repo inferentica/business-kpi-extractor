@@ -18,6 +18,7 @@ from collections import Counter
 from pathlib import Path
 
 from .ai import MISSING_REASONS
+from .audit_check import check_sample, render
 from .cli import company_pool, normalize_symbols, run_symbol
 from .control import ControlPlane
 from .evaluate import EvalControl
@@ -208,6 +209,16 @@ def main(argv: list[str] | None = None) -> int:
                                                 "lists": {s: o[3] for s, o in zip(symbols, outcomes)},
                                                 "filings": {s: o[2] for s, o in zip(symbols, outcomes)}}, default=str, indent=1))
     (out / "audit_sample.json").write_text(json.dumps(sample, default=str, indent=1))
+    # The checker reads each sampled figure back from its filing, with no AI: its flags are where an audit starts.
+    try:
+        checked = check_sample(sample, {s: o[1] for s, o in zip(symbols, outcomes)})
+        flagged = sum(1 for result in checked if result.flags)
+        (out / "audit_flags.json").write_text(json.dumps([{**result.figure, "flags": result.flags, "detail": result.detail}
+                                                          for result in checked if result.flags], default=str, indent=1))
+        (out / "audit_check.txt").write_text(render(checked) + "\n")
+        print(f"Checker: flagged {flagged} of {len(checked)} sampled figures (eval-results/audit_flags.json)", flush=True)
+    except Exception as error:  # noqa: BLE001 - the checker is a help to the audit, never a reason for the trial to fail
+        print(f"Checker did not run: {type(error).__name__}: {error}", flush=True)
     (out / "patterns.json").write_text(json.dumps(reading_patterns({s: o[1] for s, o in zip(symbols, outcomes)}),
                                                   default=str, indent=1))
     return 0

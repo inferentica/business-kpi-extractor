@@ -36,6 +36,11 @@ on:
         required: true
         default: evals/golden.json
         type: string
+      offpeak:
+        description: Wait for DeepSeek's off-peak hours (half price) before reading
+        required: false
+        default: true
+        type: boolean
       lists:
         description: KPI lists - stored (production's, cheaper and stable) or fresh (written anew, as for a new company)
         required: true
@@ -74,6 +79,9 @@ jobs:
           enable-cache: true
           cache-dependency-glob: pyproject.toml
       - run: uv pip install .
+      - name: Wait for DeepSeek off-peak prices
+        if: inputs.offpeak != false
+        run: python -m kpi_extractor.offpeak
       - name: Score each prompt
         if: inputs.suite == 'prompts'
         env:
