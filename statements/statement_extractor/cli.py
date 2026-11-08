@@ -78,7 +78,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     with (out / "readings.jsonl").open("w") as handle:
         for reading in readings:
-            handle.write(json.dumps(reading.to_json(with_lines=False), default=str) + "\n")
+            handle.write(json.dumps(reading.to_json(), default=str) + "\n")
     (out / "chosen.json").write_text(json.dumps(chosen, default=str))
     (out / "filings.json").write_text(json.dumps(filings, default=str, indent=1))
     (out / "summary.json").write_text(json.dumps(summary, default=str, indent=1))
