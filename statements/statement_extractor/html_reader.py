@@ -29,7 +29,7 @@ _TITLES = (
 # Tables that carry a statement's name but are not the company's own statement.
 _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
                             r"guarantor|pro\s+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
-                            r"statements?\s+of\s+\w+\s+data|percentage\s+of", re.I)
+                            r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis", re.I)
 _SCALE = re.compile(r"\b(?:in|amounts in|dollars in|expressed in)\s+(?:[A-Z]{2,3}\$?\s+|US\$\s*|NT\$\s*|€\s*|euros?\s+)?"
                     r"(thousands|millions|billions)\b", re.I)
 _SCALES = {"thousands": 1e3, "millions": 1e6, "billions": 1e9}
@@ -70,8 +70,9 @@ _CLOSING = re.compile(r"\bcash\b.*\bend\b", re.I)
 _CHANGE = re.compile(r"(increase|decrease|change).*\bcash\b|\bcash\b.*(increase|decrease)|^total\s+cash\s+(generated|provided|used)", re.I)
 _EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translation", re.I)
 _SECTIONS = re.compile(r"(operating|investing|financing)\s+activities$", re.I)
-_PRETAX = re.compile(r"before\s+(provision\s+for\s+|\(?provision\)?\s+|benefit\s+|)?income\s+tax", re.I)
-_NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$", re.I)
+_PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax", re.I)
+_NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
+                         r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit\s+for\s+the\s+(year|period)$", re.I)
 _TOTAL = re.compile(r"^total\b", re.I)
 
 
@@ -95,7 +96,8 @@ def find_statements(html: str | bytes) -> list[tuple[str, list[Table]]]:
             if other is not None and other != kind and "continued" not in later_title.lower():
                 break
             group.append(later)
-        if _complete(kind, group):
+        if _complete(kind, group) or (kind == "cash_flow" and sum(bool(_SECTIONS.search(row.label)) for table in group
+                                                                   for row in table.rows) >= 3):
             found.append((kind, group))
     return found
 
@@ -111,7 +113,7 @@ def _complete(kind: str, group: list[Table]) -> bool:
         return any(_ASSETS.match(label) for label in labels) and any(
             _LIABILITIES_AND_EQUITY.match(label) or _EQUITY.match(label) for label in labels)
     if kind == "cash_flow":
-        return any(_CLOSING.search(label) for label in labels) or sum(bool(_SECTIONS.search(label)) for label in labels) >= 3
+        return any(_CLOSING.search(label) for label in labels)
     return any(_NET_INCOME.match(label) or _PRETAX.search(label) for label in labels)
 
 
@@ -357,19 +359,24 @@ def _income_check(figures) -> Check:
     between = figures[pretax[0] + 1:net[0]]
     starts = _subtotals(between)
     covered = {position for end, start in starts.items() for position in range(start, end)}
-    reachable = {pretax[1]}
-    for index, (_label, _level, value) in enumerate(between):
-        if index in covered:
-            continue  # a line a later subtotal sums
-        if any(_close(value, running, len(between) + 1) for running in reachable):
-            reachable = {value}  # a running subtotal (income from continuing operations)
+    # Lines a later subtotal sums are read through that subtotal, or each on its own: a running subtotal (income from
+    # continuing operations) can also equal the two lines above it, and must then restart the chain instead.
+    for skip in (covered, set()):
+        if _chain(pretax[1], net[1], [value for index, (_l, _v, value) in enumerate(between) if index not in skip]):
+            return Check("calc", PASS, "net income from income before taxes")
+    return Check("calc", FAIL, f"income before taxes {pretax[1]:,.1f} does not lead to net income {net[1]:,.1f}")
+
+
+def _chain(start: float, end: float, values: list[float]) -> bool:
+    reachable = {start}
+    for value in values:
+        if any(_close(value, running, len(values) + 1) for running in reachable):
+            reachable = {value}  # a running subtotal
             continue
         reachable = {running + sign * value for running in reachable for sign in (1, -1)}
         if len(reachable) > 512:
-            break
-    if any(_close(running, net[1], len(between) + 2) for running in reachable):
-        return Check("calc", PASS, "net income from income before taxes")
-    return Check("calc", FAIL, f"income before taxes {pretax[1]:,.1f} does not lead to net income {net[1]:,.1f}")
+            return False
+    return any(_close(running, end, len(values) + 2) for running in reachable)
 
 
 def _subtotals(printed) -> dict[int, int]:
