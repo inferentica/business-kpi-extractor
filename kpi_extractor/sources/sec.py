@@ -1,4 +1,5 @@
-"""SEC EDGAR access through edgartools: the company, the filings worth reading, and their documents."""
+"""SEC EDGAR through edgartools, behind the source adapter (base.FilingSource): the company, the filings worth reading,
+their documents and their XBRL. `SEC` is the adapter the pipeline uses; the functions below are its parts."""
 from __future__ import annotations
 
 import os
@@ -6,7 +7,6 @@ import html
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import httpx
@@ -16,7 +16,8 @@ from edgar.httprequests import is_unreachable
 from edgar.sgml import FilingSGML
 from edgar.settings import get_identity
 
-from .archive import exhibits_from_record, exhibits_record, filing_folder
+from .archive import exhibits_from_record, exhibits_record, filing_folder, xbrl_from_parts, xbrl_parts
+from .base import CompanyProfile, FilingRef, SourceCompany
 from ..domain.fiscal import nominal_quarter_end_before
 
 PERIODIC_FORMS = ("10-Q", "10-K", "20-F", "40-F")
@@ -36,30 +37,6 @@ _SUBMISSION_TIMEOUT = 120
 
 def configure_identity() -> None:
     set_identity(os.environ.get("SEC_USER_AGENT", "TradeTracker admin@inferentica.com"))
-
-
-@dataclass
-class CompanyProfile:
-    symbol: str
-    cik: int
-    name: str
-    fiscal_year_end: str
-    foreign: bool
-    sic: int | None = None
-
-
-@dataclass
-class FilingRef:
-    accession: str
-    form: str
-    filed: date
-    role: str  # periodic_report | earnings_release
-    source_url: str
-    period_end: date | None = None
-    exhibits: list = field(default_factory=list, repr=False)
-    filing: object = field(default=None, repr=False)
-    # An 8-K Item 2.02 is an earnings release by definition; anything else is classified by the AI first.
-    confirmed: bool = True
 
 
 def _temporary(error: Exception) -> bool:
@@ -377,3 +354,67 @@ def ipo_prospectus(company: Company, first_report: date | None, today: date | No
         return None
     return FilingRef(accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="earnings_release",
                      source_url=document.url, exhibits=[document], filing=filing)
+
+
+_NO_XBRL = {"version": 1, "parts": {}}
+
+
+class SecSource:
+    """SEC EDGAR as a FilingSource."""
+
+    name = "sec"
+    url_prefixes = ("https://www.sec.gov/",)
+
+    def open_company(self, symbol: str) -> SourceCompany:
+        profile, company = company_profile(symbol)
+        return SourceCompany(profile, company)
+
+    def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None) -> list[FilingRef]:
+        return periodic_reports(company.handle, since, known_urls)
+
+    def earnings_releases(self, company: SourceCompany, since: date, archive=None, passed: list[FilingRef] | None = None,
+                          known_urls: dict[str, str] | None = None) -> list[FilingRef]:
+        return earnings_releases(company.handle, company.profile, since, archive, passed, known_urls)
+
+    def prospectus(self, company: SourceCompany, first_report: date | None) -> FilingRef | None:
+        return ipo_prospectus(company.handle, first_report)
+
+    def report_html(self, ref: FilingRef) -> str:
+        load_submission(ref.filing)
+        return ref.filing.html()
+
+    def exhibit_html(self, exhibit) -> str | None:
+        return exhibit_html(exhibit)
+
+    def is_own_document(self, exhibit) -> bool:
+        return is_own_document(exhibit)
+
+    def classification_excerpt(self, ref: FilingRef) -> str:
+        return classification_excerpt(ref)
+
+    def archive_tagged_facts(self, ref: FilingRef, archive) -> None:
+        # A filing without an XBRL instance is marked, so it is not downloaded again on every run.
+        load_submission(ref.filing)
+        archive.write_json(filing_folder(ref.filed, ref.form, ref.accession), "xbrl.json", xbrl_parts(ref.filing) or _NO_XBRL)
+
+    def tagged_facts(self, ref: FilingRef, archive=None):
+        """A filing's XBRL from the archive, else from EDGAR and then archived."""
+        if archive is None:
+            load_submission(ref.filing)
+            return ref.filing.xbrl()
+        folder = filing_folder(ref.filed, ref.form, ref.accession)
+        stored = archive.read_json(folder, "xbrl.json")
+        if stored and stored.get("parts"):
+            return xbrl_from_parts(stored)
+        load_submission(ref.filing)
+        if stored is not None:
+            return ref.filing.xbrl()  # marked as having no instance to archive: EDGAR's own reading, as before
+        parts = xbrl_parts(ref.filing)
+        if parts is None:
+            archive.write_json(folder, "xbrl.json", _NO_XBRL)
+            return ref.filing.xbrl()
+        archive.write_json(folder, "xbrl.json", parts)
+        return xbrl_from_parts(parts)
+
+
+SEC = SecSource()

@@ -63,6 +63,8 @@ on:
       - kpi_extractor/ai/**
       - kpi_extractor/rules/**
       - kpi_extractor/readers/extract.py
+      # Where filings come from: listing, downloads and XBRL, behind the source adapter.
+      - kpi_extractor/sources/**
 
 permissions:
   contents: read

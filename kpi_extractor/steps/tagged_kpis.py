@@ -9,7 +9,7 @@ from .. import ai
 from ..ai import AiResponseError, Spec
 from ..ops.control import ControlError
 from ..domain.fiscal import fiscal_label
-from ..sources.sec import FilingRef
+from ..sources.base import FilingRef
 from ..readers.tagged_metrics import (agrees, refines, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits,
                               year_ago_facts)
 from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _UNANCHORED, _is_jump, _rounding, value_key

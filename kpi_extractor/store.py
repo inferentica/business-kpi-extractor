@@ -7,7 +7,8 @@ from datetime import date
 from types import MappingProxyType
 
 from .ai import KpiSpec
-from .sources.sec import FilingRef
+from .sources import accepts_url
+from .sources.base import FilingRef
 from .steps.shared import AI_GROUP_PREFIX, CHART_METHOD, value_key
 
 # The most attempts the store accepts for a filing: a count past it would fail the company's whole store.
@@ -16,9 +17,9 @@ _STORED_ATTEMPTS = 100
 _BATCH = 400
 
 
-def _sec_source(value) -> bool:
-    url = value.get("source_url")
-    return url is None or str(url).startswith("https://www.sec.gov/")
+def _source_document(value) -> bool:
+    """A value points to one of its source's own documents (SEC EDGAR's today), or to none."""
+    return accepts_url(value.get("source_url"))
 
 
 def _keeps_verified(existing, incoming) -> bool:
@@ -171,8 +172,8 @@ class CompanyStore:
         # A figure from outside SEC filings (Unity's segment spreadsheet on its investor site) was entered by the owner:
         # the extractor never rewrites it, and the control plane takes only SEC sources, so carrying one in a write
         # failed the whole run. A figure worked out from one keeps it out of its source.
-        values = [value if _sec_source(value) else {**value, "source_url": None}
-                  for value in values if _sec_source(value) or value.get("method") == "derived"]
+        values = [value if _source_document(value) else {**value, "source_url": None}
+                  for value in values if _source_document(value) or value.get("method") == "derived"]
         outside = [value for value in values if not self._in_window(value)]
         if outside:
             self.log(f"{self.symbol}: {len(outside)} readings outside their KPI's reported periods not kept")

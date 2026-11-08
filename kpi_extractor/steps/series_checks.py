@@ -12,7 +12,7 @@ from ..domain.derive import derive_periods
 from ..documents.document import Document, parse_number
 from ..quality.checks import count_jump, parts_add_up, reported_matches
 from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
-from ..sources.sec import FilingRef
+from ..sources.base import FilingRef
 from .shared import (AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
                      _year_ago_cells, list_parents, value_key)
 

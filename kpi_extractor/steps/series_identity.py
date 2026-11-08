@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from itertools import permutations
 
 from ..domain.derive import balancing
-from ..sources.sec import FilingRef
+from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _QUARTER_HEADER, _annual_header, _days, _is_jump, _same,
                      _year_ago_cells)

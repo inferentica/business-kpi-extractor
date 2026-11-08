@@ -20,7 +20,8 @@ from datetime import date, timedelta
 from .sources.archive import Archive
 from .ops.control import ControlError
 from .documents.document import Document
-from .sources.sec import FilingRef, company_profile, earnings_releases, periodic_reports
+from .sources import source as filing_source
+from .sources.base import FilingRef, FilingSource
 from .steps.shared import RecordBuilding, _folder, list_parents, only_adds
 from .steps.loading import FilingLoading
 from .steps.reports import ReportReading
@@ -76,8 +77,10 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
     hand back what they want written."""
 
     def __init__(self, control, symbol: str, quarters: int, force: bool, today: date | None = None, log=print,
-                 wait_for_lock: bool = False, report_quarters: int | None = None):
+                 wait_for_lock: bool = False, report_quarters: int | None = None, source: FilingSource | None = None):
         self.control = control
+        # Where the company's filings come from (SEC EDGAR); every listing, download and XBRL read goes through it.
+        self.source = source or filing_source()
         self.symbol = symbol
         self.force = force
         self.quarters = quarters
@@ -153,12 +156,13 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self._statement_owners = {
             (row["statement"], row["fiscal_year"], row["fiscal_period"], row["duration"]): row
             for row in state.get("statements") or []}
-        self.profile, company = company_profile(self.symbol)
+        company = self.source.open_company(self.symbol)
+        self.profile = company.profile
         self.archive = Archive(self.control, self.symbol, self.profile.cik, self.log)
         self.archive._listing()  # once, before the download threads start
         self.archive.label(self.symbol, self.profile.name)
         known_urls = {filing["accession"]: filing["source_url"] for filing in self.filings.values() if filing.get("source_url")}
-        reports = sorted(periodic_reports(company, self.reports_since, known_urls), key=lambda ref: ref.filed)
+        reports = sorted(self.source.periodic_reports(company, self.reports_since, known_urls), key=lambda ref: ref.filed)
         pending = [ref for ref in reports if self.force or self._pending(ref)]
         for ref in reversed(reports):
             if ref not in pending and not self.archive.has(_folder(ref), "xbrl.json"):
@@ -170,7 +174,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self._read_ahead(ref)
         # The earnings releases are listed while the reports are read: the listing waits only on SEC and the archive.
         passed: list[FilingRef] = []
-        listing = self._prefetch.submit(earnings_releases, company, self.profile, self.since, self.archive, passed, known_urls)
+        listing = self._prefetch.submit(self.source.earnings_releases, company, self.since, self.archive, passed, known_urls)
         self.offset = self._year_offset(reports)
         for ref in reports:
             later = [other for other in pending if other.filed > ref.filed or (other.filed == ref.filed and other is not ref)]

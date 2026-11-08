@@ -9,7 +9,7 @@ from ..sources.archive import filing_folder
 from ..quality.checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
 from ..documents.document import Document, clean, parse_number
 from ..readers.extract import column_header
-from ..sources.sec import FilingRef
+from ..sources.base import FilingRef
 
 AI_GROUP_PREFIX = "kpi_"
 # Values read from a slide's chart: their own method, so a re-read of the release's text never withdraws them.

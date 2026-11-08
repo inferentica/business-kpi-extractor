@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..domain.fiscal import fiscal_label
 from ..readers.release_statements import release_headline, release_statements
-from ..sources.sec import FilingRef
+from ..sources.base import FilingRef
 from ..readers.statements import statement_lines
 
 class StatementReading:

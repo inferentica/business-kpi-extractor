@@ -9,7 +9,7 @@ from ..domain.sectors import sector_hint, sector_of
 from ..ai import AiResponseError, Spec
 from ..ops.control import ControlError
 from ..readers.extract import _listed_kpi
-from ..sources.sec import FilingRef, classification_excerpt, is_own_document
+from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
@@ -134,12 +134,12 @@ class KpiListUpkeep:
         if ref.confirmed:
             return True
         previous = self.filings.get(ref.accession)
-        own = any(is_own_document(exhibit) for exhibit in ref.exhibits)
+        own = any(self.source.is_own_document(exhibit) for exhibit in ref.exhibits)
         if previous and not (own and _NOT_EARNINGS in (previous.get("notes") or [])
                              and _CLASSIFIED_PAST_COVER not in (previous.get("notes") or [])):
             return _NOT_EARNINGS not in (previous.get("notes") or [])
         try:
-            answer = self._ask(ai.prompt(self.company, classification_excerpt(ref), ai.CLASSIFY_TASK),
+            answer = self._ask(ai.prompt(self.company, self.source.classification_excerpt(ref), ai.CLASSIFY_TASK),
                                "classify", ai.Classification, thinking_first=False, model="flash")
         except (AiResponseError, ControlError):
             return False  # nothing is recorded, so the next run classifies it again

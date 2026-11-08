@@ -9,7 +9,7 @@ from ..domain.fiscal import fiscal_label
 from ..readers.release_breakdowns import release_breakdown
 from ..readers.release_columns import amount, earlier_quarters, quarter_table_rows, release_grids, row_key, row_numbers
 from ..readers.release_statements import release_headline, release_statements
-from ..sources.sec import FilingRef
+from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from .shared import CHART_METHOD
 

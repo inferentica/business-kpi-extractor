@@ -8,7 +8,7 @@ from ..ai import Spec
 from ..domain.fiscal import fiscal_label
 from ..readers.prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
 from ..readers.release_breakdowns import line_key
-from ..sources.sec import FilingRef, ipo_prospectus
+from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from ..store import FilingReading
 from .shared import AI_GROUP_PREFIX, _DONE
@@ -21,7 +21,7 @@ class ListingHistory:
 
     def _prospectus(self, company, reports: list[FilingRef]) -> FilingRef | None:
         try:
-            return ipo_prospectus(company, min((ref.filed for ref in reports), default=None))
+            return self.source.prospectus(company, min((ref.filed for ref in reports), default=None))
         except Exception as error:  # noqa: BLE001 - the history is extra; the company is read without it
             self.log(f"{self.symbol}: prospectus not found ({type(error).__name__}: {error})"[:300])
             return None
