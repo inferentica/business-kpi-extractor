@@ -23,8 +23,10 @@ from .audit_check import Fetcher
 from .extract import SCALE_NOT_STATED, read_values
 from .steps.shared import AI_GROUP_PREFIX
 
-# Kinds the replay can read again one figure at a time; a reading of a whole breakdown table is replayed row by row.
-_KINDS = {"metric": "metric", "revenue_breakdown": "metric", "mix": "metric"}
+# Each figure is read again under its own group's kind: rules that apply to metrics only (a place the table never
+# names) must not show up in the replay of a breakdown's row, nor be missed for a metric. A whole breakdown table's
+# reading is replayed row by row.
+_KINDS = {"metric": "metric", "revenue_breakdown": "revenue_breakdown", "mix": "mix"}
 
 
 @dataclass

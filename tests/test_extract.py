@@ -788,3 +788,17 @@ def test_a_sub_row_named_twice_under_two_parents_is_held():
     assert _row_named_twice(table, 8, 1)  # Auna's Peru eliminations are not the group's
     assert _row_named_twice(table, 1, 1) is None  # a segment named again in the EBITDA section is not a twin
     assert _row_named_twice(table, 6, 1) is None
+
+
+def test_a_reading_taken_for_the_year_keeps_only_the_year_and_its_end_levels():
+    from types import SimpleNamespace
+    from kpi_extractor.ai import KpiSpec
+    from kpi_extractor.steps.release_flow import _year_columns_only
+    item = lambda label, unit, header: SimpleNamespace(kpi=KpiSpec(key=label[:3].lower(), label=label, unit=unit),
+                                                     group=SimpleNamespace(key="ops"), locator={"header": header})
+    ratio = item("Provision for Credit Losses Ratio", "percent", "<fourth quarter>")
+    deposits = item("Deposits", "currency", "<fourth quarter>")
+    third = item("Deposits", "currency", "<third quarter>")
+    year = item("Productivity Ratio", "percent", "for the year ended @ #")
+    kept, dropped = _year_columns_only([ratio, deposits, third, year])
+    assert kept == [deposits, year] and len(dropped) == 2

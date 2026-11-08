@@ -8,7 +8,8 @@ from .. import ai
 from ..ai import Spec
 from ..document import Document, clean
 from ..checks import check_period, date_order_findings, validate_groups
-from ..extract import ReadValue, explanation_supports, falls, forward_looking, net_gross_mismatch, previous_from_jump
+from ..extract import (_FOURTH_QUARTER, ReadValue, _stands_at_period_end, column_duration_problem, explanation_supports, falls,
+                       forward_looking, net_gross_mismatch, previous_from_jump)
 from ..fiscal import fiscal_label
 from ..sec import FilingRef
 from ..xbrl import member_key
@@ -37,6 +38,20 @@ _RELEASE_READER_PREFIX = "release reader "
 RELEASE_READERS = 4
 # A group read this many quarters without one verified period is not read again (see _readable).
 DEAD_GROUP_QUARTERS = 8
+
+def _year_columns_only(read: list[ReadValue]) -> tuple[list[ReadValue], list[str]]:
+    """A reading the period gate passed as a quarter's, once its document is taken for the year: a figure from a column
+    headed as a quarter is not the year's (Scotiabank's annual report gave its fourth-quarter PCL ratio, 0.58%, for the
+    year's 0.62%), unless it is a level at the year's end read from the fourth quarter's column."""
+    kept, dropped = [], []
+    for item in read:
+        mismatch = column_duration_problem(str(item.locator.get("header") or ""), annual=True)
+        if mismatch and not (_stands_at_period_end(item.kpi) and _FOURTH_QUARTER.search(mismatch)):
+            dropped.append(f"{item.group.key}.{item.kpi.key}: {mismatch}")
+        else:
+            kept.append(item)
+    return kept, dropped
+
 
 def _annual_columns(read: list[ReadValue]) -> bool:
     """Whether the breakdown was read from a column its header calls a year ("Twelve Months Ended", "Year Ended")."""
@@ -155,6 +170,8 @@ class ReleaseFlow:
                 # An annual report: its values are the full year, and Q4 is derived from them.
                 fiscal_year, fiscal_period = fiscal_label(period_end, self.profile.fiscal_year_end, annual=True,
                                                           year_offset=self.offset)
+                read, dropped = _year_columns_only(read)
+                problems.extend(dropped)
             validate_groups(read, self._previous(period_end, annual=located.annual))
             self._flag_scale_outliers(read, period_end, annual=located.annual)
             self._mark_year_ago_agreement(read, document, period_end, annual=located.annual)

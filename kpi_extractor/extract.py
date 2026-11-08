@@ -83,6 +83,8 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             if locator.table is not None and locator.table in document.tables and group.kind == "metric":
                 if unnamed := _place_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
                     notes.append(f"{PLACE_NOT_NAMED}: {unnamed}")
+            # Any group's row: Auna's eliminations are a line of its revenue by segment.
+            if locator.table is not None and locator.table in document.tables:
                 if twin := _row_named_twice(document.tables[locator.table], locator.row, locator.col):
                     notes.append(f"{ROW_NAMED_TWICE}: {twin}")
         except LocateError as error:
