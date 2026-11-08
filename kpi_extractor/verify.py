@@ -36,7 +36,7 @@ def run_replay(trial: str, cache: str | None) -> int:
     print(f"== Rule replay over {trial}", flush=True)
     results = replay(json.load(open(trial))["values"], CachedFetcher(cache))
     print(report(results), flush=True)
-    return sum(1 for result in results if result.change != "same")
+    return sum(1 for result in results if result.change not in ("same", "unreplayable"))
 
 
 def _dispatch(fields: list[str]) -> str:

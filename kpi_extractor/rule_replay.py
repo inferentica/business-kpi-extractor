@@ -38,8 +38,12 @@ class Replayed:
     after_status: str | None
     why: str = ""
 
+    unreplayable: bool = False
+
     @property
     def change(self) -> str:
+        if self.unreplayable:
+            return "unreplayable"
         if self.after is None:
             return "rejected"
         if abs(self.after - self.before) > max(abs(self.before) * 1e-9, 1e-9):
@@ -119,10 +123,20 @@ def replay_value(value: dict, fetcher: Fetcher) -> Replayed | None:
         return before
     if not items:
         before.why = "; ".join(problems)[:200] or "no figure"
+        # A quote from a slide's text or another exhibit of the filing is not in the one exhibit the replay opens.
+        before.unreplayable = "quote not found in the document" in before.why
         return before
     item = items[0]
     before.after, before.after_status = float(item.value), item.status
     before.why = "; ".join(item.notes)[:200]
+    # A scale the reading quoted beside its table (PNC's "$ in billions") won over the caption; readings stored before
+    # 2026-11-08 do not keep that quote, so the caption wins in the replay. Not a change the code made.
+    declared = re.search(r"table declares scale ([\d.e+]+), AI said ([\d.e+]+)", before.why)
+    if declared and not locator.get("scale_text") and before.after:
+        ratio = before.before / before.after
+        if abs(ratio - float(declared.group(2)) / float(declared.group(1))) <= 1e-6 * abs(ratio):
+            before.unreplayable = True
+            before.why = "the reading's scale quote is not stored with the figure"
     # A scale the reading quoted is not kept with stored figures before 2026-11-08: such a figure comes back held for an
     # unstated scale only because the quote is missing, not because a rule changed.
     if before.change == "held" and SCALE_NOT_STATED in item.notes and not locator.get("scale_text"):
@@ -149,9 +163,10 @@ def replay(values_by_symbol: dict[str, list[dict]], fetcher: Fetcher, symbols: s
 def report(results: list[Replayed]) -> str:
     counts = Counter(result.change for result in results)
     lines = [f"Rule replay: {len(results)} figures read again — {counts['same']} unchanged, {counts['value']} value changed, "
-             f"{counts['rejected']} now rejected, {counts['held']} now held, {counts['accepted']} now accepted"]
+             f"{counts['rejected']} now rejected, {counts['held']} now held, {counts['accepted']} now accepted; "
+             f"{counts['unreplayable']} could not be replayed (quote outside the exhibit, or scale quote not stored)"]
     for result in results:
-        if result.change == "same":
+        if result.change in ("same", "unreplayable"):
             continue
         after = "—" if result.after is None else f"{result.after:,.6g} {result.after_status}"
         lines.append(f"  {result.change:9} {result.symbol} {result.period} {result.kpi[:60]}: {result.before:,.6g} "
