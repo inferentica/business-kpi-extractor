@@ -7,7 +7,7 @@ from datetime import date, timedelta
 import re
 
 from ..ai import KpiSpec
-from ..documents.document import clean, Table
+from ..documents.document import clean, parse_number, Table
 from .scale import _PER_UNIT_KPI
 from .table import _heading
 
@@ -151,3 +151,45 @@ def header_contradicts(table: Table, row: int, col: int, expected: date, *also: 
     if years and max(years) < (expected - timedelta(days=10)).year:
         return f"column headed {max(years)}, not the quarter ended {expected.isoformat()}"
     return None
+
+
+def year_ago_value(table: Table, row: int, col: int, period_end: date | None, value: float) -> float | None:
+    """The row's figure for the same period a year before, in the read figure's units: the one other cell under a
+    column of the same length ("three months ended", "<second quarter>") whose header names the period a year earlier
+    (its date about 365 days back, or its year one before the read column's). None when no column, or more than one,
+    qualifies: the release then states no comparative this can vouch for."""
+    if period_end is None or row >= len(table.rows) or col >= len(table.rows[row]):
+        return None
+    own = parse_number(table.rows[row][col])
+    if own is None or not own.value:
+        return None
+    factor = value / own.value
+    length = column_header(table, row, col)
+    own_years = column_dates(table, row, col)[1]
+    target = period_end - timedelta(days=365)
+    found = []
+    for other, text in enumerate(table.rows[row]):
+        if other == col or not text or re.search(r"[A-Za-z]", text) or column_header(table, row, other) != length:
+            continue
+        cell = parse_number(text)
+        if cell is None or cell.percent != own.percent:
+            continue
+        dates, years = column_dates(table, row, other)
+        if dates:
+            earlier = any(abs((day - target).days) <= 20 for day in dates)
+        else:
+            earlier = len(years) == 1 and bool(own_years) and years[0] == max(own_years) - 1
+        if earlier:
+            found.append(cell.value * factor)
+    return round(found[0], 6) if len(found) == 1 else None
+
+
+def year_ago_record(table: Table | None, row: int, col: int, period_end: str | None, value: float) -> dict:
+    """A table reading's locator field for the release's own figure a year before, kept as what that release reports
+    for the earlier period (TradeTracker's business_kpi_reported): {"year_ago_value": ...}, or nothing."""
+    try:
+        end = date.fromisoformat(str(period_end)[:10]) if period_end else None
+    except ValueError:
+        end = None
+    earlier = year_ago_value(table, row, col, end, value) if table is not None else None
+    return {"year_ago_value": earlier} if earlier is not None else {}

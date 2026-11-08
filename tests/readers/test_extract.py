@@ -814,3 +814,22 @@ def test_a_slide_title_after_its_figures_names_their_period():
     assert _read_quote(text, "Contract Commitments Year to Date", "count", "22 New Commitments $625M Added Backlog Revenue", "22") == 22
     assert _read_quote("Ending backlog $1.2 billion. YTD orders rose.", "Ending Backlog", "currency", "Ending backlog $1.2 billion",
                        "$1.2 billion") == 1_200_000_000
+
+
+def test_a_table_reading_keeps_the_releases_own_figure_for_the_year_before():
+    from datetime import date
+    from kpi_extractor.documents.document import Table
+    from kpi_extractor.rules.period import year_ago_value
+    # "Three Months Ended September 30," over 2026 and 2025, then the six months: the year-ago quarter, scaled as read.
+    dated = Table(id="T1", context="", rows=[
+        ["", "Three Months Ended September 30,", "Three Months Ended September 30,", "Nine Months Ended September 30,", "Nine Months Ended September 30,"],
+        ["", "2026", "2025", "2026", "2025"],
+        ["Cloud revenue", "1,234", "1,100", "3,600", "3,100"]])
+    assert year_ago_value(dated, 2, 1, date(2026, 9, 30), 1_234_000_000) == 1_100_000_000
+    # Quarter labels: 3Q26 beside 2Q26 and 3Q25; a change column is no comparative.
+    labelled = Table(id="T2", context="", rows=[["", "3Q26", "2Q26", "3Q25", "% change"], ["Gross margin", "35.7%", "34.9%", "36.1%", "(0.4)%"]])
+    assert year_ago_value(labelled, 1, 1, date(2026, 9, 30), 35.7) == 36.1
+    # Two columns a year back (two segments side by side, both headed 2025): no one comparative to vouch for.
+    twice = Table(id="T3", context="", rows=[["", "2026", "2025", "2026", "2025"], ["Units", "10", "9", "20", "18"]])
+    assert year_ago_value(twice, 1, 1, date(2026, 12, 31), 10) is None
+    assert year_ago_value(dated, 2, 1, None, 1_234_000_000) is None

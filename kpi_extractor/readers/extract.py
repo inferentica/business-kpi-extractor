@@ -22,6 +22,7 @@ from ..rules.wording import (  # noqa: F401 - re-exported for callers of extract
 from ..rules.currency import (  # noqa: F401 - re-exported for callers of extract
     _column_currency, _currency, _CURRENCY_MARKERS)
 from ..rules.period import (  # noqa: F401 - re-exported for callers of extract
+    year_ago_record, year_ago_value,
     _CHANGE_KPI, _FOURTH_QUARTER, _FULL_DATE, _LONG_SPAN_KPI, _LONGER, _MONTH_NAME,
     _MONTH_SPAN, _MONTHS, _NAMES_QUARTER, _NUMERIC_DATE, _ORDINAL, _OTHER_PERIOD,
     _QUARTER, _stands_at_period_end, _STOCK_KPI, _YEAR, _YEAR_ROW, _YTD_TITLE,
@@ -63,7 +64,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
         if group is None or group.kind == "metric" or locator.group in table_groups:
             continue
         try:
-            rows = _read_table(document, locator, group, default_currency)
+            rows = _read_table(document, locator, group, default_currency, located.period_end)
         except LocateError as error:
             problems.append(f"{locator.group}: {error}")
             continue
@@ -111,7 +112,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             continue
         seen.add(locator.kpi)
         held = SCALE_NOT_STATED in notes or SIGN_NOT_STATED in notes or any(note.startswith((PLACE_NOT_NAMED, ROW_NAMED_TWICE)) for note in notes)
-        values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator), notes,
+        values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator, located.period_end, value), notes,
                                 status="needs_review" if held else "verified"))
     # One gate for every reading (replay, Flash, the reasoning reader): the column's own header outranks a period the AI states.
     kept = []
@@ -277,7 +278,8 @@ def _table_as_text(document: Document, key: str | None) -> TextBlock | None:
     return TextBlock(table.id, clean(" ".join(cell for row in table.rows for cell in row if cell)))
 
 
-def _read_table(document: Document, locator: TableLocator, group: GroupSpec, default_currency: str | None) -> list[ReadValue]:
+def _read_table(document: Document, locator: TableLocator, group: GroupSpec, default_currency: str | None,
+                period_end: str | None = None) -> list[ReadValue]:
     """Every row of a breakdown or mix table in the reported column, labelled by its own row label. Rows that are the
     sum of other rows (an "advanced technologies" subtotal) are dropped, so each part is counted once."""
     table = document.tables.get(locator.table)
@@ -389,7 +391,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                   "context": table.context[-80:], "whole_table": True, "total_row_label": total_label,
                   "scale": scale if unit == "currency" else None,
                   "header": column_header(table, locator.first_row, locator.col),
-                  "row_numbers": row_numbers(document.tables.get(source_table), source_row, source_col)}
+                  "row_numbers": row_numbers(document.tables.get(source_table), source_row, source_col),
+                  **year_ago_record(document.tables.get(source_table), source_row, source_col, period_end, value)}
         if key in nine and "__total__" in nine:
             record.update({"ytd": nine[key] * scale, "ytd_total": nine["__total__"] * scale})
         values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit,
@@ -555,7 +558,7 @@ def row_numbers(table: Table | None, row: int, col: int) -> list[float | None]:
             *[c.value for i, c in enumerate(cells) if c is not None and i != col][:8]]
 
 
-def _locator_record(document: Document, locator: Locator) -> dict:
+def _locator_record(document: Document, locator: Locator, period_end: str | None = None, value: float | None = None) -> dict:
     """What the next quarter's prompt is told about where this KPI was found."""
     if locator.table is not None:
         table = document.tables[locator.table]
@@ -566,7 +569,8 @@ def _locator_record(document: Document, locator: Locator) -> dict:
                 **({"scale_text": clean(locator.scale_text)[:80]} if locator.scale_text else {}),
                 "header": column_header(table, locator.row, locator.col),
                 # The row's own numbers as printed, the read cell first: a repeat the row itself shows is no wrong column.
-                "row_numbers": row_numbers(table, locator.row, locator.col)}
+                "row_numbers": row_numbers(table, locator.row, locator.col),
+                **(year_ago_record(table, locator.row, locator.col, period_end, value) if value is not None else {})}
     return {"block": locator.block, "quote": clean(locator.quote or "")[:160], "value_text": locator.value_text}
 
 
