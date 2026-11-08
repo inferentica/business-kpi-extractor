@@ -14,7 +14,16 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-GOLDEN = Path(__file__).resolve().parents[1] / "evals" / "golden.json"
+def _golden_path() -> Path:
+    """The golden set beside the package (an editable install), else in the checkout it runs from."""
+    for path in (Path(__file__).resolve().parents[1] / "evals" / "golden.json", Path.cwd() / "statements" / "evals" / "golden.json",
+                 Path.cwd() / "evals" / "golden.json"):
+        if path.exists():
+            return path
+    return Path.cwd() / "statements" / "evals" / "golden.json"
+
+
+GOLDEN = _golden_path()
 
 
 def _line(entry: dict, lines: list[dict]) -> dict | None:
