@@ -44,3 +44,11 @@ def test_a_sign_most_filings_print_wins_over_the_newest_that_dropped_it():
     [chosen] = choose(year)
     assert chosen["source_accession"] == "fy12" and chosen["lines"][0]["value"] == -100e6
     assert "versus_own" not in chosen or not chosen["versus_own"]["changed"]
+
+
+def test_a_retagged_line_is_matched_by_its_label_for_its_sign():
+    year = [reading("fy10", date(2011, 2, 28), -100e6, own=True), reading("fy11", date(2012, 2, 29), -100e6, own=False),
+            reading("fy12", date(2013, 2, 28), 100e6, own=False)]
+    year[2].lines[0]["concept"] = "us-gaap_RevenuesRetagged"
+    [chosen] = choose(year)
+    assert chosen["lines"][0]["value"] == -100e6
