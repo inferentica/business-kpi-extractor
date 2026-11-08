@@ -10,7 +10,7 @@ from ..sources.edgar import FiscalCalendarError, fiscal_label
 
 # Days a period spans, inclusive: 13-week and month-end quarters, 12- and 16-week quarters (PepsiCo, Kroger), and their
 # six- and nine-month years to date, with room for a 53rd week.
-_SPANS = (("quarter", 80, 115), ("ytd", 165, 210), ("ytd", 245, 295), ("year", 350, 380))
+_SPANS = (("quarter", 80, 122), ("ytd", 165, 210), ("ytd", 245, 295), ("year", 350, 380))
 
 
 OWN_SLACK = timedelta(days=7)  # a column dated a few days off the document period still is that period

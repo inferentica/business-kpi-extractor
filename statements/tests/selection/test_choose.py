@@ -78,3 +78,19 @@ def test_a_sign_disagreement_asks_for_the_printed_statement():
     newer = reading("fy12", date(2013, 2, 28), 100e6, own=False)
     assert sign_ties([older, newer]) == {"fy12"}
     assert sign_ties([older, reading("fy12", date(2013, 2, 28), -100e6, own=False)]) == set()
+
+
+def test_a_sign_printed_only_in_a_note_settles_it():
+    # JPM's FY2012 10-K tags its 2010 credit losses as 100 and prints (100) only in a note, not on the statement's face.
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.sign_index import printed_figures
+    note = parse_html("<table><tr><td></td><td>2012</td><td>2011</td><td>2010</td></tr>"
+                      "<tr><td>Net sales (a)</td><td>(28)</td><td>(76)</td><td>(100)</td></tr></table>")
+    xbrl = reading("fy12", date(2013, 2, 28), 100e6, own=False)
+    older = reading("fy11", date(2012, 2, 29), -100e6, own=False)
+    [chosen] = choose([older, xbrl], {"fy12": printed_figures(note)})
+    assert chosen["source_accession"] == "fy12" and chosen["lines"][0]["value"] == -100e6
+    # Without a dispute the note never changes a sign.
+    agreed = reading("fy11", date(2012, 2, 29), 100e6, own=False)
+    [chosen] = choose([agreed, reading("fy12", date(2013, 2, 28), 100e6, own=False)], {"fy12": printed_figures(note)})
+    assert chosen["lines"][0]["value"] == 100e6

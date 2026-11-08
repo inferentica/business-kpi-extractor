@@ -26,7 +26,7 @@ def differences(later: Reading, earlier: Reading) -> dict:
             "added": sorted(new.keys() - old.keys()), "removed": sorted(old.keys() - new.keys())}
 
 
-def choose(readings: list[Reading]) -> list[dict]:
+def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] | None = None) -> list[dict]:
     """Per statement period: the chosen reading (or why none), its source, and how it differs from the period's own
     filing. Sorted newest period first."""
     groups: dict[tuple, list[Reading]] = defaultdict(list)
@@ -47,7 +47,7 @@ def choose(readings: list[Reading]) -> list[dict]:
                                   for check in reading.checks if check.result == "fail"})[:5],
         }
         if winner is not None:
-            winner = settle_signs(winner, kept)
+            winner = settle_signs(winner, kept, (printed or {}).get(winner.accession))
             record.update({
                 "source_accession": winner.accession, "source_form": winner.form, "source_filed": winner.filed.isoformat(),
                 "from_comparative": not winner.own, "currency": winner.currency, "lines": winner.lines,

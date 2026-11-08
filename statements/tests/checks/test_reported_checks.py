@@ -90,3 +90,15 @@ def test_a_subtotal_with_wrong_declared_weights_adds_up_as_printed():
                      "ifrs-full_OCI": figure(-3_974.6e6, -5)},
                     presented=[("a", "oci", -1.0), ("b", "oci", 1.0), ("tax", "oci", -1.0), ("ifrs-full_OCI", "oci", 1.0)])
     assert calc_check(column, arcs).result == "pass"
+
+
+def test_cash_of_continuing_operations_rolls_forward():
+    # Kroger FY2009: its sections and its "net increase in cash and temporary cash investments" are continuing operations.
+    kroger = Column({"us-gaap_NetCashProvidedByUsedInOperatingActivitiesContinuingOperations": figure(2_309e6),
+                     "us-gaap_NetCashProvidedByUsedInInvestingActivitiesContinuingOperations": figure(-744e6),
+                     "us-gaap_NetCashProvidedByUsedInFinancingActivitiesContinuingOperations": figure(-1_531e6),
+                     "us-gaap_NetCashProvidedByUsedInContinuingOperations": figure(34e6)},
+                    opening=figure(322e6), closing=figure(356e6))
+    assert cash_check(kroger).result == "pass"
+    del kroger.figures["us-gaap_NetCashProvidedByUsedInContinuingOperations"]
+    assert cash_check(kroger).result == "pass"
