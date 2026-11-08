@@ -950,8 +950,10 @@ def _place_not_named(label: str, table: Table, row: int, col: int) -> str | None
 SCALE_NOT_STATED = "scale not stated in the document"
 # A column's own scale: Mastercard's "(Bil.)" and "(Mil.)", Axia's "(R$ mn)". A single letter counts only beside a
 # currency sign ("($B)"): a bare "(b)" is a footnote mark, as in Axia's "Regulatory Revenue (c) = (a) x (b)".
-_COLUMN_SCALE = re.compile(r"\(\s*(?:[A-Z]{1,3})?\$?\s*(?P<word>bil|bn|billions?|mil|mm|mn|millions?|thous|thousands?|000s?)\.?\s*\)"
-                           r"|\(\s*(?:[A-Z]{1,3})?\$\s*(?P<letter>[bmk])\.?\s*\)"
+# The currency code before it is upper case only ("(R$ mn)", "(US$ bn)"): the pattern ignores case, and "in" read as a code
+# made a section row's "(in thousands)" the scale of MP Materials' production volumes in the same column.
+_COLUMN_SCALE = re.compile(r"\(\s*(?:(?-i:[A-Z]{1,3}))?\$?\s*(?P<word>bil|bn|billions?|mil|mm|mn|millions?|thous|thousands?|000s?)\.?\s*\)"
+                           r"|\(\s*(?:(?-i:[A-Z]{1,3}))?\$\s*(?P<letter>[bmk])\.?\s*\)"
                            r"|(?<![\w.])(?:€|\$|£|¥)\s*(?P<bare>bn|mn|mm|m|k)\b", re.I)  # Vodafone's "€m" column heading
 _SCALE_OF = (("bil", 1e9), ("bn", 1e9), ("b", 1e9), ("mil", 1e6), ("mm", 1e6), ("mn", 1e6), ("m", 1e6), ("thous", 1e3), ("k", 1e3),
              ("000", 1e3))

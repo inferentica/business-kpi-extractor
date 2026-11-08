@@ -488,6 +488,19 @@ def test_a_repeat_the_row_itself_prints_is_no_wrong_column():
     assert not _row_shows({"locator": {}}, 737_000_000, 737_000_000)
 
 
+def test_a_section_rows_in_thousands_is_no_column_scale_for_the_volumes_below():
+    # MP Materials: "Revenue: (in thousands)" heads the revenue rows; the production volumes below are in metric tons.
+    html = """<table><tr><td>For the three months ended September 30,</td><td></td><td></td></tr>
+<tr><td>(unaudited)</td><td></td><td>2025</td></tr><tr><td>Revenue:</td><td></td><td>(in thousands)</td></tr>
+<tr><td>Rare earth concentrate</td><td>$</td><td>43,053</td></tr><tr><td>Separated NdPr products</td><td></td><td></td></tr>
+<tr><td>NdPr Production Volume (MTs)</td><td></td><td>721</td></tr></table>"""
+    assert _read_one(html, "NdPr Production Volume (MTs)", "count", 5, 2).value == 721
+    from kpi_extractor.extract import _column_scale
+    table = next(iter(parse_document("<table><tr><td></td><td>2Q26 (R$ mn)</td></tr><tr><td>x</td><td>5</td></tr></table>",
+                                     "https://example.com/x.htm").tables.values()))
+    assert _column_scale(table, 1, 1) == 1e6
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>
