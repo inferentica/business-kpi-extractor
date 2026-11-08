@@ -8,7 +8,7 @@ import re
 from ..domain.model import FAIL, NONE, PASS, Check
 from ..domain.printed_labels import (ASSETS, BARE_TOTAL, CHANGE, CLOSING, DATED_CASH, EFFECT, EQUITY, EXCHANGE, LIABILITIES,
                                      LIABILITIES_AND_EQUITY, NET_INCOME, OPENING, PRETAX, SECTION_KINDS, SECTIONS, TOTAL)
-from .subtotals import subtotals
+from .subtotals import block_start, subtotals
 from .tolerance import close
 
 
@@ -48,7 +48,7 @@ def cash_check(figures) -> Check:
     openings = [value for label, _level, value in figures if OPENING.search(label)]
     if len(openings) > 1:
         opening = (opening[0], sum(openings))
-    kinds = {match.group(2).lower() for label, _level, _value in figures if (match := SECTION_KINDS.search(label))}
+    kinds = {match.group(2).lower() for label, _level, _value in figures if (match := SECTION_KINDS.search(label))}  # operat, invest, financ
     if len(kinds) < 3:
         return Check("cash", NONE, "not every section of the statement was read: " + ", ".join(sorted(kinds) or ["none"]))
     changes = [value for label, _level, value in figures if CHANGE.search(label) and not OPENING.search(label)
@@ -112,7 +112,16 @@ def total_check(printed) -> Check:
             verified += 1  # proven as a sum or a difference of the lines above it (JPM's total net revenue)
             continue
         running, count, position, matched = 0.0, 0, index - 1, False
-        while position >= 0 and count < 40:
+        plain, plain_count = 0.0, 0  # the lines above read one by one, with no subtotal jumped
+        for earlier_label, _earlier_level, earlier_value in reversed(printed[:index]):
+            if earlier_value is None:
+                break
+            plain += -earlier_value if re.match(r"^less\b", earlier_label, re.I) else earlier_value
+            plain_count += 1
+            if plain_count >= 2 and close(plain, value, plain_count + 1):
+                matched = True
+                break
+        while position >= 0 and count < 40 and not matched:
             earlier_label, _earlier_level, earlier_value = printed[position]
             if earlier_value is None:
                 if count == 0:
@@ -124,8 +133,8 @@ def total_check(printed) -> Check:
             if count >= 2 and close(running, value, count + 1):
                 matched = True
                 break
-            position = starts.get(position, position) - 1
-        if count < 2:
+            position = block_start(starts, position) - 1
+        if count < 2 and not matched:
             continue
         verified += 1
         if not matched:

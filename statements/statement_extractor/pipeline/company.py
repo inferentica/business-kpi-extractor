@@ -12,12 +12,15 @@ import time
 from datetime import date
 from pathlib import Path
 
+from ..checks.schedules import parse_schedule, schedule_check
 from ..quality.coverage import own_period, summarise
 from ..readers.html.read import read_document
+from ..readers.text.read import read_document as read_text
 from ..readers.xbrl.read import read_filing
 from ..selection.choose import choose
 from ..sources.documents import PRINTED_DOCUMENTS
-from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission, periodic_reports
+from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
+from ..sources.listing import list_reports
 
 
 def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
@@ -25,7 +28,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     started = time.time()
     profile, company = company_profile(symbol)
-    reports = sorted(periodic_reports(company, since), key=lambda ref: ref.filed, reverse=True)
+    reports = sorted(list_reports(company, since), key=lambda ref: ref.filed, reverse=True)
     readings, filings, offset = [], [], None
     for ref in reports:
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False}
@@ -82,31 +85,44 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
 
 def _read_printed(ref, fiscal_year_end: str, year_offset: int) -> tuple[list, list[str], list[str]]:
     """A filing without XBRL, read from its printed documents: the report itself and an annual report exhibit that
-    holds its statements (EX-13). Plain-text filings (about 1993-2000) are a later reader's."""
+    holds its statements (EX-13), in HTML (about 2001-2008) or plain text (about 1993-2000)."""
     found, notes, kinds = [], [], []
     raw_end = getattr(ref.filing, "period_of_report", None)
     try:
         document_end = date.fromisoformat(str(raw_end)[:10]) if raw_end else None
     except ValueError:
         document_end = None
+    schedules = []
     for attachment in ref.filing.attachments:
         kind = str(attachment.document_type or "").upper()
+        if kind.startswith("EX-27"):
+            content = attachment.content
+            schedule = parse_schedule(content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or ""))
+            if schedule is not None:
+                schedules.append(schedule)
+            continue
         if not kind.startswith(PRINTED_DOCUMENTS):
             continue
         extension = str(attachment.extension or "").lower()
-        if extension not in (".htm", ".html"):
-            if extension == ".txt":
-                kinds.append("text")
-            continue
+        content = attachment.content
+        content = content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or "")
+        printed = "html" if extension in (".htm", ".html") or "<tr" in content[:200_000].lower() else "text"
+        reader = read_document if printed == "html" else read_text
         try:
-            readings, document_notes = read_document(attachment.content, accession=ref.accession, form=ref.form,
-                                                     filed=ref.filed, document_end=document_end,
-                                                     fiscal_year_end=fiscal_year_end, year_offset=year_offset)
+            readings, document_notes = reader(content, accession=ref.accession, form=ref.form,
+                                              filed=ref.filed, document_end=document_end,
+                                              fiscal_year_end=fiscal_year_end, year_offset=year_offset)
         except Exception as error:  # noqa: BLE001 - one unreadable document never stops the filing
             notes.append(f"{attachment.document}: unreadable ({type(error).__name__})")
             continue
         held = {reading.key for reading in found}
         found.extend(reading for reading in readings if reading.key not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
-        kinds.append("html")
+        kinds.append(printed)
+    for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
+        check = schedule_check(reading, schedules)
+        if check is not None:
+            reading.checks.append(check)
+    if schedules:
+        kinds.append("ex27")
     return found, notes, sorted(set(kinds))

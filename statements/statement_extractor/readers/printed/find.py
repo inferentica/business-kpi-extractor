@@ -6,7 +6,7 @@ import re
 
 from ...domain.printed_labels import (ASSETS, BARE_TOTAL, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES_AND_EQUITY, NET_INCOME,
                                       PRETAX, SECTIONS)
-from .tables import Table, figure_columns, tables
+from .tables import Table, figure_columns
 
 
 TITLES = (
@@ -28,9 +28,8 @@ _OTHER_STATEMENT = re.compile(r"statements?\s+of\s+(changes\s+in\s+)?(consolidat
                               r"shareowners['’]?)\s+equity|changes\s+in\s+equity|statements?\s+of\s+comprehensive\s+income", re.I)
 
 
-def find_statements(html: str | bytes) -> list[tuple[str, list[Table]]]:
-    """Each statement table in a document, with the tables it continues into."""
-    all_tables = tables(html)
+def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
+    """Each statement table in a document's tables, with the tables it continues into."""
     found: list[tuple[str, list[Table]]] = []
     for position, table in enumerate(all_tables):
         title_text = table.context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in table.header[:2])
@@ -80,15 +79,39 @@ def _is_contents(table: Table) -> bool:
     return "notes to consolidated financial statements" in labels and len(table.rows) < 15
 
 
-def labels_in_context(group: list[Table]) -> list[str]:
-    """Each line's label, a balance line read under its heading ("CASH AND CASH EQUIVALENTS / Balance at end of year")."""
+def unlabelled_totals(group: list[Table]) -> dict[int, str]:
+    """What a balance sheet's unlabelled grand totals are (Apple's 1994 balance sheet prints both without a label): the
+    figure line just before the liabilities heading is total assets, and the statement's last figure line, when it
+    equals it, is total liabilities and equity. Keyed by the row's id."""
+    rows = [row for table in group for row in table.rows]
+    named: dict[int, str] = {}
+    assets = None
+    for index, row in enumerate(rows):
+        if row.label or not row.figures:
+            continue
+        following = next((later for later in rows[index + 1:] if later.label or later.figures), None)
+        if following is not None and not following.figures and re.match(r"^liabilities\b", following.label, re.I):
+            named[id(row)], assets = "Total assets", row
+    figured = [row for row in rows if row.figures]
+    if assets is not None and figured and not figured[-1].label and figured[-1] is not assets \
+            and figured[-1].figures == assets.figures:
+        named[id(figured[-1])] = "Total liabilities and equity"
+    return named
+
+
+def labels_in_context(group: list[Table], kind: str = "") -> list[str]:
+    """Each line's label as the checks read it: a balance line under its heading ("CASH AND CASH EQUIVALENTS / Balance
+    at end of year"), and a balance sheet's unlabelled grand totals by their place."""
     labels, heading = [], ""
+    named = unlabelled_totals(group) if kind == "balance" else {}
     for table in group:
         for row in table.rows:
             if not row.figures:
                 heading = row.label
                 continue
-            if re.match(r"^(balance|net\s*\(?(increase|decrease))", row.label, re.I) and CASH_HEADING.match(heading):
+            if id(row) in named:
+                labels.append(named[id(row)])
+            elif re.match(r"^(balance|net\s*\(?(increase|decrease))", row.label, re.I) and CASH_HEADING.match(heading):
                 labels.append(f"{heading} {row.label}")
             else:
                 labels.append(row.label)
@@ -96,7 +119,7 @@ def labels_in_context(group: list[Table]) -> list[str]:
 
 
 def _complete(kind: str, group: list[Table]) -> bool:
-    labels = labels_in_context(group)
+    labels = labels_in_context(group, kind)
     if kind == "balance":
         bare = sum(1 for label in labels if BARE_TOTAL.match(label))
         return (any(ASSETS.match(label) for label in labels) or bare >= 1) and (

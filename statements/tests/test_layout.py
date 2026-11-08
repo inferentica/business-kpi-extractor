@@ -61,10 +61,13 @@ def test_folders_import_only_the_folders_below_them():
 
 
 def test_each_format_reader_stands_alone():
+    """A format's reader (xbrl, html, text) imports no other format; the printed-statement core shared by the HTML and
+    plain-text readers imports none of them."""
     for path in (PACKAGE / "readers").rglob("*.py"):
         parts = _module(path)
         if len(parts) < 3:
             continue
         for target in _targets(path):
-            if len(target) >= 2 and target[0] == "readers":
-                assert target[1] == parts[1], f"{'/'.join(parts)} imports another reader: {'/'.join(target)}"
+            if len(target) >= 2 and target[0] == "readers" and target[1] != parts[1]:
+                assert target[1] == "printed" and parts[1] != "printed", \
+                    f"{'/'.join(parts)} imports another reader: {'/'.join(target)}"

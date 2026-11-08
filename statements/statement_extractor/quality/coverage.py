@@ -53,7 +53,7 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
         "filings": len(filings), "xbrl_filings": sum(1 for f in filings if f.get("xbrl")),
         "no_xbrl_filings": [f"{f['form']} {f['filed']}" for f in filings if not f.get("xbrl")],
         "printed_filings": sum(1 for f in filings if "html" in (f.get("printed") or [])),
-        "text_filings": [f"{f['form']} {f['filed']}" for f in filings if "text" in (f.get("printed") or []) and "html" not in (f.get("printed") or [])],
+        "text_filings": sum(1 for f in filings if "text" in (f.get("printed") or [])),
         "unread_filings": [f"{f['form']} {f['filed']}" for f in filings if not f.get("xbrl") and not f.get("fiscal_period")],
         "periods": len(chosen), "by_status": by_status,
         "own_expected": expected, "own_kept": found, "own_missing": missing[:40],
