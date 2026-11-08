@@ -494,7 +494,7 @@ def test_a_section_rows_in_thousands_is_no_column_scale_for_the_volumes_below():
 <tr><td>(unaudited)</td><td></td><td>2025</td></tr><tr><td>Revenue:</td><td></td><td>(in thousands)</td></tr>
 <tr><td>Rare earth concentrate</td><td>$</td><td>43,053</td></tr><tr><td>Separated NdPr products</td><td></td><td></td></tr>
 <tr><td>NdPr Production Volume (MTs)</td><td></td><td>721</td></tr></table>"""
-    assert _read_one(html, "NdPr Production Volume (MTs)", "count", 5, 2).value == 721
+    assert _read_one(html, "NdPr Production Volume (MTs)", "count", 5, 1).value == 721
     from kpi_extractor.extract import _column_scale
     table = next(iter(parse_document("<table><tr><td></td><td>2Q26 (R$ mn)</td></tr><tr><td>x</td><td>5</td></tr></table>",
                                      "https://example.com/x.htm").tables.values()))
