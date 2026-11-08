@@ -77,7 +77,8 @@ BARE_TOTAL = re.compile(r"^total$", re.I)
 DATED_CASH = re.compile(r"^cash\b.*\bat\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b", re.I)
 # The three sections a cash flow statement must hold before its roll-forward proves anything (a statement's last page
 # alone also rolls forward).
-SECTION_KINDS = re.compile(r"^(net|cash|total)\b.*\b(operat|invest|financ)(ing\s+activities|ions\b|ment\s+activities)", re.I)
+# The first section word names the section: ASML's "Net cash used in investing activities from operations" is investing.
+SECTION_KINDS = re.compile(r"^(net|cash|total)\b.*?\b(operat|invest|financ)(ing\s+activities|ions\b|ment\s+activities)", re.I)
 
 # A heading over the cash balances themselves ("CASH AND CASH EQUIVALENTS", "Cash and due from banks"), under which
 # "Balance at beginning of year" names the opening cash; "Cash flows from financing activities" is not one.

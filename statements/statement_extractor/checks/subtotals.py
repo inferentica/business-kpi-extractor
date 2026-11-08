@@ -12,7 +12,8 @@ _SUBTOTAL_LABEL = re.compile(r"^$|^total\b|\bnet\b|^gross\b|\bincome\b|\bprofit\
                              r"\bafter\b|\bcomprehensive\b|^revenues?\b|\bmargin\b|\bactivities\b|^cash\s+(generated|provided|used)\b",
                              re.I)
 # Subtotals that sum lines under more than one heading.
-_SPANS_HEADINGS = re.compile(r"^total\b|comprehensive\s+income|\bfor\s+the\s+(year|period)\b", re.I)
+_SPANS_HEADINGS = re.compile(r"^total\b|comprehensive\s+income|\bfor\s+the\s+(year|period)\b|\bactivities\b|\boperations\b",
+                             re.I)
 
 
 def subtotals(printed) -> dict[int, int]:

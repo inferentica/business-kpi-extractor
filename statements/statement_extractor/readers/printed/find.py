@@ -84,17 +84,22 @@ def unlabelled_totals(group: list[Table]) -> dict[int, str]:
     figure line just before the liabilities heading is total assets, and the statement's last figure line, when it
     equals it, is total liabilities and equity. Keyed by the row's id."""
     rows = [row for table in group for row in table.rows]
+    # A page that opens with the liabilities in its title (Apple's 1998 10-Q: "BALANCE SHEETS (Continued) LIABILITIES
+    # AND SHAREHOLDERS' EQUITY") closes the assets on the page before it.
+    page_ends = {id(next((row for row in reversed(table.rows) if row.figures), None))
+                 for table, later in zip(group, group[1:]) if re.search(r"\bliabilities\b", later.context[-160:], re.I)}
     named: dict[int, str] = {}
     assets = None
     for index, row in enumerate(rows):
         if row.label or not row.figures:
             continue
         following = next((later for later in rows[index + 1:] if later.label or later.figures), None)
-        if following is not None and not following.figures and re.match(r"^liabilities\b", following.label, re.I):
+        heading_next = following is not None and not following.figures and re.match(r"^liabilities\b", following.label, re.I)
+        if heading_next or id(row) in page_ends:
             named[id(row)], assets = "Total assets", row
     figured = [row for row in rows if row.figures]
     if assets is not None and figured and not figured[-1].label and figured[-1] is not assets \
-            and figured[-1].figures == assets.figures:
+            and sorted(figured[-1].figures.values()) == sorted(assets.figures.values()):  # pages can sit a column apart
         named[id(figured[-1])] = "Total liabilities and equity"
     return named
 

@@ -96,6 +96,24 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
     return cells
 
 
+_JOINING = re.compile(r"\b(and|or|of|for|in|on|to|the|before|after|from|less|plus|net|by|with|at|due)$|[,\-–]$", re.I)
+# Words that open a continuation, never a label of its own ("Net", "Less" and "In" do start labels).
+_LEADING_JOIN = re.compile(r"^(and|or|of|for|on|to|before|after|from|by|with|at|due)\b", re.I)
+
+
+def _continues(before: str, after: str, already: bool) -> bool:
+    """Whether a line without figures runs on into the line after it: the next line starts in lower case, with a
+    bracket or a figure, or either side has a joining word ("INCOME BEFORE INCOME TAXES" / "AND CUMULATIVE EFFECT OF" /
+    "ACCOUNTING CHANGE"). A heading ending in a colon never does."""
+    if before.endswith(":"):
+        return False
+    if _JOINING.search(before) or _LEADING_JOIN.match(after):
+        return True
+    if already:
+        return False
+    return not after or after[:1].islower() or after[:1] in "(0123456789"
+
+
 def _rows(lines: list[_Line], columns: list[int]) -> list[Row]:
     rows: list[Row] = []
     pending: list[_Line] = []
@@ -112,16 +130,14 @@ def _rows(lines: list[_Line], columns: list[int]) -> list[Row]:
                 pending.append(line)
             continue
         label = line.label
-        joins = not label or label[:1].islower() or label[:1] in "(0123456789"
         joined: list[str] = []
         indent = line.indent
-        while pending and joins:
-            previous = pending[-1]
-            if previous.label.endswith(":") or (previous.label.isupper() and joined):
-                break
-            joined.insert(0, pending.pop().label)
+        following = label
+        while pending and _continues(pending[-1].label, following, bool(joined)):
+            previous = pending.pop()
+            joined.insert(0, previous.label)
             indent = previous.indent  # the label starts where its first line does
-            joins = not previous.label.isupper()
+            following = previous.label
         for waiting in pending:
             heading(waiting)
         pending = []
@@ -139,9 +155,32 @@ def _rows(lines: list[_Line], columns: list[int]) -> list[Row]:
     return rows
 
 
-def parse_text(text: str) -> list[Table]:
-    """Every <TABLE> block of a plain-text document as a table, with the text before it (its title and scale)."""
-    found: list[Table] = []
+_UNTAGGED_TITLE = re.compile(r"^[ \t]*(condensed\s+)?(consolidated\s+)?(balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?"
+                             r"(income|operations|earnings|cash\s+flows?|financial\s+(position|condition)))\b", re.I | re.M)
+_UNTAGGED_END = re.compile(r"^\s*(see\s+(accompanying\s+)?notes|the\s+accompanying\s+notes)|<PAGE>|<TABLE>", re.I)
+
+
+def _table(before: str, title_lines: list[str], header_lines: list[str], body: list[str], index: int) -> Table:
+    parsed = [line for line in (_split(raw_line) for raw_line in body if not _RULE.match(raw_line)) if line]
+    columns = _columns(parsed)
+    header, leading = [], []
+    for line in header_lines:
+        if _RULE.match(line):
+            continue
+        if COLUMN_TITLE.search(line) or any(_YEAR.match(chunk.text) for chunk in _chunks(line)):
+            cells = _header(line, columns)
+            if cells:
+                header.append(cells)
+        else:
+            leading.append(line)  # a heading printed in the header area ("LIABILITIES AND SHARE-OWNERS' EQUITY")
+    leading_rows = [_Line(len(line) - len(line.lstrip()), clean(line), []) for line in leading if line.strip()]
+    rows = _rows(leading_rows + parsed, columns)
+    context = clean(_TAG.sub(" ", before + " " + " ".join(title_lines)))
+    return Table(rows=rows, header=header, context=context[-600:], index=index)
+
+
+def _tagged(text: str):
+    """(position, before, title lines, header lines, body lines) for each <TABLE> block."""
     previous_end = 0
     for block in _BLOCK.finditer(text):
         before = text[max(previous_end, block.start() - 1500):block.start()]
@@ -152,20 +191,44 @@ def parse_text(text: str) -> list[Table]:
         title_lines = raw[:caption] if caption is not None else []
         header_start = caption + 1 if caption is not None else 0
         header_end = marker if marker is not None and marker >= header_start else header_start
-        body = [_TAG.sub(" ", line) for line in raw[header_end:]]
-        parsed = [line for line in (_split(raw_line) for raw_line in body if not _RULE.match(raw_line)) if line]
-        columns = _columns(parsed)
-        header_lines = [_TAG.sub(" ", line) for line in raw[header_start:header_end] if not _RULE.match(_TAG.sub(" ", line))]
-        header, leading = [], []
-        for line in header_lines:
-            if COLUMN_TITLE.search(line) or any(_YEAR.match(chunk.text) for chunk in _chunks(line)):
-                cells = _header(line, columns)
-                if cells:
-                    header.append(cells)
-            else:
-                leading.append(line)  # a heading printed in the header area ("LIABILITIES AND SHARE-OWNERS' EQUITY")
-        leading_rows = [_Line(len(line) - len(line.lstrip()), clean(line), []) for line in leading if line.strip()]
-        rows = _rows(leading_rows + parsed, columns)
-        context = clean(_TAG.sub(" ", before + " " + " ".join(title_lines)))
-        found.append(Table(rows=rows, header=header, context=context[-600:], index=len(found)))
-    return found
+        yield (block.start(), before, title_lines, [_TAG.sub(" ", line) for line in raw[header_start:header_end]],
+               [_TAG.sub(" ", line) for line in raw[header_end:]])
+
+
+def _untagged(text: str, spans: list[tuple[int, int]]):
+    """Statements printed with no <TABLE> tags (Coca-Cola's 10-Qs of 2002-2004): from a statement's title line to the
+    page's end, the lines before the first figures being its title and header."""
+    for match in _UNTAGGED_TITLE.finditer(text):
+        if any(start <= match.start() < end for start, end in spans):
+            continue
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        lines = text[line_start:line_start + 20_000].splitlines()
+        block = []
+        has_figures = False
+        for number_of_line, line in enumerate(lines):
+            if number_of_line and (_UNTAGGED_END.search(line) or _UNTAGGED_TITLE.match(line) and has_figures):
+                break  # the page's end, or the next statement once this one has figures
+            block.append(line)
+            parsed = _split(line)
+            has_figures = has_figures or bool(parsed and parsed.figures and parsed.label)
+            if len(block) > 160:
+                break
+        first = next((index for index, line in enumerate(block)
+                      if (parsed := _split(line)) and parsed.figures and parsed.label
+                      and not all(_YEAR.match(chunk.text) for chunk in parsed.figures)), None)
+        if first is None:
+            continue
+        top = block[:first]
+        headed = [index for index, line in enumerate(top) if COLUMN_TITLE.search(line) or
+                  any(_YEAR.match(chunk.text) for chunk in _chunks(line))]
+        split_at = headed[0] if headed else first
+        before = text[max(0, line_start - 1500):line_start]
+        yield line_start, before, top[:split_at], top[split_at:], block[first:]
+
+
+def parse_text(text: str) -> list[Table]:
+    """Every table of a plain-text document, tagged <TABLE> blocks and untagged statements, in document order, each with
+    the text before it (its title and scale)."""
+    spans = [(block.start(), block.end()) for block in _BLOCK.finditer(text)]
+    parts = sorted([*_tagged(text), *_untagged(text, spans)], key=lambda part: part[0])
+    return [_table(before, title, header, body, index) for index, (_start, before, title, header, body) in enumerate(parts)]
