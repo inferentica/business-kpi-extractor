@@ -93,6 +93,11 @@ def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> flo
     return None
 
 
+# A row that only states the scale or the audit status: "Notes (in thousands, except per share data) EUR EUR".
+_CAPTION = re.compile(r"\(\s*(?:in|amounts\s+in|dollars\s+in|expressed\s+in)\s+(?:[A-Z]{2,3}\s+)?(thousands|millions|billions)\b|"
+                      r"^\(?unaudited\)?$", re.I)
+
+
 # A heading over share counts: Apple's "Shares used in computing earnings per share (in thousands):" over Basic and
 # Diluted, which would otherwise read as per-share figures.
 _SHARE_HEADING = re.compile(r"\bshares\b|weighted[-\s]average|\baverage\s+(number|common)", re.I)
@@ -112,8 +117,8 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 heading = row.label
             if not row.label and not row.figures:
                 continue
-            if not row.figures and any(pattern.search(row.label) for _, pattern in TITLES):
-                continue  # the statement's title printed as a row of its own table (PepsiCo), not a line of it
+            if not row.figures and (any(pattern.search(row.label) for _, pattern in TITLES) or _CAPTION.search(row.label)):
+                continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line
             value = _figure(row, column, columns) if row.figures else None
             if row.figures and value is None:
                 continue
