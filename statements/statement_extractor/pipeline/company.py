@@ -18,9 +18,10 @@ from ..readers.html.read import read_document
 from ..readers.text.read import read_document as read_text
 from ..readers.xbrl.read import read_filing
 from ..selection.choose import choose
+from ..selection.signs import sign_ties
 from ..sources.documents import PRINTED_DOCUMENTS
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
-from ..sources.listing import list_reports
+from ..sources.listing import filing_for, list_reports
 
 
 def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
@@ -72,6 +73,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         del xbrl
         ref.filing = None
         gc.collect()
+    readings.extend(_printed_second_look(symbol, reports, filings, readings, profile.fiscal_year_end, offset or 0, log))
     chosen = choose(readings)
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     with (out / "readings.jsonl").open("w") as handle:
@@ -81,6 +83,36 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     (out / "filings.json").write_text(json.dumps(filings, default=str, indent=1))
     (out / "summary.json").write_text(json.dumps(summary, default=str, indent=1))
     return summary
+
+
+def _printed_second_look(symbol, reports, filings, readings, fiscal_year_end: str, year_offset: int, log) -> list:
+    """The printed statements of XBRL filings that need them: one whose own statement failed its checks in XBRL (JPM's
+    Q2 2010 balance sheet, which edgartools maps wrongly), and one whose served figure differs in sign from another
+    presentation (the printed sign decides)."""
+    failed = {reading.accession for reading in readings
+              if reading.source == "xbrl" and reading.own and reading.status != "kept"}
+    needed = failed | sign_ties(readings)
+    by_accession = {ref.accession: ref for ref in reports}
+    records = {record["accession"]: record for record in filings}
+    found_all = []
+    for accession in sorted(needed):
+        ref = by_accession.get(accession)
+        if ref is None:
+            continue
+        try:
+            ref.filing = filing_for(accession)
+            found, notes, kinds = _read_printed(ref, fiscal_year_end, year_offset)
+        except Exception as error:  # noqa: BLE001 - a second look that fails leaves the XBRL readings as they are
+            records[accession]["second_look"] = f"unreadable ({type(error).__name__})"
+            continue
+        finally:
+            ref.filing = None
+        records[accession]["second_look"] = {"why": "failed in XBRL" if accession in failed else "sign",
+                                             "printed": kinds, "columns": len(found), "notes": notes[:5]}
+        log(f"{symbol}: {ref.form} {ref.filed} printed second look ({records[accession]['second_look']['why']}): "
+            f"{len(found)} columns")
+        found_all.extend(found)
+    return found_all
 
 
 def _read_printed(ref, fiscal_year_end: str, year_offset: int) -> tuple[list, list[str], list[str]]:

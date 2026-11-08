@@ -56,10 +56,14 @@ jobs:
         env:
           SYMBOLS: ${{ inputs.symbols }}
           SINCE: ${{ inputs.since }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
           import json, os
-          pilot = json.load(open("statements/pilot.json"))
+          # A branch named statements/run-<set> runs statements/sets/<set>.json; any other branch runs the pilot set.
+          branch = os.environ.get("BRANCH", "")
+          name = branch.split("statements/run-", 1)[1] if branch.startswith("statements/run-") else None
+          pilot = json.load(open(f"statements/sets/{name}.json" if name else "statements/pilot.json"))
           symbols = [s.strip().upper() for s in os.environ.get("SYMBOLS", "").split(",") if s.strip()] or pilot["symbols"]
           print("symbols=" + json.dumps(symbols))
           print("since=" + (os.environ.get("SINCE") or pilot["since"]))

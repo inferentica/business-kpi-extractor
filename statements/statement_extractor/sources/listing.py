@@ -40,3 +40,9 @@ def _with_retries(read):
                 raise
             time.sleep(wait)
     return None
+
+
+def filing_for(accession: str):
+    """A filing again by its accession, for a second look at its documents."""
+    from edgar import find
+    return _with_retries(lambda: find(accession))

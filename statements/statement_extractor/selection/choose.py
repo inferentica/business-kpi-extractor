@@ -15,11 +15,15 @@ _RESTATED = 1e-6  # a line differs when it moved by more than this share of itse
 
 
 def differences(later: Reading, earlier: Reading) -> dict:
+    """How a later presentation of a period differs from its own filing's: lines restated, lines whose sign alone
+    differs (a presentation choice, JPM's impairment line printed as a loss in one filing and a charge in another),
+    and lines added or removed."""
     new, old = line_keys(later.lines), line_keys(earlier.lines)
-    changed = [key for key in new.keys() & old.keys()
-               if new[key] is not None and old[key] is not None
-               and abs(new[key] - old[key]) > max(1.0, _RESTATED * max(abs(new[key]), abs(old[key])))]
-    return {"changed": sorted(changed), "added": sorted(new.keys() - old.keys()), "removed": sorted(old.keys() - new.keys())}
+    both = [key for key in new.keys() & old.keys() if new[key] is not None and old[key] is not None]
+    moved = [key for key in both if abs(new[key] - old[key]) > max(1.0, _RESTATED * max(abs(new[key]), abs(old[key])))]
+    sign_only = [key for key in moved if abs(abs(new[key]) - abs(old[key])) <= max(1.0, _RESTATED * abs(new[key]))]
+    return {"changed": sorted(set(moved) - set(sign_only)), "sign_only": sorted(sign_only),
+            "added": sorted(new.keys() - old.keys()), "removed": sorted(old.keys() - new.keys())}
 
 
 def choose(readings: list[Reading]) -> list[dict]:
@@ -32,7 +36,7 @@ def choose(readings: list[Reading]) -> list[dict]:
     for key, group in groups.items():
         kept = [reading for reading in group if reading.status == "kept"]
         own = next((reading for reading in sorted(group, key=lambda item: item.filed) if reading.own), None)
-        winner = max(kept, key=lambda item: (item.filed, item.own)) if kept else None
+        winner = max(kept, key=lambda item: (item.filed, item.own, item.source == "xbrl")) if kept else None
         record = {
             "statement": key[0], "fiscal_year": key[1], "fiscal_period": key[2], "duration": key[3],
             "period_end": max(reading.period_end for reading in group).isoformat(),
