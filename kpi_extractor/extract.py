@@ -257,7 +257,7 @@ _OTHER_PERIOD = re.compile(r"\bfirst (?:six|nine) months\b|\b(?:six|nine|twelve)
                            r"|\bfull[- ]year\b|\bfiscal (?:year )?\d{4}\b|\byear[- ]to[- ]date\b|\bYTD\b|\bfirst half\b|\bH1\b", re.I)
 # A KPI defined over a longer span than the quarter, which such wording describes rather than contradicts.
 _LONG_SPAN_KPI = re.compile(r"year[- ]to[- ]date|\bYTD\b|cumulative|all[- ]time|trailing|\bTTM\b|\bLTM\b|twelve months|full[- ]year|annual|"
-                            r"since (?:inception|launch)|to date", re.I)
+                            r"current[- ]year|first[- ]half|\bH1\b|since (?:inception|launch)|to date", re.I)
 # A KPI that is a level at period end (a stock), not a flow over it: a year-to-date change can lead to its level.
 _STOCK_KPI = re.compile(r"backlog|obligations?|\bRPO\b|\bcRPO\b|customers?|subscribers?|members?|users?|base\b|balances?|assets|"
                         r"\bAU[MSA]\b|in force|count\b|sites|rigs|fleet|stores|locations|employees|headcount|deposits|loans|capacity|"

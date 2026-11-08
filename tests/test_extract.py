@@ -423,6 +423,9 @@ def test_a_quote_for_the_year_to_date_is_not_the_quarters_count():
     assert values == [] and "not the quarter's" in problems[0]
     values, problems = read("Year-to-Date Contract Commitments")
     assert problems == [] and values[0].value == 14
+    # A KPI defined for the year in progress keeps a full-year quote: Borr's current-year contract coverage.
+    assert _read_quote("Full year 2025 contract coverage of 85% at an average dayrate of $145,000.", "Current-Year Contract Coverage",
+                       "percent", "Full year 2025 contract coverage of 85%", "85%") == 85
     # A year-to-date change that leads to a stock measure's level: the level is the quarter's figure (GE Vernova).
     assert _read_quote("Our Electrification equipment backlog increased $6.5 billion year-to-date, to approximately $26 billion.",
                        "Electrification Equipment Backlog", "currency",
