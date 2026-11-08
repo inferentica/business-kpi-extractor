@@ -22,12 +22,21 @@ from .sec import configure_identity
 GOLDEN = Path("evals/golden.json")  # relative to the repository root, where the workflow runs
 
 
+def fixed_list_row(spec: dict) -> dict:
+    """A trial's saved list (trial.json "lists") as the stored row the KPI-list step reads."""
+    return {"groups": spec.get("groups") or [], "names": spec.get("names") or {}, "version": int(spec.get("version") or 1),
+            "source_accession": spec.get("sourceAccession") or spec.get("source_accession") or "fixed"}
+
+
 class EvalControl:
     """The control plane for AI calls and run bookkeeping; storage and company state stay local."""
 
-    def __init__(self, plane: ControlPlane, stored_lists: bool = False):
+    def __init__(self, plane: ControlPlane, stored_lists: bool = False, fixed_lists: dict[str, dict] | None = None):
         self.plane = plane
         self.stored_lists = stored_lists
+        # A trial's KPI lists given whole (an earlier trial's): a rerun then measures the readers alone, never a list
+        # Propose writes differently each time (Grifols' 11 KPIs one run, none the next).
+        self.fixed_lists = fixed_lists or {}
         self.values: dict[str, list[dict]] = {}
         self.specs: dict[str, dict] = {}  # the list a run writes (fresh lists): scored against the owner's
 
@@ -37,6 +46,8 @@ class EvalControl:
 
     def call(self, operation: str, **payload) -> dict:
         if operation == "symbol_state":
+            if payload.get("symbol") in self.fixed_lists:
+                return {"spec": fixed_list_row(self.fixed_lists[payload["symbol"]]), "filings": [], "values": []}
             if self.stored_lists:
                 # Production's KPI list and saved row choices, with every filing read fresh: the readers are scored
                 # without paying for (or varying with) a newly written list.

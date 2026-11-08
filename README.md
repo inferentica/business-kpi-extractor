@@ -80,3 +80,21 @@ python -m kpi_extractor --dry-run --symbols NVDA,TSM --quarters 8     # SEC data
 gh workflow run extract.yml -f symbols=TSM -f quarters=20             # production run for one company
 gh workflow run evaluate.yml                                          # score against the golden set
 ```
+
+## Verifying a change before it is pushed
+
+Every change passes the regression net first, in one command:
+
+```bash
+python -m kpi_extractor.verify --trial eval-results/trial.json --remote
+```
+
+1. All tests, by their real exit code.
+2. The rule replay (`kpi_extractor.rule_replay`): each figure the last trial accepted is read again from its own filing with
+   the current code, no AI, and every figure whose value or status would change is listed. Each change must be one the
+   change meant.
+3. With `--remote`, the 88-value golden set and the hand-audited set (`evals/audited.json`) on GitHub.
+
+A 50-company trial is a confirmation, not a test: rerun one only after the net passes, with `lists_from` set to an
+earlier trial's run id so the rerun measures the readers alone, not a newly written list.
+

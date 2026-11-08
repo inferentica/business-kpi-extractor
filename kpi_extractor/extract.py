@@ -815,6 +815,8 @@ def _locator_record(document: Document, locator: Locator) -> dict:
         cells = [parse_number(cell) for cell in row]
         return {"table": locator.table, "row": locator.row, "col": locator.col,
                 "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:], "scale": locator.scale,
+                # The words the reading quoted for its scale, so a later replay judges the scale exactly as this one did.
+                **({"scale_text": clean(locator.scale_text)[:80]} if locator.scale_text else {}),
                 "header": column_header(table, locator.row, locator.col),
                 # The row's own numbers as printed, the read cell first: a repeat the row itself shows is no wrong column.
                 "row_numbers": [cells[locator.col].value if locator.col < len(cells) and cells[locator.col] else None,

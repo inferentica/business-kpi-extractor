@@ -38,8 +38,8 @@ _SECOND = re.compile(r"^second read: (\w+)")
 class TrialControl(EvalControl):
     """As Evaluate's control (company state starts empty, nothing reaches the store), also keeping filings and lists."""
 
-    def __init__(self, plane: ControlPlane):
-        super().__init__(plane, stored_lists=False)
+    def __init__(self, plane: ControlPlane, fixed_lists: dict[str, dict] | None = None):
+        super().__init__(plane, stored_lists=False, fixed_lists=fixed_lists)
         self.final: dict[str, dict[tuple, dict]] = {}
         self.filings: dict[str, dict[str, dict]] = {}
 
@@ -53,9 +53,12 @@ class TrialControl(EvalControl):
         return super().call(operation, **payload)
 
 
-def trial_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolResult, list[dict], list[dict], dict | None]:
-    control = TrialControl(plane)
-    result = run_symbol(symbol, lambda: SymbolPipeline(control, symbol, quarters, True, log=lambda line: print(line, flush=True)).run())
+def trial_symbol(plane: ControlPlane, symbol: str, quarters: int, fixed_lists: dict[str, dict] | None = None
+                 ) -> tuple[SymbolResult, list[dict], list[dict], dict | None]:
+    control = TrialControl(plane, fixed_lists)
+    # With its list given, a company is not forced: the KPI-list step keeps the list instead of proposing one.
+    fresh = symbol not in (fixed_lists or {})
+    result = run_symbol(symbol, lambda: SymbolPipeline(control, symbol, quarters, fresh, log=lambda line: print(line, flush=True)).run())
     return (result, list(control.final.get(symbol, {}).values()), list(control.filings.get(symbol, {}).values()),
             control.specs.get(symbol))
 
@@ -166,14 +169,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quarters", type=int, default=4)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--seed", type=int, default=2026)
+    parser.add_argument("--lists-from", default="", help="An earlier trial.json whose KPI lists to reuse (readers measured alone)")
     args = parser.parse_args(argv)
     configure_identity()
     symbols = normalize_symbols(args.symbols)
     plane = ControlPlane(os.environ["BUSINESS_KPI_WORKFLOW_URL"])
     started = plane.call("start", runId=None, triggerType="eval", symbols=symbols, quarters=args.quarters, forceRefresh=True)
     plane.run_id = started["runId"]
+    fixed = {}
+    if args.lists_from:
+        fixed = {symbol: spec for symbol, spec in (json.load(open(args.lists_from)).get("lists") or {}).items()
+                 if spec and spec.get("groups")}
+        print(f"Lists: {len(fixed)} reused from {args.lists_from}; {len(set(symbols) - set(fixed))} written fresh", flush=True)
     with company_pool(max(1, min(args.workers, len(symbols)))) as pool:
-        outcomes = list(pool.map(trial_symbol, [plane] * len(symbols), symbols, [args.quarters] * len(symbols)))
+        outcomes = list(pool.map(trial_symbol, [plane] * len(symbols), symbols, [args.quarters] * len(symbols),
+                                 [fixed] * len(symbols)))
     companies = [company_report(symbol, *outcome) for symbol, outcome in zip(symbols, outcomes)]
     summary = summarize(companies)
     sample = audit_sample({symbol: outcome[1] for symbol, outcome in zip(symbols, outcomes)}, AUDIT_SAMPLE, args.seed)

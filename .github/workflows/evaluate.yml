@@ -36,6 +36,10 @@ on:
         required: true
         default: evals/golden.json
         type: string
+      lists_from:
+        description: For a trial - an earlier Evaluate run's id whose KPI lists to reuse, so the rerun measures the readers alone
+        required: false
+        type: string
       offpeak:
         description: Wait for DeepSeek's off-peak hours (half price) before reading
         required: false
@@ -60,6 +64,7 @@ on:
 
 permissions:
   contents: read
+  actions: read     # to fetch an earlier run's lists (lists_from)
   id-token: write
 
 jobs:
@@ -87,13 +92,23 @@ jobs:
         env:
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
         run: python -m kpi_extractor.prompt_eval
+      - name: Fetch the lists to reuse
+        if: inputs.suite == 'trial' && inputs.lists_from != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LISTS_FROM: ${{ inputs.lists_from }}
+        run: gh run download "$LISTS_FROM" --repo "$GITHUB_REPOSITORY" --dir lists-from
       - name: Read new companies (trial)
         if: inputs.suite == 'trial'
         env:
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
           SYMBOLS: ${{ inputs.symbols }}
           QUARTERS: ${{ inputs.quarters || '4' }}
-        run: python -m kpi_extractor.trial --symbols "$SYMBOLS" --quarters "$QUARTERS"
+          LISTS_FROM: ${{ inputs.lists_from }}
+        run: |
+          LISTS=""
+          if [ -n "$LISTS_FROM" ]; then LISTS="--lists-from $(find lists-from -name trial.json | head -1)"; fi
+          python -m kpi_extractor.trial --symbols "$SYMBOLS" --quarters "$QUARTERS" $LISTS
       - name: Score against the golden set
         if: inputs.suite != 'prompts' && inputs.suite != 'trial'
         env:

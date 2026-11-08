@@ -113,3 +113,29 @@ def test_the_checker_flags_a_count_scaled_with_no_scale_stated_for_it():
         return check_figure(item, {"locator": {"table": "A_T0", "row": row, "col": 1, "scale": 1000}}, fetcher).flags
     assert any("no scale stated" in f for f in flags("NdPr Production Volume", 3, 721_000))
     assert not any("no scale stated" in f for f in flags("U.S. Domestic Average Daily Package Volume", 5, 14_716_000))
+
+
+def test_a_trial_given_a_list_serves_it_as_the_stored_row():
+    from kpi_extractor.evaluate import EvalControl
+    spec = {"version": 2, "groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric", "kpis": []}],
+            "names": {}, "sourceAccession": "0001"}
+    control = EvalControl(plane=None, fixed_lists={"MP": spec})
+    row = control.call("symbol_state", symbol="MP")["spec"]
+    assert row == {"groups": spec["groups"], "names": {}, "version": 2, "source_accession": "0001"}
+
+
+def test_the_rule_replay_reads_a_stored_figure_again_and_names_the_change():
+    from kpi_extractor.audit_check import Fetcher
+    from kpi_extractor.rule_replay import replay_value
+    html = """<table><tr><td></td><td>2025</td></tr><tr><td>Revenue:</td><td>(in thousands)</td></tr>
+<tr><td>Separated NdPr products</td><td></td></tr><tr><td>NdPr Production Volume (MTs)</td><td>721</td></tr></table>"""
+    fetcher = Fetcher(); fetcher.raw["https://example.com/x.htm"] = html
+    stored = {"symbol": "MP", "group_key": "kpi_operating", "kpi_key": "ndpr", "group_label": "Operating Metrics",
+              "group_kind": "metric", "kpi_label": "NdPr Production Volume (MTs)", "unit": "count", "value": 721_000.0,
+              "validation_status": "verified", "method": "ai", "period_end": "2025-09-30", "fiscal_period": "Q3",
+              "fiscal_year": "2025", "currency": None, "source_url": "https://example.com/x.htm",
+              "locator": {"table": "A_T0", "row": 3, "col": 1, "row_label": "NdPr Production Volume (MTs)", "scale": 1.0}}
+    result = replay_value(stored, fetcher)
+    assert result.change == "value" and result.after == 721
+    assert replay_value({**stored, "value": 721.0}, fetcher).change == "same"
+    assert replay_value({**stored, "locator": {"tagged": True}}, fetcher) is None
