@@ -20,7 +20,8 @@ from ...checks.printed import balance_check, cash_check, income_check, total_che
 from ...domain.model import Reading
 from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
-from .dates import column_periods, statement_scale
+from .dates import column_periods
+from .scales import line_scale, share_scale, statement_scale
 from .find import TITLES, find_statements, unlabelled_totals
 from .tables import Table, figure_columns
 
@@ -70,7 +71,8 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if labelled is None:
                 notes.append(f"{kind}: column {period.key} off the calendar")
                 continue
-            reading = _read_column(kind, [(table, columns[index], columns) for table, columns in layout], period, scale, labelled)
+            reading = _read_column(kind, [(table, columns[index], columns) for table, columns in layout], period,
+                                   (scale, share_scale(group, scale)), labelled)
             if reading is None:
                 continue
             reading.accession, reading.form, reading.filed = accession, form, filed
@@ -91,8 +93,14 @@ def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> flo
     return None
 
 
-def _read_column(kind, layout, period, scale, labelled) -> Reading | None:
+# A heading over share counts: Apple's "Shares used in computing earnings per share (in thousands):" over Basic and
+# Diluted, which would otherwise read as per-share figures.
+_SHARE_HEADING = re.compile(r"\bshares\b|weighted[-\s]average|\baverage\s+(number|common)", re.I)
+
+
+def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
     fiscal_year, fiscal_period, duration = labelled
+    scale, shares_scale = scales
     lines: list[dict] = []
     printed: list[tuple[str, int, float | None]] = []  # label, level, figure as printed (None: a heading)
     named = unlabelled_totals([table for table, _column, _columns in layout]) if kind == "balance" else {}
@@ -112,8 +120,19 @@ def _read_column(kind, layout, period, scale, labelled) -> Reading | None:
             # A balance sheet has no per-share lines; "per share" there is a par value in a stock line's label (Kroger's
             # "Common stock, $1 par per share … 955").
             per_share = kind != "balance" and bool(PER_SHARE.search(row.label))
-            shares = not per_share and bool(SHARE_COUNT.search(row.label)) and kind == "income"
-            amount = None if value is None else value if per_share else value * (1 if shares else scale)
+            under_shares = kind == "income" and bool(_SHARE_HEADING.search(heading)) and \
+                re.match(r"^(basic|diluted|primary|fully\s+diluted|assuming\s+dilution)\b", row.label, re.I) is not None
+            counted = re.match(r"^(shares|weighted|average|number\s+of\s+shares)\b", row.label, re.I) is not None
+            if under_shares or counted or re.search(r"\bshares\b", row.label, re.I) and not re.search(
+                    r"per\s+(common\s+)?share\b|earnings|income|loss", row.label, re.I):
+                per_share = False  # TSMC's "BASIC WEIGHTED AVERAGE SHARES OUTSTANDING (THOUSANDS)"
+            shares = not per_share and kind == "income" and (under_shares or counted or bool(SHARE_COUNT.search(row.label)))
+            if value is None or per_share:
+                amount = value
+            elif shares:
+                amount = value * (line_scale(row.label, heading if under_shares else "") or shares_scale)
+            else:
+                amount = value * scale
             lines.append({"line": len(lines), "concept": _concept(row.label, kind), "label": row.label[:300],
                           "level": max(0, min(20, row.level - base)), "is_heading": not row.figures, "value": amount})
             meaning = named.get(id(row), row.label)

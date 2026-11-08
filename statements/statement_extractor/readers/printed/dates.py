@@ -11,13 +11,6 @@ from .find import TITLES
 from .tables import Table, figure_columns, header_text
 
 
-_SCALE = re.compile(r"\b(?:in|amounts in|dollars in|expressed in)\s+(?:[A-Z]{2,3}\$?\s+|US\$\s*|NT\$\s*|€\s*|euros?\s+)?"
-                    r"(thousands|millions|billions)\b", re.I)
-
-
-_SCALES = {"thousands": 1e3, "millions": 1e6, "billions": 1e9}
-
-
 _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
 
 
@@ -46,18 +39,6 @@ def _span_days(count: str, unit: str) -> int:
     if unit.lower() == "weeks":
         return number * 7
     return {3: 91, 6: 182, 9: 273, 12: 364}.get(number, round(number * 30.4))
-
-
-def statement_scale(group: list[Table]) -> float | None:
-    first = group[0]
-    leading = []
-    for row in first.rows:
-        if row.figures:
-            break
-        leading.append(row.label)  # "(In millions except par value)" printed as a row above the figures
-    text = first.context[-400:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in first.header) + " " + " ".join(leading)
-    found = {_SCALES[match.group(1).lower()] for match in _SCALE.finditer(text)}
-    return found.pop() if len(found) == 1 else None
 
 
 def _date(month: str, day: str, year: str) -> date | None:

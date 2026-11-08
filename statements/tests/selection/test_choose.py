@@ -94,3 +94,16 @@ def test_a_sign_printed_only_in_a_note_settles_it():
     agreed = reading("fy11", date(2012, 2, 29), 100e6, own=False)
     [chosen] = choose([agreed, reading("fy12", date(2013, 2, 28), 100e6, own=False)], {"fy12": printed_figures(note)})
     assert chosen["lines"][0]["value"] == 100e6
+
+
+def test_a_comparative_column_takes_its_periods_own_dates():
+    from statement_extractor.selection.period_dates import align_dates
+    own = reading("fy06", date(2006, 12, 1), 1, own=True)
+    own.period_end, own.period_start = date(2006, 9, 30), date(2005, 9, 25)
+    later = reading("fy07", date(2007, 11, 15), 1, own=False)
+    later.period_end, later.period_start = date(2006, 9, 29), date(2005, 9, 30)  # dated from the FY2007 header
+    far = reading("fy08", date(2008, 11, 5), 1, own=False)
+    far.period_end = date(2006, 12, 31)
+    aligned = {r.accession: r for r in align_dates([own, later, far])}
+    assert aligned["fy07"].period_end == date(2006, 9, 30) and aligned["fy07"].period_start == date(2005, 9, 25)
+    assert aligned["fy08"].period_end == date(2006, 12, 31)  # more than a week apart: another period, left alone

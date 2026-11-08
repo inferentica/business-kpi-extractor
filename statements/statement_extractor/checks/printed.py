@@ -145,9 +145,21 @@ def total_check(printed) -> Check:
             position = block_start(starts, position) - 1
         if count < 2 and not matched:
             continue
+        if not matched and _a_part_of_the_next_total(printed, index):
+            continue
         verified += 1
         if not matched:
             failures.append(f"{label[:40]} {value:,.1f}")
     if failures:
         return Check("totals", FAIL, "; ".join(failures[:3]))
     return Check("totals", PASS if verified else NONE, f"{verified} totals")
+
+
+def _a_part_of_the_next_total(printed, index: int) -> bool:
+    """A line labelled "Total" that is a part of the total after it, beside the total before it: Salesforce's "Total
+    stockholders' equity noncontrolling interest" between the parent's total equity and total stockholders' equity."""
+    if index < 1 or index + 1 >= len(printed):
+        return False
+    before, value, after = printed[index - 1][2], printed[index][2], printed[index + 1][2]
+    return None not in (before, value, after) and TOTAL.match(printed[index + 1][0]) is not None \
+        and close(before + value, after, 3)

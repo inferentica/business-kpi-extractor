@@ -60,12 +60,16 @@ EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translatio
 SECTIONS = re.compile(r"(operating|investing|financing)\s+activities$", re.I)
 
 
-PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax", re.I)
+# Goldman Sachs: "Pre-tax earnings".
+PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax|^pre-?\s?tax\s+(earnings|income|profit)\b",
+                    re.I)
 
 
 # Kroger 2009: "Net earnings including noncontrolling interests", then the parent's share.
 NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
+                        # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
+                        r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
                          r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit\s+for\s+the\s+(year|period)$", re.I)
 
 
