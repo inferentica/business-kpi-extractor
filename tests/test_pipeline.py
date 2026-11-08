@@ -1632,6 +1632,11 @@ def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
     assert _pipeline(None, [row("2018", "Q1", 10), row("2018", "Q2", 25), row("2018", "Q3", 60)])._scale_runs() == []
     kept = _pipeline(None, [*values[:2], {**values[2], "owner_decision": "corrected"}, *values[5:]])._scale_runs()
     assert ("2018", "Q2") not in {(v["fiscal_year"], v["fiscal_period"]) for v in kept}
+    # A per-unit amount has no table scale: FedEx's $15.32 composite yield is never raised to the quarters read wrongly
+    # with the table's "in thousands".
+    yields = [{**row(year, period, value), "unit": "currency", "kpi_label": "U.S. Domestic Composite Yield"}
+              for year, period, value in (("2025", "Q1", 14280.0), ("2025", "Q2", 14500.0), ("2025", "Q3", 14900.0), ("2026", "Q1", 15.32))]
+    assert _pipeline(None, yields)._scale_runs() == []
 
 
 def test_a_worked_out_remainder_takes_the_name_the_reports_table_gives_it():

@@ -239,6 +239,14 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         level = re.search(r"\b(?:to|reached|reaching|stood at|stands at|as of|at the end|ended the quarter with|now)\b", between)
         if not (level and _STOCK_KPI.search(kpi.label)):
             raise LocateError(f"the quote gives the figure {span.group(0).lower()!r}, not the quarter's")
+    # A slide's title can follow its figures: Borr's "22 New Commitments $625M Added Backlog Revenue ... 4,820+ Backlog
+    # Days 2025 YTD Contracting Statistics" gives the year to date, though no word before the figures says so.
+    # A quote that ends its sentence, and a next bullet or sentence ("Through the first six months of 2025, ..."), is no
+    # such title.
+    heading = re.split(r"[.;:!?]\s|\u2022|\n", block.text[block.text.find(quote) + len(quote):][:60])[0]
+    if not re.search(r"[.!?]$", quote.strip()) and (span := _YTD_TITLE.search(heading)) and not _LONG_SPAN_KPI.search(kpi.label) \
+            and not _NAMES_QUARTER.search(heading) and not _stands_at_period_end(kpi):
+        raise LocateError(f"the heading after the quote gives the figures {span.group(0).lower()!r}, not the quarter's")
     if other := net_gross_mismatch(before[-80:], kpi.label):
         raise LocateError(f"the quote gives the {other} figure, not {kpi.label!r}")
     if value > 0 and (kpi.unit == "percent" or (kpi.unit == "count" and _CHANGE_KPI.search(kpi.label))) \
@@ -289,6 +297,8 @@ _FORWARD = re.compile(r"\b(?:we|management|the company)\s+(?:now\s+)?(?:expects?
 # A figure for another period than the quarter: "for the first six months of 2023", "for fiscal year 2024".
 _OTHER_PERIOD = re.compile(r"\bfirst (?:six|nine) months\b|\b(?:six|nine|twelve) months ended\b|\bfor the (?:full )?(?:fiscal )?year\b"
                            r"|\bfull[- ]year\b|\bfiscal (?:year )?\d{4}\b|\byear[- ]to[- ]date\b|\bYTD\b|\bfirst half\b|\bH1\b", re.I)
+# A slide title naming the year to date ("2025 YTD Contracting Statistics").
+_YTD_TITLE = re.compile(r"(?:\b20\d{2}\s+)?\bYTD\b|\b[Yy]ear[- ]to[- ][Dd]ate\b")
 # A KPI defined over a longer span than the quarter, which such wording describes rather than contradicts.
 _LONG_SPAN_KPI = re.compile(r"year[- ]to[- ]date|\bYTD\b|cumulative|all[- ]time|trailing|\bTTM\b|\bLTM\b|twelve months|full[- ]year|annual|"
                             r"current[- ]year|first[- ]half|second[- ]half|\bH[12]\b|since (?:inception|launch)|to date", re.I)
@@ -503,7 +513,7 @@ _ROW_SCALE_SHORT = re.compile(r"\(\s*(?P<word>bil|bn|mil|mm|mn|thous)\.?\s*\)", 
 # A KPI priced per unit is in units, whatever its table's "$ Millions, Except as Indicated" or "In thousands, except
 # yield amounts" says: FedEx's "Revenue per Package" and "Package Yield", ConocoPhillips' "Realized Price ($/MCF)". Apollo's
 # "Yield" is an asset class, so a yield counts only for packages, freight, pounds, pieces, shipments, passengers or units.
-_PER_UNIT_KPI = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\b(?:package|freight|pound|piece|shipment|passenger|unit)\s+yields?\b|\bARP[AU]\b|\bASP\b"
+_PER_UNIT_KPI = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\b(?:package|freight|pound|piece|shipment|passenger|unit|composite)\s+(?:freight\s+|package\s+)?yields?\b|\bARP[AU]\b|\bASP\b"
                            r"|\b(?:day|daily)\s?rates?\s*(?:\(|$)|\bADR\b", re.I)  # Borr's "Average Dayrate", never its "Dayrate revenue"
 
 

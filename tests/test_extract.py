@@ -802,3 +802,15 @@ def test_a_reading_taken_for_the_year_keeps_only_the_year_and_its_end_levels():
     year = item("Productivity Ratio", "percent", "for the year ended @ #")
     kept, dropped = _year_columns_only([ratio, deposits, third, year])
     assert kept == [deposits, year] and len(dropped) == 2
+
+
+def test_a_slide_title_after_its_figures_names_their_period():
+    import pytest
+    text = ("5 Fleet Overview 22 New Commitments $625M Added Backlog Revenue $130k Avg Dayrate 4,820+ Backlog Days "
+            "2025 YTD Contracting Statistics Delivering strong coverage")
+    with pytest.raises(AssertionError):
+        _read_quote(text, "Contract Commitments Awarded", "count", "22 New Commitments $625M Added Backlog Revenue", "22")
+    # A KPI defined over the year to date reads it, and a level at the quarter's end is the quarter's.
+    assert _read_quote(text, "Contract Commitments Year to Date", "count", "22 New Commitments $625M Added Backlog Revenue", "22") == 22
+    assert _read_quote("Ending backlog $1.2 billion. YTD orders rose.", "Ending Backlog", "currency", "Ending backlog $1.2 billion",
+                       "$1.2 billion") == 1_200_000_000

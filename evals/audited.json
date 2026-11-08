@@ -542,11 +542,10 @@
     "fiscal_period": "Q2",
     "label": "^Added\\ Backlog\\ Revenue$",
     "unit": "currency",
-    "value": 541000000.0,
-    "currency": "USD",
-    "tolerance": 0.005,
+    "wrong_value": 541000000.0,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126032598/ef20080031_ex99-2.htm",
-    "audited": "audit2"
+    "audited": "audit2",
+    "found_wrong": "Borr's figures to the report date (its slide's 'YTD Contracting Statistics'), not the quarter's; my audit passed it"
   },
   {
     "symbol": "VOD",
@@ -6015,9 +6014,10 @@
     "fiscal_period": "Q2",
     "label": "^Added\\ Backlog\\ Days$",
     "unit": "count",
-    "value": 2584.0,
+    "wrong_value": 2584.0,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036125031411/ef20053984_ex99-2.htm",
-    "audited": "audit300b"
+    "audited": "audit300b",
+    "found_wrong": "Borr's figures to the report date (its slide's 'YTD Contracting Statistics'), not the quarter's; my audit passed it"
   },
   {
     "symbol": "BORR",
@@ -8960,9 +8960,10 @@
     "fiscal_period": "Q1",
     "label": "^Contract\\ Commitments\\ Awarded$",
     "unit": "count",
-    "value": 13.0,
+    "wrong_value": 13.0,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126022412/ef20074577_ex99-2.htm",
-    "audited": "audit300c"
+    "audited": "audit300c",
+    "found_wrong": "Borr's figures to the report date (its slide's 'YTD Contracting Statistics'), not the quarter's; my audit passed it"
   },
   {
     "symbol": "HSIC",
@@ -10921,11 +10922,10 @@
     "fiscal_period": "Q1",
     "label": "^Added\\ Backlog\\ Revenue$",
     "unit": "currency",
-    "value": 274000000.0,
-    "currency": "USD",
-    "tolerance": 0.005,
+    "wrong_value": 274000000.0,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126022384/ef20074627_ex99-2.htm",
-    "audited": "audit300d"
+    "audited": "audit300d",
+    "found_wrong": "Borr's figures to the report date (its slide's 'YTD Contracting Statistics'), not the quarter's; my audit passed it"
   },
   {
     "symbol": "MCBS",
@@ -11188,11 +11188,10 @@
     "fiscal_period": "Q3",
     "label": "^Added\\ Backlog\\ Revenue$",
     "unit": "currency",
-    "value": 625000000.0,
-    "currency": "USD",
-    "tolerance": 0.005,
+    "wrong_value": 625000000.0,
     "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036125040869/ef20058523_ex99-2.htm",
-    "audited": "audit300d"
+    "audited": "audit300d",
+    "found_wrong": "Borr's figures to the report date (its slide's 'YTD Contracting Statistics'), not the quarter's; my audit passed it"
   },
   {
     "symbol": "BORR",

@@ -11,7 +11,7 @@ from ..ai import Spec
 from ..derive import derive_periods
 from ..document import Document, parse_number
 from ..checks import count_jump, parts_add_up, reported_matches
-from ..extract import ReadValue, column_header
+from ..extract import _PER_UNIT_KPI, ReadValue, column_header
 from ..sec import FilingRef
 from .shared import (AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
                      _year_ago_cells, list_parents, value_key)
@@ -439,8 +439,10 @@ class SeriesChecks:
         quarters and leaves the run between them; an owner's figure is never changed, and percentages have no scale."""
         series: dict[tuple, list[dict]] = {}
         for v in self.values.values():
+            # A per-unit amount has no table scale to put back: FedEx's $15.32 composite yield, read right, was raised
+            # a thousandfold to match quarters read wrongly with the table's "in thousands".
             if (v["method"] == "ai" and v["group_kind"] == "metric" and v["validation_status"] != "rejected"
-                    and v["unit"] != "percent" and float(v["value"]) > 0):
+                    and v["unit"] != "percent" and float(v["value"]) > 0 and not _PER_UNIT_KPI.search(v.get("kpi_label") or "")):
                 series.setdefault((v["group_key"], v["kpi_key"], v["fiscal_period"] == "FY"), []).append(v)
         records = []
         for rows in series.values():
