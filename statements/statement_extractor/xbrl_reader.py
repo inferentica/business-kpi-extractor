@@ -274,6 +274,8 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
             "level": max(0, min(20, int(level) - base)) if level is not None else 0,
             "is_heading": heading, "value": value,
         })
+    if name == "balance":
+        lines = _through_grand_total(lines)
     lines = [line for index, line in enumerate(lines) if not line["is_heading"] or _has_lines_below(lines, index)]
     if not any(not line["is_heading"] for line in lines):
         return None
@@ -285,6 +287,17 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
         accession="", form="", filed=date.min, own=False, source="xbrl",
         lines=lines, checks=checks_for(name, column, arcs),
     )
+
+
+_GRAND_TOTAL = re.compile(r"^(us-gaap_LiabilitiesAndStockholdersEquity|ifrs-full_EquityAndLiabilities)$")
+
+
+def _through_grand_total(lines: list[dict]) -> list[dict]:
+    """A balance sheet's lines up to its total liabilities and equity. Lines after it are a memo, not lines of the
+    statement (JPM's FY2010 "limited program-wide credit enhancement", tagged without a dimension and printed
+    nowhere on the balance sheet); a figure counted there would be counted twice."""
+    last = max((index for index, line in enumerate(lines) if _GRAND_TOTAL.match(line["concept"])), default=None)
+    return lines if last is None else lines[:last + 1]
 
 
 def _coarser(left: int | None, right: int | None) -> int | None:

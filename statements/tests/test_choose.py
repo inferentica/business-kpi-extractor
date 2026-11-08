@@ -35,3 +35,12 @@ def test_a_fourth_quarter_from_a_restated_year_and_an_unrestated_nine_months_is_
     year = [reading("own", date(2009, 10, 27), 100, own=True), reading("later", date(2010, 10, 27), 110, own=False)]
     nine = [reading("q3", date(2009, 7, 22), 70, own=True, period="Q3", duration="ytd")]
     assert mixed_vintage_q4s(choose(year + nine)) == ["income 2009"]
+
+
+def test_a_sign_most_filings_print_wins_over_the_newest_that_dropped_it():
+    # JPM's 2010 credit losses recognized in income: (100) in the FY2010 and FY2011 10-Ks, 100 in the FY2012 one.
+    year = [reading("fy10", date(2011, 2, 28), -100e6, own=True), reading("fy11", date(2012, 2, 29), -100e6, own=False),
+            reading("fy12", date(2013, 2, 28), 100e6, own=False)]
+    [chosen] = choose(year)
+    assert chosen["source_accession"] == "fy12" and chosen["lines"][0]["value"] == -100e6
+    assert "versus_own" not in chosen or not chosen["versus_own"]["changed"]

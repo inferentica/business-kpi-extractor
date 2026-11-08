@@ -170,3 +170,11 @@ def test_every_beginning_balance_opens_the_period_and_the_main_one_shown_again_c
     readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
     flows = next(r for r in readings if r.statement == "cash_flow" and r.own)
     assert flows.status == "kept"
+
+
+def test_a_balance_sheet_ends_at_total_liabilities_and_equity():
+    x = fake_xbrl()
+    x.statements.balance_sheet().rows.append(row("jpm_LimitedProgramWideCreditEnhancement", {"instant_2009-09-26": 2_000e6}))
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    balance = next(r for r in readings if r.statement == "balance" and r.own)
+    assert balance.lines[-1]["concept"] == "us-gaap_LiabilitiesAndStockholdersEquity"

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from .base import company_profile, configure_identity, learn_year_offset, load_submission, periodic_reports
 from .choose import choose, mixed_vintage_q4s
+from .golden import report_text, score
 from .xbrl_reader import read_filing
 
 # AI calls this package makes, by design: none. Reported in every summary so a run's cost is on record.
@@ -170,8 +171,11 @@ def main(argv: list[str] | None = None) -> int:
         summary = read_company(args.symbol.upper(), date.fromisoformat(args.since), Path(args.out))
         print(json.dumps({key: summary[key] for key in ("symbol", "periods", "by_status", "own_kept", "own_expected")}))
         return 0
-    text = report([Path(folder) for folder in args.folders])
+    folders = [Path(folder) for folder in args.folders]
+    scored = score(folders)
+    text = report([Path(folder) for folder in args.folders]) + "\n\n" + report_text(scored)
     print(text)
+    Path("golden_results.json").write_text(json.dumps(scored, default=str, indent=1))
     summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_file:
         with open(summary_file, "a") as handle:

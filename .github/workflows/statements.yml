@@ -112,7 +112,12 @@ jobs:
       - run: uv pip install . ./statements
       - uses: actions/download-artifact@v7
         with:
-          pattern: statements-*
+          pattern: statements-[A-Z]*
           path: out
           merge-multiple: true
       - run: python -m statement_extractor report out/*
+      - uses: actions/upload-artifact@v6
+        with:
+          name: statements-golden
+          path: golden_results.json
+          retention-days: 30
