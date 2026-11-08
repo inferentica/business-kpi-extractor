@@ -4680,16 +4680,6 @@
     "audited": "audit300b"
   },
   {
-    "symbol": "MP",
-    "period_end": "2026-09-30",
-    "fiscal_period": "Q3",
-    "label": "^REO\\ Production\\ Volume$",
-    "unit": "count",
-    "value": 12887000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000056/mpmcq32026er.htm",
-    "audited": "audit300b"
-  },
-  {
     "symbol": "LMT",
     "period_end": "2025-09-28",
     "fiscal_period": "Q3",
@@ -5102,16 +5092,6 @@
     "audited": "audit300b"
   },
   {
-    "symbol": "MP",
-    "period_end": "2026-03-31",
-    "fiscal_period": "Q1",
-    "label": "^REO\\ Production\\ Volume$",
-    "unit": "count",
-    "value": 12983000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000027/mpmcq12026er.htm",
-    "audited": "audit300b"
-  },
-  {
     "symbol": "PINE",
     "period_end": "2025-09-30",
     "fiscal_period": "Q3",
@@ -5412,16 +5392,6 @@
     "audited": "audit300b"
   },
   {
-    "symbol": "MP",
-    "period_end": "2026-06-30",
-    "fiscal_period": "Q2",
-    "label": "^NdPr\\ Sales\\ Volume$",
-    "unit": "count",
-    "value": 1006000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000047/mpmcq22026er.htm",
-    "audited": "audit300b"
-  },
-  {
     "symbol": "SUI",
     "period_end": "2025-09-30",
     "fiscal_period": "Q3",
@@ -5576,16 +5546,6 @@
     "currency": "CAD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312526364091/d143422dex991.htm",
-    "audited": "audit300b"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2026-09-30",
-    "fiscal_period": "Q3",
-    "label": "^NdPr\\ Production\\ Volume$",
-    "unit": "count",
-    "value": 1018000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000056/mpmcq32026er.htm",
     "audited": "audit300b"
   },
   {
@@ -6489,16 +6449,6 @@
     "audited": "audit300b"
   },
   {
-    "symbol": "MP",
-    "period_end": "2025-12-31",
-    "fiscal_period": "Q4",
-    "label": "^NdPr\\ Production\\ Volume$",
-    "unit": "count",
-    "value": 718000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000007/mpmcq42025er.htm",
-    "audited": "audit300b"
-  },
-  {
     "symbol": "SHOO",
     "period_end": "2025-06-30",
     "fiscal_period": "Q2",
@@ -6615,16 +6565,6 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/717605/000119312526170559/hxl-ex99_2.htm",
-    "audited": "audit300b"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2025-09-30",
-    "fiscal_period": "Q3",
-    "label": "^NdPr\\ Sales\\ Volume$",
-    "unit": "count",
-    "value": 525000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000052/mpmcq32025er.htm",
     "audited": "audit300b"
   },
   {
@@ -6768,16 +6708,6 @@
     "audited": "audit300b"
   },
   {
-    "symbol": "MP",
-    "period_end": "2025-06-30",
-    "fiscal_period": "Q2",
-    "label": "^REO\\ Production\\ Volume$",
-    "unit": "count",
-    "value": 13145000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
-    "audited": "audit300b"
-  },
-  {
     "symbol": "RTX",
     "period_end": "2026-03-31",
     "fiscal_period": "Q1",
@@ -6799,16 +6729,6 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000021/prim-20260731xex99d1.htm",
-    "audited": "audit300b"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2025-09-30",
-    "fiscal_period": "Q3",
-    "label": "^NdPr\\ Production\\ Volume$",
-    "unit": "count",
-    "value": 721000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000052/mpmcq32025er.htm",
     "audited": "audit300b"
   },
   {
@@ -6987,16 +6907,6 @@
     "group": "^Revenue\\ by\\ Product\\ \\(International\\)$",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1000228/000100022826000043/exhibit991.htm",
-    "audited": "audit300b"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2025-06-30",
-    "fiscal_period": "Q2",
-    "label": "^NdPr\\ Sales\\ Volume$",
-    "unit": "count",
-    "value": 443000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
     "audited": "audit300b"
   },
   {
@@ -8357,16 +8267,6 @@
     "audited": "audit300c"
   },
   {
-    "symbol": "MP",
-    "period_end": "2025-06-30",
-    "fiscal_period": "Q2",
-    "label": "^NdPr\\ Production\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 597000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
-    "audited": "audit300c"
-  },
-  {
     "symbol": "BNS",
     "period_end": "2026-01-31",
     "fiscal_period": "Q1",
@@ -9475,16 +9375,6 @@
     "audited": "audit300c"
   },
   {
-    "symbol": "MP",
-    "period_end": "2026-06-30",
-    "fiscal_period": "Q2",
-    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 1006000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000047/mpmcq22026er.htm",
-    "audited": "audit300c"
-  },
-  {
     "symbol": "RTX",
     "period_end": "2026-09-30",
     "fiscal_period": "Q3",
@@ -9507,16 +9397,6 @@
     "audited": "audit300c"
   },
   {
-    "symbol": "MP",
-    "period_end": "2026-06-30",
-    "fiscal_period": "Q2",
-    "label": "^REO\\ Production\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 11072000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000047/mpmcq22026er.htm",
-    "audited": "audit300c"
-  },
-  {
     "symbol": "GRFS",
     "period_end": "2026-06-30",
     "fiscal_period": "Q2",
@@ -9526,16 +9406,6 @@
     "currency": "EUR",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926087634/tm2621481d1_6k.htm",
-    "audited": "audit300c"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2026-06-30",
-    "fiscal_period": "Q2",
-    "label": "^NdPr\\ Production\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 840000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000047/mpmcq22026er.htm",
     "audited": "audit300c"
   },
   {
@@ -9670,16 +9540,6 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182926000030/a2026-10x208xkerexhibit99.htm",
-    "audited": "audit300c"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2026-09-30",
-    "fiscal_period": "Q3",
-    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 1020000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000056/mpmcq32026er.htm",
     "audited": "audit300c"
   },
   {
@@ -9871,26 +9731,6 @@
     "audited": "audit300c"
   },
   {
-    "symbol": "MP",
-    "period_end": "2025-12-31",
-    "fiscal_period": "Q4",
-    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 562000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000007/mpmcq42025er.htm",
-    "audited": "audit300c"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2025-06-30",
-    "fiscal_period": "Q2",
-    "label": "^REO\\ Production\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 13145000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
-    "audited": "audit300c"
-  },
-  {
     "symbol": "GTN",
     "period_end": "2026-03-31",
     "fiscal_period": "Q1",
@@ -10004,16 +9844,6 @@
     "unit": "count",
     "value": 120.0,
     "source": "https://www.sec.gov/Archives/edgar/data/43196/000143774926015344/ex_956963.htm",
-    "audited": "audit300c"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2026-03-31",
-    "fiscal_period": "Q1",
-    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 1006000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000027/mpmcq12026er.htm",
     "audited": "audit300c"
   },
   {
@@ -12883,16 +12713,6 @@
     "audited": "audit300d"
   },
   {
-    "symbol": "MP",
-    "period_end": "2025-12-31",
-    "fiscal_period": "Q4",
-    "label": "^NdPr\\ Production\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 718000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136826000007/mpmcq42025er.htm",
-    "audited": "audit300d"
-  },
-  {
     "symbol": "BKNG",
     "period_end": "2026-06-30",
     "fiscal_period": "Q2",
@@ -13397,16 +13217,6 @@
     "unit": "count",
     "value": 4537000.0,
     "source": "https://www.sec.gov/Archives/edgar/data/1005210/000119312526038543/sph-ex99_1.htm",
-    "audited": "audit300d"
-  },
-  {
-    "symbol": "MP",
-    "period_end": "2025-06-30",
-    "fiscal_period": "Q2",
-    "label": "^NdPr\\ Sales\\ Volume\\ \\(MTs\\)$",
-    "unit": "count",
-    "value": 443000.0,
-    "source": "https://www.sec.gov/Archives/edgar/data/1801368/000180136825000025/mpmcq22025er.htm",
     "audited": "audit300d"
   },
   {

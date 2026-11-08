@@ -146,9 +146,10 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
             # A table's "(in millions, except employee data)" describes its amounts, not its counts: a count takes a
             # scale only from its own row label ("Paid memberships (in millions)"), its column's ("Purchase Trans.
             # (Mil.)"), or a scale the reading quotes from the document.
-            # FedEx's "Avg. daily package volume (ADV) (000s):" heads the rows under it: a section heading's scale is theirs.
+            # FedEx's "Avg. daily package volume (ADV) (000s):" heads the rows under it: the nearest heading's scale is
+            # theirs, never one further up ("Revenue: (in thousands)" over MP Materials' tonnages).
             row_scale = (_row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col)
-                         or _row_scale(_section_heading(table, locator.row)))
+                         or _row_scale(_nearest_heading(table, locator.row)))
             if row_scale is None and locator.scale in (1e3, 1e6, 1e9):
                 if _scale_quoted(document, table, locator.scale_text, locator.scale):
                     row_scale = locator.scale
@@ -1007,6 +1008,13 @@ def _ai_scale_notes(document: Document, part, scale_text: str | None, scale: flo
     if _scale_quoted(document, part, scale_text, scale):
         return [f"scale quoted: {clean(scale_text or '')[:40]!r}"]
     return [SCALE_NOT_STATED]
+
+
+def _nearest_heading(table: Table, row: int) -> str:
+    """The heading row just above a row (a label with no figures), or "" when the row above has figures."""
+    index = row - 1
+    cells = table.rows[index] if 0 <= index < len(table.rows) else []
+    return " ".join(cells) if cells and not any(parse_number(cell) for cell in cells[1:]) else ""
 
 
 def _section_heading(table: Table, row: int) -> str:

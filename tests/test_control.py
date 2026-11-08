@@ -99,3 +99,17 @@ def test_the_checker_flags_a_per_unit_scale_a_year_row_and_an_unnamed_place():
     assert any("row is a year" in f for f in check("Pre-Owned Home Sales", 2, 1210, "count"))
     assert any("names a place" in f for f in check("Japan Account Balances", 3, 53_903_000_000))
     assert check("Total Revenue", 3, 53_903_000_000) == ["row label shares no word with the KPI: 'International Businesses'"]
+
+
+def test_the_checker_flags_a_count_scaled_with_no_scale_stated_for_it():
+    from kpi_extractor.audit_check import Fetcher, check_figure
+    html = """<table><tr><td></td><td>2025</td></tr><tr><td>Revenue:</td><td>(in thousands)</td></tr>
+<tr><td>Separated NdPr products</td><td></td></tr><tr><td>NdPr Production Volume (MTs)</td><td>721</td></tr>
+<tr><td>Avg. daily package volume (000s):</td><td></td></tr><tr><td>Total U.S. domestic ADV</td><td>14,716</td></tr></table>"""
+    fetcher = Fetcher(); fetcher.raw["https://example.com/x.htm"] = html
+    def flags(kpi, row, value):
+        item = {"symbol": "X", "kpi": f"Operating Metrics / {kpi}", "period": "Q3 2025", "periodEnd": "2025-09-30", "value": value,
+                "unit": "count", "source": "https://example.com/x.htm"}
+        return check_figure(item, {"locator": {"table": "A_T0", "row": row, "col": 1, "scale": 1000}}, fetcher).flags
+    assert any("no scale stated" in f for f in flags("NdPr Production Volume", 3, 721_000))
+    assert not any("no scale stated" in f for f in flags("U.S. Domestic Average Daily Package Volume", 5, 14_716_000))

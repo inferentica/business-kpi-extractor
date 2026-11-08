@@ -19,7 +19,7 @@ import urllib.request
 from dataclasses import dataclass, field
 
 from .document import Document, parse_document, parse_number
-from .extract import _heading
+from .extract import _heading, _nearest_heading
 
 MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split()
 MONTH_NAMES = "january|february|march|april|may|june|july|august|september|october|november|december"
@@ -147,6 +147,16 @@ def _check_table(out: Checked, table, locator: dict, value: float, label: str, i
         out.flags.append(f"row label shares no word with the KPI: {row_label[:60]!r}")
     if re.fullmatch(r"\s*(?:FY\s?|fiscal\s+)?(?:19|20)\d\d\s*", row_label or ""):
         out.flags.append(f"row is a year, not a quarter: {row_label.strip()!r}")
+    # A count scaled up must have its scale stated for it: in its row, its column's own heading, or the section heading
+    # just above. A table's "(in thousands)" for its amounts is not enough (MP Materials' tonnages read 1,000x too big).
+    if item.get("unit") == "count" and parsed is not None and parsed.value and abs(value / parsed.value) >= 1000:
+        # Only true heading rows head a column: a row with a label of its own ("Revenue: (in thousands)") is a section.
+        heading_cells = " ".join(_heading(h, col) for h in table.rows[: min(row_index or 0, 6)]
+                                 if col is not None and col < len(h) and not re.search(r"[A-Za-z]", re.sub(r"(?i)\(?unaudited\)?", "", h[0] if h else "")))
+        own_scale = re.search(r"\(\s*(?:in\s+)?(?:#\s*)?(?:thousand|million|billion|000s?|mil\.?|mn|mm|bn|bil\.?)|\b(?:thousand|million|billion)s?\b",
+                              f"{' '.join(row)} {heading_cells} {_nearest_heading(table, row_index)}", re.I)
+        if not own_scale:
+            out.flags.append(f"count scaled {value / parsed.value:g}x with no scale stated for it in its row, column or section")
     if item.get("unit") == "currency" and locator.get("scale"):
         around = f"{table.context[-200:]} {' '.join(heads)} {' '.join(row)}".lower()
         stated = {SCALE_WORDS[w] for w in re.findall(r"\b(thousand|million|billion)s?\b", around)}
