@@ -6,13 +6,14 @@ import multiprocessing
 import os
 import re
 import sys
+import time
 import traceback
 from concurrent.futures import ProcessPoolExecutor
 
 from .control import ControlError, ControlPlane, DryRunControl
 from .memory import MemoryWatch, peak_gb
 from .pipeline import SymbolPipeline, SymbolResult
-from .sec import configure_identity
+from .sec import _temporary, configure_identity
 
 _SYMBOL = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
@@ -45,13 +46,30 @@ def normalize_symbols(raw: str | list[str]) -> list[str]:
 REPORT_QUARTERS = 40
 
 
+# A company whose run fails on a passing SEC failure (a read timeout, a busy server) is run again once after this wait:
+# Prudential dropped out of a trial on one ReadTimeout that no single fetch's retries caught.
+COMPANY_RETRY_WAIT = 60
+
+
+def run_symbol(symbol: str, run, log=print) -> SymbolResult:
+    """`run()` for one company, once more after a temporary failure; any other failure is the company's result, never the run's."""
+    for attempt in (1, 2):
+        try:
+            return run()
+        except Exception as error:  # noqa: BLE001 - one company must not stop the run
+            traceback.print_exc()
+            if attempt == 1 and _temporary(error):
+                log(f"{symbol}: {type(error).__name__} from SEC; running the company again in {COMPANY_RETRY_WAIT} s")
+                time.sleep(COMPANY_RETRY_WAIT)
+                continue
+            return SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
+    return SymbolResult(symbol, errors=["unreachable"])
+
+
 def process_symbol(control, symbol: str, quarters: int, force: bool, wait_for_lock: bool = False) -> SymbolResult:
     try:
-        return SymbolPipeline(control, symbol, quarters, force, log=lambda line: print(line, flush=True),
-                              wait_for_lock=wait_for_lock, report_quarters=REPORT_QUARTERS).run()
-    except Exception as error:  # noqa: BLE001 - one company must not stop the run
-        traceback.print_exc()
-        return SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
+        return run_symbol(symbol, lambda: SymbolPipeline(control, symbol, quarters, force, log=lambda line: print(line, flush=True),
+                                                         wait_for_lock=wait_for_lock, report_quarters=REPORT_QUARTERS).run())
     finally:
         print(f"{symbol}: this process has held at most {peak_gb():.1f} GB", flush=True)
 

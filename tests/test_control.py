@@ -54,3 +54,21 @@ def test_githubs_token_service_is_asked_again_after_an_outage(monkeypatch):
         return reply
     monkeypatch.setattr(control_module.urllib.request, "urlopen", urlopen)
     assert plane._oidc_token() == "oidc"
+
+
+def test_a_company_is_run_again_once_after_a_temporary_sec_failure(monkeypatch):
+    import httpx
+    from kpi_extractor import cli
+    monkeypatch.setattr(cli, "COMPANY_RETRY_WAIT", 0)
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) == 1:
+            raise httpx.ReadTimeout("The read operation timed out")
+        return cli.SymbolResult("PRU", values=3)
+
+    assert cli.run_symbol("PRU", flaky, log=lambda *_: None).values == 3 and len(calls) == 2
+    # A failure trying again cannot cure is the company's result at once.
+    broken = lambda: (_ for _ in ()).throw(ValueError("bad list"))  # noqa: E731
+    assert cli.run_symbol("X", broken, log=lambda *_: None).errors == ["ValueError: bad list"]

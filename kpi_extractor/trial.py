@@ -18,7 +18,7 @@ from collections import Counter
 from pathlib import Path
 
 from .ai import MISSING_REASONS
-from .cli import company_pool, normalize_symbols
+from .cli import company_pool, normalize_symbols, run_symbol
 from .control import ControlPlane
 from .evaluate import EvalControl
 from .pipeline import SymbolPipeline, SymbolResult
@@ -54,10 +54,7 @@ class TrialControl(EvalControl):
 
 def trial_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolResult, list[dict], list[dict], dict | None]:
     control = TrialControl(plane)
-    try:
-        result = SymbolPipeline(control, symbol, quarters, True, log=lambda line: print(line, flush=True)).run()
-    except Exception as error:  # noqa: BLE001
-        result = SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
+    result = run_symbol(symbol, lambda: SymbolPipeline(control, symbol, quarters, True, log=lambda line: print(line, flush=True)).run())
     return (result, list(control.final.get(symbol, {}).values()), list(control.filings.get(symbol, {}).values()),
             control.specs.get(symbol))
 
