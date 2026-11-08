@@ -22,7 +22,14 @@ TITLES = (
 _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
                             r"guarantor|pro\s+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
-                            r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b", re.I)
+                            r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b|"
+                            # Chase's 1998 reconciliation of reported results to an operating basis, headed "INCOME STATEMENT".
+                            r"operating\s+basis|reported\s+results", re.I)
+
+
+# Column headings that are no period: a statement's columns are periods, a reconciliation's are its steps (Chase's
+# 1998 "Reported Results", "Credit Costs", "Special Items", "Operating Basis").
+_NOT_A_PERIOD = re.compile(r"^(reported|operating|adjustments?|special|as\s+adjusted)\b", re.I)
 
 
 # Statements of the set that are none of the three: a table under one of these titles never continues another.
@@ -44,6 +51,8 @@ def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
             kind = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
             title_text += " " + leading
         if kind is None or _NOT_STATEMENT.search(title_text[-260:]) or len([r for r in table.rows if r.figures]) < 4:
+            continue
+        if any(_NOT_A_PERIOD.match(cell.text) for cells in table.header for cell in cells if cell.start > 0):
             continue
         if _is_contents(table):
             continue

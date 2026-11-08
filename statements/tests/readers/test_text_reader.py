@@ -259,3 +259,20 @@ def test_a_name_wrapped_onto_a_line_further_in():
     balance = readings[("balance", "2003", "Q2", "instant")]
     assert {line["label"]: line["value"] for line in balance.lines}["Coca-Cola Hellenic Bottling Company S.A."] == 1_066e6
     assert balance.status == "kept"
+
+
+def test_a_reconciliation_headed_income_statement_is_not_the_statement():
+    # Chase's 1998 10-K: an MD&A table reconciling reported results to an operating basis, longer than the statement.
+    rows = "".join(f"  Line {n:<36}{n * 10:>10}{n:>10}{n * 10 + n:>10}\n" for n in range(1, 12))
+    reconciliation = ("<TABLE>\n<CAPTION>\n" + " " * 48 + "1998\n"
+                      "Year Ended December 31,                   Reported  Special  Operating\n"
+                      "(in millions, except per share data)\n<S> <C> <C> <C>\n"
+                      "INCOME STATEMENT\n" + rows + "Income Before Income Tax Expense" + " " * 16 + "500        10       510\n"
+                      "Net Income" + " " * 38 + "300        10       310\n</TABLE>\n")
+    statement = ("Consolidated Statement of Income\n<TABLE>\n<CAPTION>\nYear ended December 31, (in millions)" + " " * 11
+                 + "1998\n<S> <C>\n" + "".join(f"Item {n:<43}{n:>10}\n" for n in range(1, 4))
+                 + "Income Before Income Tax Expense" + " " * 18 + "5,930\nIncome Tax Expense" + " " * 32 + "2,148\n"
+                 + "NET INCOME" + " " * 38 + "$ 3,782\n</TABLE>\n")
+    readings, _ = read(reconciliation + statement, "1231", date(1998, 12, 31), form="10-K")
+    values = {line["label"]: line["value"] for line in readings[("income", "1998", "FY", "year")].lines}
+    assert values["NET INCOME"] == 3_782e6
