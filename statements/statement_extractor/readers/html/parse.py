@@ -49,6 +49,10 @@ def _row(cells: list[Cell]) -> Row | None:
         value = number(text.rstrip(")")) if text.endswith(")") and not text.startswith("(") else number(text)
         if value is not None and not label_parts and re.fullmatch(r"\d{1,2}", text):
             continue  # a note reference, not a figure
+        if value is not None and not label_parts and not figures and cell.start > 0:
+            figures[cell.start] = value  # an unlabelled subtotal (PepsiCo's net property, plant and equipment)
+            last_figure = cell.start
+            continue
         if value is not None and (figures or label_parts):
             if text.endswith(")") and not text.startswith("("):
                 value = -abs(value)

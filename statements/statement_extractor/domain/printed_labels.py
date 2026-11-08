@@ -34,13 +34,14 @@ KNOWN = (
 ASSETS = re.compile(r"^total\s+assets$", re.I)
 
 
-LIABILITIES_AND_EQUITY = re.compile(r"^total\s+liabilities.*\b(equity|investment|deficit|capital)$", re.I)
+# AMD 2009: "Total liabilities and stockholders' equity (deficit)".
+LIABILITIES_AND_EQUITY = re.compile(r"^total\s+liabilities.*\b(equity|investment|deficit|capital)(\s*\(deficit\))?$", re.I)
 
 
 LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
 
 
-EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’]?\s+)?equity$", re.I)
+EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’]?\s+)?equity(\s*\(deficit\))?$", re.I)
 
 
 OPENING = re.compile(r"\bcash\b.*\b(beginning|start)\b", re.I)
@@ -61,7 +62,9 @@ SECTIONS = re.compile(r"(operating|investing|financing)\s+activities$", re.I)
 PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax", re.I)
 
 
+# Kroger 2009: "Net earnings including noncontrolling interests", then the parent's share.
 NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
+                        r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
                          r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit\s+for\s+the\s+(year|period)$", re.I)
 
 
@@ -82,7 +85,7 @@ SECTION_KINDS = re.compile(r"^(net|cash|total)\b.*?\b(operat|invest|financ)(ing\
 
 # A heading over the cash balances themselves ("CASH AND CASH EQUIVALENTS", "Cash and due from banks"), under which
 # "Balance at beginning of year" names the opening cash; "Cash flows from financing activities" is not one.
-CASH_HEADING = re.compile(r"^cash\s+and\s+(cash\s+equivalents|due\s+from\s+banks)\b", re.I)
+CASH_HEADING = re.compile(r"^cash\s+and\s+(cash\s+equivalents|due\s+from\s+banks|temporary\s+cash\s+investments)\b", re.I)
 # Adjustments printed between the change in cash and the balances: the exchange-rate effect, and others such as
 # TSMC's "effect of changes in consolidated entities".
 EFFECT = re.compile(r"^effects?\s+of\b", re.I)

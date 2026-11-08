@@ -54,6 +54,13 @@ def cash_check(figures) -> Check:
     changes = [value for label, _level, value in figures if CHANGE.search(label) and not OPENING.search(label)
                and not CLOSING.search(label)]
     effects = [value for label, _level, value in figures if EXCHANGE.search(label) or EFFECT.match(label)]
+    # Any other line printed between the change in cash and the opening balance adjusts it too (Kroger 2008: "cash
+    # from consolidated variable interest entity").
+    first_change = next((index for index, (label, _level, _value) in enumerate(figures) if CHANGE.search(label)
+                         and not OPENING.search(label) and not CLOSING.search(label)), None)
+    if first_change is not None and first_change < opening[0]:
+        effects += [value for label, _level, value in figures[first_change + 1:opening[0]]
+                    if value is not None and not (EXCHANGE.search(label) or EFFECT.match(label) or CHANGE.search(label))]
     sections = [value for label, _level, value in figures if SECTIONS.search(label) and re.search(r"^net|^cash|^total", label, re.I)]
     candidates = list(changes)
     candidates += [change + effect for change in changes for effect in effects]
@@ -102,7 +109,7 @@ def _chain(start: float, end: float, values: list[float]) -> bool:
 def total_check(printed) -> Check:
     """Each printed "Total …" equals lines just above it, read upward: an earlier subtotal counts as one line for the
     lines it sums, together with the headings over them ("Total assets" = total current assets + the lines after it),
-    and a line headed "Less" is taken away. A total with fewer than two lines above it is not tested."""
+    and a line headed "Less" is taken away, in brackets or not (Costco's accumulated depreciation). A total with fewer than two lines above it is not tested."""
     verified, failures = 0, []
     starts = subtotals(printed)
     for index, (label, _level, value) in enumerate(printed):
@@ -116,11 +123,13 @@ def total_check(printed) -> Check:
         for earlier_label, _earlier_level, earlier_value in reversed(printed[:index]):
             if earlier_value is None:
                 break
-            plain += -earlier_value if re.match(r"^less\b", earlier_label, re.I) else earlier_value
+            plain += -abs(earlier_value) if re.match(r"^less\b", earlier_label, re.I) else earlier_value
             plain_count += 1
             if plain_count >= 2 and close(plain, value, plain_count + 1):
                 matched = True
                 break
+        if not matched and plain_count == 1 and close(plain, value, 2):
+            matched = True  # the only line under its heading, printed again as its total
         while position >= 0 and count < 40 and not matched:
             earlier_label, _earlier_level, earlier_value = printed[position]
             if earlier_value is None:
@@ -128,7 +137,7 @@ def total_check(printed) -> Check:
                     break  # the first line under its heading (a supplemental block's total): nothing above it to sum
                 position -= 1
                 continue  # a heading: a total can sum sections under several headings
-            running += -earlier_value if re.match(r"^less\b", earlier_label, re.I) else earlier_value
+            running += -abs(earlier_value) if re.match(r"^less\b", earlier_label, re.I) else earlier_value
             count += 1
             if count >= 2 and close(running, value, count + 1):
                 matched = True
