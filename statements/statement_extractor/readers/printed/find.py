@@ -21,7 +21,8 @@ TITLES = (
 # Tables that carry a statement's name but are not the company's own statement.
 _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
                             r"guarantor|pro\s+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
-                            r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis", re.I)
+                            r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
+                            r"(income\s+statement|balance\s+sheet|cash\s+flows?)\s+data\b", re.I)
 
 
 # Statements of the set that are none of the three: a table under one of these titles never continues another.
@@ -35,9 +36,13 @@ def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
     found: list[tuple[str, list[Table]]] = []
     for position, table in enumerate(all_tables):
         title_text = table.context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in table.header[:2])
-        # A title printed as the table's own first rows, above its figures (PepsiCo's 2013 balance sheet).
-        title_text += " " + " ".join(row.label for row in _leading(table))
         kind = next((name for name, pattern in TITLES if _titled(pattern, title_text)), None)
+        if kind is None:
+            # A title printed as the table's own first rows, above its figures (PepsiCo's 2013 balance sheet), when
+            # nothing before the table names it.
+            leading = " ".join(row.label for row in _leading(table))
+            kind = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
+            title_text += " " + leading
         if kind is None or _NOT_STATEMENT.search(title_text[-260:]) or len([r for r in table.rows if r.figures]) < 4:
             continue
         if _is_contents(table):
