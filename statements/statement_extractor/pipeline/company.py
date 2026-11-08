@@ -13,6 +13,7 @@ from datetime import date
 from pathlib import Path
 
 from ..checks.schedules import parse_schedule, schedule_check
+from ..domain.calendar import ANNUAL_FORMS, year_end_for
 from ..quality.coverage import own_period, summarise
 from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
@@ -21,6 +22,7 @@ from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..readers.xbrl.read import read_filing
 from ..selection.choose import choose
+from ..selection.period_dates import align_dates
 from ..selection.signs import sign_ties
 from ..sources.documents import PRINTED_DOCUMENTS
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
@@ -34,7 +36,10 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     profile, company = company_profile(symbol)
     reports = sorted(list_reports(company, since), key=lambda ref: ref.filed, reverse=True)
     readings, filings, offset = [], [], None
+    annual_ends = [end for ref in reports if ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None]
+    year_ends = {ref.accession: year_end_for(_period_end(ref), annual_ends, profile.fiscal_year_end) for ref in reports}
     for ref in reports:
+        fiscal_year_end = year_ends[ref.accession]
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False}
         try:
             load_submission(ref.filing)
@@ -44,7 +49,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
             filings.append(record)
             continue
         if xbrl is None:
-            found, notes, kinds = _read_printed(ref, profile.fiscal_year_end, offset or 0)
+            found, notes, kinds = _read_printed(ref, fiscal_year_end, offset or 0)
             own = [reading for reading in found if reading.own]
             record.update({"note": "no XBRL", "printed": kinds, "columns": len(found), "notes": notes,
                            "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
@@ -64,7 +69,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
             if end and year:
                 offset = learn_year_offset([(date.fromisoformat(str(end)[:10]), str(year), False)], profile.fiscal_year_end)
         found, notes = read_filing(xbrl, accession=ref.accession, form=ref.form, filed=ref.filed,
-                                   fiscal_year_end=profile.fiscal_year_end, year_offset=offset or 0)
+                                   fiscal_year_end=fiscal_year_end, year_offset=offset or 0)
         own = [reading for reading in found if reading.own]
         record.update({"xbrl": True, "period_end": str(entity.get("document_period_end_date"))[:10],
                        **own_period(own, ref.form),
@@ -77,8 +82,9 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         ref.filing = None
         gc.collect()
     printed_signs: dict[str, dict] = {}
-    readings.extend(_printed_second_look(symbol, reports, filings, readings, profile.fiscal_year_end, offset or 0, log,
+    readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
                                          printed_signs))
+    readings = align_dates(readings)
     chosen = choose(readings, printed_signs)
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     with (out / "readings.jsonl").open("w") as handle:
@@ -90,7 +96,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     return summary
 
 
-def _printed_second_look(symbol, reports, filings, readings, fiscal_year_end: str, year_offset: int, log,
+def _printed_second_look(symbol, reports, filings, readings, year_ends: dict[str, str], year_offset: int, log,
                          printed_signs: dict) -> list:
     """The printed statements of XBRL filings that need them: one whose own statement failed its checks in XBRL (JPM's
     Q2 2010 balance sheet, which edgartools maps wrongly), and one whose served figure differs in sign from another
@@ -108,7 +114,7 @@ def _printed_second_look(symbol, reports, filings, readings, fiscal_year_end: st
             continue
         try:
             ref.filing = filing_for(accession)
-            found, notes, kinds = _read_printed(ref, fiscal_year_end, year_offset,
+            found, notes, kinds = _read_printed(ref, year_ends[accession], year_offset,
                                                 printed_signs.setdefault(accession, {}) if accession in ties else None)
         except Exception as error:  # noqa: BLE001 - a second look that fails leaves the XBRL readings as they are
             records[accession]["second_look"] = f"unreadable ({type(error).__name__})"
@@ -121,6 +127,14 @@ def _printed_second_look(symbol, reports, filings, readings, fiscal_year_end: st
             f"{len(found)} columns")
         found_all.extend(found)
     return found_all
+
+
+def _period_end(ref) -> date | None:
+    raw = getattr(ref.filing, "period_of_report", None)
+    try:
+        return date.fromisoformat(str(raw)[:10]) if raw else None
+    except ValueError:
+        return None
 
 
 def _read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None = None) -> tuple[list, list[str], list[str]]:
