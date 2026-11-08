@@ -426,6 +426,12 @@ def test_a_quote_for_the_year_to_date_is_not_the_quarters_count():
     # A KPI defined for the year in progress keeps a full-year quote: Borr's current-year contract coverage.
     assert _read_quote("Full year 2025 contract coverage of 85% at an average dayrate of $145,000.", "Current-Year Contract Coverage",
                        "percent", "Full year 2025 contract coverage of 85%", "85%") == 85
+    # A quote that names the quarter is the quarter's figure, whatever fiscal year it names (Blue Bird).
+    assert _read_quote("In the second quarter of fiscal 2026, 2,148 units booked compared to 2,295.", "Legacy Blue Bird Unit Bookings",
+                       "count", "In the second quarter of fiscal 2026, 2,148 units booked", "2,148") == 2148
+    # A second-half KPI may quote the first half beside it (Borr's 2026 coverage).
+    assert _read_quote("Awards increased 2026 coverage to 80% in the first half and 48% in the second half.", "Second-Half Contract Coverage",
+                       "percent", "coverage to 80% in the first half and 48% in the second half", "48%") == 48
     # A year-to-date change that leads to a stock measure's level: the level is the quarter's figure (GE Vernova).
     assert _read_quote("Our Electrification equipment backlog increased $6.5 billion year-to-date, to approximately $26 billion.",
                        "Electrification Equipment Backlog", "currency",
