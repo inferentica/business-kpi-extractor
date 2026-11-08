@@ -32,6 +32,8 @@ class Column:
     """One period of one statement: each concept's reported figure, and its opening and closing cash if it has them."""
     figures: dict[str, Figure] = field(default_factory=dict)
     blank: set[str] = field(default_factory=set)  # lines the statement presents with no figure for this period
+    # The lines with figures, in the statement's order: (concept, presentation parent, the sign it is printed with).
+    presented: list[tuple[str, str, float]] = field(default_factory=list)
     opening: Figure | None = None
     closing: Figure | None = None
 
@@ -94,7 +96,7 @@ def cash_check(column: Column) -> Check:
 def calc_check(column: Column, arcs: dict[str, list[tuple[str, float]]]) -> Check:
     """Every subtotal the filer declared (its calculation relationships) that this column can test: the parent and at
     least one of its lines are presented with figures; a presented line without a figure counts as nothing."""
-    verified, failures = 0, []
+    verified, completed, failures = 0, 0, []
     for parent, children in arcs.items():
         total = column.figures.get(parent)
         present = [(column.figures[child], weight) for child, weight in children if child in column.figures]
@@ -105,13 +107,54 @@ def calc_check(column: Column, arcs: dict[str, list[tuple[str, float]]]) -> Chec
             continue  # a line outside this statement (a note's figure): the sum cannot be tested here
         computed = sum(figure.value * weight for figure, weight in present)
         verified += 1
-        if not _agree(total.value, computed, total, *(figure for figure, _ in present)):
-            failures.append(f"{parent.split('_', 1)[-1]} {total.value:,.0f} vs lines {computed:,.0f}")
+        if _agree(total.value, computed, total, *(figure for figure, _ in present)):
+            continue
+        if _completed(column, arcs, parent, children, total.value - computed):
+            completed += 1
+            continue
+        failures.append(f"{parent.split('_', 1)[-1]} {total.value:,.0f} vs lines {computed:,.0f}")
     if failures:
         return Check("calc", FAIL, "; ".join(failures[:3]) + (f" (+{len(failures) - 3})" if len(failures) > 3 else ""))
     if verified == 0:
         return Check("calc", NONE, "no subtotal to test")
-    return Check("calc", PASS, f"{verified} subtotals")
+    return Check("calc", PASS, f"{verified} subtotals" + (f", {completed} as printed" if completed else ""))
+
+
+def _completed(column: Column, arcs: dict[str, list[tuple[str, float]]], parent: str,
+               children: list[tuple[str, float]], gap: float) -> bool:
+    """Whether a subtotal the filer's calculation file gets wrong adds up as the statement prints it: its lines, with
+    the signs they are printed with, sum to the printed total. The calculation file can leave lines out (Prudential's
+    total assets names 7 of its 8 asset lines; TSMC's retained earnings leaves out its legal reserve) or give a line
+    the wrong weight (TSMC's other comprehensive income), while the statement itself adds up. Lines left out count
+    when they share the declared lines' place in the presentation and sit on the same side of the total, and no other
+    counted line already sums them."""
+    order = [concept for concept, _, _ in column.presented]
+    where = {concept: index for index, concept in enumerate(order)}
+    places = {concept: place for concept, place, _ in column.presented}
+    signs = {concept: sign for concept, _, sign in column.presented}
+    declared = {child for child, _ in children}
+    present = [child for child in declared if child in where]
+    if parent not in where or not present:
+        return False
+
+    def printed(concept: str) -> float:
+        return column.figures[concept].value * signs[concept]
+
+    total = printed(parent)
+    figures = [column.figures[child] for child in present] + [column.figures[parent]]
+    if _agree(total, sum(printed(child) for child in present), *figures):
+        return True
+    below = where[parent] > max(where[child] for child in present)
+    shared = {places[child] for child in present}
+    extra = [concept for concept in order
+             if concept not in declared and concept != parent and places[concept] in shared
+             and (where[concept] < where[parent] if below else where[concept] > where[parent])]
+    summed = {child for concept in [*present, *extra] for child, _ in arcs.get(concept, [])}
+    extra = [concept for concept in extra if concept not in summed]
+    if not extra:
+        return False
+    return _agree(total, sum(printed(concept) for concept in [*present, *extra]),
+                  *figures, *(column.figures[concept] for concept in extra))
 
 
 def checks_for(statement: str, column: Column, arcs: dict[str, list[tuple[str, float]]]) -> list[Check]:

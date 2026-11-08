@@ -65,3 +65,28 @@ def test_a_presented_line_without_a_figure_counts_as_nothing_but_a_line_elsewher
     assert calc_check(blank, arcs).result == "pass"
     elsewhere = Column({"us-gaap_OperatingExpenses": figure(9), "us-gaap_ResearchAndDevelopmentExpense": figure(5)})
     assert calc_check(elsewhere, arcs).result == "none"
+
+
+def test_a_subtotal_whose_declared_lines_miss_adds_up_as_printed_with_the_lines_beside_them():
+    # Prudential Q3 2021: the calculation file names 7 asset lines; assets held for sale sit beside them.
+    arcs = {"us-gaap_Assets": [("us-gaap_Investments", 1.0), ("us-gaap_OtherAssets", 1.0)]}
+    column = Column({"us-gaap_Investments": figure(488_790e6), "us-gaap_OtherAssets": figure(299_882e6),
+                     "us-gaap_AssetsOfDisposalGroupIncludingDiscontinuedOperation": figure(143_910e6),
+                     "us-gaap_Assets": figure(932_582e6)},
+                    presented=[("us-gaap_Investments", "assets", 1.0),
+                               ("us-gaap_AssetsOfDisposalGroupIncludingDiscontinuedOperation", "assets", 1.0),
+                               ("us-gaap_OtherAssets", "assets", 1.0), ("us-gaap_Assets", "assets", 1.0)])
+    check = calc_check(column, arcs)
+    assert check.result == "pass" and "as printed" in check.detail
+    # A line elsewhere in the statement never completes a subtotal.
+    column.presented[1] = ("us-gaap_AssetsOfDisposalGroupIncludingDiscontinuedOperation", "liabilities", 1.0)
+    assert calc_check(column, arcs).result == "fail"
+
+
+def test_a_subtotal_with_wrong_declared_weights_adds_up_as_printed():
+    # TSMC 2018: other comprehensive income not reclassified; printed signs add up, declared weights do not.
+    arcs = {"ifrs-full_OCI": [("a", 1.0), ("b", 1.0), ("tax", -1.0)]}
+    column = Column({"a": figure(861.2e6, -5), "b": figure(-3_309.1e6, -5), "tax": figure(-195.7e6, -5),
+                     "ifrs-full_OCI": figure(-3_974.6e6, -5)},
+                    presented=[("a", "oci", -1.0), ("b", "oci", 1.0), ("tax", "oci", -1.0), ("ifrs-full_OCI", "oci", 1.0)])
+    assert calc_check(column, arcs).result == "pass"

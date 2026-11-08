@@ -107,3 +107,37 @@ def test_arithmetic_decides_what_is_kept():
     assert readings[("income", "2009", "year")].status == "kept"
     assert readings[("balance", "2009", "instant")].status == "kept"
     assert readings[("balance", "2008", "instant")].status == "rejected"  # 39,572 vs 39,000
+
+
+def test_closing_cash_is_the_opening_line_shown_again_not_a_reconciliation_after_it():
+    # Coca-Cola: cash, cash equivalents and restricted cash close the statement, then "less restricted cash" leads to
+    # the balance sheet's cash and cash equivalents.
+    x = fake_xbrl()
+    cash = x.statements.cash_flow_statement()
+    total = "us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"
+    for line in cash.rows:
+        if line["concept"] == "us-gaap_CashAndCashEquivalentsAtCarryingValue":
+            line["concept"] = total
+    cash.rows.append(row("us-gaap_CashAndCashEquivalentsAtCarryingValue",
+                         {"instant_2009-09-26": 5_000e6, "instant_2008-09-27": 11_000e6}))
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    flows = next(r for r in readings if r.statement == "cash_flow" and r.own)
+    assert flows.status == "kept"
+    assert flows.lines[-1]["value"] == 5_000e6  # still shown, at the period's end
+
+
+def test_a_figure_only_tagged_for_part_of_the_company_is_not_a_line():
+    import pandas as pd
+    x = fake_xbrl()
+    facts = []
+    for statement in (x.statements.income_statement(), x.statements.balance_sheet(), x.statements.cash_flow_statement()):
+        for item in statement.rows:
+            for key in item["values"]:
+                facts.append({"concept": item["concept"].replace("_", ":", 1), "period_key": key, "is_dimensioned": False})
+    # JPM: a memo line of consolidated VIEs' liabilities, tagged only with the VIE member.
+    x.statements.balance_sheet().rows.append(row("us-gaap_OtherLiabilities", {"instant_2009-09-26": 799e6}))
+    facts.append({"concept": "us-gaap:OtherLiabilities", "period_key": "instant_2009-09-26", "is_dimensioned": True})
+    x.facts = SimpleNamespace(to_dataframe=lambda: pd.DataFrame(facts))
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    balance = next(r for r in readings if r.statement == "balance" and r.own)
+    assert "us-gaap_OtherLiabilities" not in {line["concept"] for line in balance.lines}

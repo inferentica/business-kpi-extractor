@@ -49,18 +49,32 @@ def clean_label(raw: str) -> str:
     return label[:300]
 
 
+def _facts(xbrl):
+    try:
+        facts = xbrl.facts.to_dataframe()
+    except Exception:  # noqa: BLE001 - without facts the statement's own figures stand
+        return None
+    return None if facts is None or getattr(facts, "empty", True) else facts
+
+
+def consolidated_figures(facts) -> set[tuple[str, str]]:
+    """(concept, period) of every figure tagged for the company as a whole. A line whose figure for a period exists only
+    for a part of it (JPM's memo of consolidated VIEs' assets and liabilities, "included in the line items above") is
+    not a line of that period's statement: counted as one, it is counted twice."""
+    if facts is None or "is_dimensioned" not in facts or "period_key" not in facts:
+        return set()
+    plain = facts[facts["is_dimensioned"] != True]  # noqa: E712 - pandas mask
+    return {(str(concept).replace(":", "_", 1), str(key)) for concept, key in zip(plain["concept"], plain["period_key"])}
+
+
 class ReportingCurrency:
     """A filer may tag a line twice for one period: in its own currency and as a convenience translation (TSMC's 20-F
     gives the latest year in US dollars as well). Each line takes the figure in the currency the filing reports in."""
 
-    def __init__(self, xbrl):
+    def __init__(self, facts):
         self.currency: str | None = None
         self.facts: dict[tuple[str, str], list[tuple[str, float, str]]] = {}
-        try:
-            facts = xbrl.facts.to_dataframe()
-        except Exception:  # noqa: BLE001 - without facts the statement's own figures stand
-            return
-        if facts is None or facts.empty or "currency" not in facts:
+        if facts is None or "currency" not in facts:
             return
         if "is_dimensioned" in facts:
             facts = facts[facts["is_dimensioned"] != True]  # noqa: E712 - pandas mask
@@ -132,29 +146,29 @@ def _is_instant_line(row: dict) -> bool:
 
 
 def _annotated(xbrl, rows: list[dict], flows: bool) -> list[dict]:
-    """Each line with the filer's labels and, in a flow statement, whether a balance it shows is the opening or the
-    closing one: by the role the presentation gives it ("beginning of period"), else, for a balance shown twice with
-    no role, the first is the opening one."""
-    seen: dict[str, int] = {}
-    counts: dict[str, int] = {}
-    for row in rows:
-        if flows and _is_instant_line(row):
-            counts[str(row["concept"])] = counts.get(str(row["concept"]), 0) + 1
+    """Each line with the filer's labels and, in a flow statement, which balance a balance line is: the opening one (by
+    the role its presentation gives it, "beginning of period", else the first of a balance shown twice), the closing
+    one (that same line shown again at the end), or another (a reconciliation after the closing balance: Coca-Cola's
+    "less restricted cash" down to the balance sheet's cash). Each other balance is shown at the period's end."""
+    balances = [index for index, row in enumerate(rows) if flows and _is_instant_line(row)]
+    concept_of = {index: str(rows[index]["concept"]) for index in balances}
+    opening = next((index for index in balances if "periodStart" in str(rows[index].get("preferred_label") or "")), None)
+    if opening is None:
+        opening = next((index for index in balances
+                        if sum(1 for other in balances if concept_of[other] == concept_of[index]) > 1), None)
+    closing = None
+    if opening is not None:
+        closing = next((index for index in reversed(balances)
+                        if index > opening and concept_of[index] == concept_of[opening]), None)
+    if closing is None:
+        closing = next((index for index in reversed(balances)
+                        if "periodEnd" in str(rows[index].get("preferred_label") or "")), balances[-1] if balances else None)
     annotated = []
-    for row in rows:
-        concept = str(row["concept"])
+    for index, row in enumerate(rows):
         balance = None
-        if flows and _is_instant_line(row):
-            role = str(row.get("preferred_label") or "")
-            occurrence = seen.get(concept, 0)
-            seen[concept] = occurrence + 1
-            if "periodStart" in role:
-                balance = "opening"
-            elif "periodEnd" in role:
-                balance = "closing"
-            else:
-                balance = "opening" if counts[concept] > 1 and occurrence == 0 else "closing"
-        annotated.append({**row, "_labels": _labels(xbrl, concept), "_balance": balance})
+        if index in concept_of:
+            balance = "opening" if index == opening else "closing" if index == closing else "other"
+        annotated.append({**row, "_labels": _labels(xbrl, str(row["concept"])), "_balance": balance, "_index": index})
     return annotated
 
 
@@ -176,7 +190,9 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
         document_end = date.fromisoformat(str(entity.get("document_period_end_date"))[:10])
     except ValueError:
         return [], ["no document period end"]
-    currency = ReportingCurrency(xbrl)
+    facts = _facts(xbrl)
+    currency = ReportingCurrency(facts)
+    consolidated = consolidated_figures(facts)
     readings: list[Reading] = []
     notes: list[str] = []
     for name, methods in _STATEMENTS:
@@ -198,7 +214,7 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
             if labelled is None:
                 notes.append(f"{name}: column {period.key} off the calendar")
                 continue
-            reading = _read_column(name, rows, period, instants, arcs, currency, labelled)
+            reading = _read_column(name, rows, period, instants, arcs, currency, consolidated, labelled)
             if reading is None:
                 continue
             reading.accession, reading.form, reading.filed = accession, form, filed
@@ -208,7 +224,7 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
 
 
 def _read_column(name: str, rows: list[dict], period: Period, instants: dict[date, str], arcs, currency,
-                 labelled: tuple[str, str, str]) -> Reading | None:
+                 consolidated: set[tuple[str, str]], labelled: tuple[str, str, str]) -> Reading | None:
     fiscal_year, fiscal_period, duration = labelled
     lines: list[dict] = []
     column = Column()
@@ -224,6 +240,8 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
             if raw is None:
                 column.blank.add(concept)
                 continue  # a line this period does not report
+            if consolidated and (concept, key) not in consolidated:
+                continue  # a figure for part of the company only (a memo of consolidated VIEs)
             when = parse_period(key).end.isoformat()
             raw = currency.value(concept, when, raw)
             figure = Figure(raw, _decimals((row.get("decimals") or {}).get(key)))
@@ -232,9 +250,11 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
             if period.start is not None and row.get("_balance") == "opening":
                 column.opening = column.opening or figure
             elif period.start is not None and row.get("_balance") == "closing":
-                column.closing = figure  # the last balance a flow statement shows is its closing one
-            else:
-                column.figures.setdefault(concept, figure)
+                column.closing = figure
+            elif not (period.start is not None and row.get("_balance") == "other"):
+                if concept not in column.figures:
+                    column.figures[concept] = figure
+                    column.presented.append((concept, str(row.get("parent") or ""), sign))
         labels = _labels_for(row)
         level = _number(row.get("level"))
         lines.append({
