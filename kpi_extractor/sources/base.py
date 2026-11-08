@@ -48,7 +48,8 @@ class FilingSource(Protocol):
     # Where its documents live: a value's source_url must start with one of these to be stored.
     url_prefixes: tuple[str, ...]
 
-    def open_company(self, symbol: str) -> SourceCompany: ...
+    # With the company's archive (when its ID is known before the source is asked), from what is archived there.
+    def open_company(self, symbol: str, archive=None) -> SourceCompany: ...
 
     def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,
                          archive=None) -> list[FilingRef]: ...

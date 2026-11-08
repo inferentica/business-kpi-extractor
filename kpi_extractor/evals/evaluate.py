@@ -46,14 +46,17 @@ class EvalControl:
 
     def call(self, operation: str, **payload) -> dict:
         if operation == "symbol_state":
+            # The registry's CIK, so the company opens from its archived filing list as in production.
+            state = self.plane.call(operation, **payload)
+            cik = state.get("cik")
             if payload.get("symbol") in self.fixed_lists:
-                return {"spec": fixed_list_row(self.fixed_lists[payload["symbol"]]), "filings": [], "values": []}
+                return {"spec": fixed_list_row(self.fixed_lists[payload["symbol"]]), "filings": [], "values": [], "cik": cik}
             if self.stored_lists:
                 # Production's KPI list and saved row choices, with every filing read fresh: the readers are scored
                 # without paying for (or varying with) a newly written list.
-                state = self.plane.call(operation, **payload)
-                return {"spec": state.get("spec"), "curations": state.get("curations") or [], "filings": [], "values": []}
-            return {"spec": None, "filings": [], "values": []}
+                return {"spec": state.get("spec"), "curations": state.get("curations") or [], "filings": [], "values": [],
+                        "cik": cik}
+            return {"spec": None, "filings": [], "values": [], "cik": cik}
         if operation == "store_statements":
             return {}
         if operation == "store":

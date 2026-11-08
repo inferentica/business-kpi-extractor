@@ -11,6 +11,7 @@ from datetime import date, timedelta
 
 import httpx
 from edgar import Company, set_identity
+from edgar.entity.submissions import create_entity_from_submissions_json
 from edgar.exceptions import IdentityError, http_status
 from edgar.httprequests import is_unreachable
 from edgar.sgml import FilingSGML
@@ -127,7 +128,26 @@ def _sic(company) -> int | None:
 
 
 def _company_profile(symbol: str) -> tuple[CompanyProfile, Company]:
-    company = Company(symbol)
+    return profile_of(symbol, Company(symbol))
+
+
+def archived_company(symbol: str, archive) -> tuple[CompanyProfile, Company] | None:
+    """The company from the filing list Bedrock's worker keeps in the archive, so opening it asks SEC nothing (SEC
+    refuses many requests from shared cloud addresses). None, with the reason logged, when that list cannot stand in
+    for SEC's own; the company is then read from SEC."""
+    listing, reason = archive.filing_list()
+    if listing is None:
+        archive.log(f"{symbol}: {reason}; listing filings from SEC")
+        return None
+    try:
+        company = create_entity_from_submissions_json(listing, entity_type="company")
+        return profile_of(symbol, company)
+    except Exception as error:  # noqa: BLE001 - a list edgartools cannot read: SEC's instead
+        archive.log(f"{symbol}: archived filing list unreadable ({str(error)[:200]}); listing filings from SEC")
+        return None
+
+
+def profile_of(symbol: str, company: Company) -> tuple[CompanyProfile, Company]:
     latest = _latest_annual_report(company)
     fiscal_year_end = annual_report_year_end(company, str(getattr(company, "fiscal_year_end", None) or "1231").zfill(4), latest)
     profile = CompanyProfile(
@@ -381,8 +401,9 @@ class SecSource:
     name = "sec"
     url_prefixes = ("https://www.sec.gov/",)
 
-    def open_company(self, symbol: str) -> SourceCompany:
-        profile, company = company_profile(symbol)
+    def open_company(self, symbol: str, archive=None) -> SourceCompany:
+        opened = archived_company(symbol, archive) if archive is not None else None
+        profile, company = opened or company_profile(symbol)
         return SourceCompany(profile, company)
 
     def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,

@@ -12,10 +12,13 @@ import json
 import threading
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from ..ops.control import ControlError
 
 XBRL_PARTS = ("schema", "label", "presentation", "calculation", "definition", "instance")
+# Bedrock's worker fetches each tracked company's filing list every hour; an older one may miss a filing SEC has listed.
+FILING_LIST_AGE = timedelta(minutes=90)
 
 
 class Archive:
@@ -23,10 +26,12 @@ class Archive:
         self.control, self.symbol, self.cik, self.log = control, symbol, cik, log
         self._lock = threading.Lock()
         self._links: dict[str, str] | None = None
+        self._listed_at: dict[str, str] = {}  # when each filing list in the archive was written
         self._written: set[str] = set()
         self._refused = False  # the archive turned a write down: the rest of the run reads from EDGAR only
         self.reads = self.writes = 0
         self.submissions = 0  # full submissions read from the archive instead of SEC
+        self.lists = 0  # filing lists read from the archive instead of SEC
 
     def key(self, folder: str, name: str) -> str:
         return f"filings/{self.cik}/{folder}/{name}.gz"
@@ -35,7 +40,9 @@ class Archive:
         with self._lock:
             if self._links is None:
                 try:
-                    self._links = dict(self.control.call("archive_list", symbol=self.symbol, cik=self.cik).get("files") or {})
+                    listing = self.control.call("archive_list", symbol=self.symbol, cik=self.cik)
+                    self._links = dict(listing.get("files") or {})
+                    self._listed_at = dict(listing.get("written") or {})
                 except ControlError as error:
                     self.log(f"{self.symbol}: filing archive unavailable ({str(error)[:200]}); reading from EDGAR")
                     self._links, self._refused = {}, True
@@ -46,7 +53,10 @@ class Archive:
         return key in self._written or key in self._listing()
 
     def read_json(self, folder: str, name: str) -> dict | None:
-        link = self._listing().get(self.key(folder, name))
+        return self._read_gzipped_json(self.key(folder, name))
+
+    def _read_gzipped_json(self, key: str) -> dict | None:
+        link = self._listing().get(key)
         if not link:
             return None
         try:
@@ -56,6 +66,49 @@ class Archive:
             return None
         self.reads += 1
         return data
+
+    def filing_list_key(self, name: str | None = None) -> str:
+        """Where the company's SEC filing list (CIK0000320193.json) or one of its older pages sits."""
+        return f"filings/{self.cik}/submissions/{name or f'CIK{self.cik:010d}.json'}.gz"
+
+    def filing_list(self, now: datetime | None = None) -> tuple[dict | None, str]:
+        """The company's SEC filing list as Bedrock's worker keeps it here, its older pages merged in (as edgartools
+        merges a bulk download's), and why not when it cannot stand in for SEC's: missing, written more than 90 minutes
+        ago, an older page missing, or a filing whose full submission was archived since and that it does not list."""
+        key = self.filing_list_key()
+        links = self._listing()
+        written = self._listed_at.get(key)
+        if key not in links or not written:
+            return None, "no archived filing list"
+        try:
+            age = (now or datetime.now(timezone.utc)) - datetime.fromisoformat(written.replace("Z", "+00:00"))
+        except ValueError:
+            return None, "archived filing list has no write time"
+        if age > FILING_LIST_AGE:
+            return None, f"archived filing list is {age.total_seconds() / 3600:.1f} h old"
+        data = self._read_gzipped_json(key)
+        filings = (data or {}).get("filings") or {}
+        recent = filings.get("recent")
+        if not isinstance(recent, dict) or not isinstance(recent.get("accessionNumber"), list):
+            return None, "archived filing list unreadable"
+        for page in filings.get("files") or []:
+            older = self._read_gzipped_json(self.filing_list_key(str(page.get("name") or "")))
+            if not isinstance(older, dict) or not isinstance(older.get("accessionNumber"), list):
+                return None, f"older page {page.get('name')} not archived"
+            count = len(older["accessionNumber"])
+            for field, values in recent.items():
+                column = older.get(field)
+                values.extend(column if isinstance(column, list) and len(column) == count else [None] * count)
+        filings["files"] = []
+        listed = set(recent["accessionNumber"])
+        prefix = f"filings/{self.cik}/raw/"
+        unlisted = [stored[len(prefix):-len(".txt.gz")] for stored in links
+                    if stored.startswith(prefix) and stored.endswith(".txt.gz")
+                    and stored[len(prefix):-len(".txt.gz")] not in listed]
+        if unlisted:
+            return None, f"archived filing list lacks {unlisted[0]}, filed since"
+        self.lists += 1
+        return data, ""
 
     def raw_submission_key(self, accession: str) -> str:
         """Where a filing's full submission sits as SEC served it, put there by the filing feed's worker."""

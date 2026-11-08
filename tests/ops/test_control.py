@@ -119,9 +119,13 @@ def test_a_trial_given_a_list_serves_it_as_the_stored_row():
     from kpi_extractor.evals.evaluate import EvalControl
     spec = {"version": 2, "groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric", "kpis": []}],
             "names": {}, "sourceAccession": "0001"}
-    control = EvalControl(plane=None, fixed_lists={"MP": spec})
-    row = control.call("symbol_state", symbol="MP")["spec"]
-    assert row == {"groups": spec["groups"], "names": {}, "version": 2, "source_accession": "0001"}
+    class Plane:
+        def call(self, operation, **payload):
+            return {"cik": 1524358, "spec": {"version": 9}}
+    control = EvalControl(plane=Plane(), fixed_lists={"MP": spec})
+    state = control.call("symbol_state", symbol="MP")
+    assert state["spec"] == {"groups": spec["groups"], "names": {}, "version": 2, "source_accession": "0001"}
+    assert state["cik"] == 1524358  # the registry's, so the company opens from its archived filing list
 
 
 def test_the_rule_replay_reads_a_stored_figure_again_and_names_the_change():

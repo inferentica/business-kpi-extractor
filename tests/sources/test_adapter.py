@@ -11,12 +11,12 @@ from kpi_extractor.sources import sec
 
 
 class Control:
-    def __init__(self):
-        self.calls = []
+    def __init__(self, cik=None):
+        self.calls, self.cik = [], cik
 
     def call(self, operation, **payload):
-        self.calls.append(operation)
-        return {}
+        self.calls.append(operation if operation != "archive_list" else f"archive_list {payload['cik']}")
+        return {"cik": self.cik} if operation == "symbol_state" else {}
 
 
 class FakeSource:
@@ -27,8 +27,9 @@ class FakeSource:
     def __init__(self):
         self.asked = []
 
-    def open_company(self, symbol):
+    def open_company(self, symbol, archive=None):
         self.asked.append("open_company")
+        self.opened_with = archive
         return SourceCompany(CompanyProfile(symbol=symbol, cik=1, name="Example Co", fiscal_year_end="1231", foreign=False))
 
     def periodic_reports(self, company, since, known_urls=None, archive=None):
@@ -91,3 +92,16 @@ def test_the_store_keeps_only_a_sources_own_documents():
 
 def test_filing_references_keep_their_old_import_path():
     assert sec.FilingRef is FilingRef and sec.CompanyProfile is CompanyProfile
+
+
+@pytest.mark.parametrize("registered, listed", [(1, ["archive_list 1"]), (7, ["archive_list 7", "archive_list 1"]),
+                                                 (None, ["archive_list 1"])])
+def test_the_registrys_cik_opens_the_archive_before_the_company(registered, listed):
+    # With the registry's CIK the source gets the archive (its filing list) to open the company from; a CIK SEC's
+    # company does not have gives way to SEC's, and without one the archive opens after the company, as before.
+    control, fake = Control(registered), FakeSource()
+    pipeline = SymbolPipeline(control, "EXCO", quarters=4, force=False, today=date(2026, 11, 8), log=lambda *_: None, source=fake)
+    pipeline.run()
+    assert [call for call in control.calls if call.startswith("archive_list")] == listed
+    assert (fake.opened_with.cik if fake.opened_with else None) == registered
+    assert pipeline.archive.cik == 1
