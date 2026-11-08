@@ -65,3 +65,15 @@ def test_lines_between_the_change_in_cash_and_its_opening_balance_adjust_it():
                     ("Cash and temporary cash investments beginning of year", 242),
                     ("Cash and temporary cash investments end of quarter", 307))
     assert cash_check(printed).result == "pass"
+
+
+def test_net_income_chain_through_a_tax_total_and_running_subtotals():
+    # Prudential FY2006: current and deferred tax under the total tax expense, then two running subtotals.
+    from statement_extractor.checks.printed import income_check
+    figures = lines(("INCOME FROM CONTINUING OPERATIONS BEFORE INCOME TAXES", 4403), ("Current", 501), ("Deferred", 747),
+                    ("Total income tax expense", 1248),
+                    ("INCOME FROM CONTINUING OPERATIONS BEFORE EQUITY IN EARNINGS OF OPERATING JOINT VENTURES", 3155),
+                    ("Equity in earnings of operating joint ventures, net of taxes", 208),
+                    ("INCOME FROM CONTINUING OPERATIONS BEFORE EXTRAORDINARY GAIN", 3363),
+                    ("Income from discontinued operations, net of taxes", 65), ("NET INCOME", 3428))
+    assert income_check(figures).result == "pass"

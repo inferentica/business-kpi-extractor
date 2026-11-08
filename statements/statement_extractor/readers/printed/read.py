@@ -46,17 +46,22 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     found = find_statements(all_tables)
     # A statement printed more than once (in full, and as a summary elsewhere): the fullest table is the statement.
     found.sort(key=lambda item: -sum(len([row for row in table.rows if row.figures]) for table in item[1]))
+    read_periods: dict[str, set] = {}
     for kind, group in found:
-        if any(reading.statement == kind for reading in readings):
-            continue
+        periods = column_periods(kind, group, fiscal_year_end, document_end)
+        if kind in read_periods:
+            # A statement printed again is a summary, unless it prints periods of its own: Chase's 1995 10-Qs print the
+            # three months and the six months as two income statements.
+            if not periods or {period.key for period in periods.values()} & read_periods[kind]:
+                continue
         scale = statement_scale(group)
         if scale is None:
             notes.append(f"{kind}: no single scale stated")
             continue
-        periods = column_periods(kind, group, fiscal_year_end, document_end)
         if not periods:
             notes.append(f"{kind}: no dated columns")
             continue
+        read_periods.setdefault(kind, set()).update(period.key for period in periods.values())
         ordered = [periods[column] for column in sorted(periods)]
         layout = [(group[0], sorted(periods))]
         for table in group[1:]:
@@ -113,18 +118,21 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
     for table, column, columns in layout:
         base = min((row.level for row in table.rows if row.label), default=0)
         for row in table.rows:
-            if not row.figures and row.label:
-                heading = row.label
             if not row.label and not row.figures:
                 continue
             if not row.figures and (any(pattern.search(row.label) for _, pattern in TITLES) or _CAPTION.search(row.label)):
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line
+            if not row.figures:
+                heading = row.label
             value = _figure(row, column, columns) if row.figures else None
             if row.figures and value is None:
                 continue
             # A balance sheet has no per-share lines; "per share" there is a par value in a stock line's label (Kroger's
             # "Common stock, $1 par per share … 955").
-            per_share = kind != "balance" and bool(PER_SHARE.search(row.label))
+            # A line under a per-share heading is per share too: Coca-Cola's "INCOME PER SHARE" / "Before change in
+            # accounting principle  $ .55".
+            per_share = kind != "balance" and bool(PER_SHARE.search(row.label) or kind == "income" and row.figures
+                                                   and PER_SHARE.search(heading) and not _SHARE_HEADING.search(row.label))
             under_shares = kind == "income" and bool(_SHARE_HEADING.search(heading)) and \
                 re.match(r"^(basic|diluted|primary|fully\s+diluted|assuming\s+dilution)\b", row.label, re.I) is not None
             counted = re.match(r"^(shares|weighted|average|number\s+of\s+shares)\b", row.label, re.I) is not None

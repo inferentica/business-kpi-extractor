@@ -7,7 +7,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-_NUMBER = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*\)?$")
+# A figure may drop its leading zero: Coca-Cola's 1994 "$ .59" a share.
+_NUMBER = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*(\d{1,3}(?:,\d{3})+|\d+|(?=\.\d))(\.\d+)?\s*\)?$")
 
 
 _DASH = re.compile(r"^[—–\-−]+$")
