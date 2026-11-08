@@ -10,7 +10,7 @@ from ..ai import AiResponseError, Spec
 from ..control import ControlError
 from ..fiscal import fiscal_label
 from ..sec import FilingRef
-from ..tagged_metrics import (agrees, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits,
+from ..tagged_metrics import (agrees, refines, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits,
                               year_ago_facts)
 from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _UNANCHORED, _is_jump, _rounding, value_key
 
@@ -179,8 +179,8 @@ class TaggedKpiReading:
                                 if quarter in quarters else None)
                         reading = held.get(quarter)
                         # Only the same figure, more exactly: a release's 3.65% never gives way to a report's 3.
-                        if (fact is not None and quarter in readings and fact != readings[quarter] and reading
-                                and agrees(fact, readings[quarter]) and not reading.get("owner_decision")):
+                        if (fact is not None and quarter in readings and reading and refines(fact, readings[quarter])
+                                and not reading.get("owner_decision")):
                             ref, end = quarters[quarter]
                             records.append({**reading, "value": fact, "source_accession": ref.accession, "source_url": ref.source_url,
                                             "filed_at": ref.filed.isoformat(),
@@ -393,7 +393,7 @@ class TaggedKpiReading:
             if len(present) != 1 or reading.get("owner_decision"):
                 continue
             fact = facts_of(quarter)[present[0]]
-            if fact == readings[quarter] or not agrees(fact, readings[quarter]):
+            if not refines(fact, readings[quarter]):
                 continue
             ref, _end = quarters[quarter]
             tag = present[0]
@@ -417,7 +417,7 @@ class TaggedKpiReading:
                 annual = quarter_facts(self._xbrl(ref).facts.to_dataframe(), end, (330, 400))
             except Exception:  # noqa: BLE001 - an unreadable report gives nothing
                 continue
-            fits = {fact - sum(nine) for fact in annual.values() if agrees(fact - sum(nine), readings[quarter])}
+            fits = {fact - sum(nine) for fact in annual.values() if refines(fact - sum(nine), readings[quarter])}
             if len(fits) != 1:
                 continue
             reading, value = held[quarter], fits.pop()

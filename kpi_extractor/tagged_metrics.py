@@ -93,6 +93,13 @@ def agrees(fact: float, value: float) -> bool:
     return abs(fact - value) <= _tolerance(value)
 
 
+def refines(fact: float, stated: float) -> bool:
+    """Whether a report's tagged figure may replace the figure a release stated: only the same figure to more places
+    ($4.65 billion → 4,651,000,000). A different figure never replaces a stated one, whatever tag it carries: UCB's
+    3.65% margin once gave way to a count of 3, TSMC's average exchange rates to its closing rates."""
+    return fact != stated and agrees(fact, stated)
+
+
 def learn_tag(readings: dict[tuple[str, str], float], facts: dict[tuple[str, str], dict[Tag, float]]) -> Tag | None:
     """The one tag whose fact equals the KPI's reading in at least two quarters and never differs from one."""
     candidates = learn_tags(readings, facts)

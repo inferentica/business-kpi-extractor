@@ -392,3 +392,13 @@ def test_a_ratio_tagged_as_a_decimal_reads_as_a_percentage():
     deposits = Tag("us-gaap:Deposits", (), True)
     scaled = _percent_scale({cet1: 0.1747, deposits: 1.2})
     assert scaled[cet1] == 17.47 and scaled[deposits] == 1.2
+
+
+def test_a_tagged_figure_replaces_a_stated_one_only_to_more_places():
+    from kpi_extractor.tagged_metrics import refines
+    assert refines(4_651_000_000, 4_650_000_000)        # Adobe: $4.65 billion to the dollar
+    assert not refines(4_650_000_000, 4_650_000_000)    # the same figure: nothing to refine
+    assert not refines(3, 3.65)                         # UCB: a count is no margin
+    assert not refines(32.79, 32.3)                     # TSMC: a closing rate is no average rate
+    assert refines(462_300_000_000, 460_000_000_000)      # "$460 billion" is rounded to ten billion: $462.3B refines it
+    assert not refines(13_487_000_000, 13_760_000_000)    # a different figure never replaces a stated one
