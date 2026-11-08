@@ -5,7 +5,7 @@ import pytest
 from kpi_extractor.ai import AiResponseError, Located, Spec, parse_located, parse_spec
 from kpi_extractor.document import parse_document
 from kpi_extractor.checks import check_period, validate_groups
-from kpi_extractor.extract import read_values
+from kpi_extractor.extract import listed_after_fall, read_values
 
 RELEASE = """
 <p>In the second quarter, shipments of 3-nanometer accounted for 30% of total wafer revenue; 5-nanometer accounted
@@ -715,3 +715,39 @@ def test_an_explanation_must_be_about_the_figure_and_the_quarter():
     assert not explanation_supports("Pension Group Annuities: Closed one transaction during the quarter despite heightened competition", "Other Spread Products Inflows", 577e6)
     assert not explanation_supports("Second vintage of strategic third-party sidecar is expected to begin supporting Athene's organic growth", "Inflows Attributable to ADIP", 31e6)
     assert not explanation_supports("AUM were impacted by market volatility and outflows in the current period.", "Long-term Net Flows", -14.4e9)
+
+
+def test_an_unsigned_figure_listed_after_a_fall_is_held():
+    # Vodafone UK: "(Q3: 73,000, Q4: 22,000)" after "declined by" were two falls; Germany TV's "declined by 6,000
+    # (Q2: 62,000)" listed a gain. Neither sign can be trusted, so the figure is held, not accepted.
+    text = "Our mobile contract customer base declined by 127,000 during the year (Q3: 73,000, Q4: 22,000) including losses."
+    document = parse_document(f"<p>{text}</p>", "https://example.com/ex99.htm")
+    block = next(iter(document.blocks))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "k", "label": "UK Mobile Contract Net Additions", "unit": "count"}]}]})
+    quote = "Our mobile contract customer base declined by 127,000 during the year (Q3: 73,000, Q4: 22,000)"
+    located = Located.model_validate({"period_end": "2026-03-31", "values": [
+        {"kpi": "ops.k", "block": block, "quote": quote, "value_text": "22,000"}]})
+    values, _ = read_values(document, spec, located, "USD")
+    assert values[0].status == "needs_review"
+    # A list that gives its signs is read as it stands, and a fall stated next to its figure still makes it negative.
+    signed = "contract customer base declined by 103,000 during the year (Q3: 11,000, Q4: -77,000)"
+    assert _read_quote(signed, "Germany Mobile Contract Net Additions", "count", signed, "-77,000") == -77_000
+    assert not listed_after_fall(signed, "-77,000")
+    assert not listed_after_fall("Our broadband customer base increased by 222,000 in FY26 (Q3: 64,000, Q4: 64,000)", "64,000")
+    assert _read_quote("In mobile, our contract customer base declined by 46,000 in the quarter.", "UK Mobile Contract Net "
+                       "Additions", "count", "our contract customer base declined by 46,000 in the quarter", "46,000") == -46_000
+
+
+def test_a_footnote_mark_after_a_place_still_names_it():
+    from kpi_extractor.extract import _places
+    assert _places("Other Europe1") == {"EUROPE"}
+    assert _places("Europeans") == set()
+
+
+def test_a_dayrate_keeps_its_units_under_a_millions_heading():
+    # Borr: "(in millions)" heads its release; "an average dayrate of approximately $137,000" is $137,000 a day.
+    text = "(In US$ millions) Revenue 250. We have contracts at an average dayrate of approximately $137,000."
+    assert _read_quote(text, "Average Dayrate", "currency", "average dayrate of approximately $137,000", "$137,000") == 137_000
+    assert _read_quote("(In US$ millions) Dayrate revenue 241.0", "Dayrate revenue", "currency", "Dayrate revenue 241.0",
+                       "241.0") == 241_000_000

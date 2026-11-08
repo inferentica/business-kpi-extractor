@@ -14501,5 +14501,2875 @@
     "value": 199.0,
     "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465925101399/tm2529198d1_ex99-1.htm",
     "audited": "audit_sample"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q1",
+    "label": "^Germany\\ Mobile\\ Contract\\ Net\\ Additions$",
+    "unit": "count",
+    "value": -85000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495426006907/a9477n.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^MH\\ Occupancy$",
+    "unit": "percent",
+    "value": 97.2,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000073/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Wealth\\ management\\ fees$",
+    "unit": "currency",
+    "value": 4629000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926045714/tm2612164d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Protected\\ Lives$",
+    "unit": "count",
+    "value": 3057763.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010326007438/dp246930_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^ROW$",
+    "unit": "currency",
+    "value": 339000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926056966/tm2613942d1_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Service\\ charges\\ on\\ deposit\\ accounts$",
+    "unit": "currency",
+    "value": 848000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926048536/mcbs-20260424xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Commercial\\ LNG\\ Offtake\\ Portfolio\\ \\(MTPA\\)$",
+    "unit": "count",
+    "value": 10.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000005/cop-20260205x8kexx991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Mortgage\\ servicing\\ income,\\ net$",
+    "unit": "currency",
+    "value": 781000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000047/mcbs-20250718xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Transient\\ RV\\ Sites$",
+    "unit": "count",
+    "value": 23820.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000156/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Zircon\\ Volume\\ Growth,\\ Year\\ over\\ Year$",
+    "unit": "percent",
+    "value": 49.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036126042049/ef20084959_99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Total\\ Client\\ Assets\\ Under\\ Administration$",
+    "unit": "currency",
+    "value": 503000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026048244/q22026financialhighlightsa.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Assured\\ Capacity\\ \\(aMW\\)$",
+    "unit": "count",
+    "value": 21655.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281425002951/ebr20250806_6k1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Same\\ Property\\ Adjusted\\ Blended\\ Occupancy$",
+    "unit": "percent",
+    "value": 98.7,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000156/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Efficiency\\ Ratio$",
+    "unit": "percent",
+    "value": 62.4,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895526000088/exh992earningsrelease1q2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Off\\-Price\\ Retail$",
+    "unit": "percent",
+    "value": 4.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000110465926047698/pine-20260423xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Allowance\\ for\\ Credit\\ Losses\\ to\\ Total\\ Loans$",
+    "unit": "percent",
+    "value": 1.62,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialhighlightsa.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Lending\\ and\\ loan\\ servicing\\ fees$",
+    "unit": "currency",
+    "value": 3690000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465925069783/tm2521430d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2025-06-28",
+    "fiscal_period": "Q3",
+    "label": "^Refined\\ Fuels\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 2522000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000095017025104606/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Net\\ gain\\ \\(loss\\)\\ on\\ investment\\ securities$",
+    "unit": "currency",
+    "value": 247000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895526000195/a8k3q26earningsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Power\\ supply\\ to\\ non\\-end\\ consumers$",
+    "unit": "currency",
+    "value": 4235000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281425003897/ebrpr3q25_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Total\\ Loans$",
+    "unit": "currency",
+    "value": 7987664000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000083532426000004/sybt-20260930.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^WM\\&T\\ Assets\\ Under\\ Management$",
+    "unit": "currency",
+    "value": 7480000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184325006747/exh_991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Entertainment$",
+    "unit": "percent",
+    "value": 8.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000110465926086260/pine-20260723xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Foreign\\ Exchange$",
+    "unit": "currency",
+    "value": 16666000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895525000097/a8k3q25earningsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Total\\ Fleet$",
+    "unit": "count",
+    "value": 29.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828026036988/q120266-k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Net\\ Refinery\\ Throughputs\\ \\(mbpd\\)$",
+    "unit": "count",
+    "value": 2850.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000039/mpcq12026earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Commercial\\ \\&\\ Industrial\\ Loans$",
+    "unit": "currency",
+    "value": 2516000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465925069783/tm2521430d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Eagle\\ Ford\\ Production$",
+    "unit": "count",
+    "value": 370.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000005/cop-20260205x8kexx991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Nonperforming\\ Loans\\ to\\ Total\\ Loans$",
+    "unit": "percent",
+    "value": 0.58,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026065936/q32026financialhighlightsa.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Efficiency\\ Ratio$",
+    "unit": "percent",
+    "value": 55.64,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184326004978/exh_991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^RV\\ Average\\ Monthly\\ Base\\ Rent\\ per\\ Site$",
+    "unit": "currency",
+    "value": 697.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000156/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Gathering\\ System\\ Throughputs\\ \\(MMcf/d\\)$",
+    "unit": "count",
+    "value": 7216.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000069/mpcq32026earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^NGL\\ Production$",
+    "unit": "count",
+    "value": 424.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316525000040/cop-20250807x8kexx992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^C2\\+\\ NGLs\\ Fractionated\\ \\(mbpd\\)$",
+    "unit": "count",
+    "value": 680.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000060/mpcq22026earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Wealth\\ Management$",
+    "unit": "currency",
+    "value": 7351000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895525000097/a8k3q25earningsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Net\\ investment\\ product\\ sales\\ commissions\\ and\\ fees$",
+    "unit": "currency",
+    "value": 1112000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184325006747/exh_991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^WM\\&T\\ Assets\\ Under\\ Management$",
+    "unit": "currency",
+    "value": 7193000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184325004628/exh_991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Dayrate\\ Equivalent\\ Backlog$",
+    "unit": "currency",
+    "value": 1170000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126022412/ef20074577_ex99-2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SHOO",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Direct\\-to\\-Consumer$",
+    "unit": "currency",
+    "value": 316600000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315226007955/ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q1",
+    "label": "^Germany$",
+    "unit": "currency",
+    "value": 2979000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495425008453/a3187s.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Net\\ Charge\\-Offs\\ to\\ Average\\ Loans$",
+    "unit": "percent",
+    "value": 0.01,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000047/mcbs-20250718xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Owner\\ Occupied\\ Commercial\\ RE\\ Loans$",
+    "unit": "currency",
+    "value": 4041000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926045714/tm2612164d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q3",
+    "label": "^Total\\ New\\ Student\\ Starts$",
+    "unit": "count",
+    "value": 5721.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165425000017/exhibit991-q32025earningsp.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^West\\ Africa$",
+    "unit": "currency",
+    "value": 71900000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828025049534/q320256-k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Group\\ Life\\ Persistency\\ Ratio$",
+    "unit": "percent",
+    "value": 96.8,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777425000104/exhibit992-2q25qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2026-08-01",
+    "fiscal_period": "Q2",
+    "label": "^Stores$",
+    "unit": "count",
+    "value": 9436.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570326000108/ex991q2-26earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q3",
+    "label": "^Other\\ Europe$",
+    "unit": "currency",
+    "value": 1509000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495426000933/a7811rtst.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Asset\\ Management\\ Fees$",
+    "unit": "currency",
+    "value": 858000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000012/exhibit992-4q25qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Other$",
+    "unit": "currency",
+    "value": 753000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184326004978/exh_991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Bareboat\\ charter\\ revenue$",
+    "unit": "currency",
+    "value": 26700000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036125040727/ef20058406_ex99-2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q4",
+    "label": "^UK\\ Broadband\\ Net\\ Additions$",
+    "unit": "count",
+    "value": 64000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495426004689/a9489d.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^ROW$",
+    "unit": "currency",
+    "value": 401612000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465925106104/tm2530212d1_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Healthcare\\ Services\\ Colombia$",
+    "unit": "currency",
+    "value": 346000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010325010462/dp233186_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q1",
+    "label": "^International\\ Priority\\ Freight$",
+    "unit": "currency",
+    "value": 784000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Bookings\\ at\\ 100%\\ Share$",
+    "unit": "currency",
+    "value": 400330000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926010887/dlr-20260205xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^CET1\\ Ratio$",
+    "unit": "percent",
+    "value": 12.33,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000110465926085424/tm2620858d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Dayrate\\ revenue$",
+    "unit": "currency",
+    "value": 187700000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126032598/ef20080031_ex99-2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Group\\ Insurance\\ Administrative\\ Expense\\ Ratio$",
+    "unit": "percent",
+    "value": 15.2,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777425000104/exhibit992-2q25qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Total\\ Capital\\ Ratio$",
+    "unit": "percent",
+    "value": 15.32,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895525000097/a8k3q25earningsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2025-12-27",
+    "fiscal_period": "Q1",
+    "label": "^Propane\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 110165000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000119312526038543/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Same\\-Capital\\ Cash\\ NOI\\ Growth$",
+    "unit": "percent",
+    "value": 8.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465925101827/dlr-20251023xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Home\\ Sales\\ Units$",
+    "unit": "count",
+    "value": 917.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000156/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Management\\ contract\\ revenue$",
+    "unit": "currency",
+    "value": 10800000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126006137/ef20066099_ex99-2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Net\\ Interest\\ Margin\\ \\(FTE\\)$",
+    "unit": "percent",
+    "value": 4.02,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895525000097/a8k3q25earningsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Total\\ Bed\\ Capacity$",
+    "unit": "count",
+    "value": 2228.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010326012579/dp251949_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Gain\\ on\\ sale\\ of\\ SBA\\ loans$",
+    "unit": "currency",
+    "value": 643000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000047/mcbs-20250718xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Distillates\\ Yield\\ \\(mbpd\\)$",
+    "unit": "count",
+    "value": 1023.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000039/mpcq12026earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Commercial\\ Loan\\ Outstanding\\ Face\\ Amount$",
+    "unit": "currency",
+    "value": 167000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000110465926086260/pine-20260723xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Assured\\ Capacity\\ \\(aMW\\)$",
+    "unit": "count",
+    "value": 21444.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426002854/axiapr1q26_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Dollar\\ Stores$",
+    "unit": "percent",
+    "value": 12.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000155837025009538/pine-20250724xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Non\\-Interest\\ Bearing\\ Deposits$",
+    "unit": "currency",
+    "value": 1435846000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184326000445/exh_991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Noninterest\\-Bearing\\ Demand\\ Deposits$",
+    "unit": "currency",
+    "value": 6444067000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465925101399/tm2529198d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^CET1\\ Capital\\ Ratio$",
+    "unit": "percent",
+    "value": 12.19,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000083532426000004/sybt-20260930.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q1",
+    "label": "^U\\.S\\.\\ Priority$",
+    "unit": "currency",
+    "value": 3142000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q3",
+    "label": "^UTI\\ End\\ of\\ Period\\ Full\\-Time\\ Active\\ Students$",
+    "unit": "count",
+    "value": 14602.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000015/exhibit991-q32026earningsp.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Top\\ 20\\ Customer\\ Share\\ of\\ Annualized\\ Recurring\\ Revenue$",
+    "unit": "percent",
+    "value": 51.9,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926047702/dlr-20260423xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Net\\ investment\\ product\\ sales\\ commissions\\ and\\ fees$",
+    "unit": "currency",
+    "value": 980000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184325004628/exh_991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Average\\ Home\\ Selling\\ Price$",
+    "unit": "currency",
+    "value": 91117.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000272/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Healthcare\\ Services\\ Peru$",
+    "unit": "currency",
+    "value": 279000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010325015107/dp237728_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Lending\\ and\\ loan\\ servicing\\ fees$",
+    "unit": "currency",
+    "value": 3332000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926117113/tm2627820d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Energy\\ Sold\\ ACL\\ \\(TWh\\)$",
+    "unit": "count",
+    "value": 17.9,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281425002951/ebr20250806_6k1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Properties$",
+    "unit": "count",
+    "value": 128.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000110465926086260/pine-20260723xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Commercial\\ Construction\\ \\&\\ Land\\ Loans$",
+    "unit": "currency",
+    "value": 1143000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926085229/tm2620881d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Commercial\\ Real\\ Estate\\ Loans$",
+    "unit": "currency",
+    "value": 814464000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000058/mcbs-20251017xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Supercharger\\ Connectors$",
+    "unit": "count",
+    "value": 79918.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026026551/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q3",
+    "label": "^Total\\ New\\ Student\\ Starts$",
+    "unit": "count",
+    "value": 6342.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000015/exhibit991-q32026earningsp.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Loans\\ to\\ Deposits$",
+    "unit": "percent",
+    "value": 79.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000026/q12026financialhighlightsa.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Total\\ Capital\\ Ratio$",
+    "unit": "percent",
+    "value": 15.83,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895526000195/a8k3q26earningsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Total\\ Production$",
+    "unit": "count",
+    "value": 434358.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026003837/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Bitumen\\ Production$",
+    "unit": "count",
+    "value": 144.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316525000040/cop-20250807x8kexx992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Commercial\\ Real\\ Estate\\ Loans$",
+    "unit": "currency",
+    "value": 1479506000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926118460/mcbs-ex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2026-03-29",
+    "fiscal_period": "Q1",
+    "label": "^Aeronautics\\ Backlog$",
+    "unit": "currency",
+    "value": 55032000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026026683/ex991q12026.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2025-11-30",
+    "fiscal_period": "Q2",
+    "label": "^U\\.S\\.\\ Priority$",
+    "unit": "currency",
+    "value": 2843000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891125000076/fdx-earningsreleasefy2026q2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Supercharger\\ Connectors$",
+    "unit": "count",
+    "value": 73817.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045861/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Model\\ 3/Y\\ Production$",
+    "unit": "count",
+    "value": 457387.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026066738/exhibit9914.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^MH\\ Occupancy$",
+    "unit": "percent",
+    "value": 97.4,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259325000213/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Crude\\ Oil\\ Capacity\\ Utilization$",
+    "unit": "percent",
+    "value": 95.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000003/mpcq42025earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Investment\\ Grade$",
+    "unit": "percent",
+    "value": 55.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000110465926086260/pine-20260723xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Full\\-Time\\ Equivalent\\ Employees$",
+    "unit": "count",
+    "value": 2319.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895526000088/a8k1q26earningsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Top\\ 20\\ Customer\\ Share\\ of\\ Annualized\\ Recurring\\ Revenue$",
+    "unit": "percent",
+    "value": 53.1,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926086270/dlr-20260723xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Japan\\ Face\\ Amount\\ of\\ Individual\\ Policies\\ in\\ Force$",
+    "unit": "currency",
+    "value": 506000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000093/exhibit992-1q26qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Net\\ gains\\ from\\ sales\\ of\\ other\\ loans$",
+    "unit": "currency",
+    "value": 947000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926085229/tm2620881d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Residential\\ and\\ Commercial\\ Mortgage$",
+    "unit": "currency",
+    "value": 148000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000006/q42025financialhighlightsa.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Distillates\\ Yield\\ \\(mbpd\\)$",
+    "unit": "count",
+    "value": 1117.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029525000052/mpcq22025earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Natural\\ Gas\\ Realized\\ Price$",
+    "unit": "currency",
+    "value": 4.28,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316525000056/cop-20251106x8kexx992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^ROW$",
+    "unit": "currency",
+    "value": 368000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926121154/tm2628724d1_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q3",
+    "label": "^Concorde\\ Average\\ Full\\-Time\\ Active\\ Students$",
+    "unit": "count",
+    "value": 9552.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165425000017/exhibit991-q32025earningsp.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Zircon\\ Price/Mix,\\ Year\\ over\\ Year$",
+    "unit": "percent",
+    "value": -23.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036126006120/ef20066098_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Bareboat\\ charter\\ revenue$",
+    "unit": "currency",
+    "value": 26600000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828026036988/q120266-k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Employees$",
+    "unit": "count",
+    "value": 55047.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialsupplement.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Other\\ service\\ charges,\\ commissions\\ and\\ fees$",
+    "unit": "currency",
+    "value": 1428000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926086635/mcbs-20260724xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Generation$",
+    "unit": "currency",
+    "value": 7021000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426000554/axiapr4q25_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Commercial\\ Loans$",
+    "unit": "count",
+    "value": 11.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000110465926118157/pine-ex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q1",
+    "label": "^International\\ Priority\\ Package$",
+    "unit": "currency",
+    "value": 2677000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Energy\\ Sold\\ ACR\\ \\(TWh\\)$",
+    "unit": "count",
+    "value": 7.8,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426000554/axiapr4q25_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Assets\\ Under\\ Administration$",
+    "unit": "currency",
+    "value": 190900000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000093/exhibit992-1q26qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Discretionary\\ Client\\ AUM$",
+    "unit": "currency",
+    "value": 247000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026048244/q22026financialhighlightsa.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q1",
+    "label": "^Africa$",
+    "unit": "currency",
+    "value": 1932000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495425008453/a3187s.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Crude\\ Oil\\ Production$",
+    "unit": "count",
+    "value": 1111.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000016/cop-20260430x8kexx992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Total\\ Production$",
+    "unit": "count",
+    "value": 408386.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026026551/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Group\\ Insurance\\ Benefits\\ Ratio$",
+    "unit": "percent",
+    "value": 83.7,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000093/exhibit992-1q26qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Employees$",
+    "unit": "count",
+    "value": 57801.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000026/q12026financialsupplement.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Realized\\ Price\\ per\\ BOE$",
+    "unit": "currency",
+    "value": 50.36,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000016/cop-20260430x8kexx992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Net\\ Interest\\ Margin$",
+    "unit": "percent",
+    "value": 2.84,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000006/q42025financialhighlightsa.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Global\\ Vehicle\\ Inventory\\ \\(Days\\ of\\ Supply\\)$",
+    "unit": "count",
+    "value": 27.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026026551/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2026-01-31",
+    "fiscal_period": "Q4",
+    "label": "^Stores$",
+    "unit": "count",
+    "value": 9282.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570326000024/ex991q4-25earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Commercial\\ \\&\\ Industrial\\ Loans$",
+    "unit": "currency",
+    "value": 2771000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926045714/tm2612164d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Group\\ Insurance\\ Benefits\\ Ratio$",
+    "unit": "percent",
+    "value": 82.5,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000012/exhibit992-4q25qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Same\\ Property\\ Adjusted\\ Blended\\ Occupancy$",
+    "unit": "percent",
+    "value": 98.8,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000231/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SHOO",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Company\\-Operated\\ Brick\\-and\\-Mortar\\ Retail\\ Stores$",
+    "unit": "count",
+    "value": 397.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315225020804/ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Gasoline\\ Yield\\ \\(mbpd\\)$",
+    "unit": "count",
+    "value": 1524.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000003/mpcq42025earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Total\\ Deliveries$",
+    "unit": "count",
+    "value": 480126.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026049213/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Gross\\ Loans\\ Held\\ for\\ Investment$",
+    "unit": "currency",
+    "value": 2967492000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000174706825000058/mcbs-20251017xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q1",
+    "label": "^UK$",
+    "unit": "currency",
+    "value": 1934000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495425008453/a3187s.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Bookings\\ at\\ DLR\\ Share$",
+    "unit": "currency",
+    "value": 208000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926086270/dlr-20260723xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Entertainment$",
+    "unit": "percent",
+    "value": 5.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000155837025009538/pine-20250724xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Crude\\ Oil\\ Refining\\ Capacity\\ \\(mbpcd\\)$",
+    "unit": "count",
+    "value": 2963.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029525000059/mpcq32025earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Bookings\\ at\\ DLR\\ Share$",
+    "unit": "currency",
+    "value": 161804000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465925101827/dlr-20251023xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Average\\ Home\\ Selling\\ Price$",
+    "unit": "currency",
+    "value": 96396.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259326000073/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^NGL\\ Production$",
+    "unit": "count",
+    "value": 415.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000016/cop-20260430x8kexx992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Fixed\\ Backlog$",
+    "unit": "currency",
+    "value": 4985900000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000007/prim-20260217xex99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^O\\&M\\ revenue$",
+    "unit": "currency",
+    "value": 475000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426000554/axiapr4q25_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q1",
+    "label": "^UTI\\ Average\\ Full\\-Time\\ Active\\ Students$",
+    "unit": "count",
+    "value": 16347.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000003/exhibit991-q12026earningsp.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Alaska\\ Production$",
+    "unit": "count",
+    "value": 182.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316525000056/cop-20251106x8kexx992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Retail\\ Customers\\ \\-\\ Third\\ Party$",
+    "unit": "currency",
+    "value": 224000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000170/exhibit992-2q26qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2026-05-02",
+    "fiscal_period": "Q1",
+    "label": "^Stores$",
+    "unit": "count",
+    "value": 9382.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570326000064/ex991q1-26earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Transmission\\ RAP$",
+    "unit": "currency",
+    "value": 16839000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426004087/axiapr2q26_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Renewals\\ Signed\\ \\(kW\\)$",
+    "unit": "count",
+    "value": 92670.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926120212/dlr-ex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Other\\ Models\\ Deliveries$",
+    "unit": "count",
+    "value": 12364.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026049213/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Institutional\\ Customers\\ \\-\\ Third\\ Party$",
+    "unit": "currency",
+    "value": 402000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777426000170/exhibit992-2q26qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Oncosalud\\ Plan\\ Memberships$",
+    "unit": "count",
+    "value": 1472019.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010326012579/dp251949_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Transmission\\ RAP$",
+    "unit": "currency",
+    "value": 16733000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426000554/axiapr4q25_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Holding\\ and\\ Eliminations$",
+    "unit": "currency",
+    "value": -96444000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010326007438/dp246930_ex9902.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Others$",
+    "unit": "currency",
+    "value": 60512000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465925071915/tm2521924d2_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Cumulative\\ Vehicle\\ Deliveries\\ \\(Millions\\)$",
+    "unit": "count",
+    "value": 9.7,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026049213/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2025-11-30",
+    "fiscal_period": "Q2",
+    "label": "^U\\.S\\.\\ Ground$",
+    "unit": "currency",
+    "value": 9173000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891125000076/fdx-earningsreleasefy2026q2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Data\\ Centers$",
+    "unit": "count",
+    "value": 310.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926010887/dlr-20260205xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BNS",
+    "period_end": "2026-01-31",
+    "fiscal_period": "Q1",
+    "label": "^Employees$",
+    "unit": "count",
+    "value": 79740.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312526065249/d93621dex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q1",
+    "label": "^Concorde\\ Revenue\\ per\\ Student$",
+    "unit": "currency",
+    "value": 7400.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000003/q12026financialsupplemen.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Europe$",
+    "unit": "currency",
+    "value": 17600000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828026036988/q120266-k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BNS",
+    "period_end": "2025-07-31",
+    "fiscal_period": "Q3",
+    "label": "^Employees$",
+    "unit": "count",
+    "value": 87317.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312525188101/d944686dex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Point\\ in\\ time$",
+    "unit": "currency",
+    "value": 8800000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000162828026055957/borr-20260630.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Refining\\ \\&\\ Marketing\\ Adjusted\\ EBITDA\\ per\\ Barrel$",
+    "unit": "currency",
+    "value": 7.15,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000003/mpcq42025earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-02-28",
+    "fiscal_period": "Q3",
+    "label": "^U\\.S\\.\\ Domestic\\ Average\\ Daily\\ Package\\ Volume$",
+    "unit": "count",
+    "value": 15496000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000010/fdx-earningsreleasefy2026q3.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2025-11-01",
+    "fiscal_period": "Q3",
+    "label": "^Selling\\ Square\\ Footage$",
+    "unit": "count",
+    "value": 82500000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570325000104/ex991q3-25earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Oncosalud\\ Medical\\ Loss\\ Ratio$",
+    "unit": "percent",
+    "value": 55.9,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010326012579/dp251949_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q1",
+    "label": "^U\\.S\\.\\ Ground$",
+    "unit": "currency",
+    "value": 9545000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000128/fdx-earningsreleasety2026q3.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MSI",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Backlog$",
+    "unit": "currency",
+    "value": 15700000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/68505/000006850526000006/msiq42025pressrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Emergency\\ Treatments$",
+    "unit": "count",
+    "value": 97857.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010326012579/dp251949_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BNS",
+    "period_end": "2025-10-31",
+    "fiscal_period": "FY",
+    "label": "^Provision\\ for\\ Credit\\ Losses\\ Ratio$",
+    "unit": "percent",
+    "value": 0.62,
+    "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312525304603/d41644dex992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Bookings\\ at\\ 100%\\ Share$",
+    "unit": "currency",
+    "value": 706883000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926047702/dlr-20260423xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "ROKU",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Roku\\-Made\\ TVs\\ Share\\ of\\ U\\.S\\.\\ TV\\ Unit\\ Sales$",
+    "unit": "percent",
+    "value": 8.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1428439/000162828026068877/a04fy2026q3exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Zircon\\ Volume\\ Growth,\\ Year\\ over\\ Year$",
+    "unit": "percent",
+    "value": -4.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036125040677/ef20058426_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q3",
+    "label": "^Concorde\\ End\\ of\\ Period\\ Full\\-Time\\ Active\\ Students$",
+    "unit": "count",
+    "value": 8495.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165425000017/exhibit991-q32025earningsp.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Total\\ Bed\\ Capacity$",
+    "unit": "count",
+    "value": 2224.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010325015107/dp237728_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^EU$",
+    "unit": "currency",
+    "value": 393000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926056966/tm2613942d1_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2025-11-30",
+    "fiscal_period": "Q2",
+    "label": "^U\\.S\\.\\ Deferred$",
+    "unit": "currency",
+    "value": 1396000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891125000076/fdx-earningsreleasefy2026q2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^TiO2\\ Volume\\ Growth,\\ Quarter\\ over\\ Quarter$",
+    "unit": "percent",
+    "value": 9.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036126006120/ef20066098_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BNS",
+    "period_end": "2026-07-31",
+    "fiscal_period": "Q3",
+    "label": "^Canadian\\ Banking$",
+    "unit": "currency",
+    "value": 3646000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312526364115/d93977dex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BNS",
+    "period_end": "2026-07-31",
+    "fiscal_period": "Q3",
+    "label": "^Global\\ Wealth\\ Management$",
+    "unit": "currency",
+    "value": 1897000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312526364115/d93977dex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^TiO2\\ Volume\\ Growth,\\ Quarter\\ over\\ Quarter$",
+    "unit": "percent",
+    "value": -11.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036126042049/ef20084959_99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BNS",
+    "period_end": "2025-10-31",
+    "fiscal_period": "Q4",
+    "label": "^Deposits$",
+    "unit": "currency",
+    "value": 966279000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312525304589/d849316dex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^EU$",
+    "unit": "currency",
+    "value": 394914000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465925106104/tm2530212d1_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q2",
+    "label": "^UTI\\ Revenue\\ per\\ Student$",
+    "unit": "currency",
+    "value": 9200.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000009/q22026financialsupplemen.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BNS",
+    "period_end": "2026-01-31",
+    "fiscal_period": "Q1",
+    "label": "^Global\\ Wealth\\ Management$",
+    "unit": "currency",
+    "value": 1801000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312526065249/d93621dex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q3",
+    "label": "^Africa$",
+    "unit": "currency",
+    "value": 2208000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495426000933/a7811rtst.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Zircon\\ Price/Mix,\\ Year\\ over\\ Year$",
+    "unit": "percent",
+    "value": -28.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036126019589/ef20072648_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^TiO2\\ Price/Mix,\\ Quarter\\ over\\ Quarter$",
+    "unit": "percent",
+    "value": -3.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036125040677/ef20058426_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2026-08-01",
+    "fiscal_period": "Q2",
+    "label": "^New\\ Store\\ Openings$",
+    "unit": "count",
+    "value": 75.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570326000108/ex991q2-26earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GTN",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^US\\ TV\\ Household\\ Reach$",
+    "unit": "percent",
+    "value": 37.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/43196/000143774926035398/ex_1037935.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Plasma\\ Centers\\ \\(Egypt\\)$",
+    "unit": "count",
+    "value": 18.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926121154/tm2628724d1_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^TiO2\\ Price/Mix,\\ Quarter\\ over\\ Quarter$",
+    "unit": "percent",
+    "value": 3.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036126019589/ef20072648_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q3",
+    "label": "^Germany\\ Broadband\\ Net\\ Additions$",
+    "unit": "count",
+    "value": -63000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495426000933/a7811rtst.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UL",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^The\\ Americas$",
+    "unit": "currency",
+    "value": 5000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741026000061/a2026-10x28xunileverq320.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^TiO2\\ Volume\\ Growth,\\ Quarter\\ over\\ Quarter$",
+    "unit": "percent",
+    "value": -4.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036125040677/ef20058426_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q1",
+    "label": "^UTI\\ Revenue\\ per\\ Student$",
+    "unit": "currency",
+    "value": 8700.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165426000003/q12026financialsupplemen.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "VOD",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q1",
+    "label": "^Germany\\ IoT\\ Devices\\ Connected$",
+    "unit": "count",
+    "value": 2900000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/839923/000165495425008453/a3187s.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2026-08-01",
+    "fiscal_period": "Q2",
+    "label": "^Selling\\ Square\\ Footage$",
+    "unit": "count",
+    "value": 84000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570326000108/ex991q2-26earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2026-01-31",
+    "fiscal_period": "Q4",
+    "label": "^New\\ Store\\ Openings$",
+    "unit": "count",
+    "value": 42.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570326000024/ex991q4-25earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2025-08-02",
+    "fiscal_period": "Q2",
+    "label": "^Multi\\-Price\\ Stores$",
+    "unit": "count",
+    "value": 585.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570325000060/ex991q2-25earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2025-08-02",
+    "fiscal_period": "Q2",
+    "label": "^Stores$",
+    "unit": "count",
+    "value": 9148.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570325000060/ex991q2-25earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Biopharma$",
+    "unit": "currency",
+    "value": 1632629000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465925071915/tm2521924d2_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SHOO",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Company\\-Operated\\ Brick\\-and\\-Mortar\\ Retail\\ Stores$",
+    "unit": "count",
+    "value": 392.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315225011490/ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "CPS",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^New\\ Awards\\ for\\ Battery\\ Electric\\ or\\ Full\\-Hybrid\\ Platforms$",
+    "unit": "currency",
+    "value": 36600000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1320461/000132046126000110/q22026earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2026-09-27",
+    "fiscal_period": "Q3",
+    "label": "^Missiles\\ and\\ Fire\\ Control\\ Backlog$",
+    "unit": "currency",
+    "value": 142517000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026066780/ex991q32026.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2025-09-27",
+    "fiscal_period": "Q4",
+    "label": "^Refined\\ Fuels\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 1841000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000119312525279017/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2025-09-28",
+    "fiscal_period": "Q3",
+    "label": "^Space\\ Backlog$",
+    "unit": "currency",
+    "value": 38390000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828025045582/ex991q32025.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BLBD",
+    "period_end": "2026-03-28",
+    "fiscal_period": "Q2",
+    "label": "^EV\\ Buses\\ in\\ Firm\\ Order\\ Backlog$",
+    "unit": "count",
+    "value": 900.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1589526/000158952626000028/a2026q2resultsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TNGX",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Objective\\ Response\\ Rate$",
+    "unit": "percent",
+    "value": 27.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1819133/000119312526007086/d26323dex992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2026-09-27",
+    "fiscal_period": "Q3",
+    "label": "^C\\-130J\\ Deliveries$",
+    "unit": "count",
+    "value": 2.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026066780/ex991q32026.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^MSA\\ Backlog$",
+    "unit": "currency",
+    "value": 6960100000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153825000038/prim-20251029xex99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2026-06-28",
+    "fiscal_period": "Q2",
+    "label": "^Aeronautics\\ Backlog$",
+    "unit": "currency",
+    "value": 54356000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026049277/ex991q22026.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^ROW$",
+    "unit": "currency",
+    "value": 463308000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926020526/tm267368d1_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^MSA\\ Backlog$",
+    "unit": "currency",
+    "value": 8498799999.999999,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000035/prim-ex99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SHOO",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Company\\-Operated\\ Brick\\-and\\-Mortar\\ Retail\\ Stores$",
+    "unit": "count",
+    "value": 387.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315226021398/ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UL",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Asia\\ Pacific\\ Africa$",
+    "unit": "currency",
+    "value": 6000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741026000061/a2026-10x28xunileverq320.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UL",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^The\\ Americas$",
+    "unit": "currency",
+    "value": 5200000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741025000058/q32025tradingstatement.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2026-06-27",
+    "fiscal_period": "Q3",
+    "label": "^Propane\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 70622000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000100521026000010/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "RTX",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Total\\ Backlog$",
+    "unit": "currency",
+    "value": 271000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182926000009/a2026-04x218xkerexhibit99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2025-06-28",
+    "fiscal_period": "Q3",
+    "label": "^Propane\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 71913000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000095017025104606/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SHOO",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Wholesale$",
+    "unit": "currency",
+    "value": 433300000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315226007955/ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "RTX",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Commercial\\ and\\ Defense\\ Awards$",
+    "unit": "currency",
+    "value": 37000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182925000040/a2025-10x218xkerexhibit99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UL",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Asia\\ Pacific\\ Africa$",
+    "unit": "currency",
+    "value": 6200000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741025000058/q32025tradingstatement.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2026-03-29",
+    "fiscal_period": "Q1",
+    "label": "^Space\\ Backlog$",
+    "unit": "currency",
+    "value": 38990000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026026683/ex991q12026.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GTN",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^US\\ TV\\ Household\\ Reach$",
+    "unit": "percent",
+    "value": 37.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/43196/000143774926005740/ex_924265.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "CPS",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^New\\ Awards\\ for\\ Battery\\ Electric\\ or\\ Full\\-Hybrid\\ Platforms$",
+    "unit": "currency",
+    "value": 28200000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1320461/000132046126000138/q32026earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GTN",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^US\\ TV\\ Household\\ Reach$",
+    "unit": "percent",
+    "value": 37.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/43196/000143774926015344/ex_956963.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2025-09-28",
+    "fiscal_period": "Q3",
+    "label": "^Rotary\\ and\\ Mission\\ Systems\\ Backlog$",
+    "unit": "currency",
+    "value": 47269000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828025045582/ex991q32025.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2025-09-27",
+    "fiscal_period": "Q4",
+    "label": "^Propane\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 60817000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000119312525279017/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BKNG",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Room\\ Nights$",
+    "unit": "count",
+    "value": 309000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1075531/000107553125000035/bkngq22025earningspressr.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GTN",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^US\\ TV\\ Household\\ Reach$",
+    "unit": "percent",
+    "value": 37.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/43196/000143774926031279/ex_1019903.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "CPS",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^New\\ Awards\\ for\\ Battery\\ Electric\\ or\\ Full\\-Hybrid\\ Platforms$",
+    "unit": "currency",
+    "value": 31800000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1320461/000132046126000078/q12026earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2026-06-28",
+    "fiscal_period": "Q2",
+    "label": "^Total\\ Backlog$",
+    "unit": "currency",
+    "value": 230416000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828026049277/ex991q22026.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GTN",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Telemundo\\ Affiliate\\ Markets$",
+    "unit": "count",
+    "value": 46.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/43196/000143774926031279/ex_1019903.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FROG",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Cloud\\ Revenue$",
+    "unit": "currency",
+    "value": 70200000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1800667/000119312526048726/frog-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2026-03-28",
+    "fiscal_period": "Q2",
+    "label": "^Propane\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 161593000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000119312526210425/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "LMT",
+    "period_end": "2025-06-29",
+    "fiscal_period": "Q2",
+    "label": "^Missiles\\ and\\ Fire\\ Control\\ Backlog$",
+    "unit": "currency",
+    "value": 40250000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/936468/000162828025035502/ex991q22025.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Fixed\\ Backlog$",
+    "unit": "currency",
+    "value": 5024900000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153825000030/prim-20250730xex99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^MSA\\ Backlog$",
+    "unit": "currency",
+    "value": 8152000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000021/prim-20260731xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BLBD",
+    "period_end": "2026-06-27",
+    "fiscal_period": "Q3",
+    "label": "^EV\\ Buses\\ in\\ Firm\\ Order\\ Backlog$",
+    "unit": "count",
+    "value": 770.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1589526/000158952626000046/a2026q3resultsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^MSA\\ Backlog$",
+    "unit": "currency",
+    "value": 7458300000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000014/prim-20260430xex99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TNGX",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Objective\\ Response\\ Rate$",
+    "unit": "percent",
+    "value": 49.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1819133/000119312525263684/tngx-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FROG",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Customers\\ with\\ ARR\\ Over\\ \\$100K$",
+    "unit": "count",
+    "value": 1357.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1800667/000119312526449797/frog-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BKNG",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Flight\\ Tickets$",
+    "unit": "count",
+    "value": 21.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1075531/000107553126000044/q3-26bkngearningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "ROKU",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Roku\\-Made\\ TVs\\ Share\\ of\\ U\\.S\\.\\ TV\\ Unit\\ Sales$",
+    "unit": "percent",
+    "value": 5.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1428439/000162828026054321/a04fy2026q2exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Fixed\\ Backlog$",
+    "unit": "currency",
+    "value": 4182800000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000014/prim-20260430xex99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GTN",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Television\\ Markets$",
+    "unit": "count",
+    "value": 117.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/43196/000143774926031279/ex_1019903.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FROG",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Remaining\\ Performance\\ Obligations$",
+    "unit": "currency",
+    "value": 565700000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1800667/000119312526048726/frog-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SHOO",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Company\\-Operated\\ Brick\\-and\\-Mortar\\ Retail\\ Stores$",
+    "unit": "count",
+    "value": 382.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315226035322/ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FROG",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Net\\ Dollar\\ Retention\\ Rate$",
+    "unit": "percent",
+    "value": 121.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1800667/000119312526337998/frog-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Fixed\\ Backlog$",
+    "unit": "currency",
+    "value": 5569100000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153826000035/prim-ex99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MSI",
+    "period_end": "2025-06-28",
+    "fiscal_period": "Q2",
+    "label": "^Backlog$",
+    "unit": "currency",
+    "value": 14100000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/68505/000006850525000038/msiq22025pressrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2026-03-28",
+    "fiscal_period": "Q2",
+    "label": "^Refined\\ Fuels\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 7469000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000119312526210425/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "ROKU",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^New\\-to\\-Service\\ Share\\ of\\ Premium\\ Subscription\\ Sign\\-Ups$",
+    "unit": "percent",
+    "value": 95.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1428439/000162828026068877/a04fy2026q3exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRIM",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^MSA\\ Backlog$",
+    "unit": "currency",
+    "value": 6468600000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1361538/000136153825000030/prim-20250730xex99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SHOO",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Company\\-Operated\\ Brick\\-and\\-Mortar\\ Retail\\ Stores$",
+    "unit": "count",
+    "value": 381.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315226050053/ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SPH",
+    "period_end": "2025-12-27",
+    "fiscal_period": "Q1",
+    "label": "^Refined\\ Fuels\\ Gallons\\ Sold$",
+    "unit": "count",
+    "value": 4537000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1005210/000119312526038543/sph-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SHOO",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Company\\-Operated\\ Brick\\-and\\-Mortar\\ Retail\\ Stores$",
+    "unit": "count",
+    "value": 399.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/913241/000149315226007955/ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UL",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Europe$",
+    "unit": "currency",
+    "value": 2300000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741026000061/a2026-10x28xunileverq320.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FROG",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Net\\ Dollar\\ Retention\\ Rate$",
+    "unit": "percent",
+    "value": 120.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1800667/000119312526211940/frog-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UL",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Europe$",
+    "unit": "currency",
+    "value": 3300000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/217410/000021741025000058/q32025tradingstatement.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TNGX",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Objective\\ Response\\ Rate$",
+    "unit": "percent",
+    "value": 92.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1819133/000119312526343434/tngx-ex99_1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "RTX",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Commercial\\ and\\ Defense\\ Awards$",
+    "unit": "currency",
+    "value": 81000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182926000030/a2026-10x208xkerexhibit99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GTN",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^US\\ TV\\ Household\\ Reach$",
+    "unit": "percent",
+    "value": 37.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/43196/000143774925033706/ex_883502.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "RTX",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Total\\ Backlog$",
+    "unit": "currency",
+    "value": 289000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/101829/000010182926000025/a2026-07x238xkerexhibit99.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSEM",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^SiPho\\ Revenue\\ Run\\ Rate$",
+    "unit": "currency",
+    "value": 680000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/928876/000117891326003776/exhibit_99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SYBT",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^WM\\&T\\ Assets\\ Under\\ Management$",
+    "unit": "currency",
+    "value": 8949000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/835324/000117184326006885/exh_991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FFBC",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Assets\\ Under\\ Management$",
+    "unit": "currency",
+    "value": 4000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/708955/000070895525000097/a8k3q25earningsreleaseex991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UCB",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Securities\\ gains,\\ net$",
+    "unit": "currency",
+    "value": 133000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/857855/000110465926045714/tm2612164d1_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PNC",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Total\\ Client\\ Assets\\ Under\\ Administration$",
+    "unit": "currency",
+    "value": 421000000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialhighlightsa.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PINE",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Properties$",
+    "unit": "count",
+    "value": 127.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1786117/000110465926010892/pine-20260205xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "COP",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Natural\\ Gas\\ Realized\\ Price$",
+    "unit": "currency",
+    "value": 3.72,
+    "source": "https://www.sec.gov/Archives/edgar/data/1163165/000116316526000005/cop-20260205x8kexx992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "PRU",
+    "period_end": "2025-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Institutional\\ Customers\\ \\-\\ Third\\ Party$",
+    "unit": "currency",
+    "value": 387000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1137774/000113777425000104/exhibit992-2q25qfs.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MCBS",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^Other\\ service\\ charges,\\ commissions\\ and\\ fees$",
+    "unit": "currency",
+    "value": 1581000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1747068/000110465926048536/mcbs-20260424xex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AXIA",
+    "period_end": "2025-12-31",
+    "fiscal_period": "Q4",
+    "label": "^Installed\\ Generation\\ Capacity\\ \\(MW\\)$",
+    "unit": "count",
+    "value": 43872.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1439124/000129281426000554/axiapr4q25_6k.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "SUI",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Rental\\ Program\\ Occupied\\ Sites$",
+    "unit": "count",
+    "value": 11630.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/912593/000091259325000258/exhibit991pressreleaseands.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "MPC",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Crude\\ Oil\\ Refined\\ \\(mbpd\\)$",
+    "unit": "count",
+    "value": 2973.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1510295/000151029526000069/mpcq32026earningsrelease.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TSLA",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Supercharger\\ Stations$",
+    "unit": "count",
+    "value": 7753.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045861/exhibit991.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLR",
+    "period_end": "2026-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Top\\ 20\\ Customer\\ Share\\ of\\ Annualized\\ Recurring\\ Revenue$",
+    "unit": "percent",
+    "value": 53.5,
+    "source": "https://www.sec.gov/Archives/edgar/data/1297996/000110465926120212/dlr-ex99d1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BORR",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q2",
+    "label": "^Bareboat\\ charter\\ revenue$",
+    "unit": "currency",
+    "value": 32900000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1715497/000114036126032598/ef20080031_ex99-2.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "AUNA",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q3",
+    "label": "^Oncological\\ Plan\\ Memberships$",
+    "unit": "count",
+    "value": 989000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1799207/000095010325015107/dp237728_ex9901.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "FDX",
+    "period_end": "2026-02-28",
+    "fiscal_period": "Q3",
+    "label": "^U\\.S\\.\\ Domestic\\ Revenue\\ per\\ Package$",
+    "unit": "currency",
+    "value": 14.7,
+    "source": "https://www.sec.gov/Archives/edgar/data/1048911/000104891126000010/fdx-earningsreleasefy2026q3.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "BNS",
+    "period_end": "2025-10-31",
+    "fiscal_period": "FY",
+    "label": "^Employees$",
+    "unit": "count",
+    "value": 86431.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/9631/000119312525304603/d41644dex992.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "TROX",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^TiO2\\ Volume\\ Growth,\\ Quarter\\ over\\ Quarter$",
+    "unit": "percent",
+    "value": 4.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1530804/000114036126019589/ef20072648_ex99-1.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "UTI",
+    "period_end": "2025-09-30",
+    "fiscal_period": "Q4",
+    "label": "^Concorde\\ Revenue\\ per\\ Student$",
+    "unit": "currency",
+    "value": 7900.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1261654/000126165425000022/q42025financialsupplemen.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "DLTR",
+    "period_end": "2025-11-01",
+    "fiscal_period": "Q3",
+    "label": "^New\\ Store\\ Openings$",
+    "unit": "count",
+    "value": 106.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/935703/000093570325000104/ex991q3-25earningspressrel.htm",
+    "audited": "audit300e"
+  },
+  {
+    "symbol": "GRFS",
+    "period_end": "2026-03-31",
+    "fiscal_period": "Q1",
+    "label": "^US\\ \\+\\ Canada$",
+    "unit": "currency",
+    "value": 968000000.0,
+    "source": "https://www.sec.gov/Archives/edgar/data/1438569/000110465926056966/tm2613942d1_6k.htm",
+    "audited": "audit300e"
   }
 ]

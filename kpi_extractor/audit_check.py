@@ -19,7 +19,7 @@ import urllib.request
 from dataclasses import dataclass, field
 
 from .document import Document, parse_document, parse_number
-from .extract import _heading, _nearest_heading
+from .extract import _heading, _nearest_heading, _places
 
 MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split()
 MONTH_NAMES = "january|february|march|april|may|june|july|august|september|october|november|december"
@@ -27,10 +27,6 @@ PER_UNIT = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\byields?\b
 FALL = re.compile(r"\b(decreas\w*|declin\w*|fell|dropped|down|lower|loss|lost|negative)\b", re.I)
 OTHER_PERIOD = re.compile(r"first half|six months|nine months|year[- ]to[- ]date|\bytd\b|full[- ]year|for the year|guidance|expect|outlook|"
                           r"\btarget\b|cumulative", re.I)
-PLACE = re.compile(r"\b(Japan|China|U\.?S\.?|United States|North America|Latin America|Americas|Europe|EMEA|APAC|Asia Pacific|Asia|"
-                   r"Canada|Mexico|Brazil|Germany|U\.?K\.?|United Kingdom|India|Korea|Taiwan|France|Australia|Africa|Middle East|"
-                   r"Peru|Colombia|Chile|Spain|Italy)\b", re.I)
-NOT_THE_PLACE = re.compile(r"(excluding|excl\.?|ex|intra|non)[- ]\s*$", re.I)
 STOP_WORDS = {"the", "of", "and", "a", "an", "in", "for", "by", "to", "total", "revenue", "revenues", "operating", "metrics",
               "net", "average", "number"}
 SCALE_WORDS = {"thousand": 1e3, "million": 1e6, "billion": 1e9}
@@ -45,11 +41,6 @@ class Checked:
 
 def _words(text: str) -> set[str]:
     return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP_WORDS and len(w) > 1}
-
-
-def _places(text: str, own: bool = False) -> set[str]:
-    return {m.group(0).replace(".", "").upper() for m in PLACE.finditer(text)
-            if not (own and NOT_THE_PLACE.search(text[:m.start()][-16:]))}
 
 
 class Fetcher:

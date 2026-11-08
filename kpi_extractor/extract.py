@@ -87,7 +87,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             problems.append(f"{locator.kpi}: {error}")
             continue
         seen.add(locator.kpi)
-        held = SCALE_NOT_STATED in notes or any(note.startswith(PLACE_NOT_NAMED) for note in notes)
+        held = SCALE_NOT_STATED in notes or SIGN_NOT_STATED in notes or any(note.startswith(PLACE_NOT_NAMED) for note in notes)
         values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator), notes,
                                 status="needs_review" if held else "verified"))
     # One gate for every reading (replay, Flash, the reasoning reader): the column's own header outranks a period the AI states.
@@ -228,6 +228,10 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         # declined by 46,000" is net additions of -46,000: the sentence carries the sign, not the number.
         value = -value
         notes.append("a fall, as the quote says")
+    elif value > 0 and kpi.unit == "count" and _CHANGE_KPI.search(kpi.label) and listed_after_fall(quote, value_text):
+        # Vodafone's "declined by 127,000 during the year (Q3: 73,000, Q4: 22,000)" means two falls, but its "declined
+        # by 6,000 (Q2: 62,000)" lists a gain: an unsigned figure in such a list has no sign a reader can trust.
+        notes.append(SIGN_NOT_STATED)
     if kpi.unit == "count" and parsed.scale_word is None:
         # A count takes its label's own scale, as a table row's does: "Starlink Subscribers (#, in millions) 12.0".
         value *= _row_scale(quote[:quote.find(value_text)]) or 1
@@ -357,6 +361,24 @@ def falls(quote: str, value_text: str) -> bool:
     return at >= 0 and bool(_FALL.search(quote[:at][-80:]))
 
 
+SIGN_NOT_STATED = "the sign of a figure listed after a fall is not stated"
+
+# A period's figure in a bracketed list: "(Q3: 73,000, Q4: 22,000)", "(Q1, -36,000, Q2: -1,000)".
+_PERIOD_LIST = re.compile(r"\b(?:Q[1-4]|H[12]|FY\s?\d{0,4})\b[:,]?\s*[-\u2212]?[\d,.]+[^()]*$|\b(?:Q[1-4]|H[12])\b[:,]?\s*$", re.I)
+_FALL_WORD = re.compile(r"\b(?:decreas\w*|declin\w*|fell|falls?|dropped|drops?|down|lower|contracted|reduc\w*|lost|loss(?:es)?)\b", re.I)
+
+
+def listed_after_fall(quote: str, value_text: str) -> bool:
+    """Whether the figure is an unsigned entry of a bracketed period list that follows a fall."""
+    if value_text.lstrip().startswith(("-", "\u2212")):
+        return False
+    at = quote.find(value_text)
+    opening = quote.rfind("(", 0, at) if at >= 0 else -1
+    if opening < 0 or ")" in quote[opening:at] or quote[max(0, at - 1):at] in ("-", "\u2212"):
+        return False
+    return bool(_PERIOD_LIST.search(quote[opening + 1:at])) and bool(_FALL_WORD.search(quote[:opening][-120:]))
+
+
 def net_gross_mismatch(text: str, kpi_label: str) -> str | None:
     """"net" when the text names a net figure and the KPI a gross one (KKR's Net Unrealized Carried Interest is not its
     Gross Unrealized Carried Interest), "gross" the other way round, else None."""
@@ -462,7 +484,8 @@ _ROW_SCALE_SHORT = re.compile(r"\(\s*(?P<word>bil|bn|mil|mm|mn|thous)\.?\s*\)", 
 # A KPI priced per unit is in units, whatever its table's "$ Millions, Except as Indicated" or "In thousands, except
 # yield amounts" says: FedEx's "Revenue per Package" and "Package Yield", ConocoPhillips' "Realized Price ($/MCF)". Apollo's
 # "Yield" is an asset class, so a yield counts only for packages, freight, pounds, pieces, shipments, passengers or units.
-_PER_UNIT_KPI = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\b(?:package|freight|pound|piece|shipment|passenger|unit)\s+yields?\b|\bARP[AU]\b|\bASP\b", re.I)
+_PER_UNIT_KPI = re.compile(r"\bper\s+(?!cent\b)\w|\$\s*/\s*\w|\bprices?\b|\b(?:package|freight|pound|piece|shipment|passenger|unit)\s+yields?\b|\bARP[AU]\b|\bASP\b"
+                           r"|\b(?:day|daily)\s?rates?\s*(?:\(|$)|\bADR\b", re.I)  # Borr's "Average Dayrate", never its "Dayrate revenue"
 
 
 def _row_scale(text: str) -> float | None:
@@ -930,7 +953,8 @@ def labels_agree(named: str | None, actual: str) -> bool:
 PLACE_NOT_NAMED = "the row and its headings name no"
 _PLACE = re.compile(r"\b(Japan|China|U\.?S\.?|United States|North America|Latin America|Americas|Europe|EMEA|APAC|"
                     r"Asia Pacific|Asia|Canada|Mexico|Brazil|Germany|U\.?K\.?|United Kingdom|India|Korea|Taiwan|France|"
-                    r"Australia|Africa|Middle East|Peru|Colombia|Chile|Türkiye|Turkey|Spain|Italy)\b", re.I)
+                    r"Australia|Africa|Middle East|Peru|Colombia|Chile|Türkiye|Turkey|Spain|Italy)(?![A-Za-z])", re.I)
+# A footnote mark may follow a place: Vodafone's row "Other Europe1" names Europe.
 # A place a name leaves out ("Excluding Intra-Europe") is not the figure's own.
 _NOT_THE_PLACE = re.compile(r"(?:excluding|excl\.?|ex|intra|non|outside|other than)[- ]\s*$", re.I)
 
