@@ -751,3 +751,26 @@ def test_a_dayrate_keeps_its_units_under_a_millions_heading():
     assert _read_quote(text, "Average Dayrate", "currency", "average dayrate of approximately $137,000", "$137,000") == 137_000
     assert _read_quote("(In US$ millions) Dayrate revenue 241.0", "Dayrate revenue", "currency", "Dayrate revenue 241.0",
                        "241.0") == 241_000_000
+
+
+def test_a_quarter_label_keeps_its_meaning_in_a_column_header():
+    from kpi_extractor.extract import column_duration_problem, column_header
+    from kpi_extractor.document import Table
+    table = Table(id="T1", rows=[["", "Q4", "Q3", "Fiscal 2025"], ["PCL ratio", "0.58", "0.55", "0.62"]], context="")
+    # Scotiabank's fourth-quarter ratio is no fiscal year's figure, and a year-to-date column is no quarter's.
+    assert column_duration_problem(column_header(table, 1, 1), annual=True)
+    assert column_duration_problem(column_header(table, 1, 3), annual=True) is None
+    assert column_header(table, 1, 1) == "<fourth quarter>" and column_header(table, 1, 2) == "<third quarter>"
+    ytd = Table(id="T2", rows=[["", "3Q26", "YTD", "LTM"], ["Rent change", "5.9", "5.1", "4.9"]], context="")
+    assert column_duration_problem(column_header(ytd, 1, 1), annual=False) is None
+    assert column_duration_problem(column_header(ytd, 1, 2), annual=False)
+    assert column_duration_problem(column_header(ytd, 1, 3), annual=False)
+
+
+def test_a_level_at_the_period_end_may_come_from_a_year_to_date_column():
+    from kpi_extractor.extract import _stands_at_period_end
+    from kpi_extractor.ai import KpiSpec
+    assert _stands_at_period_end(KpiSpec(key="b", label="Total Bed Capacity", unit="count"))
+    assert not _stands_at_period_end(KpiSpec(key="m", label="Oncology Plan Medical Loss Ratio", unit="percent"))
+    assert not _stands_at_period_end(KpiSpec(key="r", label="Average Monthly Revenue per Plan Member", unit="currency"))
+    assert not _stands_at_period_end(KpiSpec(key="c", label="Contract Commitments Awarded", unit="count"))

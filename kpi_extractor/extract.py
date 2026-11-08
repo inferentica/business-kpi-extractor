@@ -94,6 +94,10 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
     kept = []
     for item in values:
         mismatch = column_duration_problem(str(item.locator.get("header") or ""), located.annual)
+        if mismatch and _stands_at_period_end(item.kpi) and (not located.annual or _FOURTH_QUARTER.search(mismatch)):
+            # A level is no span's total: Auna's beds "YTD 25" at September 30 are the beds at the quarter's end, and
+            # Scotiabank's deposits in its "Q4" column are the year-end deposits (its Q4 ratios are not the year's).
+            mismatch = None
         if mismatch:
             problems.append(f"{item.group.key}.{item.kpi.key}: {mismatch}")
         else:
@@ -104,9 +108,20 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
 # A week-based quarter is 12, 13, 14 or 16 weeks (PepsiCo, Costco, Kroger); its half and three quarters 24 to 28 and
 # 36 to 40 weeks.
 _QUARTER = re.compile(r"<3 months>|three months|<1[2-6] weeks>|(twelve|thirteen|fourteen|sixteen) weeks|quarter|\bq[1-4]\b|\b[1-4]q\b")
+# "ytd" and "ltm" head Digital Realty's leasing columns beside each quarter's.
 _LONGER = re.compile(r"<(6|9|12) months>|(six|nine|twelve) months|<(2[4-8]|3[6-9]|40|5[23]) weeks>|"
                      r"(twenty-four|twenty-six|twenty-eight|thirty-six|thirty-nine|forty|fifty-two|fifty-three) weeks|"
-                     r"years? ended|year to date|fiscal years?")
+                     r"years? ended|year to date|fiscal years?|\bytd\b|\bltm\b|last twelve months|trailing twelve months")
+
+
+_FOURTH_QUARTER = re.compile(r"fourth quarter", re.I)
+_ORDINAL = {"1": "first", "2": "second", "3": "third", "4": "fourth"}
+
+
+def _stands_at_period_end(kpi: KpiSpec) -> bool:
+    """A count or amount that is a level at the period's end (beds, deposits, backlog), never a ratio or a per-unit amount."""
+    return kpi.unit in ("count", "currency") and bool(_STOCK_KPI.search(kpi.label)) and not _PER_UNIT_KPI.search(kpi.label) \
+        and not _CHANGE_KPI.search(kpi.label) and not re.search(r"\b(?:added|awarded|new|sold|sales|revenue|gross adds)\b", kpi.label, re.I)
 
 
 def column_duration_problem(header: str, annual: bool) -> str | None:
@@ -832,6 +847,9 @@ def column_header(table: Table, first_data_row: int, col: int) -> str:
                   r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b", "@", text)
     # A duration names the column ("3 months", "six months", "26 weeks"), so its number is kept; dates and years blank.
     text = re.sub(r"(?<!<)\b(\d{1,2})(\s*-?\s*)(months?|weeks?|quarters?)\b(?!>)", r"<\1 \3>", text)
+    # A quarter's label keeps its meaning once its digits blank: Scotiabank's "Q4" and Digital Realty's "3Q26" were "q#"
+    # and "#q#", which the period gate could not read, so a fourth quarter's ratio was stored as the fiscal year's.
+    text = re.sub(r"\b(?:q([1-4])|([1-4])q)(?:\s*'?\s*(?:fy)?\s*\d{2,4})?\b", lambda m: f"<{_ORDINAL[m.group(1) or m.group(2)]} quarter>", text)
     return re.sub(r"(?<![<\d])[\d.,]+(?![\d]* (?:months?|weeks?|quarters?)>)", "#", text)[:120]
 
 
