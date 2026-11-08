@@ -64,9 +64,17 @@ def _summary(run: str) -> str:
     return "\n".join(wanted[:30]) or f"run {run}: no summary line"
 
 
+def _push_run() -> str:
+    """The golden-set run a push of this commit already started, if any: a second one would read the same 88 figures again."""
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    out = subprocess.run(["gh", "run", "list", "-R", REPO, "-w", "evaluate.yml", "-e", "push", "-c", sha, "-L", "1",
+                          "--json", "databaseId", "-q", ".[0].databaseId"], capture_output=True, text=True)
+    return out.stdout.strip()
+
+
 def run_remote() -> bool:
     print("== Scoring sets on GitHub (golden, audited)", flush=True)
-    golden = _dispatch(["suite=golden", "offpeak=false"])
+    golden = _push_run() or _dispatch(["suite=golden", "offpeak=false"])
     audited = _dispatch(["suite=golden", "golden=evals/audited.json", "lists=fresh", "quarters=4", "offpeak=false"])
     golden_summary, audited_summary = _summary(golden), _summary(audited)
     print(f"golden (run {golden}):\n{golden_summary}\naudited (run {audited}):\n{audited_summary}", flush=True)

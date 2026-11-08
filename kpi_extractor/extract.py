@@ -83,11 +83,13 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             if locator.table is not None and locator.table in document.tables and group.kind == "metric":
                 if unnamed := _place_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
                     notes.append(f"{PLACE_NOT_NAMED}: {unnamed}")
+                if twin := _row_named_twice(document.tables[locator.table], locator.row, locator.col):
+                    notes.append(f"{ROW_NAMED_TWICE}: {twin}")
         except LocateError as error:
             problems.append(f"{locator.kpi}: {error}")
             continue
         seen.add(locator.kpi)
-        held = SCALE_NOT_STATED in notes or SIGN_NOT_STATED in notes or any(note.startswith(PLACE_NOT_NAMED) for note in notes)
+        held = SCALE_NOT_STATED in notes or SIGN_NOT_STATED in notes or any(note.startswith((PLACE_NOT_NAMED, ROW_NAMED_TWICE)) for note in notes)
         values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator), notes,
                                 status="needs_review" if held else "verified"))
     # One gate for every reading (replay, Flash, the reasoning reader): the column's own header outranks a period the AI states.
@@ -868,6 +870,38 @@ def _locator_record(document: Document, locator: Locator) -> dict:
                 "row_numbers": [cells[locator.col].value if locator.col < len(cells) and cells[locator.col] else None,
                                 *[c.value for i, c in enumerate(cells) if c is not None and i != locator.col][:8]]}
     return {"block": locator.block, "quote": clean(locator.quote or "")[:160], "value_text": locator.value_text}
+
+
+ROW_NAMED_TWICE = "the table names this row twice, with another figure"
+
+
+_SUB_ROW = re.compile(r"^\s*[\-\u2013\u2022\u00b7*]\s*\w")
+_TWIN_REACH = 8
+
+
+def _plain_label(label: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"^[\s\-\u2013\u2022\u00b7*]+", "", label)).strip().lower()
+
+
+def _row_named_twice(table: Table, row: int, col: int) -> str | None:
+    """Another row of the table with the read row's own name and a different figure in its column, if any: Auna lists
+    "- Holding and eliminations" under Colombia (-1) and under its Peru segments (-101), and the group's is both."""
+    if row >= len(table.rows) or col >= len(table.rows[row]):
+        return None
+    label = _row_label(table.rows[row], col)
+    name, value = _plain_label(label), parse_number(table.rows[row][col])
+    # Only a sub-row ("- Holding and eliminations") under one parent beside its twin under another: a release that
+    # repeats its segment names section by section (revenue, then EBITDA) names each row once per section.
+    if not name or value is None or not _SUB_ROW.match(label):
+        return None
+    for index in range(max(0, row - _TWIN_REACH), min(len(table.rows), row + _TWIN_REACH + 1)):
+        other = table.rows[index]
+        if index == row or col >= len(other) or not _SUB_ROW.match(twin := _row_label(other, col)) or _plain_label(twin) != name:
+            continue
+        figure = parse_number(other[col])
+        if figure is not None and figure.value != value.value:
+            return f"row {index} gives {other[col].strip()}"
+    return None
 
 
 def _row_label(row: list[str], col: int) -> str:

@@ -774,3 +774,17 @@ def test_a_level_at_the_period_end_may_come_from_a_year_to_date_column():
     assert not _stands_at_period_end(KpiSpec(key="m", label="Oncology Plan Medical Loss Ratio", unit="percent"))
     assert not _stands_at_period_end(KpiSpec(key="r", label="Average Monthly Revenue per Plan Member", unit="currency"))
     assert not _stands_at_period_end(KpiSpec(key="c", label="Contract Commitments Awarded", unit="count"))
+
+
+def test_a_sub_row_named_twice_under_two_parents_is_held():
+    from kpi_extractor.extract import _row_named_twice
+    from kpi_extractor.document import Table
+    rows = [["", "2Q'26"], ["Healthcare Services Mexico", "300"], ["Healthcare Services Colombia", "426"],
+            ["- Healthcare Services Colombia", "427"], ["- Holding and eliminations", "(1)"],
+            ["Healthcare Services Peru & Oncosalud Peru", "512"], ["- Healthcare Services Peru", "296"],
+            ["- Oncosalud Peru", "317"], ["- Holding and eliminations", "(101)"], ["Total Revenue", "1,238"],
+            ["Adjusted EBITDA", ""], ["Healthcare Services Mexico", "75"]]
+    table = Table(id="T34", rows=rows, context="")
+    assert _row_named_twice(table, 8, 1)  # Auna's Peru eliminations are not the group's
+    assert _row_named_twice(table, 1, 1) is None  # a segment named again in the EBITDA section is not a twin
+    assert _row_named_twice(table, 6, 1) is None
