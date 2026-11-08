@@ -42,9 +42,21 @@ def _chunks(line: str) -> list[_Chunk]:
     return [_Chunk(match.start(), match.end(), match.group(0)) for match in _CHUNK.finditer(line)]
 
 
+def _figures_apart(chunks: list[_Chunk]) -> list[_Chunk]:
+    """A chunk of figures one space apart is a figure each: Apple's 1994 "(257,228) (1,359,796)"."""
+    out = []
+    for chunk in chunks:
+        parts = list(re.finditer(r"\S+", chunk.text))
+        if len(parts) > 1 and all(_FIGURE.match(part.group(0)) for part in parts):
+            out.extend(_Chunk(chunk.start + part.start(), chunk.start + part.end(), part.group(0)) for part in parts)
+        else:
+            out.append(chunk)
+    return out
+
+
 def _split(line: str) -> _Line | None:
     """A line's label and the run of figures that ends it ("Net sales  $ 9,188,748  $ 7,976,954")."""
-    chunks = _chunks(line.replace("$", " "))
+    chunks = _figures_apart(_chunks(line.replace("$", " ")))
     if not chunks:
         return None
     run = len(chunks)
@@ -101,13 +113,29 @@ _JOINING = re.compile(r"\b(and|or|of|for|in|on|to|the|before|after|from|less|plu
 _LEADING_JOIN = re.compile(r"^(and|or|of|for|on|to|before|after|from|by|with|at|due)\b", re.I)
 
 
-def _continues(before: str, after: str, already: bool) -> bool:
+# A line in capitals that heads a section rather than starting a label ("CURRENT ASSETS", "INTEREST INCOME").
+_CAPITAL_HEADING = re.compile(r"\b(ASSETS|LIABILITIES|EQUITY|ACTIVITIES|INCOME|EXPENSES?|REVENUES?|OPERATIONS)$")
+
+
+def _capitals(text: str) -> bool:
+    return any(character.isalpha() for character in text) and text.upper() == text
+
+
+def _continues(before: str, after: str, already: bool, indented: bool = False) -> bool:
     """Whether a line without figures runs on into the line after it: the next line starts in lower case, with a
     bracket or a figure, or either side has a joining word ("INCOME BEFORE INCOME TAXES" / "AND CUMULATIVE EFFECT OF" /
-    "ACCOUNTING CHANGE"). A heading ending in a colon never does."""
+    "ACCOUNTING CHANGE"), or a label in capitals goes on in capitals one step in, or after a joining word
+    ("AVERAGE SHARES" / " OUTSTANDING"; " AND CHANGE IN ACCOUNTING" / " PRINCIPLE"). A heading ending in a colon never
+    does, and a heading in capitals does not run into a label in mixed case ("INCOME PER SHARE" / "Before change in")."""
     if before.endswith(":"):
         return False
+    if _capitals(before) and not _capitals(after) and after[:1].isupper():
+        return False
     if _JOINING.search(before) or _LEADING_JOIN.match(after):
+        return True
+    heading = _CAPITAL_HEADING.search(before) and not re.search(r"\b(BEFORE|AFTER|FROM|PER)\b", before)
+    if _capitals(before) and _capitals(after) and not heading and (
+            indented or _LEADING_JOIN.match(before)):
         return True
     if already:
         return False
@@ -132,12 +160,12 @@ def _rows(lines: list[_Line], columns: list[int]) -> list[Row]:
         label = line.label
         joined: list[str] = []
         indent = line.indent
-        following = label
-        while pending and _continues(pending[-1].label, following, bool(joined)):
+        following, following_indent = label, line.indent
+        while pending and _continues(pending[-1].label, following, bool(joined), following_indent > pending[-1].indent):
             previous = pending.pop()
             joined.insert(0, previous.label)
             indent = previous.indent  # the label starts where its first line does
-            following = previous.label
+            following, following_indent = previous.label, previous.indent
         for waiting in pending:
             heading(waiting)
         pending = []
@@ -152,7 +180,23 @@ def _rows(lines: list[_Line], columns: list[int]) -> list[Row]:
         rows.append(Row(label=full, level=indent, figures=figures, cells=cells))
     for waiting in pending:
         heading(waiting)
-    return rows
+    return _wrapped_names(rows)
+
+
+def _wrapped_names(rows: list[Row]) -> list[Row]:
+    """A "heading" over a single line set further in, with the line after back at the heading's own place, is one label
+    wrapped: Coca-Cola's "Coca-Cola Hellenic Bottling" / "  Company S.A.  1,066" between two other bottlers."""
+    out: list[Row] = []
+    for index, row in enumerate(rows):
+        name = out[-1] if out and index and out[-1] is rows[index - 1] else None
+        after = rows[index + 1] if index + 1 < len(rows) else None
+        if name is not None and not name.figures and name.label and not name.label.endswith(":") \
+                and not _capitals(name.label) and row.figures and row.label and after is not None and after.label \
+                and row.level > name.level == after.level:
+            out[-1] = Row(label=f"{name.label} {row.label}", level=name.level, figures=row.figures, cells=row.cells)
+            continue
+        out.append(row)
+    return out
 
 
 _UNTAGGED_TITLE = re.compile(r"^[ \t]*(condensed\s+)?(consolidated\s+)?(balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?"
@@ -198,8 +242,9 @@ def _tagged(text: str):
 def _untagged(text: str, spans: list[tuple[int, int]]):
     """Statements printed with no <TABLE> tags (Coca-Cola's 10-Qs of 2002-2004): from a statement's title line to the
     page's end, the lines before the first figures being its title and header."""
+    previous_end = 0
     for match in _UNTAGGED_TITLE.finditer(text):
-        if any(start <= match.start() < end for start, end in spans):
+        if any(start <= match.start() < end for start, end in spans) or match.start() < previous_end:
             continue
         line_start = text.rfind("\n", 0, match.start()) + 1
         lines = text[line_start:line_start + 20_000].splitlines()
@@ -222,13 +267,19 @@ def _untagged(text: str, spans: list[tuple[int, int]]):
         headed = [index for index, line in enumerate(top) if COLUMN_TITLE.search(line) or
                   any(_YEAR.match(chunk.text) for chunk in _chunks(line))]
         split_at = headed[0] if headed else first
-        before = text[max(0, line_start - 1500):line_start]
+        # The text before is this statement's own, never the statement before it: Apple's 1996 balance sheet would
+        # otherwise take the "(in thousands)" of the share line ending its income statement as a second scale.
+        before = text[max(previous_end, line_start - 1500):line_start]
+        previous_end = line_start + sum(len(line) + 1 for line in block)
         yield line_start, before, top[:split_at], top[split_at:], block[first:]
 
 
 def parse_text(text: str) -> list[Table]:
     """Every table of a plain-text document, tagged <TABLE> blocks and untagged statements, in document order, each with
     the text before it (its title and scale)."""
+    # A tab stands for the spaces to the next stop of eight: Apple's 1996-97 10-Qs end some wrapped labels with tabs,
+    # which would put the figure after them in no column.
+    text = "\n".join(line.expandtabs(8) for line in text.split("\n"))
     spans = [(block.start(), block.end()) for block in _BLOCK.finditer(text)]
     parts = sorted([*_tagged(text), *_untagged(text, spans)], key=lambda part: part[0])
     return [_table(before, title, header, body, index) for index, (_start, before, title, header, body) in enumerate(parts)]

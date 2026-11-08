@@ -86,9 +86,13 @@ def income_check(figures) -> Check:
     between = figures[pretax[0] + 1:net[0]]
     starts = subtotals(between)
     covered = {position for end, start in starts.items() for position in range(start, end)}
+    # Lines under a "Total …" only: Prudential's current and deferred tax under its total tax expense, while its income
+    # from continuing operations before equity earnings stays in the chain though the next subtotal sums it too.
+    under_totals = {position for end, start in starts.items() if TOTAL.match(between[end][0])
+                    for position in range(start, end)}
     # Lines a later subtotal sums are read through that subtotal, or each on its own: a running subtotal (income from
     # continuing operations) can also equal the two lines above it, and must then restart the chain instead.
-    for skip in (covered, set()):
+    for skip in (covered, under_totals, set()):
         if _chain(pretax[1], net[1], [value for index, (_l, _v, value) in enumerate(between) if index not in skip]):
             return Check("calc", PASS, "net income from income before taxes")
     return Check("calc", FAIL, f"income before taxes {pretax[1]:,.1f} does not lead to net income {net[1]:,.1f}")
