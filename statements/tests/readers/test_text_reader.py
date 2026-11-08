@@ -276,3 +276,17 @@ def test_a_reconciliation_headed_income_statement_is_not_the_statement():
     readings, _ = read(reconciliation + statement, "1231", date(1998, 12, 31), form="10-K")
     values = {line["label"]: line["value"] for line in readings[("income", "1998", "FY", "year")].lines}
     assert values["NET INCOME"] == 3_782e6
+
+
+def test_one_year_over_each_column_in_order():
+    # Apple's FY1997 10-K: "1997" sits four characters off its column, "1996" three.
+    text = ("CONSOLIDATED BALANCE SHEETS\n(DOLLARS IN MILLIONS)\n<TABLE>\n<CAPTION>\n"
+            "SEPTEMBER 26, 1997 AND SEPTEMBER 27, 1996" + " " * 59 + "1997       1996\n<S> <C> <C>\n"
+            + "".join(f"{label + '.' * (98 - len(label))}  {a:>9}  {b:>9}\n" for label, a, b in (
+                ("Cash and cash equivalents", "$   1,230", "$   1,552"), ("Total current assets", "3,424", "5,224"),
+                ("Other assets", "309", "140"), ("Total assets", "$   4,233", "$   5,364"),
+                ("Total liabilities", "2,033", "2,306"), ("Total shareholders' equity", "1,200", "2,058"),
+                ("Total liabilities and shareholders' equity", "$   4,233", "$   5,364"))) + "</TABLE>\n")
+    readings, _ = read(text, "0930", date(1997, 9, 26), form="10-K")
+    values = {line["label"]: line["value"] for line in readings[("balance", "1997", "FY", "instant")].lines}
+    assert values["Cash and cash equivalents"] == 1_230e6
