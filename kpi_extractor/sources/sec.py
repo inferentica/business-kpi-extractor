@@ -72,7 +72,12 @@ def _read_submission_afresh(filing) -> None:
     response = httpx.get(filing.text_url, headers={"User-Agent": get_identity()}, timeout=_SUBMISSION_TIMEOUT,
                          follow_redirects=True)
     response.raise_for_status()
-    submission = FilingSGML.from_text(response.text)
+    _hold_submission(filing, response.text)
+
+
+def _hold_submission(filing, text: str) -> None:
+    """Holds a full submission's text on its filing, as edgartools would after reading it from SEC."""
+    submission = FilingSGML.from_text(text)
     # As FilingSGML.from_filing fills what a submission's header leaves out.
     if not submission.accession_number:
         submission.header.filing_metadata.update("ACCESSION NUMBER", filing.accession_no)
@@ -83,19 +88,30 @@ def _read_submission_afresh(filing) -> None:
     filing._sgml = submission
 
 
-def load_submission(filing) -> None:
+def load_submission(filing, archive=None) -> None:
     """Holds a filing's full submission on it. Its URL, attachments and documents are read from the submission, so reading
-    those afterwards cannot fail."""
+    those afterwards cannot fail. The archive's copy comes first (the filing feed's worker puts each new filing there),
+    then SEC."""
+    if getattr(filing, "_sgml", None) is not None:
+        return
+    if archive is not None:
+        text = archive.read_submission(filing.accession_no)
+        if text:
+            try:
+                _hold_submission(filing, text)
+                return
+            except Exception:  # noqa: BLE001 - a damaged copy: SEC's then
+                pass
     _with_retries(filing.sgml, lambda: _read_submission_afresh(filing))
 
 
-def _document_url(filing, known_urls: dict[str, str] | None) -> str:
+def _document_url(filing, known_urls: dict[str, str] | None, archive=None) -> str:
     """A filing's main document. Asking edgartools downloads the whole submission, so a filing already recorded keeps the
     address recorded: a run used to download every report of the last ten years to list them."""
     known = (known_urls or {}).get(filing.accession_no)
     if known:
         return known
-    load_submission(filing)
+    load_submission(filing, archive)
     return filing.filing_url if hasattr(filing, "filing_url") else filing.url
 
 
@@ -166,7 +182,7 @@ def year_ends_agree(stated: str, period: date) -> bool:
     return any(abs((anchor.replace(year=anchor.year + shift) - period).days) <= 10 for shift in (-1, 0, 1))
 
 
-def periodic_reports(company: Company, since: date, known_urls: dict[str, str] | None = None) -> list[FilingRef]:
+def periodic_reports(company: Company, since: date, known_urls: dict[str, str] | None = None, archive=None) -> list[FilingRef]:
     filings = _with_retries(lambda: company.get_filings(form=list(PERIODIC_FORMS), filing_date=f"{since.isoformat()}:"))
     refs = []
     for filing in filings:
@@ -174,7 +190,7 @@ def periodic_reports(company: Company, since: date, known_urls: dict[str, str] |
             continue  # amendments restate a subset; the original report is the complete one
         refs.append(FilingRef(
             accession=filing.accession_no, form=filing.form, filed=filing.filing_date, role="periodic_report",
-            source_url=_document_url(filing, known_urls), filing=filing,
+            source_url=_document_url(filing, known_urls, archive), filing=filing,
         ))
     return refs
 
@@ -284,15 +300,15 @@ def _archived_exhibits(filing, archive) -> list:
     stored = archive.read_json(folder, _DOCUMENTS_RECORD)
     if stored is not None:
         return exhibits_from_record(stored)
-    exhibits = _html_exhibits(filing)
+    exhibits = _html_exhibits(filing, archive)
     archive.write_json(folder, _DOCUMENTS_RECORD, exhibits_record(exhibits, _MAX_EXHIBIT_BYTES))
     return exhibits
 
 
-def _html_exhibits(filing) -> list:
+def _html_exhibits(filing, archive=None) -> list:
     """A filing's HTML exhibits. A 6-K with none carries its content in its own document (TSMC's until October 2019:
     its results and quarterly financial statements, by technology from 2018), which then stands in for them."""
-    load_submission(filing)
+    load_submission(filing, archive)
     attachments = list(filing.attachments)
     exhibits = [attachment for attachment in attachments
                 if str(attachment.document_type or "").upper().startswith("EX-99") and attachment.is_html()]
@@ -369,8 +385,9 @@ class SecSource:
         profile, company = company_profile(symbol)
         return SourceCompany(profile, company)
 
-    def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None) -> list[FilingRef]:
-        return periodic_reports(company.handle, since, known_urls)
+    def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,
+                         archive=None) -> list[FilingRef]:
+        return periodic_reports(company.handle, since, known_urls, archive)
 
     def earnings_releases(self, company: SourceCompany, since: date, archive=None, passed: list[FilingRef] | None = None,
                           known_urls: dict[str, str] | None = None) -> list[FilingRef]:
@@ -379,8 +396,8 @@ class SecSource:
     def prospectus(self, company: SourceCompany, first_report: date | None) -> FilingRef | None:
         return ipo_prospectus(company.handle, first_report)
 
-    def report_html(self, ref: FilingRef) -> str:
-        load_submission(ref.filing)
+    def report_html(self, ref: FilingRef, archive=None) -> str:
+        load_submission(ref.filing, archive)
         return ref.filing.html()
 
     def exhibit_html(self, exhibit) -> str | None:
@@ -394,7 +411,7 @@ class SecSource:
 
     def archive_tagged_facts(self, ref: FilingRef, archive) -> None:
         # A filing without an XBRL instance is marked, so it is not downloaded again on every run.
-        load_submission(ref.filing)
+        load_submission(ref.filing, archive)
         archive.write_json(filing_folder(ref.filed, ref.form, ref.accession), "xbrl.json", xbrl_parts(ref.filing) or _NO_XBRL)
 
     def tagged_facts(self, ref: FilingRef, archive=None):
@@ -406,7 +423,7 @@ class SecSource:
         stored = archive.read_json(folder, "xbrl.json")
         if stored and stored.get("parts"):
             return xbrl_from_parts(stored)
-        load_submission(ref.filing)
+        load_submission(ref.filing, archive)
         if stored is not None:
             return ref.filing.xbrl()  # marked as having no instance to archive: EDGAR's own reading, as before
         parts = xbrl_parts(ref.filing)

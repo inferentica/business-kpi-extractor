@@ -26,6 +26,7 @@ class Archive:
         self._written: set[str] = set()
         self._refused = False  # the archive turned a write down: the rest of the run reads from EDGAR only
         self.reads = self.writes = 0
+        self.submissions = 0  # full submissions read from the archive instead of SEC
 
     def key(self, folder: str, name: str) -> str:
         return f"filings/{self.cik}/{folder}/{name}.gz"
@@ -55,6 +56,24 @@ class Archive:
             return None
         self.reads += 1
         return data
+
+    def raw_submission_key(self, accession: str) -> str:
+        """Where a filing's full submission sits as SEC served it, put there by the filing feed's worker."""
+        return f"filings/{self.cik}/raw/{accession}.txt.gz"
+
+    def read_submission(self, accession: str) -> str | None:
+        """A filing's full submission text from the archive, or None when the worker has not put it there."""
+        link = self._listing().get(self.raw_submission_key(accession))
+        if not link:
+            return None
+        try:
+            with urllib.request.urlopen(link, timeout=180) as response:
+                text = gzip.decompress(response.read()).decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001 - read from SEC instead
+            return None
+        self.reads += 1
+        self.submissions += 1
+        return text
 
     def write_json(self, folder: str, name: str, data: dict) -> None:
         self._put(self.key(folder, name), gzip.compress(json.dumps(data).encode(), compresslevel=6), "application/gzip")

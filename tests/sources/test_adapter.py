@@ -31,7 +31,7 @@ class FakeSource:
         self.asked.append("open_company")
         return SourceCompany(CompanyProfile(symbol=symbol, cik=1, name="Example Co", fiscal_year_end="1231", foreign=False))
 
-    def periodic_reports(self, company, since, known_urls=None):
+    def periodic_reports(self, company, since, known_urls=None, archive=None):
         self.asked.append("periodic_reports")
         return []
 
@@ -43,7 +43,7 @@ class FakeSource:
         self.asked.append("prospectus")
         return None
 
-    def report_html(self, ref):
+    def report_html(self, ref, archive=None):
         raise AssertionError("no report to read")
 
     def exhibit_html(self, exhibit):

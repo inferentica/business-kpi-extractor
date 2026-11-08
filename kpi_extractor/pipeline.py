@@ -162,7 +162,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.archive._listing()  # once, before the download threads start
         self.archive.label(self.symbol, self.profile.name)
         known_urls = {filing["accession"]: filing["source_url"] for filing in self.filings.values() if filing.get("source_url")}
-        reports = sorted(self.source.periodic_reports(company, self.reports_since, known_urls), key=lambda ref: ref.filed)
+        reports = sorted(self.source.periodic_reports(company, self.reports_since, known_urls, self.archive), key=lambda ref: ref.filed)
         pending = [ref for ref in reports if self.force or self._pending(ref)]
         for ref in reversed(reports):
             if ref not in pending and not self.archive.has(_folder(ref), "xbrl.json"):
@@ -271,7 +271,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.log(f"{self.symbol}: no Q4 for {', '.join(self.result.q4_gaps[:10])}")
         for future in self._archiving:
             future.exception()  # archiving finishes before the download threads are shut down
-        self.log(f"{self.symbol}: filing archive {self.archive.reads} read, {self.archive.writes} added")
+        self.log(f"{self.symbol}: filing archive {self.archive.reads} read ({self.archive.submissions} full submissions "
+                 f"instead of SEC), {self.archive.writes} added")
         return self.result
 
     def _write_extra(self, rows: list[dict], what: str) -> None:
