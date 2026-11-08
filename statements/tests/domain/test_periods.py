@@ -34,3 +34,9 @@ def test_opening_balance_is_the_day_before_the_period_starts():
     assert opening_instant(parse_period("duration_2008-09-28_2009-09-26"), instants) == "instant_2008-09-27"
     assert opening_instant(parse_period("duration_2008-10-01_2009-09-26"), instants) == "instant_2008-09-27"
     assert opening_instant(Period(date(2009, 9, 26)), instants) is None
+
+
+def test_a_sixteen_or_seventeen_week_quarter_is_a_quarter():
+    # Costco's fourth quarter: 16 weeks, 17 in a 53-week year (2017-05-08 to 2017-09-03).
+    assert parse_period("duration_2017-05-08_2017-09-03").duration == "quarter"
+    assert label_period(parse_period("duration_2017-05-08_2017-09-03"), "0903", 0) == ("2017", "Q4", "quarter")

@@ -14,7 +14,10 @@ from pathlib import Path
 
 from ..checks.schedules import parse_schedule, schedule_check
 from ..quality.coverage import own_period, summarise
+from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
+from ..readers.printed.sign_index import printed_figures
+from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..readers.xbrl.read import read_filing
 from ..selection.choose import choose
@@ -73,8 +76,10 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         del xbrl
         ref.filing = None
         gc.collect()
-    readings.extend(_printed_second_look(symbol, reports, filings, readings, profile.fiscal_year_end, offset or 0, log))
-    chosen = choose(readings)
+    printed_signs: dict[str, dict] = {}
+    readings.extend(_printed_second_look(symbol, reports, filings, readings, profile.fiscal_year_end, offset or 0, log,
+                                         printed_signs))
+    chosen = choose(readings, printed_signs)
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     with (out / "readings.jsonl").open("w") as handle:
         for reading in readings:
@@ -85,13 +90,15 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     return summary
 
 
-def _printed_second_look(symbol, reports, filings, readings, fiscal_year_end: str, year_offset: int, log) -> list:
+def _printed_second_look(symbol, reports, filings, readings, fiscal_year_end: str, year_offset: int, log,
+                         printed_signs: dict) -> list:
     """The printed statements of XBRL filings that need them: one whose own statement failed its checks in XBRL (JPM's
     Q2 2010 balance sheet, which edgartools maps wrongly), and one whose served figure differs in sign from another
-    presentation (the printed sign decides)."""
+    presentation (the printed sign decides, from the statement or any table of the filing)."""
     failed = {reading.accession for reading in readings
               if reading.source == "xbrl" and reading.own and reading.status != "kept"}
-    needed = failed | sign_ties(readings)
+    ties = sign_ties(readings)
+    needed = failed | ties
     by_accession = {ref.accession: ref for ref in reports}
     records = {record["accession"]: record for record in filings}
     found_all = []
@@ -101,7 +108,8 @@ def _printed_second_look(symbol, reports, filings, readings, fiscal_year_end: st
             continue
         try:
             ref.filing = filing_for(accession)
-            found, notes, kinds = _read_printed(ref, fiscal_year_end, year_offset)
+            found, notes, kinds = _read_printed(ref, fiscal_year_end, year_offset,
+                                                printed_signs.setdefault(accession, {}) if accession in ties else None)
         except Exception as error:  # noqa: BLE001 - a second look that fails leaves the XBRL readings as they are
             records[accession]["second_look"] = f"unreadable ({type(error).__name__})"
             continue
@@ -115,9 +123,10 @@ def _printed_second_look(symbol, reports, filings, readings, fiscal_year_end: st
     return found_all
 
 
-def _read_printed(ref, fiscal_year_end: str, year_offset: int) -> tuple[list, list[str], list[str]]:
+def _read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None = None) -> tuple[list, list[str], list[str]]:
     """A filing without XBRL, read from its printed documents: the report itself and an annual report exhibit that
-    holds its statements (EX-13), in HTML (about 2001-2008) or plain text (about 1993-2000)."""
+    holds its statements (EX-13), in HTML (about 2001-2008) or plain text (about 1993-2000). With `signs`, every
+    figure its tables print is also collected there by label."""
     found, notes, kinds = [], [], []
     raw_end = getattr(ref.filing, "period_of_report", None)
     try:
@@ -147,6 +156,10 @@ def _read_printed(ref, fiscal_year_end: str, year_offset: int) -> tuple[list, li
         except Exception as error:  # noqa: BLE001 - one unreadable document never stops the filing
             notes.append(f"{attachment.document}: unreadable ({type(error).__name__})")
             continue
+        if signs is not None:
+            parse = parse_html if printed == "html" else parse_text
+            for key, figures in printed_figures(parse(content)).items():
+                signs.setdefault(key, []).extend(figures)
         held = {reading.key for reading in found}
         found.extend(reading for reading in readings if reading.key not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
