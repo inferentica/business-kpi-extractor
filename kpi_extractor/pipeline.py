@@ -245,6 +245,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.write(self._anchor_ai_breakdowns())
         self.store.write(self._prove_flagged(releases, list_parents(spec)))
         self.store.write(self._release_held_breakdowns())
+        self.store.write(self._stand_tied_rows())
         self.store.write(self._join_custom_axes())
         self.store.write(self._unify_series())
         self.store.write(self._unify_release_series(releases))

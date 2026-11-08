@@ -636,7 +636,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         record = {"table": source_table, "row": source_row, "col": source_col, "row_label": label[:80],
                   "context": table.context[-80:], "whole_table": True, "total_row_label": total_label,
                   "scale": scale if unit == "currency" else None,
-                  "header": column_header(table, locator.first_row, locator.col)}
+                  "header": column_header(table, locator.first_row, locator.col),
+                  "row_numbers": row_numbers(document.tables.get(source_table), source_row, source_col)}
         if key in nine and "__total__" in nine:
             record.update({"ytd": nine[key] * scale, "ytd_total": nine["__total__"] * scale})
         values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit,
@@ -857,20 +858,28 @@ def column_header(table: Table, first_data_row: int, col: int) -> str:
     return re.sub(r"(?<![<\d])[\d.,]+(?![\d]* (?:months?|weeks?|quarters?)>)", "#", text)[:120]
 
 
+def row_numbers(table: Table | None, row: int, col: int) -> list[float | None]:
+    """A row's own numbers as printed, the read cell first: a repeat the row itself shows is no wrong column, and a
+    breakdown's row that gives last year's accepted figure ties out (series_checks.ties_out)."""
+    if table is None or row >= len(table.rows):
+        return []
+    cells = [parse_number(cell) for cell in table.rows[row]]
+    return [cells[col].value if col < len(cells) and cells[col] else None,
+            *[c.value for i, c in enumerate(cells) if c is not None and i != col][:8]]
+
+
 def _locator_record(document: Document, locator: Locator) -> dict:
     """What the next quarter's prompt is told about where this KPI was found."""
     if locator.table is not None:
         table = document.tables[locator.table]
         row = table.rows[locator.row] if locator.row < len(table.rows) else []
-        cells = [parse_number(cell) for cell in row]
         return {"table": locator.table, "row": locator.row, "col": locator.col,
                 "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:], "scale": locator.scale,
                 # The words the reading quoted for its scale, so a later replay judges the scale exactly as this one did.
                 **({"scale_text": clean(locator.scale_text)[:80]} if locator.scale_text else {}),
                 "header": column_header(table, locator.row, locator.col),
                 # The row's own numbers as printed, the read cell first: a repeat the row itself shows is no wrong column.
-                "row_numbers": [cells[locator.col].value if locator.col < len(cells) and cells[locator.col] else None,
-                                *[c.value for i, c in enumerate(cells) if c is not None and i != locator.col][:8]]}
+                "row_numbers": row_numbers(table, locator.row, locator.col)}
     return {"block": locator.block, "quote": clean(locator.quote or "")[:160], "value_text": locator.value_text}
 
 

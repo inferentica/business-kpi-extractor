@@ -23,7 +23,8 @@ _ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
 _CONFIRMED_LATER = "confirmed by the next year's release"
 _RESTATED_LATER = "restated in the next year's release"
 _WITHIN_XBRL = "parts make up nearly all of a figure reported in XBRL"
-_PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER, _WITHIN_XBRL)
+TIES_OUT = "its row gives last year's accepted figure for the quarter: it stands on its own"
+_PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER, _WITHIN_XBRL, TIES_OUT)
 # A split of part of a reported line (Adobe's two customer groups: 99.5% of its subscription revenue, the rest its
 # advertising business's) covers at least this share of it.
 _MIN_COVERAGE = 0.99
@@ -49,8 +50,98 @@ def _proven(value: dict) -> bool:
 
 
 
+# Holds a row gets from its group alone: the breakdown's sum, its total's anchor, or another row's hold.
+_GROUP_HOLDS = ("parts differ from the total by", "another part of this breakdown needs review",
+                "total matches no figure the company reported in XBRL", "no total revenue to reconcile against")
+_ASIDE = ("confirmed by review", "settled by the checks", "checked against ")
+
+
+def ties_out(value: dict, year_ago: float | None) -> bool:
+    """Whether the value's own row, as printed, gives the figure already accepted for the quarter a year before, in the
+    value's units: two filings agree on the row, its scale and its series."""
+    numbers = (value.get("locator") or {}).get("row_numbers") or []
+    if year_ago is None or len(numbers) < 2 or not numbers[0]:
+        return False
+    factor = float(value["value"]) / float(numbers[0])
+    return any(abs(float(n) * factor - year_ago) <= max(abs(year_ago) * 1e-4, 1e-9) for n in numbers[1:])
+
+
+def _overlaps(rows: list[dict]) -> list[dict]:
+    """Rows of one breakdown that count the same money twice: a run of adjacent rows of one table that adds up, to the
+    table's rounding, to another row of the breakdown, and that row. PNC's "Other noninterest income" (214) is its
+    Visa gains (11), securities losses (-1) and "Other" (204) together."""
+    placed = sorted((v for v in rows if (v.get("locator") or {}).get("table") and (v.get("locator") or {}).get("row") is not None),
+                    key=lambda v: (str(v["locator"]["table"]), int(v["locator"]["row"])))
+    found: list[dict] = []
+    for start in range(len(placed)):
+        run: list[dict] = []
+        total = 0.0
+        for v in placed[start:]:
+            if run and (v["locator"]["table"] != run[-1]["locator"]["table"]
+                        or int(v["locator"]["row"]) != int(run[-1]["locator"]["row"]) + 1):
+                break
+            run.append(v)
+            total += float(v["value"])
+            if len(run) < 2:
+                continue
+            unit = max(float(r["locator"].get("scale") or 1) for r in run)
+            found += [item for other in rows if all(other is not r for r in run) and float(other["value"])
+                      and abs(float(other["value"]) - total) <= unit * (len(run) + 1) / 2 for item in (*run, other)]
+    return found
+
+
+def tied_rows(values: list[dict]) -> list[dict]:
+    """Breakdown rows held only for their group (parts off the total, a total no XBRL figure matches, another row's
+    hold) whose own row ties out to last year's accepted figure: UCB's fee lines beside an unlisted remainder, Henry
+    Schein's U.S. products, PNC's fee types. A row a second KPI shares (Axia's "Contractual" twice) never stands alone,
+    and a row held for itself (its scale, a jump, its period, a place, a twin row) keeps its hold. Oldest first, so a
+    row cleared this way is last year's figure for the next."""
+    def group_held_only(v: dict) -> bool:
+        own = [note for note in v.get("notes") or [] if not note.startswith((*_ASIDE, *_PROOFS)) and not _EXACT_NOTE.match(note)]
+        return all(note.startswith(_GROUP_HOLDS) for note in own)
+
+    # Last year's figure counts when it is accepted, or held only for its group and read from another filing: two
+    # filings then agree on the row (PNC's fee types, held every year because their total is no XBRL figure).
+    accepted = {(v["group_key"], v["kpi_key"], v["fiscal_period"] == "FY", v["period_end"]): (float(v["value"]), v.get("source_accession"))
+                for v in values if v["validation_status"] == "verified"
+                or v["validation_status"] == "needs_review" and v["method"] == "ai" and group_held_only(v)}
+    released = []
+    by_period: dict[tuple, list[dict]] = {}
+    for v in values:
+        if v["method"] == "ai" and v["group_kind"] != "metric" and v["validation_status"] != "rejected":
+            by_period.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), []).append(v)
+    # Rows that count the same money twice never stand alone, the subtotal nor its lines.
+    overlapping = {id(v) for rows in by_period.values() for v in _overlaps(rows)}
+    for v in sorted(values, key=lambda v: v["period_end"]):
+        if v["method"] != "ai" or v["group_kind"] == "metric" or v["validation_status"] != "needs_review":
+            continue
+        # A note that proves or refines the figure (confirmed by the next year's release, the 10-Q's exact figure) is no hold.
+        if not group_held_only(v) or id(v) in overlapping:
+            continue
+        locator = v.get("locator") or {}
+        siblings = [o for o in by_period.get((v["group_key"], v["fiscal_year"], v["fiscal_period"]), []) if o is not v]
+        if any(abs(float(o["value"]) - float(v["value"])) <= abs(float(v["value"])) * 1e-9
+               or ((o.get("locator") or {}).get("table"), (o.get("locator") or {}).get("row")) == (locator.get("table"), locator.get("row"))
+               and locator.get("table") for o in siblings):
+            continue
+        end = date.fromisoformat(v["period_end"][:10])
+        year_ago = next((figure for (g, k, annual, other_end), (figure, filing) in accepted.items()
+                         if g == v["group_key"] and k == v["kpi_key"] and annual == (v["fiscal_period"] == "FY")
+                         and abs((end - timedelta(days=365) - date.fromisoformat(other_end[:10])).days) <= 12
+                         and filing != v.get("source_accession")), None)
+        if ties_out(v, year_ago) or _CONFIRMED_LATER in (v.get("notes") or []):
+            cleared = {**v, "validation_status": "verified", "notes": [*(v.get("notes") or []), TIES_OUT]}
+            released.append(cleared)
+            accepted[(v["group_key"], v["kpi_key"], v["fiscal_period"] == "FY", v["period_end"])] = (float(v["value"]), v.get("source_accession"))
+    return released
+
+
 class SeriesChecks:
     """Checks across periods: proving or clearing flagged figures, scale runs, and working out derived periods."""
+
+    def _stand_tied_rows(self) -> list[dict]:
+        """Breakdown rows held only for their group whose own row ties out to last year's figure (tied_rows)."""
+        return tied_rows(list(self.values.values()))
 
     def _anchor_ai_breakdowns(self) -> list[dict]:
         """An AI breakdown's total must be a figure the company reported in XBRL for the same period: its revenue, or a
@@ -80,9 +171,10 @@ class SeriesChecks:
             total, end = float(rows[0]["locator"]["total"]), rows[0]["period_end"]
             any_reported, matches = reported_matches(total, end, reported.get(period, []))
             if any_reported and not matches:
+                # A row proven on its own (its year-ago figure, the next year's release) stands whatever the total.
                 flagged += [{**v, "validation_status": "needs_review",
                              "notes": [*(v.get("notes") or []), "total matches no figure the company reported in XBRL"]}
-                            for v in rows]
+                            for v in rows if not _proven(v)]
             elif matches and all(member for member in matches):
                 segment_of.setdefault(group, set()).add(matches[0])
         # A breakdown of one segment (AMD's Client + Gaming = its "Client and Gaming" segment) is titled for that
