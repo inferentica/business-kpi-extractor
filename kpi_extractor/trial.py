@@ -59,8 +59,9 @@ def trial_symbol(plane: ControlPlane, symbol: str, quarters: int, fixed_lists: d
     # With its list given, a company is not forced: the KPI-list step keeps the list instead of proposing one.
     fresh = symbol not in (fixed_lists or {})
     result = run_symbol(symbol, lambda: SymbolPipeline(control, symbol, quarters, fresh, log=lambda line: print(line, flush=True)).run())
+    # A reused list is the company's list even though the run never writes it again.
     return (result, list(control.final.get(symbol, {}).values()), list(control.filings.get(symbol, {}).values()),
-            control.specs.get(symbol))
+            control.specs.get(symbol) or (fixed_lists or {}).get(symbol))
 
 
 def _reason(note: str) -> str:
