@@ -70,6 +70,9 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
                                       f"{kpi.label!r}: point at the row for {kpi.label} itself")
                 if other := net_gross_mismatch(row_label, kpi.label):
                     raise LocateError(f"{locator.table} r{locator.row} is the {other} figure {row_label!r}, not {kpi.label!r}")
+                first_cell = (table.rows[locator.row][0] if table.rows[locator.row] else "").strip()  # a bare year has no letters
+                if not located.annual and _YEAR_ROW.match(first_cell) and not _LONG_SPAN_KPI.search(kpi.label):
+                    raise LocateError(f"{locator.table} r{locator.row} is the year {first_cell!r}, not a quarter")
             value, currency, notes = _read(document, locator, kpi, default_currency)
             if locator.table is not None and locator.table in document.tables and group.kind == "metric":
                 if unnamed := _place_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
@@ -197,6 +200,10 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
     before = quote[:quote.find(value_text)]
     if forward_looking(before):
         raise LocateError("the quote is a forecast or guidance, not the reported figure")
+    # "YTD 2025, the company was awarded 14 new contract commitments" is the year to date, not the quarter's count,
+    # unless the KPI itself is defined over the longer span (Tesla's cumulative deliveries, PGIM's trailing flows).
+    if (span := _OTHER_PERIOD.search(before[-120:])) and not _LONG_SPAN_KPI.search(kpi.label):
+        raise LocateError(f"the quote gives the figure {span.group(0).lower()!r}, not the quarter's")
     if other := net_gross_mismatch(before[-80:], kpi.label):
         raise LocateError(f"the quote gives the {other} figure, not {kpi.label!r}")
     if value > 0 and (kpi.unit == "percent" or (kpi.unit == "count" and _CHANGE_KPI.search(kpi.label))) \
@@ -242,7 +249,12 @@ _FORWARD = re.compile(r"\b(?:we|management|the company)\s+(?:now\s+)?(?:expects?
                       r"|\bguidance\b|\boutlook\b|\bwill be\b|\b(?:is|are) expected to\b(?! be recogni)", re.I)
 # A figure for another period than the quarter: "for the first six months of 2023", "for fiscal year 2024".
 _OTHER_PERIOD = re.compile(r"\bfirst (?:six|nine) months\b|\b(?:six|nine|twelve) months ended\b|\bfor the (?:full )?(?:fiscal )?year\b"
-                           r"|\bfull[- ]year\b|\bfiscal (?:year )?\d{4}\b|\byear[- ]to[- ]date\b", re.I)
+                           r"|\bfull[- ]year\b|\bfiscal (?:year )?\d{4}\b|\byear[- ]to[- ]date\b|\bYTD\b|\bfirst half\b|\bH1\b", re.I)
+# A KPI defined over a longer span than the quarter, which such wording describes rather than contradicts.
+_LONG_SPAN_KPI = re.compile(r"year[- ]to[- ]date|\bYTD\b|cumulative|all[- ]time|trailing|\bTTM\b|\bLTM\b|twelve months|full[- ]year|annual|"
+                            r"since (?:inception|launch)|to date", re.I)
+# A table row that is a year, not a quarter: Sun Communities' operating statistics by year (2025, 2024, 2023).
+_YEAR_ROW = re.compile(r"^\s*(?:FY\s?|fiscal\s+)?(?:19|20)\d\d\s*$", re.I)
 # Words of a KPI's name that say nothing on their own.
 _PLAIN_WORDS = {"other", "total", "revenue", "revenues", "growth", "net", "inflows", "outflows", "flows", "income", "fees", "fee", "year",
                 "over", "and", "the", "of", "by", "constant", "dollar", "dollars", "excluding", "quarter", "quarterly", "sales", "volume"}

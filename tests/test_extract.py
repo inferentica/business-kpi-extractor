@@ -408,6 +408,42 @@ def test_a_metric_named_for_a_place_its_row_never_names_is_held():
     assert _places("8 ASIA PACIFIC") == {"ASIA PACIFIC"} and _places("Asia Pacific Unit Case Volume", own=True) == {"ASIA PACIFIC"}
 
 
+def test_a_quote_for_the_year_to_date_is_not_the_quarters_count():
+    # Borr: "YTD 2025, the company was awarded 14 new contract commitments" is no quarterly award count.
+    text = "YTD 2025, the company was awarded 14 new contract commitments, representing 2,584 days."
+    document = parse_document(f"<p>{text}</p>", "https://example.com/ex99.htm")
+    block = next(iter(document.blocks))
+    def read(label):
+        spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                                 "kpis": [{"key": "k", "label": label, "unit": "count"}]}]})
+        located = Located.model_validate({"period_end": "2025-06-30", "values": [
+            {"kpi": "ops.k", "block": block, "quote": "YTD 2025, the company was awarded 14 new contract commitments", "value_text": "14"}]})
+        return read_values(document, spec, located, "USD")
+    values, problems = read("Contract Commitments Awarded")
+    assert values == [] and "not the quarter's" in problems[0]
+    values, problems = read("Year-to-Date Contract Commitments")
+    assert problems == [] and values[0].value == 14
+    # A KPI defined over the longer span keeps its quote: cumulative deliveries, trailing flows.
+    assert _read_quote("Cumulative deliveries (all-time; mil) 8.5 10.2", "Cumulative Deliveries", "count",
+                       "Cumulative deliveries (all-time; mil) 8.5 10.2", "10.2") == 10.2
+
+
+def test_a_row_that_is_a_year_is_not_a_quarter():
+    # Sun Communities' operating statistics by year: the 2025 row is the full year's pre-owned home sales.
+    html = """<table><tr><td></td><td>Number of Move-outs</td><td>Pre-owned Home Sales</td></tr>
+<tr><td>2025</td><td>10,179</td><td>1,210</td></tr><tr><td>2024</td><td>7,050</td><td>1,554</td></tr></table>"""
+    document = parse_document(html, "https://example.com/ex99.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "k", "label": "Pre-Owned Home Sales", "unit": "count"}]}]})
+    quarter = Located.model_validate({"period_end": "2025-12-31", "values": [{"kpi": "ops.k", "table": table, "row": 1, "col": 2}]})
+    values, problems = read_values(document, spec, quarter, "USD")
+    assert values == [] and "is the year '2025'" in problems[0]
+    annual = Located.model_validate({"period_end": "2025-12-31", "annual": True, "values": [{"kpi": "ops.k", "table": table, "row": 1, "col": 2}]})
+    values, problems = read_values(document, spec, annual, "USD")
+    assert problems == [] and values[0].value == 1210
+
+
 def test_a_row_label_with_a_short_scale_scales_its_count():
     # Tesla: "Active FSD Subscriptions (mil) 0.8 0.8 0.9 1.0 1.1"; a footnote "(b)" is never billions.
     fsd = _read_one("""<table><tr><td>($ in millions)</td><td>Q4-2025</td></tr>
