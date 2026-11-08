@@ -28,7 +28,7 @@ _YEAR = re.compile(r"\b((?:19|20)\d{2})\b")
 
 
 _SPAN = re.compile(r"\b(three|thirteen|six|twenty-six|nine|thirty-nine|twelve|fifty-two|fifty-three)[-\s]+(months|weeks)\b|"
-                   r"\b(?:fiscal\s+)?years?\s+ended\b|\b(?:quarter)\s+ended\b", re.I)
+                   r"\b(?:fiscal\s+)?years?\s+ended\b|\b(?:quarter)\s+ended\b|\b(?:first|second|third|fourth)\s+quarter\b", re.I)
 
 
 _SPAN_DAYS = {"three": 91, "thirteen": 91, "six": 182, "twenty-six": 182, "nine": 273, "thirty-nine": 273,
@@ -57,8 +57,11 @@ def _date(month: str, day: str, year: str) -> date | None:
         return None
 
 
-def column_periods(kind: str, group: list[Table], fiscal_year_end: str) -> dict[tuple[int, ...], Period]:
-    """Each figure column's period, from the header above it and the statement's title."""
+def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
+                   document_end: date | None = None) -> dict[tuple[int, ...], Period]:
+    """Each figure column's period, from the header above it and the statement's title. A column printed with a year
+    only ("2002 | 2001" under "Third Quarter") ends on the filing's own period date in that year when it spans less than
+    a year (JPM's 2002 10-Qs), and on the fiscal year end otherwise."""
     first = group[0]
     header_all = " ".join(" ".join(cell.text for cell in cells) for cells in first.header)
     context = first.context[-300:]
@@ -77,8 +80,16 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str) -> dict[
             continue
         year = years[-1]
         day = _MONTH_DAY.search(above) or title_day
+        span = _SPAN.search(above) or title_span
+        days = 364
+        if span is not None and span.group(1):
+            days = _SPAN_DAYS.get(span.group(1).lower(), 364)
+        elif span is not None and "quarter" in span.group(0).lower():
+            days = 91
         if day is not None:
             end = _date(day.group(1), day.group(2), year)
+        elif document_end is not None and (days < 350 and kind != "balance" or kind == "balance" and int(year) == document_end.year):
+            end = date(int(year), document_end.month, min(document_end.day, calendar.monthrange(int(year), document_end.month)[1]))
         else:
             month, day_of = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
             end = date(int(year), month, min(day_of, calendar.monthrange(int(year), month)[1]))
@@ -87,11 +98,5 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str) -> dict[
         if kind == "balance":
             periods[column] = Period(end)
             continue
-        span = _SPAN.search(above) or title_span
-        days = 364
-        if span is not None and span.group(1):
-            days = _SPAN_DAYS.get(span.group(1).lower(), 364)
-        elif span is not None and "quarter" in span.group(0).lower():
-            days = 91
         periods[column] = Period(end, end - timedelta(days=days - 1))
     return periods

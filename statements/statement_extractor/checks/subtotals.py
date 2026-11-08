@@ -6,6 +6,10 @@ import re
 from .tolerance import close
 
 
+# Subtotals that sum lines under more than one heading.
+_SPANS_HEADINGS = re.compile(r"^total\b|comprehensive\s+income|\bfor\s+the\s+(year|period)\b", re.I)
+
+
 def subtotals(printed) -> dict[int, int]:
     """Where each subtotal's lines start: a printed "Total …", or a line equal to the two or more lines just above it
     (an unlabelled net figure). An earlier subtotal counts as one line."""
@@ -17,6 +21,9 @@ def subtotals(printed) -> dict[int, int]:
         while position >= 0 and len(sums) < 12:
             earlier_label, _earlier_level, earlier_value = printed[position]
             if earlier_value is None:
+                if sums and _SPANS_HEADINGS.search(label):
+                    position -= 1
+                    continue  # a subtotal over several headed blocks (TSMC's other comprehensive income for the year)
                 break
             total += -earlier_value if re.match(r"^less\b", earlier_label, re.I) else earlier_value
             sums.append((position, total))

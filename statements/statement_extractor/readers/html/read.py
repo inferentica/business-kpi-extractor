@@ -19,7 +19,7 @@ from datetime import date, timedelta
 from ...checks.printed import balance_check, cash_check, income_check, total_check
 from ...domain.model import Reading
 from ...domain.periods import label_period
-from ...domain.printed_labels import KNOWN, PER_SHARE, SHARE_COUNT
+from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
 from .dates import column_periods, statement_scale
 from .find import find_statements
 from .tables import figure_columns
@@ -52,14 +52,14 @@ def read_document(html: str | bytes, *, accession: str, form: str, filed: date, 
         if scale is None:
             notes.append(f"{kind}: no single scale stated")
             continue
-        periods = column_periods(kind, group, fiscal_year_end)
+        periods = column_periods(kind, group, fiscal_year_end, document_end)
         if not periods:
             notes.append(f"{kind}: no dated columns")
             continue
         ordered = [periods[column] for column in sorted(periods)]
         layout = [(group[0], sorted(periods))]
         for table in group[1:]:
-            own = column_periods(kind, [table], fiscal_year_end)
+            own = column_periods(kind, [table], fiscal_year_end, document_end)
             columns = sorted(own) if own else [c for c in figure_columns(table)][:len(ordered)]
             if len(columns) != len(ordered):
                 notes.append(f"{kind}: a continuation table's columns do not line up")
@@ -113,7 +113,7 @@ def _read_column(kind, layout, period, scale, labelled) -> Reading | None:
                           "level": max(0, min(20, row.level - base)), "is_heading": not row.figures, "value": amount})
             meaning = row.label
             if re.match(r"^(balance|net\s*\(?(increase|decrease)|increase|decrease)\b", row.label, re.I) and "cash" not in row.label.lower() \
-                    and "cash" in heading.lower():
+                    and CASH_HEADING.match(heading):
                 meaning = f"{heading} {row.label}"  # Coca-Cola: CASH AND CASH EQUIVALENTS / Balance at beginning of year
             if not row.figures:
                 printed.append((row.label, row.level, None))
@@ -124,7 +124,10 @@ def _read_column(kind, layout, period, scale, labelled) -> Reading | None:
         return None
     for index, line in enumerate(lines):
         line["line"] = index
-    # The checks run in printed units: a printed figure is exact to one unit.
+    # The checks run in printed units: a printed figure is exact to one unit of the precision it is printed to, a
+    # whole million for most filers, a tenth for TSMC (where a whole-unit tolerance let 32.5 - 31.3 pass as 0.0).
+    unit = _printed_unit([value for _label, _level, value in printed if value is not None])
+    printed = [(label, level, None if value is None else round(value / unit, 6)) for label, level, value in printed]
     figures = [(label, level, value) for label, level, value in printed if value is not None]
     checks = [total_check(printed)]
     if kind == "balance":
@@ -136,6 +139,14 @@ def _read_column(kind, layout, period, scale, labelled) -> Reading | None:
     return Reading(statement=kind, duration=duration, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
                    period_end=period.end, period_start=period.start, currency=None, accession="", form="", filed=date.min,
                    own=False, source="html", lines=lines, checks=checks)
+
+
+def _printed_unit(values: list[float]) -> float:
+    """The smallest place the column's figures are printed to: 1, 0.1, 0.01 or 0.001."""
+    for places in range(4):
+        if all(abs(value * 10 ** places - round(value * 10 ** places)) < 1e-6 for value in values):
+            return 10.0 ** -places
+    return 0.001
 
 
 def _has_lines_below(lines: list[dict], index: int) -> bool:

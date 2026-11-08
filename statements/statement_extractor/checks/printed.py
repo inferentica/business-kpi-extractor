@@ -6,8 +6,8 @@ from __future__ import annotations
 import re
 
 from ..domain.model import FAIL, NONE, PASS, Check
-from ..domain.printed_labels import (ASSETS, CHANGE, CLOSING, EQUITY, EXCHANGE, LIABILITIES, LIABILITIES_AND_EQUITY,
-                                     NET_INCOME, OPENING, PRETAX, SECTIONS, TOTAL)
+from ..domain.printed_labels import (ASSETS, BARE_TOTAL, CHANGE, CLOSING, DATED_CASH, EFFECT, EQUITY, EXCHANGE, LIABILITIES,
+                                     LIABILITIES_AND_EQUITY, NET_INCOME, OPENING, PRETAX, SECTION_KINDS, SECTIONS, TOTAL)
 from .subtotals import subtotals
 from .tolerance import close
 
@@ -22,6 +22,9 @@ def first_match(figures, pattern, after: int = -1) -> tuple[int, float] | None:
 def balance_check(figures) -> Check:
     assets = first_match(figures, ASSETS)
     total = first_match(figures, LIABILITIES_AND_EQUITY)
+    bare = [(index, value) for index, (label, _level, value) in enumerate(figures) if BARE_TOTAL.match(label)]
+    if len(bare) >= 2:  # TSMC closes each side with a bare "TOTAL"
+        assets, total = assets or bare[0], total or bare[-1]
     if assets and total:
         return Check("balance", PASS if close(assets[1], total[1]) else FAIL,
                      "" if close(assets[1], total[1]) else f"assets {assets[1]:,.1f} vs liabilities and equity {total[1]:,.1f}")
@@ -36,14 +39,25 @@ def balance_check(figures) -> Check:
 
 def cash_check(figures) -> Check:
     opening, closing = first_match(figures, OPENING), first_match(figures, CLOSING)
+    dated = [(index, value) for index, (label, _level, value) in enumerate(figures) if DATED_CASH.search(label)]
+    if (not opening or not closing) and len(dated) >= 2:
+        opening, closing = dated[0], dated[-1]
     if not opening or not closing:
         return Check("cash", NONE, "no opening and closing cash")
+    # Every beginning balance opens the period (TSMC: cash held for sale at the beginning of the year, then cash).
+    openings = [value for label, _level, value in figures if OPENING.search(label)]
+    if len(openings) > 1:
+        opening = (opening[0], sum(openings))
+    kinds = {match.group(2).lower() for label, _level, _value in figures if (match := SECTION_KINDS.search(label))}
+    if len(kinds) < 3:
+        return Check("cash", NONE, "not every section of the statement was read: " + ", ".join(sorted(kinds) or ["none"]))
     changes = [value for label, _level, value in figures if CHANGE.search(label) and not OPENING.search(label)
                and not CLOSING.search(label)]
-    effects = [value for label, _level, value in figures if EXCHANGE.search(label)]
+    effects = [value for label, _level, value in figures if EXCHANGE.search(label) or EFFECT.match(label)]
     sections = [value for label, _level, value in figures if SECTIONS.search(label) and re.search(r"^net|^cash|^total", label, re.I)]
     candidates = list(changes)
     candidates += [change + effect for change in changes for effect in effects]
+    candidates += [change + sum(effects) for change in changes if len(effects) > 1]
     if len(sections) >= 3:
         candidates += [sum(sections[:3]), sum(sections[:3]) + sum(effects[:1])]
     for change in candidates:
@@ -92,12 +106,17 @@ def total_check(printed) -> Check:
     verified, failures = 0, []
     starts = subtotals(printed)
     for index, (label, _level, value) in enumerate(printed):
-        if value is None or not TOTAL.match(label) or LIABILITIES_AND_EQUITY.match(label):
+        if value is None or not TOTAL.match(label) or LIABILITIES_AND_EQUITY.match(label) or BARE_TOTAL.match(label):
+            continue  # a grand total is proven by the balance identity
+        if index in starts:
+            verified += 1  # proven as a sum or a difference of the lines above it (JPM's total net revenue)
             continue
         running, count, position, matched = 0.0, 0, index - 1, False
         while position >= 0 and count < 40:
             earlier_label, _earlier_level, earlier_value = printed[position]
             if earlier_value is None:
+                if count == 0:
+                    break  # the first line under its heading (a supplemental block's total): nothing above it to sum
                 position -= 1
                 continue  # a heading: a total can sum sections under several headings
             running += -earlier_value if re.match(r"^less\b", earlier_label, re.I) else earlier_value

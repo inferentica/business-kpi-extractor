@@ -102,3 +102,53 @@ def test_note_references_beside_a_label_are_not_part_of_it():
     html = INCOME.replace("<td>Net sales</td>", "<td>Net sales</td><td>2, 26</td>").replace("""<td colspan="3">Three""", """<td colspan="4">Three""")
     readings, _ = read(html, "0929", date(2007, 9, 29))
     assert readings[("income", "2007")].lines[0]["label"] == "Net sales"
+
+
+def table(title, header, rows):
+    body = "".join("<tr>" + cells(*row) + "</tr>" for row in rows)
+    return f"<p>{title}</p><table><tr>{header}</tr>{body}</table>"
+
+
+def test_quarter_columns_dated_by_the_filing_and_cash_balances_named_by_their_dates():
+    # JPM's 2002 10-Q: "Third Quarter | Nine Months" over bare years; cash and due from banks named by date.
+    income = table("CONSOLIDATED STATEMENT OF INCOME (in millions)",
+                   '<td colspan="2"></td><td colspan="2">Third Quarter</td>',
+                   [["", "", "2002", "2001"], ["Total net revenue", "", "7,525", "7,000"],
+                    ["Income before income tax expense", "", "2,430", "2,000"], ["Income tax expense", "", "830", "700"],
+                    ["Net income", "", "1,600", "1,300"]])
+    readings, _ = read(income, "1231", date(2002, 9, 30))
+    quarter = readings[("income", "2002")]
+    assert quarter.fiscal_period == "Q3" and quarter.duration == "quarter" and quarter.period_end == date(2002, 9, 30)
+    flows = table("CONSOLIDATED STATEMENT OF CASH FLOWS (in millions)", "<td>Nine Months Ended September 30,</td><td>2002</td>",
+                  [["Net cash provided by operating activities", "100"], ["Net cash used in investing activities", "(40)"],
+                   ["Net cash used in financing activities", "(10)"], ["Net increase in cash and due from banks", "50"],
+                   ["Cash and due from banks at December 31, 2001", "200"], ["Cash and due from banks at September 30, 2002", "250"]])
+    readings, _ = read(flows, "1231", date(2002, 9, 30))
+    assert readings[("cash_flow", "2002")].status == "kept"
+
+
+def test_a_cash_flow_page_without_its_sections_proves_nothing():
+    flows = table("CONSOLIDATED STATEMENTS OF CASH FLOWS (in millions)", "<td>Year Ended December 31,</td><td>2014</td>",
+                  [["Net increase in cash and cash equivalents", "50"], ["Effect of exchange rate changes on cash", "1"],
+                   ["Cash and cash equivalents, beginning of year", "200"], ["Cash and cash equivalents, end of year", "251"]])
+    readings, _ = read(flows, "1231", date(2014, 12, 31))
+    assert readings[("cash_flow", "2014")].status == "unproven"
+
+
+def test_ifrs_titles_and_bare_totals():
+    # TSMC: statements of financial position closing each side with a bare TOTAL.
+    balance = table("CONSOLIDATED STATEMENTS OF FINANCIAL POSITION (In Millions of New Taiwan Dollars)",
+                    "<td>Notes</td><td>December 31, 2014</td>",
+                    [["Total current assets", "6", "900"], ["Total noncurrent assets", "", "100"], ["TOTAL", "", "1,000"],
+                     ["Total liabilities", "", "400"], ["Total equity", "", "600"], ["TOTAL", "", "1,000"]])
+    readings, _ = read(balance, "1231", date(2014, 12, 31))
+    assert readings[("balance", "2014")].status == "kept"
+
+
+def test_a_statement_named_inside_a_sentence_is_not_a_title():
+    as_titled = INCOME.split("</p>", 1)[1]  # the scale line and the table, without the title
+    html = "<p>Interest is shown as reported on the Consolidated Statement of Income.</p>" + as_titled
+    readings, notes = read(html, "0929", date(2007, 9, 29))
+    assert not readings and not notes
+    readings, _ = read("<p>CONSOLIDATED STATEMENT OF INCOME</p>" + as_titled, "0929", date(2007, 9, 29))
+    assert readings

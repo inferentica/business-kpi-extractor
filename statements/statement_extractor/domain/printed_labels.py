@@ -66,3 +66,22 @@ NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+in
 
 
 TOTAL = re.compile(r"^total\b", re.I)
+
+
+# A balance sheet that closes each side with a bare "TOTAL" (TSMC's IFRS statements of financial position): the first
+# is total assets, the last total liabilities and equity.
+BARE_TOTAL = re.compile(r"^total$", re.I)
+
+# Cash balances named by their dates (JPM: "Cash and due from banks at December 31, 2002 and 2001" … "at September 30,
+# 2003 and 2002"): the first is the opening balance, the last the closing one.
+DATED_CASH = re.compile(r"^cash\b.*\bat\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b", re.I)
+# The three sections a cash flow statement must hold before its roll-forward proves anything (a statement's last page
+# alone also rolls forward).
+SECTION_KINDS = re.compile(r"^(net|cash|total)\b.*\b(operating|investing|financing)\s+activities\b", re.I)
+
+# A heading over the cash balances themselves ("CASH AND CASH EQUIVALENTS", "Cash and due from banks"), under which
+# "Balance at beginning of year" names the opening cash; "Cash flows from financing activities" is not one.
+CASH_HEADING = re.compile(r"^cash\s+and\s+(cash\s+equivalents|due\s+from\s+banks)\b", re.I)
+# Adjustments printed between the change in cash and the balances: the exchange-rate effect, and others such as
+# TSMC's "effect of changes in consolidated entities".
+EFFECT = re.compile(r"^effects?\s+of\b", re.I)

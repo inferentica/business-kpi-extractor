@@ -179,6 +179,7 @@ _YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
 
 
 _COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)\s+ended\b|\bended\b|"
+                           r"^(\s*(first|second|third|fourth)\s+quarter|\s*(three|six|nine|twelve)\s+months)\b|"
                            r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b", re.I)
 
 
@@ -229,6 +230,10 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
                 groups[-1].append(position)
                 continue
         groups.append([position])
+    # A "Notes" column holds note references, not figures (TSMC: "Cash and cash equivalents | 6 | 242,695.6").
+    groups = [group for group in groups if not re.fullmatch(r"notes?", header_text(table, group[0]).strip(), re.I)]
+    if not groups:
+        return []
     # A group carrying few figures beside a full one is a stray cell (a footnote figure), not a column.
     sizes = [sum(counts.get(position, 0) for position in group) for group in groups]
     keep = max(sizes) * 0.3
