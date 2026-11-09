@@ -391,23 +391,6 @@
   "source_filed": "1995-02-09"
  },
  {
-  "id": "AAPL-text-09",
-  "symbol": "AAPL",
-  "era": "text",
-  "statement": "balance",
-  "fiscal_year": "1997",
-  "fiscal_period": "Q3",
-  "duration": "instant",
-  "period_end": "1997-06-27",
-  "label": "",
-  "concept": "printed_subtotal",
-  "value": 1286000000.0,
-  "currency": "USD",
-  "source_accession": "0000320193-97-000014",
-  "source_form": "10-Q",
-  "source_filed": "1997-08-11"
- },
- {
   "id": "AAPL-text-10",
   "symbol": "AAPL",
   "era": "text",

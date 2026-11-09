@@ -238,3 +238,15 @@ def test_average_balance_sheets_in_the_discussion_are_no_statement():
                 ("Total liabilities and stockholders' equity", "2,818,072", "2,640,000"))) + "</table>")
     readings, _ = read(html, "1231", date(2017, 3, 31))
     assert not readings
+
+
+def test_share_counts_under_a_heading_that_names_their_scale():
+    # Apple's FY2003 10-K: "Shares used in computing earnings (loss) per share (in thousands):" is the heading of the
+    # share counts below it, not a caption to skip, so "Basic" is 345,613 thousand shares, not 345,613 a share.
+    html = INCOME.replace("""<tr>""" + cells("Diluted", "", "", "$", "3.93", "$", "2.27") + """</tr>""",
+                          """<tr>""" + cells("Diluted", "", "", "$", "3.93", "$", "2.27") + """</tr>
+<tr>""" + cells("Shares used in computing earnings per share (in thousands):", "", "", "", "", "", "") + """</tr>
+<tr>""" + cells("Basic", "", "", "", "861,199", "", "844,058") + """</tr>""")
+    readings, _ = read(html, "0929", date(2007, 9, 29))
+    values = [(line["label"], line["value"]) for line in readings[("income", "2007")].lines]
+    assert ("Diluted", 3.93) in values and ("Basic", 861_199e3) in values

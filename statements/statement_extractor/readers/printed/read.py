@@ -150,6 +150,14 @@ def _close_section(printed: list, section: str | None, index: int | None) -> Non
 
 # A heading over share counts: Apple's "Shares used in computing earnings per share (in thousands):" over Basic and
 # Diluted, which would otherwise read as per-share figures.
+def _caption_only(label: str) -> bool:
+    """A row that is only a scale caption ("(In millions, except share amounts)"). One that names its lines and then
+    their scale is a heading: Apple's "Shares used in computing earnings (loss) per share (in thousands):", whose
+    "Basic" and "Diluted" below are share counts in thousands, not figures a share."""
+    match = _CAPTION.search(label)
+    return bool(match) and not label[:match.start()].strip(" (\t")
+
+
 _SHARE_HEADING = re.compile(r"\bshares\b|weighted[-\s]average|\baverage\s+(number|common)", re.I)
 
 
@@ -165,7 +173,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
         for row in table.rows:
             if not row.label and not row.figures:
                 continue
-            if not row.figures and (any(pattern.search(row.label) for _, pattern in TITLES) or _CAPTION.search(row.label)):
+            if not row.figures and (any(pattern.search(row.label) for _, pattern in TITLES) or _caption_only(row.label)):
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line
             if not row.figures:
                 heading = row.label

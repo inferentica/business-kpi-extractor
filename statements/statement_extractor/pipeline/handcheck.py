@@ -4,7 +4,7 @@ filing itself. Nothing here uses the extractor's readers: HTML tables are taken 
 filings line by line, PDFs by pdfplumber's own text. Rows are found by their label only, never by the served figure,
 so a check cannot be steered towards agreeing.
 
-    statement-extractor rows evals/handcheck/sample.json --out rows.md
+    statement-extractor rows evals/handcheck/recheck.json --out rows.md
 """
 from __future__ import annotations
 
@@ -53,33 +53,45 @@ def _html_tables(content: str) -> list[tuple[str, list[str]]]:
     return found
 
 
-def _html_rows(content: str, probe: str) -> list[str]:
-    out = []
+# The statement's own title, so its table is shown before notes and analyses that print the same label.
+_TITLES = {"income": r"statements?\s+of\s+(consolidated\s+)?(income|operations|earnings|profit)|income\s+statements?|"
+                     r"profit\s+or\s+loss|comprehensive\s+income",
+           "balance": r"balance\s+sheets?|financial\s+(position|condition)",
+           "cash_flow": r"cash\s+flows?"}
+
+
+def _hit(row_text: str, probes: list[str]) -> bool:
+    key = _key(row_text)
+    return any(key.startswith(probe) for probe in probes)
+
+
+def _html_rows(content: str, probes: list[str], statement: str) -> list[str]:
+    title = re.compile(_TITLES[statement], re.I)
+    found = []
     for context, rows in _html_tables(content):
-        hits = [row for row in rows if _key(row).startswith(probe)]
+        hits = [row for row in rows if _hit(row, probes)]
         if not hits:
             continue
         header = [row for row in rows[:8] if not _FIGURE.fullmatch(row.split(" | ")[0]) and _HEADER.search(row)][:4]
-        out.append(f"context: …{context.strip()[-200:]}\n" + "\n".join(f"  H {row[:220]}" for row in header) +
-                   "\n" + "\n".join(f"  > {row[:260]}" for row in hits[:3]))
-        if len(out) >= 3:
-            break
-    return out
+        text = (f"context: …{context.strip()[-200:]}\n" + "\n".join(f"  H {row[:220]}" for row in header) +
+                "\n" + "\n".join(f"  > {row[:260]}" for row in hits[:4]))
+        found.append((not title.search(context + " ".join(header)), len(found), text))
+    return [text for _, _, text in sorted(found)[:3]]
 
 
-def _text_rows(text: str, probe: str) -> list[str]:
+def _text_rows(text: str, probes: list[str], statement: str) -> list[str]:
+    title = re.compile(_TITLES[statement], re.I)
     lines = text.splitlines()
-    out = []
+    found = []
     for number, line in enumerate(lines):
-        if not _key(line).startswith(probe):
+        if not _hit(line, probes):
             continue
         header = [lines[at] for at in range(max(0, number - 70), number) if _HEADER.search(lines[at])][-7:]
-        following = lines[number + 1:number + 2] if not re.search(r"\d", line) else []  # figures on the next line
-        out.append("\n".join(f"  H {row.rstrip()[:200]}" for row in header) + "\n" +
-                   "\n".join(f"  > {row.rstrip()[:220]}" for row in [line, *following]))
-        if len(out) >= 3:
-            break
-    return out
+        following = lines[number + 1:number + 3]  # a wrapped label's figures, on the lines after
+        body = ("\n".join(f"  H {row.rstrip()[:200]}" for row in header) + "\n" +
+                "\n".join(f"  > {row.rstrip()[:220]}" for row in [line, *following]))
+        found.append((not title.search(" ".join(header)), len(found), body))
+    return [body for _, _, body in sorted(found)[:4]]
 
 
 def _documents(sample: dict) -> list[tuple[str, str, str]]:
@@ -103,7 +115,9 @@ def _documents(sample: dict) -> list[tuple[str, str, str]]:
             continue
         content = attachment.content
         content = content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or "")
-        printed = "html" if "<tr" in content[:200_000].lower() else "text"
+        # An inline XBRL filing opens with its XBRL header, far longer than 200 KB in TSMC's and ASML's 20-Fs.
+        printed = "html" if "<tr" in content.lower() or str(attachment.document).lower().endswith((".htm", ".html")) \
+            else "text"
         found.append((f"{attachment.document} ({kind})", printed, content))
     return found
 
@@ -123,9 +137,11 @@ def raw_rows(samples: list[dict], log=print) -> str:
             failure = ""
         for sample in group:
             probe = _probe(sample["label"])
+            probes = [probe, " ".join(probe.split()[:3])] if len(probe.split()) > 3 else [probe]
             found = []
             for name, printed, content in documents:
-                rows = _html_rows(content, probe) if printed == "html" else _text_rows(content, probe)
+                reader = _html_rows if printed == "html" else _text_rows
+                rows = reader(content, probes[:1], sample["statement"]) or reader(content, probes[1:], sample["statement"])
                 found.extend(f"[{name}]\n{row}" for row in rows)
             sections[sample["id"]] = (
                 f"### {sample['id']}: {sample['statement']} {sample['fiscal_year']} {sample['fiscal_period']} "

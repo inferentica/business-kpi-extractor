@@ -57,8 +57,8 @@ def share_scale(group: list[Table], money: float) -> float:
 def line_scale(*texts: str) -> float | None:
     """A scale printed in a share line's own label or heading: "(thousands)", "(in millions)"."""
     for text in texts:
-        short = re.search(r"\(\s*'?\s*(M|000)\s*\)", text or "")  # TSMC's "Weighted Average Outstanding Shares ('M)"
-        if short:
+        short = re.search(r"\(\s*'?\s*(M|K|000)\s*\)", text or "")  # TSMC's "Weighted Average Outstanding Shares ('M)",
+        if short:                                                       # its 1999-2000 releases' "Shares Outstanding ('K)"
             return 1e6 if short.group(1) == "M" else 1e3
         match = _LINE_UNIT.search(text or "")
         if match:

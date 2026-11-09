@@ -22,3 +22,4 @@ def test_a_share_line_can_name_its_own_scale():
     assert line_scale("BASIC WEIGHTED AVERAGE SHARES OUTSTANDING (THOUSANDS)") == 1e3
     assert line_scale("", "Shares used in computing earnings per share (in thousands):") == 1e3
     assert line_scale("Average shares outstanding") is None
+    assert line_scale("Shares Outstanding ('K)") == 1e3  # TSMC's 1999-2000 releases
