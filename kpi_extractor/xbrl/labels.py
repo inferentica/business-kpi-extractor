@@ -38,7 +38,7 @@ def official_labels(element_catalog: dict | None) -> Callable[[str], str | None]
             if role.endswith(("terseLabel", "/label")) and text:
                 cleaned = re.sub(r"\s*\[(member|axis|domain|line items|table)\]\s*$", "", str(text), flags=re.I).strip()
                 if cleaned:
-                    return cleaned
+                    return without_footnote(cleaned)
         return None
 
     return label
@@ -107,12 +107,21 @@ def drop_declared_parents(members: dict[str, float], total: float | None, childr
     return {member: value for member, value in members.items() if member not in parents}
 
 
+# A footnote marker run into a label: "Infrastructure(a)" (BAM's 2026 segments), "devices(1)".
+_FOOTNOTE = re.compile(r"\s*\((?:[a-z]|\d{1,2})\)$")
+
+
+def without_footnote(label: str) -> str:
+    """A member's label without the footnote marker a filing runs into it."""
+    return _FOOTNOTE.sub("", label).strip() or label
+
+
 def _member_labels(facts: pd.DataFrame) -> dict[str, str]:
     labels: dict[str, str] = {}
     if "member" in facts.columns and "dimension_member_label" in facts.columns:
         pairs = facts[["member", "dimension_member_label"]].dropna().drop_duplicates("member")
         for member, label in pairs.itertuples(index=False):
-            labels[str(member)] = str(label).strip()
+            labels[str(member)] = without_footnote(str(label).strip())
     return labels
 
 
