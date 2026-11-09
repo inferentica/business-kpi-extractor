@@ -78,7 +78,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
             if own is not None and own is not winner:
                 record["versus_own"] = differences(winner, own)
         chosen.append(record)
-    tie(chosen)  # closing cash against the balance sheet, quarters against the year (selection/ties.py)
+    tie(chosen, readings)  # closing cash against the balance sheet, quarters against the year (selection/ties.py)
     return sorted(chosen, key=lambda item: (item["period_end"], item["statement"], item["duration"]), reverse=True)
 
 

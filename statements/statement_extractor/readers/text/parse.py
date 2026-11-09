@@ -117,6 +117,8 @@ def _rows(lines: list[Line], columns: list[int]) -> list[Row]:
         rows.append(Row(label=line.label, level=line.indent, cells=[Cell(line.indent, 1, line.label)]))
 
     for line in lines:
+        if line.figures and line.label and all(_nearest(columns, chunk.end) is None for chunk in line.figures):
+            line = Line(line.indent, line.label, [])  # a mark in no column ("Shares ('M)  (3)"): a label to join
         if not line.figures:
             continued = rows and rows[-1].figures and not pending and line.label[:1].islower()
             if continued:

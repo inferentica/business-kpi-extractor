@@ -54,15 +54,26 @@ def quarters_to_year(quarters: list[dict], year: dict) -> str:
     return "add up" if not gaps else "differ: " + ", ".join(gaps)
 
 
-def tie(chosen: list[dict]) -> None:
-    """Writes each verdict on the chosen record it concerns."""
+def tie(chosen: list[dict], readings: list) -> None:
+    """Writes each verdict on the chosen record it concerns. Closing cash is checked against the balance sheet of the
+    same filing, so both are one vintage and one scope (ASML's FY2001 20-F restated 1999 for a merger its 2000 report
+    had not seen); quarters against a year of the same scope and basis (TSMC's quarters to 2004 are the parent's)."""
     kept = {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"]): item
             for item in chosen if item["status"] == "kept"}
-    balances = {item["period_end"]: item for item in kept.values() if item["statement"] == "balance"}
+    balances: dict[tuple, list[dict]] = {}
+    for reading in readings:
+        if reading.statement == "balance" and reading.status == "kept":
+            balances.setdefault((reading.period_end.isoformat(), reading.scope, reading.basis), []).append(
+                {"lines": reading.lines, "accession": reading.accession})
     for item in kept.values():
         if item["statement"] == "cash_flow":
-            item["cash_on_balance"] = cash_on_balance(item, balances.get(item["period_end"]))
+            candidates = balances.get((item["period_end"], item.get("scope"), item.get("basis")), [])
+            # The same filing's balance sheet first; any other's on that date and basis can agree too.
+            candidates.sort(key=lambda balance: balance["accession"] != item["source_accession"])
+            verdicts = [cash_on_balance(item, balance) for balance in candidates]
+            item["cash_on_balance"] = "agree" if "agree" in verdicts else "differ" if "differ" in verdicts else "untested"
         if item["statement"] == "income" and item["fiscal_period"] == "FY":
             quarters = [kept.get(("income", item["fiscal_year"], f"Q{number}", "quarter")) for number in range(1, 5)]
-            if all(quarters):
+            if all(quarters) and all((q.get("scope"), q.get("basis")) == (item.get("scope"), item.get("basis"))
+                                     for q in quarters):
                 item["quarters"] = quarters_to_year(quarters, item)
