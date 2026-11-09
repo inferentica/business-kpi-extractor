@@ -31,19 +31,20 @@ KNOWN = (
 )
 
 
-ASSETS = re.compile(r"^total\s+assets$", re.I)
+# TIM's 6-Ks print the total on the heading itself: "Assets 55,706,609", then its lines (only rows with figures count).
+ASSETS = re.compile(r"^(total\s+)?assets$", re.I)
 
 
 # AMD 2009: "Total liabilities and stockholders' equity (deficit)".
 # KBR 2007: "Total liabilities, minority interest and shareholders' equity and accumulated other comprehensive loss".
-LIABILITIES_AND_EQUITY = re.compile(r"^total\s+liabilities.*\b(equity|investment|deficit|capital)(\s*\(deficit\))?"
+LIABILITIES_AND_EQUITY = re.compile(r"^(total\s+liabilities.*|liabilities\s+and\s+(stockholders|shareholders)['’´]?\s+)\b(equity|investment|deficit|capital)(\s*\(deficit\))?"
                                     r"(\s+and\s+accumulated\s+other\s+comprehensive\s+(income|loss|\(loss\)\s+income))?$", re.I)
 
 
 LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
 
 
-EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’]?\s+)?equity(\s*\(deficit\))?$", re.I)
+EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’´]?\s+)?equity(\s*\(deficit\))?$", re.I)
 
 
 # Stock Yards: "Beginning cash and cash equivalents", "Ending cash and cash equivalents".
@@ -73,7 +74,9 @@ PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+b
 
 
 # Kroger 2009: "Net earnings including noncontrolling interests", then the parent's share.
-NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+\((loss|income)\)\s+(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
+NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+profit(\s*/\s*\(loss\)|\s+\(loss\))?$|"
+                        # IFRS: TIM's "Net profit for the period", Petrobras's "Net income for the period"
+                        r"^net\s+(income|profit|earnings|loss)(\s*/\s*\(loss\)|\s+\(loss\))?\s+for\s+the\s+(period|year|quarter)$|^net\s+\((loss|income)\)\s+(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"

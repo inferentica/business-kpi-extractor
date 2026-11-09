@@ -22,8 +22,9 @@ from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
 from .currency import column_currencies, reporting_currency, translations
 from .dates import column_periods
-from .scales import line_scale, share_scale, statement_scale
+from .scales import line_scale, share_scale, statement_scale, states_two
 from .find import TITLES, find_statements, unlabelled_totals
+from .side_by_side import column_scopes
 from .tables import Table, figure_columns
 
 
@@ -49,8 +50,12 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     found = find_statements(all_tables, release=form == "6-K")
     # A statement printed more than once (in full, and as a summary elsewhere): the fullest table is the statement;
     # the group's statements before the parent company's alone (TSMC's 6-Ks of 2008 print both).
-    found.sort(key=lambda item: (_scope(item[1], form) != "consolidated",
-                                 -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
+    # Among statements of one kind and of like size, the first printed: the registrant's own, before the sections on
+    # its subsidiaries (UBS's quarterly reports print UBS Group AG, then UBS AG and UBS Limited).
+    size = {id(item): sum(len([row for row in table.rows if row.figures]) for table in item[1]) for item in found}
+    largest = {kind: max(size[id(item)] for item in found if item[0] == kind) for kind, _group in found}
+    found.sort(key=lambda item: (_scope(item[1], form) != "consolidated", size[id(item)] < 0.8 * largest[item[0]],
+                                 item[1][0].index if size[id(item)] >= 0.8 * largest[item[0]] else -size[id(item)]))
     read_periods: dict[str, set] = {}
     for kind, group in found:
         periods = column_periods(kind, group, fiscal_year_end, document_end)
@@ -61,7 +66,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if not periods:
                 continue
         scale = statement_scale(group)
-        if scale is None and unstated_scale is not None and not _states_two(group):
+        if scale is None and unstated_scale is not None and not states_two(group):
             scale = unstated_scale
         elif scale is None:
             notes.append(f"{kind}: no single scale stated")
@@ -79,6 +84,10 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             notes.append(f"{kind}: {len(dropped)} convenience translation column(s) left out")
         read_periods.setdefault(kind, set()).update(period.key for period in periods.values())
         kept = [index for index, column in enumerate(dated) if column not in dropped]
+        scopes = column_scopes(group, dated, periods)
+        if scopes is None:
+            notes.append(f"{kind}: parent and group columns side by side, not told apart")
+            continue
         layout = [(group[0], dated)]
         for table in group[1:]:
             own = column_periods(kind, [table], fiscal_year_end, document_end)
@@ -100,16 +109,10 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if reading is None:
                 continue
             reading.accession, reading.form, reading.filed, reading.currency = accession, form, filed, currency
-            reading.scope = _scope(group, form)
+            reading.scope = scopes.get(dated[index]) or _scope(group, form)
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes
-
-
-def _states_two(group: list[Table]) -> bool:
-    """Whether the statement names two scales (then it is ambiguous, not unstated)."""
-    from .scales import scale_text
-    return bool(re.search(r"\b(thousands?|millions?|billions?)\b", scale_text(group), re.I))
 
 
 _FOREIGN_FORMS = ("20-F", "40-F", "6-K")
@@ -122,8 +125,9 @@ def _scope(group: list[Table], form: str) -> str:
     leading = " ".join(row.label for row in group[0].rows[:4] if not row.figures)  # a title in the table's own rows
     title = (group[0].context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in group[0].header)
              + " " + leading).lower()
-    if re.search(r"\b(unconsolidated|non-consolidated|parent\s+company\s+only)\b", title):
-        return "parent"
+    if re.search(r"\b(unconsolidated|non-consolidated|parent\s+company\s+only)\b", title) or \
+            re.search(r"\bstandalone\b", title[-160:]):
+        return "parent"  # UBS's "UBS AG (standalone) financial information"
     if form.upper() in _FOREIGN_FORMS and "consolidated" not in title:
         return "parent"
     return "consolidated"
@@ -164,6 +168,11 @@ def _close_section(printed: list, section: str | None, index: int | None) -> Non
 # Diluted, which would otherwise read as per-share figures.
 _YEAR_ROW_LABEL = re.compile(r"\bstatements?\s+of\b|\bfor\s+the\s+(years?|quarters?|periods?|(three|six|nine|twelve)\s+months)\b|"
                              r"\byears?\s+ended\b|\bsummary\b|\bforward\s+look", re.I)
+
+
+# A memo line inside the line above it, served but never summed: UBS's "of which: assets pledged as collateral which
+# may be sold or repledged by counterparties", within its trading portfolio assets.
+_MEMO = re.compile(r"^\s*(of\s+which|thereof)\b", re.I)
 
 
 def _caption_only(label: str) -> bool:
@@ -247,7 +256,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 meaning = f"{heading} {row.label}"
             if not row.figures:
                 printed.append((row.label, row.level, None))
-            elif not (per_share or shares):
+            elif not (per_share or shares or _MEMO.match(row.label)):
                 printed.append((meaning, row.level, value))
     _close_section(printed, section, section_total)
     lines = [line for index, line in enumerate(lines) if not line["is_heading"] or _has_lines_below(lines, index)]

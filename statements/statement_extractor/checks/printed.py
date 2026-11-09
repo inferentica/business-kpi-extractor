@@ -188,6 +188,7 @@ def total_check(printed) -> Check:
             continue
         if not matched and _a_part_of_the_next_total(printed, index):
             continue
+        matched = matched or _sums_below(printed, index, value)
         verified += 1
         if not matched:
             failures.append(f"{label[:40]} {value:,.1f}")
@@ -204,3 +205,28 @@ def _a_part_of_the_next_total(printed, index: int) -> bool:
     before, value, after = printed[index - 1][2], printed[index][2], printed[index + 1][2]
     return None not in (before, value, after) and TOTAL.match(printed[index + 1][0]) is not None \
         and close(before + value, after, 3)
+
+
+def _sums_below(printed, index: int, value: float) -> bool:
+    """A total printed above its parts (TIM's 6-Ks: "Total liabilities", then "Current liabilities" and its lines, then
+    "Non-current liabilities" and its lines): the lines below it, each part's own lines skipped where they sum to it."""
+    running, count, position = 0.0, 0, index + 1
+    while position < len(printed) and count < 40:
+        part = printed[position][2]
+        if part is None:
+            position += 1
+            continue
+        running += part
+        count += 1
+        if count >= 2 and close(running, value, count + 1):
+            return True
+        own, lines, end = 0.0, 0, position
+        for later in range(position + 1, min(len(printed), position + 60)):
+            if printed[later][2] is None:
+                continue
+            own, lines = own + printed[later][2], lines + 1
+            if lines >= 2 and close(own, part, lines + 1):
+                end = later
+                break
+        position = end + 1
+    return False

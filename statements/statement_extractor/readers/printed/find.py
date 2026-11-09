@@ -6,6 +6,7 @@ import re
 
 from ...domain.printed_labels import (ASSETS, BARE_TOTAL, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES_AND_EQUITY, NET_INCOME,
                                       PRETAX, SECTIONS)
+from .side_by_side import SIDE_BY_SIDE
 from .tables import Table, figure_columns
 
 
@@ -19,7 +20,7 @@ TITLES = (
 
 
 # Tables that carry a statement's name but are not the company's own statement.
-_NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|quarterly(?!\s+report)|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
+_NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bversus\b|\bcomparison\b|quarterly(?!\s+report)|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
                             r"guarantor|pro\s+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
                             r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b|"
@@ -75,7 +76,12 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         if kind is None and _COMPREHENSIVE.search(title_text[-300:]) and \
                 any(row.figures and PRETAX.search(row.label) for row in table.rows):
             kind = "income"  # one statement of profit and other comprehensive income (TSMC's Taiwan-IFRS reports)
+        # The words before the table count too, though its own first rows extend the title text (UBS's "Comparison UBS
+        # Group AG (consolidated) versus UBS AG (consolidated)", then "Income statement" as the table's first row).
+        # A parent company's columns beside the group's are no parent-only statement (side_by_side.py).
+        title_text = SIDE_BY_SIDE.sub(" ", title_text)
         if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
+                not_statement.search(_RUNNING_LINK.sub(" ", table.context[-200:])) or \
                 len([r for r in table.rows if r.figures]) < 4:
             continue
         if any(_NOT_A_PERIOD.match(cell.text) for cells in table.header for cell in cells if cell.start > 0):
