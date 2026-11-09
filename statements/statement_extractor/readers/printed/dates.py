@@ -146,7 +146,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         if numeric is not None and not _MONTH_DAY.search(above):
             month, day_of, year_of = (int(part) for part in numeric.groups())
             try:
-                end = date(year_of + 2000 if year_of < 100 else year_of, month, day_of)
+                # Two-digit years: "3/21/09" is 2009, Oshkosh's "12/30/95" 1995 (EDGAR's filings start in 1993).
+                end = date(year_of + (2000 if year_of < 50 else 1900) if year_of < 100 else year_of, month, day_of)
             except ValueError:
                 end = None
         elif day is not None:
