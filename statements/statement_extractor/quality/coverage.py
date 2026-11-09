@@ -74,6 +74,15 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
             "quarters_missing": missing[:40]}
 
 
+def _counts(chosen, field: str, kind=lambda value: value) -> dict:
+    """How many served statements carry each verdict of a witness check."""
+    counts: dict[str, int] = {}
+    for item in chosen:
+        if item.get(field):
+            counts[kind(item[field])] = counts.get(kind(item[field]), 0) + 1
+    return counts
+
+
 def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dict:
     by_status: dict[str, int] = {}
     for item in chosen:
@@ -115,6 +124,9 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
         "first_period": min((item["period_end"] for item in chosen if item["status"] == "kept"), default=None),
         "readings": len(readings), "rejected_readings": sum(1 for r in readings if r.status == "rejected"),
         "unproven_readings": sum(1 for r in readings if r.status == "unproven"),
+        "witnesses": _counts(chosen, "witness"), "cash_on_balance": _counts(chosen, "cash_on_balance"),
+        "quarters_to_year": _counts(chosen, "quarters", lambda value: value.split(":")[0]),
+        "set_aside": sum(len(item.get("set_aside", [])) for item in chosen),
         **release_coverage(filings, kept, {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"])
                                            for item in chosen if item.get("scope") == "parent"},
                            {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"]):
