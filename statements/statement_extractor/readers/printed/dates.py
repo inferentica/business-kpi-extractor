@@ -121,6 +121,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     in_order = years_in_order(first, columns)
     aboves = {column: header_text(first, column[0]) or header_text(first, column[-1]) for column in columns}
     header_days = list(_MONTH_DAY.finditer(header_all))
+    day_first = _day_first(header_all)
     # One day for each column, in order, when no column prints a day of its own.
     named = [m.group(0).lower() for m in header_days]
     in_order_days = len(header_days) == len(columns) >= 2 and len(set(named)) == len(named) and all(
@@ -162,7 +163,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             if numeric is not None:
                 month, day_of, year_of = (int(part) for part in numeric.groups())
             else:
-                day_of, month, year_of = (int(part) for part in dotted.groups())  # UBS's "31.12.14"
+                first, second, year_of = (int(part) for part in dotted.groups())
+                day_of, month = (first, second) if day_first else (second, first)
             try:
                 # Two-digit years: "3/21/09" is 2009, Oshkosh's "12/30/95" 1995 (EDGAR's filings start in 1993).
                 end = date(year_of + (2000 if year_of < 50 else 1900) if year_of < 100 else year_of, month, day_of)
@@ -200,6 +202,20 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             continue
         periods[column] = Period(end, end - timedelta(days=days - 1))
     return periods
+
+
+def _day_first(text: str) -> bool:
+    """The order of a header's dotted dates: UBS prints "31.12.14", Copel "12.31.2014". A date only one order can read
+    settles it; else the order that ends every date on a month's last days, where periods end; else day first."""
+    dates = [(int(first), int(second)) for first, second, _year in _DOTTED_DATE.findall(text)]
+    if any(first > 12 for first, _second in dates):
+        return True
+    if any(second > 12 for _first, second in dates):
+        return False
+    month_end = lambda day, month: day >= 28 or (month == 2 and day >= 27)  # noqa: E731
+    if dates and all(month_end(second, first) for first, second in dates) and not all(month_end(first, second) for first, second in dates):
+        return False
+    return True
 
 
 def _near_year_end(end: date, fiscal_year_end: str) -> bool:
