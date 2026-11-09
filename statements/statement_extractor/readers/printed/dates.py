@@ -201,10 +201,11 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         elif day is not None:
             end = _date(day.group(1), day.group(2), year)
             month_named = re.search(rf"\b({_MONTH})\s+(?:19|20)\d{{2}}\b", above, re.I)
-            if month_named and end is not None and _date(month_named.group(1), "1", year).month != end.month:
+            numbered = re.search(r"\b(0?[1-9]|1[0-2])/(?:19|20)\d{2}\b", above)  # TIM's "06/2026 | 12/2025"
+            month = _date(month_named.group(1), "1", year).month if month_named else int(numbered.group(1)) if numbered else None
+            if month and end is not None and month != end.month:
                 # "June 2023 | December 2022" under "June 30, 2023 and December 31, 2022": the column's own month, on
                 # the title's day for it, else its last day.
-                month = _date(month_named.group(1), "1", year).month
                 titled_day = next((int(match.group(2)) for match in [*_MONTH_DAY.finditer(header_all), *in_title]
                                    if _date(match.group(1), "1", year).month == month), None)
                 end = date(int(year), month, titled_day or calendar.monthrange(int(year), month)[1])
