@@ -20238,13 +20238,13 @@
    "fiscal_year": "2003",
    "fiscal_period": "Q2",
    "duration": "ytd",
-   "label": "^Net\\ cash\\ provided\\ by\\ \\(used\\ in\\)\\ operating\\ activities\\ from\\ continuing\\ operations$",
+   "label": "^Net\\ cash\\ provided\\ by\\ (\\(used\\ in\\)\\ )?operating\\ activities\\ from\\ continuing\\ operations$",
    "value": 270275000.0,
    "scale": 1000,
    "source_accession": "0000950172-03-002304",
    "era": "release",
    "checked": "read by hand",
-   "note": "hand check ASML-release-13, 2026-11-09: the filing's own printed row"
+   "note": "hand check ASML-release-13, 2026-11-09: the filing's own printed row; ASML's 2004 release prints it again as 'Net cash provided by operating activities from continuing operations', same 270,275"
   },
   {
    "symbol": "ASML",
