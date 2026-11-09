@@ -27,3 +27,16 @@ def test_release_quarters_are_counted_from_the_first_releases_year():
     # 2002: four incomes, three balance sheets and three cash flows; 2003 Q1: three.
     assert (found["quarters_expected"], found["quarters_kept"], found["quarters_parent_only"]) == (13, 7, 1)
     assert "2002 Q1 balance" in found["quarters_missing"]
+
+
+def test_a_quarter_derivable_on_a_shared_basis_counts_apart():
+    from statement_extractor.quality.coverage import release_coverage
+    filings = [{"form": "6-K", "release_quarter": ["2013", "Q4"]}]
+    kept = {("income", "2013", "Q1", "quarter"), ("income", "2013", "Q2", "ytd"), ("income", "2013", "Q3", "ytd"),
+            ("income", "2013", "FY", "year")}
+    bases = {("income", "2013", "Q1", "quarter"): {"Taiwan-IFRS"}, ("income", "2013", "Q2", "ytd"): {"Taiwan-IFRS"},
+             ("income", "2013", "Q3", "ytd"): {"Taiwan-IFRS"}, ("income", "2013", "FY", "year"): {"IFRS", "Taiwan-IFRS"}}
+    found = release_coverage(filings, kept, bases=bases)
+    assert found["quarters_derivable"] == 3 and "2013 Q2 income" not in found["quarters_missing"]
+    bases[("income", "2013", "FY", "year")] = {"IFRS"}
+    assert release_coverage(filings, kept, bases=bases)["quarters_derivable"] == 2

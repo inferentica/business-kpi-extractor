@@ -35,7 +35,9 @@ def _derivable(year: str, number: int, kept: set, bases: dict) -> bool:
     later = {2: ("Q2", "ytd"), 3: ("Q3", "ytd"), 4: ("FY", "year")}[number]
     earlier = {2: ("Q1", "quarter"), 3: ("Q2", "ytd"), 4: ("Q3", "ytd")}[number]
     keys = [("income", year, *later), ("income", year, *earlier)]
-    return all(key in kept for key in keys) and len({bases.get(key) for key in keys}) == 1
+    # Each period counts on every basis it is kept on: TSMC's year is on IFRS in its 20-F and on Taiwan-IFRS in its
+    # annual 6-K, its nine months on Taiwan-IFRS only.
+    return all(key in kept for key in keys) and bool(set.intersection(*(set(bases.get(key) or ()) for key in keys)))
 
 
 def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict | None = None) -> dict:
@@ -81,8 +83,8 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
     expected = found = 0
     missing = []
     for filing in filings:
-        if filing["form"] == "6-K":
-            continue  # releases are counted by quarter (release_coverage)
+        if filing["form"] == "6-K" or "asset-backed" in (filing.get("printed") or []):
+            continue  # releases are counted by quarter (release_coverage); a trust's report is not the company's
         if not filing.get("fiscal_period"):
             # A filing nothing could be read from has no period of its own to name, yet its three statements are
             # missing all the same: counted as such, not left out of the coverage.
@@ -115,7 +117,8 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
         "unproven_readings": sum(1 for r in readings if r.status == "unproven"),
         **release_coverage(filings, kept, {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"])
                                            for item in chosen if item.get("scope") == "parent"},
-                           {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"]): item.get("basis")
+                           {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"]):
+                            {item.get("basis"), *(other["basis"] for other in item.get("other_bases", []))}
                             for item in chosen if item["status"] == "kept"}),
         "ai_calls": AI_CALLS, "cost_cny": 0.0, "seconds": round(seconds),
     }

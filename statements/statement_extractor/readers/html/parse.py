@@ -89,6 +89,51 @@ def _currency_row(cells: list[Cell]) -> bool:
     return len(money) > 1 or money[0].start > 0 and bool(currencies_named(money[0].text))
 
 
+def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
+    """A table's rows, its header rows (those above the first figures) and whether it has figures."""
+    rows, header, seen_figures = [], [], False
+    for cells in lines:
+        if not seen_figures and (_currency_row(cells) or is_subheader(cells)):
+            header.append([cell for cell in cells if cell.text])
+            continue
+        row = _row(cells)
+        if row is None:
+            continue
+        if row.figures and not is_header_figures(row):
+            seen_figures = True
+            rows.append(row)
+        elif not seen_figures:
+            texts = " ".join(cell.text for cell in cells)
+            if COLUMN_TITLE.search(texts):
+                header.append([cell for cell in cells if cell.text])
+            elif row.label:
+                rows.append(Row(label=row.label, level=row.level, cells=cells))
+        else:
+            rows.append(row)
+    return rows, header, seen_figures
+
+
+def _side_by_side(lines: list[list[Cell]]) -> int | None:
+    """Where a second statement starts beside the first: a column where most figure rows print a label after figures
+    and more figures after it."""
+    starts: dict[int, int] = {}
+    figured = 0
+    for cells in lines:
+        texts = [cell for cell in cells if cell.text]
+        kinds = [(cell.start, number(cell.text) is not None or cell.text in ("$", ")", "-", "—")) for cell in texts]
+        if not any(is_figure for _start, is_figure in kinds):
+            continue
+        figured += 1
+        for position, (start, is_figure) in enumerate(kinds):
+            if not is_figure and start > 0 and any(f for _s, f in kinds[:position]) and any(f for _s, f in kinds[position + 1:]):
+                starts[start] = starts.get(start, 0) + 1
+                break
+    if not starts or figured < 6:
+        return None
+    middle, count = max(starts.items(), key=lambda item: item[1])
+    return middle if count >= max(5, figured * 0.3) else None
+
+
 def parse_html(html: str | bytes) -> list[Table]:
     """Every table of a document with rows, its header rows and the text before it."""
     raw = html.encode("utf-8") if isinstance(html, str) else html
@@ -108,26 +153,16 @@ def parse_html(html: str | bytes) -> list[Table]:
         if element.tag == "table":
             if element.getparent() is not None and any(a.tag == "table" for a in element.iterancestors()):
                 continue
-            rows, header, seen_figures = [], [], False
-            for tr in element.iter("tr"):
-                cells = _cells(tr)
-                if not seen_figures and (_currency_row(cells) or is_subheader(cells)):
-                    header.append([cell for cell in cells if cell.text])
-                    continue
-                row = _row(cells)
-                if row is None:
-                    continue
-                if row.figures and not is_header_figures(row):
-                    seen_figures = True
-                    rows.append(row)
-                elif not seen_figures:
-                    texts = " ".join(cell.text for cell in cells)
-                    if COLUMN_TITLE.search(texts):
-                        header.append([cell for cell in cells if cell.text])
-                    elif row.label:
-                        rows.append(Row(label=row.label, level=row.level, cells=cells))
-                else:
-                    rows.append(row)
+            lines = [_cells(tr) for tr in element.iter("tr")]
+            rows, header, seen_figures = _rows(lines)
+            middle = _side_by_side(lines)
+            if middle is not None:
+                # Assets on the left and liabilities on the right of each row (TSMC's consolidated half-year balance
+                # sheets): the right half is read after the left, on the left's columns.
+                rows, header, seen_figures = _rows([[cell for cell in cells if cell.start < middle] for cells in lines])
+                right, _header, _seen = _rows([[Cell(cell.start - middle, cell.span, cell.text) for cell in cells
+                                                if cell.start >= middle] for cells in lines])
+                rows += right[next((index for index, row in enumerate(right) if row.figures), len(right)):]
             context = " ".join(previous_text)[-600:]
             found.append(Table(rows=rows, header=header, context=context, index=len(found)))
             if seen_figures:

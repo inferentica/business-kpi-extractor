@@ -93,3 +93,20 @@ def test_currencies_and_the_basis_are_read_from_the_printed_words():
     assert stated_basis("present fairly … in conformity with the Regulations Governing the Preparation of Financial "
                         "Reports by Securities Issuers and IFRSs endorsed by the Financial Supervisory Commission of the "
                         "Republic of China.") == TAIWAN_IFRS
+
+
+def test_assets_and_liabilities_printed_side_by_side():
+    # TSMC's consolidated half-year balance sheets: liabilities to the right of the assets on each row.
+    rows = [("Cash and cash equivalents", "150,978", "172,486", "Short-term loans", "33,140", "18,082"),
+            ("Receivables", "50,000", "40,000", "Accounts payable", "11,710", "11,552"),
+            ("Inventories", "20,000", "18,000", "Total liabilities", "44,850", "29,634"),
+            ("Total current assets", "220,978", "230,486", "Capital stock", "259,000", "259,000"),
+            ("Property, plant and equipment", "562,838", "450,290", "Retained earnings", "479,966", "392,142"),
+            ("Other assets", "0", "0", "Total shareholders' equity", "738,966", "651,142"),
+            ("TOTAL", "783,816", "680,776", "TOTAL", "783,816", "680,776")]
+    html = ("<p>CONSOLIDATED BALANCE SHEETS JUNE 30, 2011 AND 2010 (In Millions of New Taiwan Dollars)</p><table>"
+            "<tr><td></td><td>2011</td><td>2010</td><td></td><td>2011</td><td>2010</td></tr>" +
+            "".join("<tr>" + cells(*row) + "</tr>" for row in rows) + "</table>")
+    readings, _ = read(html, form="6-K", end=date(2011, 6, 30))
+    assert [(r.fiscal_year, r.status) for r in readings] == [("2011", "kept"), ("2010", "kept")]
+    assert any(line["label"] == "Short-term loans" and line["value"] == 33_140e6 for line in readings[0].lines)
