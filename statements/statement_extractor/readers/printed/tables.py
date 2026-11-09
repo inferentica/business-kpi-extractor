@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ...domain.basis import currencies_named
+from ...domain.basis import currencies_named, is_currency_word
 
 # A figure may drop its leading zero: Coca-Cola's 1994 "$ .59" a share.
 _NUMBER = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*(\d{1,3}(?:,\d{3})+|\d+|(?=\.\d))(\.\d+)?\s*\)?$")
@@ -70,6 +70,23 @@ def number(text: str) -> float | None:
 YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
 
 
+# Words a header row prints over each column rather than a period: TSMC's management reports print "USD | NTD | % |
+# NTD | % | … | Amount | %" under their dates.
+_COLUMN_WORD = re.compile(r"^(.{0,12}%.{0,12}|amounts?|change|move|yoy|qoq|notes?|\(?(un)?audited\)?)$", re.I)
+PERCENT_WORD = re.compile(r"%")  # "%", "% of Sales", "Inc(Dec)%"
+
+
+def is_column_word(text: str) -> bool:
+    return bool(_COLUMN_WORD.match(text.strip())) or is_currency_word(text) and text.strip() != "$"
+
+
+def is_subheader(cells: list[Cell]) -> bool:
+    """A row naming what each column holds (currencies, amounts, percentages), after a label cell at most."""
+    words = [cell for cell in cells if cell.text and cell.start > 0]
+    return len(words) > 1 and all(is_column_word(cell.text) for cell in words) and \
+        any(currencies_named(cell.text) or PERCENT_WORD.search(cell.text) for cell in words)
+
+
 COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)\s+ended\b|\bended\b|"
                            r"^(\s*(first|second|third|fourth)\s+quarter|\s*(three|six|nine|twelve)\s+months)\b|"
                            r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|"
@@ -114,7 +131,8 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
     positions = sorted(column for column, count in counts.items() if count >= 2 or most < 3)
     # A row naming each column's currency sits lowest and splits a year's two columns, its own and a translation
     # (TSMC's "2003" over "NT$ | US$"); else the lowest row with years or spans.
-    bottom = next((cells for cells in reversed(table.header) if cells and all(currencies_named(cell.text) for cell in cells)),
+    bottom = next((cells for cells in reversed(table.header) if (money := [cell for cell in cells if cell.start > 0])
+                   and (all(currencies_named(cell.text) for cell in money) or is_subheader(cells))),
                   None) or next((cells for cells in reversed(table.header) if any(YEAR_ONLY.match(cell.text) or COLUMN_TITLE.search(cell.text)
                                                                                   for cell in cells[1:] or cells)), [])
 
@@ -132,7 +150,9 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
         groups.append([position])
     # A "Notes" column holds note references, not figures (TSMC: "Cash and cash equivalents | 6 | 242,695.6").
     # Its header is the cell right over it; the rows above and below may reach it from the columns beside it.
-    groups = [group for group in groups if not any(cell.start <= group[0] < cell.end and re.fullmatch(r"notes?", cell.text.strip(), re.I)
+    # A percentage column beside each amount (TSMC's "% of net sales") is no figure column either.
+    groups = [group for group in groups if not any(cell.start <= group[0] < cell.end and (re.fullmatch(r"notes?", cell.text.strip(), re.I)
+                                                                                          or PERCENT_WORD.search(cell.text))
                                                    for cells in table.header for cell in cells)]
     if not groups:
         return []

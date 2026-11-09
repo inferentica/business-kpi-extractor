@@ -20,6 +20,7 @@ class Report:
     form: str
     filed: date
     filing: object = field(default=None, repr=False)
+    period_end: date | None = None  # a release's quarter end (a report's comes from its filing)
 
 
 def list_reports(company, since: date) -> list[Report]:
@@ -29,6 +30,27 @@ def list_reports(company, since: date) -> list[Report]:
     reports = [Report(str(filing.accession_no), str(filing.form), filing.filing_date, filing)
                for filing in filings if str(filing.form) in REPORT_FORMS]
     return sorted(reports, key=lambda report: report.filed)
+
+
+# A results release comes in the weeks after its quarter closes: ASML's about two weeks on, TSMC's management report
+# about four and its reviewed quarterly statements about six. Monthly sales and other notices in that window are read
+# too and give nothing.
+RELEASE_WINDOW = (5, 50)  # days after the quarter end
+_PAPER = "9999999997-"  # EDGAR's placeholder for a filing made on paper: no documents to read
+
+
+def list_releases(company, since: date, quarter_end) -> list[Report]:
+    """A foreign filer's 6-Ks furnished within the release window after a quarter end, oldest first, each with that
+    quarter's end. `quarter_end(day)` is the latest quarter end at least five days before a day."""
+    filings = _with_retries(lambda: company.get_filings(form="6-K", filing_date=f"{since.isoformat()}:"))
+    found = []
+    for filing in filings:
+        if str(filing.form) != "6-K" or str(filing.accession_no).startswith(_PAPER):
+            continue
+        end = quarter_end(filing.filing_date)
+        if RELEASE_WINDOW[0] <= (filing.filing_date - end).days <= RELEASE_WINDOW[1]:
+            found.append(Report(str(filing.accession_no), "6-K", filing.filing_date, filing, period_end=end))
+    return sorted(found, key=lambda report: report.filed)
 
 
 def _with_retries(read):

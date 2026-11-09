@@ -58,16 +58,22 @@ def settle_signs(winner: Reading, kept: list[Reading], printed: dict[str, list[f
 
 
 def _signs_from(winner: Reading, printed: Reading) -> Reading:
-    """Each line's sign as the filing prints it, matched by label and amount."""
+    """Each line's sign as the filing prints it, matched by label, occurrence and amount: Salesforce prints "Excess tax
+    benefits from employee stock plans" twice, (6,018) under operating and 6,018 under financing activities."""
     from dataclasses import replace
-    by_label = {}
+    by_label: dict[str, list[float]] = {}
     for line in printed.lines:
         if not line["is_heading"] and line["value"]:
-            by_label.setdefault(line["label"].lower(), line["value"])
-    lines, flipped = [], 0
+            by_label.setdefault(line["label"].lower(), []).append(line["value"])
+    lines, flipped, seen = [], 0, {}
     for line in winner.lines:
         line = dict(line)
-        shown = by_label.get(line["label"].lower())
+        label = line["label"].lower()
+        occurrence = seen.get(label, 0)
+        if not line["is_heading"] and line["value"]:
+            seen[label] = occurrence + 1
+        printed_values = by_label.get(label, [])
+        shown = printed_values[occurrence] if occurrence < len(printed_values) else None
         if line["value"] and shown is not None and abs(abs(shown) - abs(line["value"])) < 0.5 and (shown < 0) != (line["value"] < 0):
             line["value"] = -line["value"]
             flipped += 1

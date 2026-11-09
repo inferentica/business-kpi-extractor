@@ -29,3 +29,19 @@ def year_end_for(period_end: date | None, annual_ends: list[date], usual: str) -
         return usual
     found = _mmdd(min(closing))
     return usual if _gap(found, usual) <= _SAME else found
+
+
+def quarter_end_before(day: date, fiscal_year_end: str, min_gap: int = 5) -> date:
+    """The latest fiscal quarter end at least `min_gap` days before `day`: the quarter a results release that day
+    reports. Quarters end on the year end's day of month every three months (a 52/53-week year's dates differ by days,
+    which the reader allows)."""
+    import calendar
+    month, day_of = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
+    candidates = []
+    for year in (day.year - 2, day.year - 1, day.year):
+        for step in range(4):
+            m = (month - 1 + 3 * step) % 12 + 1
+            y = year + (1 if month - 1 + 3 * step >= 12 else 0)
+            last = calendar.monthrange(y, m)[1]
+            candidates.append(date(y, m, min(day_of if day_of < 28 else last, last)))
+    return max(end for end in candidates if (day - end).days >= min_gap)

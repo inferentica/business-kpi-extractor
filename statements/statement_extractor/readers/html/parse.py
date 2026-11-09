@@ -9,7 +9,7 @@ import re
 import lxml.html
 
 from ...domain.basis import currencies_named, is_currency_word
-from ..printed.tables import COLUMN_TITLE, NOTE_MARK, Cell, Row, Table, clean, is_header_figures, number
+from ..printed.tables import COLUMN_TITLE, is_subheader, NOTE_MARK, Cell, Row, Table, clean, is_header_figures, number
 
 
 def _text(element) -> str:
@@ -111,7 +111,7 @@ def parse_html(html: str | bytes) -> list[Table]:
             rows, header, seen_figures = [], [], False
             for tr in element.iter("tr"):
                 cells = _cells(tr)
-                if not seen_figures and _currency_row(cells):
+                if not seen_figures and (_currency_row(cells) or is_subheader(cells)):
                     header.append([cell for cell in cells if cell.text])
                     continue
                 row = _row(cells)

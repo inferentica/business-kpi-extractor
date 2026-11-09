@@ -13,65 +13,14 @@ import re
 from dataclasses import dataclass
 
 from ...domain.basis import is_currency_word
-from ..printed.tables import COLUMN_TITLE, NOTE_MARK, Cell, Row, Table, clean, number
+from ..printed.tables import COLUMN_TITLE, Cell, Row, Table, clean, number
+from .blocks import BLOCK, TAG, tagged, untagged
+from .lines import RULE, YEAR, Chunk, Line, chunks, split
 
-_BLOCK = re.compile(r"<TABLE>(.*?)</TABLE>", re.I | re.S)
-_TAG = re.compile(r"</?(S|C|CAPTION|PAGE|FN|F\d+|TABLE)>", re.I)
-_CHUNK = re.compile(r"\S+(?: \S+)*")  # words one space apart; two or more spaces part chunks
-_FIGURE = re.compile(r"^\(?-?\d[\d,]*(\.\d+)?\)?$|^\(?-?\.\d+\)?$|^-+$|^—$")
-_PERCENT = re.compile(r"^\(?-?[\d.,]+\)?%$")
-_RULE = re.compile(r"^[\s\-=_]*$")
-_YEAR = re.compile(r"^(19|20)\d{2}$")
 _ALIGN = 3  # characters a figure can sit off its column
 
 
-@dataclass
-class _Chunk:
-    start: int
-    end: int
-    text: str
-
-
-@dataclass
-class _Line:
-    indent: int
-    label: str
-    figures: list[_Chunk]
-
-
-def _chunks(line: str) -> list[_Chunk]:
-    return [_Chunk(match.start(), match.end(), match.group(0)) for match in _CHUNK.finditer(line)]
-
-
-def _figures_apart(chunks: list[_Chunk]) -> list[_Chunk]:
-    """A chunk of figures one space apart is a figure each: Apple's 1994 "(257,228) (1,359,796)"."""
-    out = []
-    for chunk in chunks:
-        parts = list(re.finditer(r"\S+", chunk.text))
-        if len(parts) > 1 and all(_FIGURE.match(part.group(0)) for part in parts):
-            out.extend(_Chunk(chunk.start + part.start(), chunk.start + part.end(), part.group(0)) for part in parts)
-        else:
-            out.append(chunk)
-    return out
-
-
-def _split(line: str) -> _Line | None:
-    """A line's label and the run of figures that ends it ("Net sales  $ 9,188,748  $ 7,976,954")."""
-    chunks = _figures_apart(_chunks(line.replace("$", " ")))
-    if not chunks:
-        return None
-    run = len(chunks)
-    while run > 0 and (_FIGURE.match(chunks[run - 1].text) or _PERCENT.match(chunks[run - 1].text)):
-        run -= 1
-    label_chunks, figures = chunks[:run], [chunk for chunk in chunks[run:] if not _PERCENT.match(chunk.text)]
-    if len(label_chunks) > 1 and re.fullmatch(r"\d{1,2}", label_chunks[0].text):
-        label_chunks = label_chunks[1:]  # a note number in the margin: ASML's "3       Total cost of sales"
-    label = " ".join(chunk.text for chunk in label_chunks)
-    label = NOTE_MARK.sub("", re.sub(r"\s*\.{2,}[\s.]*$", "", label)).strip()  # dot leaders: "Net sales........"
-    return _Line(label_chunks[0].start if label_chunks else chunks[0].start, clean(label), figures)
-
-
-def _columns(lines: list[_Line]) -> list[int]:
+def _columns(lines: list[Line]) -> list[int]:
     """Where each figure column ends: the right edges of figures, gathered where they lie within a few characters."""
     edges = sorted(chunk.end for line in lines for chunk in line.figures)
     groups: list[list[int]] = []
@@ -92,11 +41,11 @@ def _nearest(columns: list[int], edge: int) -> int | None:
 def _header(line: str, columns: list[int]) -> list[Cell]:
     """A header line's words as cells over the columns they name: one word per column where there are as many, else
     each column takes the word nearest above it (a span over several columns)."""
-    chunks = _chunks(line.replace("$", " "))
-    if not chunks or not columns:
+    found = chunks(line.replace("$", " "))
+    if not found or not columns:
         return []
-    left = [chunk for chunk in chunks if chunk.end < columns[0] - 12]
-    over = [chunk for chunk in chunks if chunk not in left]
+    left = [chunk for chunk in found if chunk.end < columns[0] - 12]
+    over = [chunk for chunk in found if chunk not in left]
     cells = [Cell(0, 1, " ".join(chunk.text for chunk in left))] if left else []
     if len(over) == len(columns):
         # One word over each column, in order: Apple's FY1997 "1997" sits four characters off its column and "1996"
@@ -104,7 +53,7 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
         return cells + [Cell(column, 1, chunk.text) for column, chunk in zip(columns, over)]
     owners: dict[int, list[int]] = {}
     for column in columns:
-        def distance(chunk: _Chunk) -> int:
+        def distance(chunk: Chunk) -> int:
             return 0 if chunk.start <= column <= chunk.end else min(abs(column - chunk.start), abs(column - chunk.end))
         if over:
             best = min(range(len(over)), key=lambda index: distance(over[index]))
@@ -149,11 +98,11 @@ def _continues(before: str, after: str, already: bool, indented: bool = False) -
     return not after or after[:1].islower() or after[:1] in "(0123456789"
 
 
-def _rows(lines: list[_Line], columns: list[int]) -> list[Row]:
+def _rows(lines: list[Line], columns: list[int]) -> list[Row]:
     rows: list[Row] = []
-    pending: list[_Line] = []
+    pending: list[Line] = []
 
-    def heading(line: _Line) -> None:
+    def heading(line: Line) -> None:
         rows.append(Row(label=line.label, level=line.indent, cells=[Cell(line.indent, 1, line.label)]))
 
     for line in lines:
@@ -206,81 +155,26 @@ def _wrapped_names(rows: list[Row]) -> list[Row]:
     return out
 
 
-_UNTAGGED_TITLE = re.compile(r"^[ \t]*(condensed\s+)?(consolidated\s+)?(balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?"
-                             r"(income|operations|earnings|cash\s+flows?|financial\s+(position|condition)))\b", re.I | re.M)
-_UNTAGGED_END = re.compile(r"^\s*(see\s+(accompanying\s+)?notes|the\s+accompanying\s+notes)|<PAGE>|<TABLE>", re.I)
-
 
 def _table(before: str, title_lines: list[str], header_lines: list[str], body: list[str], index: int) -> Table:
-    parsed = [line for line in (_split(raw_line) for raw_line in body if not _RULE.match(raw_line)) if line]
+    parsed = [line for line in (split(raw_line) for raw_line in body if not RULE.match(raw_line)) if line]
     columns = _columns(parsed)
     header, leading = [], []
     for line in header_lines:
-        if _RULE.match(line):
+        if RULE.match(line):
             continue
-        words = _chunks(line)
-        if COLUMN_TITLE.search(line) or any(_YEAR.match(chunk.text) for chunk in words) or \
+        words = chunks(line)
+        if COLUMN_TITLE.search(line) or any(YEAR.match(chunk.text) for chunk in words) or \
                 len(words) > 1 and all(is_currency_word(chunk.text) for chunk in words):  # ASML's "EUR EUR EUR USD"
             cells = _header(line, columns)
             if cells:
                 header.append(cells)
         else:
             leading.append(line)  # a heading printed in the header area ("LIABILITIES AND SHARE-OWNERS' EQUITY")
-    leading_rows = [_Line(len(line) - len(line.lstrip()), clean(line), []) for line in leading if line.strip()]
+    leading_rows = [Line(len(line) - len(line.lstrip()), clean(line), []) for line in leading if line.strip()]
     rows = _rows(leading_rows + parsed, columns)
-    context = clean(_TAG.sub(" ", before + " " + " ".join(title_lines)))
+    context = clean(TAG.sub(" ", before + " " + " ".join(title_lines)))
     return Table(rows=rows, header=header, context=context[-600:], index=index)
-
-
-def _tagged(text: str):
-    """(position, before, title lines, header lines, body lines) for each <TABLE> block."""
-    previous_end = 0
-    for block in _BLOCK.finditer(text):
-        before = text[max(previous_end, block.start() - 1500):block.start()]
-        previous_end = block.end()
-        raw = block.group(1).splitlines()
-        caption = next((index for index, line in enumerate(raw) if re.search(r"<CAPTION>", line, re.I)), None)
-        marker = next((index for index, line in enumerate(raw) if re.search(r"<[SC]>", line, re.I)), None)
-        title_lines = raw[:caption] if caption is not None else []
-        header_start = caption + 1 if caption is not None else 0
-        header_end = marker if marker is not None and marker >= header_start else header_start
-        yield (block.start(), before, title_lines, [_TAG.sub(" ", line) for line in raw[header_start:header_end]],
-               [_TAG.sub(" ", line) for line in raw[header_end:]])
-
-
-def _untagged(text: str, spans: list[tuple[int, int]]):
-    """Statements printed with no <TABLE> tags (Coca-Cola's 10-Qs of 2002-2004): from a statement's title line to the
-    page's end, the lines before the first figures being its title and header."""
-    previous_end = 0
-    for match in _UNTAGGED_TITLE.finditer(text):
-        if any(start <= match.start() < end for start, end in spans) or match.start() < previous_end:
-            continue
-        line_start = text.rfind("\n", 0, match.start()) + 1
-        lines = text[line_start:line_start + 20_000].splitlines()
-        block = []
-        has_figures = False
-        for number_of_line, line in enumerate(lines):
-            if number_of_line and (_UNTAGGED_END.search(line) or _UNTAGGED_TITLE.match(line) and has_figures):
-                break  # the page's end, or the next statement once this one has figures
-            block.append(line)
-            parsed = _split(line)
-            has_figures = has_figures or bool(parsed and parsed.figures and parsed.label)
-            if len(block) > 160:
-                break
-        first = next((index for index, line in enumerate(block)
-                      if (parsed := _split(line)) and parsed.figures and parsed.label
-                      and not all(_YEAR.match(chunk.text) for chunk in parsed.figures)), None)
-        if first is None:
-            continue
-        top = block[:first]
-        headed = [index for index, line in enumerate(top) if COLUMN_TITLE.search(line) or
-                  any(_YEAR.match(chunk.text) for chunk in _chunks(line))]
-        split_at = headed[0] if headed else first
-        # The text before is this statement's own, never the statement before it: Apple's 1996 balance sheet would
-        # otherwise take the "(in thousands)" of the share line ending its income statement as a second scale.
-        before = text[max(previous_end, line_start - 1500):line_start]
-        previous_end = line_start + sum(len(line) + 1 for line in block)
-        yield line_start, before, top[:split_at], top[split_at:], block[first:]
 
 
 def parse_text(text: str) -> list[Table]:
@@ -289,6 +183,6 @@ def parse_text(text: str) -> list[Table]:
     # A tab stands for the spaces to the next stop of eight: Apple's 1996-97 10-Qs end some wrapped labels with tabs,
     # which would put the figure after them in no column.
     text = "\n".join(line.expandtabs(8) for line in text.split("\n"))
-    spans = [(block.start(), block.end()) for block in _BLOCK.finditer(text)]
-    parts = sorted([*_tagged(text), *_untagged(text, spans)], key=lambda part: part[0])
+    spans = [(block.start(), block.end()) for block in BLOCK.finditer(text)]
+    parts = sorted([*tagged(text), *untagged(text, spans)], key=lambda part: part[0])
     return [_table(before, title, header, body, index) for index, (_start, before, title, header, body) in enumerate(parts)]

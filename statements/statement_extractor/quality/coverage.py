@@ -29,6 +29,37 @@ def own_period(own: list, form: str) -> dict:
     return {"fiscal_year": ordered[0].fiscal_year, "fiscal_period": "FY" if annual else ordered[0].fiscal_period}
 
 
+def release_coverage(filings, kept: set, parent: set = frozenset()) -> dict:
+    """A foreign filer's quarters, from the first fiscal year a release came in to its latest release quarter: each
+    quarter's income, and for the first three its balance sheet and cash flows (three months or the year to date);
+    the fourth quarter's balance sheet is the annual report's."""
+    quarters = sorted({tuple(f["release_quarter"]) for f in filings if f["form"] == "6-K" and f.get("release_quarter")})
+    if not quarters:
+        return {}
+    latest = quarters[-1]
+    expected = found = parent_only = 0
+    missing = []
+    for year in range(int(quarters[0][0]), int(latest[0]) + 1):
+        for number in range(1, 5):
+            quarter = f"Q{number}"
+            if (str(year), quarter) > latest:
+                break
+            wanted = [("income", [(quarter, "quarter")])]
+            if number < 4:
+                wanted.append(("balance", [(quarter, "instant")]))
+                wanted.append(("cash_flow", [(quarter, "quarter"), (quarter, "ytd")]))
+            for statement, keys in wanted:
+                expected += 1
+                served = [(statement, str(year), period, duration) for period, duration in keys]
+                if any(key in kept for key in served):
+                    found += 1
+                    parent_only += all(key in parent or key not in kept for key in served)
+                else:
+                    missing.append(f"{year} {quarter} {statement}")
+    return {"quarters_expected": expected, "quarters_kept": found, "quarters_parent_only": parent_only,
+            "quarters_missing": missing[:40]}
+
+
 def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dict:
     by_status: dict[str, int] = {}
     for item in chosen:
@@ -38,6 +69,8 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
     expected = found = 0
     missing = []
     for filing in filings:
+        if filing["form"] == "6-K":
+            continue  # releases are counted by quarter (release_coverage)
         if not filing.get("fiscal_period"):
             # A filing nothing could be read from has no period of its own to name, yet its three statements are
             # missing all the same: counted as such, not left out of the coverage.
@@ -68,5 +101,7 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
         "first_period": min((item["period_end"] for item in chosen if item["status"] == "kept"), default=None),
         "readings": len(readings), "rejected_readings": sum(1 for r in readings if r.status == "rejected"),
         "unproven_readings": sum(1 for r in readings if r.status == "unproven"),
+        **release_coverage(filings, kept, {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"])
+                                           for item in chosen if item.get("scope") == "parent"}),
         "ai_calls": AI_CALLS, "cost_cny": 0.0, "seconds": round(seconds),
     }

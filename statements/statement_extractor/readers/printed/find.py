@@ -30,6 +30,9 @@ _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|conso
                             r"reconciliation\s+of|amounts\s+determined\s+under|(under|to|with)\s+u\.?\s?s\.?\s+gaap", re.I)
 
 
+_NOT_IN_RELEASE = re.compile(_NOT_STATEMENT.pattern.replace("summary|", "").replace("|quarterly|", "|"), re.I)
+
+
 # A link printed atop every page back to the index (TSMC's "Index to Financial Statements"), with a title after it: not
 # the index itself.
 _RUNNING_LINK = re.compile(r"\b(index\s+to\s+(consolidated\s+)?financial\s+statements|table\s+of\s+contents)\b(?=.{40,})", re.I | re.S)
@@ -46,8 +49,10 @@ _OTHER_STATEMENT = re.compile(r"statements?\s+of\s+(changes\s+in\s+)?(consolidat
                               r"comprehensive\s+income\s+statements?", re.I)
 
 
-def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
-    """Each statement table in a document's tables, with the tables it continues into."""
+def find_statements(all_tables: list[Table], release: bool = False) -> list[tuple[str, list[Table]]]:
+    """Each statement table in a document's tables, with the tables it continues into. A results release titles its
+    statements "Summary Consolidated Statements of Operations" (ASML): there they are the statements."""
+    not_statement = _NOT_IN_RELEASE if release else _NOT_STATEMENT
     found: list[tuple[str, list[Table]]] = []
     for position, table in enumerate(all_tables):
         title_text = table.context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in table.header[:2])
@@ -58,7 +63,7 @@ def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
             leading = " ".join(row.label for row in _leading(table))
             kind = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
             title_text += " " + leading
-        if kind is None or _NOT_STATEMENT.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
+        if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
                 len([r for r in table.rows if r.figures]) < 4:
             continue
         if any(_NOT_A_PERIOD.match(cell.text) for cells in table.header for cell in cells if cell.start > 0):

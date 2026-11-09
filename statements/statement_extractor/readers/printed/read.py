@@ -44,16 +44,19 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     """Every statement column of a printed filing, checked; and notes on what it could not read."""
     readings: list[Reading] = []
     notes: list[str] = []
-    found = find_statements(all_tables)
-    # A statement printed more than once (in full, and as a summary elsewhere): the fullest table is the statement.
-    found.sort(key=lambda item: -sum(len([row for row in table.rows if row.figures]) for table in item[1]))
+    found = find_statements(all_tables, release=form == "6-K")
+    # A statement printed more than once (in full, and as a summary elsewhere): the fullest table is the statement;
+    # the group's statements before the parent company's alone (TSMC's 6-Ks of 2008 print both).
+    found.sort(key=lambda item: (_scope(item[1], form) != "consolidated",
+                                 -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
     read_periods: dict[str, set] = {}
     for kind, group in found:
         periods = column_periods(kind, group, fiscal_year_end, document_end)
         if kind in read_periods:
-            # A statement printed again is a summary, unless it prints periods of its own: Chase's 1995 10-Qs print the
-            # three months and the six months as two income statements.
-            if not periods or {period.key for period in periods.values()} & read_periods[kind]:
+            # A statement printed again gives only the periods it prints of its own: Chase's 1995 10-Qs print the three
+            # months and the six months as two income statements; TSMC's releases print the quarters and the year.
+            periods = {column: period for column, period in periods.items() if period.key not in read_periods[kind]}
+            if not periods:
                 continue
         scale = statement_scale(group)
         if scale is None:
@@ -91,9 +94,25 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if reading is None:
                 continue
             reading.accession, reading.form, reading.filed, reading.currency = accession, form, filed, currency
+            reading.scope = _scope(group, form)
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes
+
+
+_FOREIGN_FORMS = ("20-F", "40-F", "6-K")
+
+
+def _scope(group: list[Table], form: str) -> str:
+    """A foreign filer's statement is the company's alone when its title does not say consolidated ("TAIWAN
+    SEMICONDUCTOR MANUFACTURING COMPANY LTD. BALANCE SHEETS", "UNCONSOLIDATED BALANCE SHEET"). A U.S. filer's is
+    taken as its group's: some print a bare "BALANCE SHEETS" though they consolidate."""
+    title = (group[0].context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in group[0].header)).lower()
+    if re.search(r"\b(unconsolidated|non-consolidated|parent\s+company\s+only)\b", title):
+        return "parent"
+    if form.upper() in _FOREIGN_FORMS and "consolidated" not in title:
+        return "parent"
+    return "consolidated"
 
 
 def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> float | None:
