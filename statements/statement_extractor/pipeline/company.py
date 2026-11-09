@@ -14,6 +14,7 @@ from pathlib import Path
 
 from ..checks.across import cash_against_balances
 from ..domain.calendar import ANNUAL_FORMS, year_end_for
+from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period, summarise
 from ..readers.xbrl.read import read_filing
 from ..selection.choose import choose
@@ -50,6 +51,12 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
             record.update({"note": "no XBRL", "printed": kinds, "columns": len(found), "notes": notes,
                            "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
                            **own_period(own, ref.form)})
+            if not own and ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None:
+                # An annual report whose statements came elsewhere (Brookfield's FY2010 40-F holds its annual
+                # information form; the statements came on 6-K): its year, so another filing's statements count.
+                labelled = label_period(Period(end), fiscal_year_end, offset or 0)
+                if labelled:
+                    record.update({"fiscal_year": labelled[0], "fiscal_period": "FY"})
             filings.append(record)
             readings.extend(found)
             log(f"{symbol}: {ref.form} {ref.filed} printed ({','.join(kinds) or 'nothing readable'}) {len(found)} columns, "

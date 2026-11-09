@@ -56,7 +56,9 @@ def cash_against_balances(readings: list[Reading]) -> int:
         if change is None or end is None or start is None or end is start:
             continue
         moved = _cash(end) - _cash(start)
-        if abs(moved - change) <= 2 * _unit([change, _cash(end), _cash(start)]):
+        # Each figure is exact to its own printed precision: ASML's release prints the year-end cash again rounded to
+        # a tenth of a million beside the quarter's in thousands.
+        if abs(moved - change) <= 2 * max(_unit([value]) for value in (change, _cash(end), _cash(start))):
             flows.checks[flows.checks.index(cash_check)] = Check(
                 "cash", PASS, f"change in cash equals the balance sheets' ({start.accession} to {end.accession})")
             proved += 1

@@ -16,6 +16,7 @@ from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.documents import PRINTED_DOCUMENTS, release_documents
 
+_ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
 _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anything far larger is no statement
 
 
@@ -32,8 +33,12 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         except ValueError:
             document_end = None
     attachments = list(ref.filing.attachments)
+    if any(str(item.document_type or "").upper().startswith(_ASSET_BACKED) for item in attachments):
+        # An asset-backed issuer's report the company files for a trust (Scotiabank's covered bonds): Regulation AB's
+        # servicing exhibits, no statements of the company's own.
+        return [], ["asset-backed issuer report (Regulation AB exhibits)"], ["asset-backed"]
     # A 40-F is a cover: a Canadian filer's audited statements are its exhibits (EX-99.1 or EX-99.2 by year).
-    wanted = PRINTED_DOCUMENTS + (("EX-99",) if ref.form.upper().startswith("40-F") else ())
+    wanted = PRINTED_DOCUMENTS + (("EX-",) if ref.form.upper().startswith("40-F") else ())  # Scotiabank 2010-15: EX-1-3
     chosen = set(map(id, release_documents(attachments))) if release else None
     schedules, filing_basis, filing_currency = [], None, None
     for attachment in attachments:
