@@ -6,13 +6,16 @@ Archive's captures, through its documented replay address, which returns the fil
 """
 from __future__ import annotations
 
+import hashlib
+import os
 import time
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 
 _REPLAY = "https://web.archive.org/web/{timestamp}id_/{url}"  # "id_": the capture's own bytes, without the Archive's frame
 _CLIENT = "statement-extractor (TradeTracker research; reads archived annual and quarterly reports)"
-_WAITS = (5, 20, 60)
+_WAITS = (10, 30, 90, 180, 300)  # the Archive refuses connections for minutes at a time
 _PAUSE = 1.0  # seconds between requests, to go easy on the Archive
 
 
@@ -40,7 +43,20 @@ def archived(symbol: str) -> list[Archived]:
 
 
 def fetch(item: Archived) -> bytes:
-    """The archived document's bytes, with a few tries when the Archive is slow or busy."""
+    """The archived document's bytes: from the run's cache when an earlier run fetched it (STATEMENTS_ARCHIVE_CACHE),
+    else from the Archive, with tries over several minutes when it is slow or refuses connections."""
+    folder = os.environ.get("STATEMENTS_ARCHIVE_CACHE")
+    cached = Path(folder, f"{item.timestamp}-{hashlib.sha1(item.url.encode()).hexdigest()[:16]}.pdf") if folder else None
+    if cached is not None and cached.exists():
+        return cached.read_bytes()
+    content = _download(item)
+    if cached is not None:
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        cached.write_bytes(content)
+    return content
+
+
+def _download(item: Archived) -> bytes:
     import httpx
     for wait in (*_WAITS, None):
         try:

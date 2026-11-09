@@ -80,6 +80,7 @@ jobs:
         symbol: ${{ fromJSON(needs.plan.outputs.symbols) }}
     env:
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
+      STATEMENTS_ARCHIVE_CACHE: archive-cache  # archived reports fetched once, kept between runs
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v10.2.0
@@ -91,7 +92,17 @@ jobs:
             pyproject.toml
             statements/pyproject.toml
       - run: uv pip install . ./statements
+      - uses: actions/cache/restore@v4
+        with:
+          path: archive-cache
+          key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
+          restore-keys: statements-archive-${{ matrix.symbol }}-
       - run: python -m statement_extractor read --symbol "${{ matrix.symbol }}" --since "${{ needs.plan.outputs.since }}" --out "out/${{ matrix.symbol }}"
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: archive-cache
+          key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v6
         if: always()
         with:

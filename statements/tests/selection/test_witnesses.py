@@ -57,3 +57,11 @@ def test_four_quarters_against_the_year():
                 for sales, net in ((100.0e6, 10.0e6), (110.0e6, 11.0e6), (120.0e6, 12.0e6), (130.0e6, 13.0e6))]
     assert quarters_to_year(quarters, {"lines": lines(("Net sales", 460.0e6), ("Net income", 46.0e6))}) == "add up"
     assert quarters_to_year(quarters, {"lines": lines(("Net sales", 460.0e6), ("Net income", 48.0e6))}).startswith("differ")
+
+
+def test_a_statement_in_a_currency_the_company_does_not_report_in_is_never_served():
+    annual = income("fy2001", date(2002, 5, 9), 14_483e6, own=True)
+    translated = income("q3", date(2001, 10, 30), 2_765e6, period="Q3", duration="ytd", own=True)
+    translated.currency = "USD"
+    chosen = {item["fiscal_period"]: item for item in choose([annual, translated])}
+    assert chosen["FY"]["status"] == "kept" and chosen["Q3"]["status"] != "kept"
