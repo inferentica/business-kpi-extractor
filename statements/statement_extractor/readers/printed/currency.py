@@ -20,22 +20,25 @@ def column_currencies(table: Table, columns: list[tuple[int, ...]]) -> dict[tupl
     found = {}
     for column in columns:
         named = currencies_named(header_text(table, column[0]) or header_text(table, column[-1]))
-        found[column] = named[-1] if named else None
+        # Two currencies over one column (TSMC's "3Q 2002 NTD" with a "USD" set off from the row below): neither.
+        found[column] = named[0] if len(named) == 1 else None
     return found
 
 
 def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | None:
+    text = scale_text(group)
+    titles = [match.end() for pattern in TITLE_PATTERNS for match in pattern.finditer(text)]
+    # The title's own words ("Expressed in Millions New Taiwan Dollars (NTD) and U.S. Dollars (USD)"), not the text
+    # before it, which can name another currency.
+    start = max(0, max(titles) - 120) if titles else 0
+    in_title = currencies_named(text[start:start + 400]) or currencies_named(text)
     named = [currency for currency in by_column.values() if currency]
     if named:
         counts = Counter(named)
         best = max(counts.values())
-        return next(currency for currency in named if counts[currency] == best)
-    text = scale_text(group)
-    titles = [match.end() for pattern in TITLE_PATTERNS for match in pattern.finditer(text)]
-    # The title's own words first ("Expressed in Millions New Taiwan Dollars (NTD) and U.S. Dollars (USD)"), not the
-    # text before it, which can name another currency.
-    start = max(0, max(titles) - 120) if titles else 0
-    in_title = currencies_named(text[start:start + 400]) or currencies_named(text)
+        tied = [currency for currency in counts if counts[currency] == best]
+        # A tie goes to the currency the title names first: its reporting currency, the other its translation.
+        return next((currency for currency in in_title if currency in tied), tied[0])
     return in_title[0] if in_title else None  # else the document's or the form's (pipeline/printed.py)
 
 

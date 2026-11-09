@@ -122,3 +122,11 @@ def test_a_note_number_before_each_label_is_no_statement_beside_it():
             "<td>2005</td><td></td><td>2006</td></tr>" + "".join("<tr>" + cells(*row) + "</tr>" for row in rows) + "</table>")
     readings, _ = read(html, end=date(2006, 12, 31))
     assert sorted((r.fiscal_year, r.status) for r in readings) == [("2005", "kept"), ("2006", "kept")]
+
+
+def test_a_column_under_two_currencies_has_none_and_a_tie_goes_to_the_titles_first():
+    from statement_extractor.readers.printed.currency import reporting_currency
+    from statement_extractor.readers.printed.tables import Table
+    title = Table(rows=[], header=[], context="Statements of Income (Expressed in Millions New Taiwan Dollars (NTD) and "
+                                              "U.S. Dollars (USD))", index=0)
+    assert reporting_currency([title], {(2,): "USD", (5,): "TWD", (11,): None, (26,): "TWD", (17,): "USD"}, "6-K") == "TWD"

@@ -33,12 +33,17 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
     filing. Sorted newest period first."""
     annual_bases = {reading.fiscal_year: reading.basis for reading in sorted(readings, key=lambda item: item.filed)
                     if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.basis}
+    reporting = _reporting_currency(readings)
     groups: dict[tuple, list[Reading]] = defaultdict(list)
     for reading in readings:
         groups[reading.key].append(reading)
     chosen = []
     for key, group in groups.items():
-        kept = [reading for reading in group if reading.status == "kept"]
+        # A statement in a currency the company does not report in is a convenience translation read as the
+        # statement (TSMC's archived Q3 2001 nine months in US$): never served, even where nothing else covers the
+        # period.
+        kept = [reading for reading in group if reading.status == "kept"
+                and (reporting is None or reading.currency in (None, reporting))]
         own = next((reading for reading in sorted(group, key=lambda item: item.filed) if reading.own), None)
         # A report filed with the SEC (10-K, 20-F, 10-Q) wins over a release for the same period: a release's year and
         # year-end columns are unaudited, and the annual report that follows is the company's statement of them.
@@ -92,3 +97,12 @@ def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
                 newest[reading.basis] = reading
     return [{"basis": basis, "source_accession": reading.accession, "source_filed": reading.filed.isoformat(),
              "currency": reading.currency, "lines": reading.lines} for basis, reading in sorted(newest.items())]
+
+
+def _reporting_currency(readings: list[Reading]) -> str | None:
+    """The currency of the company's own annual reports (their most common), if they state one."""
+    counts: dict[str, int] = defaultdict(int)
+    for reading in readings:
+        if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.currency:
+            counts[reading.currency] += 1
+    return max(counts, key=counts.get) if counts else None
