@@ -28,7 +28,7 @@ def subtotals(printed) -> dict[int, int]:
         if value is None:
             continue
         sums, position, total = [], index - 1, 0.0
-        while position >= 0 and len(sums) < 12:
+        while position >= 0 and len(sums) < 30:  # Copel sums 13 current assets
             earlier_label, _earlier_level, earlier_value = printed[position]
             if earlier_value is None:
                 if sums and _SPANS_HEADINGS.search(label):

@@ -3,6 +3,7 @@ statement continues into across a page break, and never a summary, a selected-da
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 from ...domain.printed_labels import (ASSETS, BARE_TOTAL, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES_AND_EQUITY, NET_INCOME,
                                       PRETAX, SECTIONS)
@@ -69,6 +70,12 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
     for position, table in enumerate(all_tables):
         title_text = table.context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in table.header[:2])
         kind = next((name for name, pattern in TITLES if _titled(pattern, title_text)), None)
+        if kind is None and found and found[-1][1][-1].index == table.index - 1 and not table.context.strip() and \
+                _header_words(table) == _header_words(found[-1][1][0]) and _SCOPE_ROW.search(" ".join(r.label for r in _leading(table))):
+            # Copel's group statement printed after the parent's, untitled ("CONTINUING OPERATIONS Consolidated"): the
+            # same title and scale.
+            kind, table = found[-1][0], replace(table, context=found[-1][1][0].context)
+            title_text = table.context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in table.header[:2])
         if kind is not None and _retitled(kind, title_text):
             kind = None  # an earlier statement's title, then this one's (UBS: "Income statement" … "Statement of comprehensive income")
         if kind is None:
@@ -135,6 +142,13 @@ def _retitled(kind: str, text: str) -> bool:
 
 
 _INTERIM_SPAN = re.compile(r"\b(months|weeks)\s+ended\b", re.I)
+_SCOPE_ROW = re.compile(r"\b(consolidated|parent\s+company)$", re.I)
+
+
+def _header_words(table: Table) -> list[str]:
+    return [cell.text for cells in table.header for cell in cells]
+
+
 _GENERIC_TITLE = re.compile(r"\bconsolidated\s+statements\b(?!\s+of)", re.I)
 _EARNINGS_HEAD = re.compile(r"^(earnings|income|operations)\b(\s*\(notes?\b[^)]*\))?$", re.I)
 

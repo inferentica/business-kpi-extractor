@@ -48,17 +48,17 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     readings: list[Reading] = []
     notes: list[str] = []
     found = find_statements(all_tables, release=form == "6-K")
-    # A statement printed more than once (in full, and as a summary elsewhere): the fullest table is the statement;
-    # the group's statements before the parent company's alone (TSMC's 6-Ks of 2008 print both).
+    # A statement printed more than once: the fullest table, the group's before the parent's alone (TSMC's 2008 6-Ks).
     found.sort(key=lambda item: (_scope(item[1], form) != "consolidated",
                                  -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
-    read_periods: dict[str, set] = {}
+    read_periods: dict[tuple, set] = {}  # by kind and scope: Copel prints the parent's quarter, then the group's
     for kind, group in found:
         periods = column_periods(kind, group, fiscal_year_end, document_end)
-        if kind in read_periods:
+        seen = (kind, _scope(group, form))
+        if seen in read_periods:
             # A statement printed again gives only the periods it prints of its own: Chase's 1995 10-Qs print the three
             # months and the six months as two income statements; TSMC's releases print the quarters and the year.
-            periods = {column: period for column, period in periods.items() if period.key not in read_periods[kind]}
+            periods = {column: period for column, period in periods.items() if period.key not in read_periods[seen]}
             if not periods:
                 continue
         scale = statement_scale(group)
@@ -78,7 +78,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         dropped = translations(dated, periods, by_column, currency, group)
         if dropped:
             notes.append(f"{kind}: {len(dropped)} convenience translation column(s) left out")
-        read_periods.setdefault(kind, set()).update(period.key for period in periods.values())
+        read_periods.setdefault(seen, set()).update(period.key for period in periods.values())
         kept = [index for index, column in enumerate(dated) if column not in dropped]
         scopes = column_scopes(group, dated, periods)
         if scopes is None:
@@ -121,7 +121,9 @@ def _scope(group: list[Table], form: str) -> str:
     leading = " ".join(row.label for row in group[0].rows[:4] if not row.figures)  # a title in the table's own rows
     title = (group[0].context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in group[0].header)
              + " " + leading).lower()
+    own_rows = [row.label for row in group[0].rows[:4] if not row.figures]
     if re.search(r"\b(unconsolidated|non-consolidated|parent\s+company\s+only)\b", title) or \
+            any(re.search(r"\bparent\s+company$", label, re.I) for label in own_rows) or \
             re.search(r"\bstandalone\b", title[-160:]):
         return "parent"  # UBS's "UBS AG (standalone) financial information"
     if form.upper() in _FOREIGN_FORMS and "consolidated" not in title:
@@ -180,6 +182,7 @@ def _caption_only(label: str) -> bool:
     return bool(match) and not _SHARE_HEADING.search(label[:match.start()])
 
 
+_SHARE_CLASS = re.compile(r"^(ordinary|common|preferred|class\s+\S+)\b.*\bshares?$", re.I)
 _SHARE_HEADING = re.compile(r"\bshares\b|weighted[-\s]average|\baverage\s+(number|common)", re.I)
 
 
@@ -198,8 +201,9 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 continue
             # A heading wrapped onto a second line: Apple's "Shares used in computing earnings (loss)" / "per common
             # share (in thousands):".
-            label = f"{last_heading} {row.label}" if not row.figures and last_heading and row.label[:1].islower() \
-                else row.label
+            # Copel's "Basic and diluted net earning per share attributed" / "To parent company shareholders - in reais".
+            label = f"{last_heading} {row.label}" if not row.figures and last_heading and (row.label[:1].islower() or re.search(
+                r"\b(attributed|attributable|of|to|per|for)$", last_heading, re.I)) else row.label
             last_heading = None
             if not row.figures and (any(pattern.search(label) for _, pattern in TITLES) or _caption_only(label)):
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line
@@ -222,13 +226,14 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
             # "Common stock, $1 par per share … 955").
             # A line under a per-share heading is per share too: Coca-Cola's "INCOME PER SHARE" / "Before change in
             # accounting principle  $ .55".
-            per_share = kind != "balance" and bool(PER_SHARE.search(row.label) or kind == "income" and row.figures
-                                                   and PER_SHARE.search(heading) and not _SHARE_HEADING.search(row.label))
+            per_share = kind != "balance" and bool(PER_SHARE.search(row.label) or kind == "income" and row.figures and PER_SHARE.search(
+                heading) and (not _SHARE_HEADING.search(row.label) or _SHARE_CLASS.match(row.label)))
             under_shares = kind == "income" and bool(_SHARE_HEADING.search(heading)) and \
                 re.match(r"^(basic|diluted|primary|fully\s+diluted|assuming\s+dilution)\b", row.label, re.I) is not None
             counted = re.match(r"^(shares|weighted|average|number\s+of\s+shares)\b", row.label, re.I) is not None
-            if under_shares or counted or re.search(r"\bshares\b", row.label, re.I) and not re.search(
-                    r"per\s+(common\s+)?share\b|earnings|income|loss", row.label, re.I):
+            # A share class under a per-share heading is that class's amount per share (Copel's "Class \"B\" Preferred shares").
+            if not (per_share and _SHARE_CLASS.match(row.label)) and (under_shares or counted or re.search(r"\bshares\b", row.label, re.I) and not re.search(
+                    r"per\s+(common\s+)?share\b|earnings|income|loss", row.label, re.I)):
                 per_share = False  # TSMC's "BASIC WEIGHTED AVERAGE SHARES OUTSTANDING (THOUSANDS)"
             shares = not per_share and kind == "income" and (under_shares or counted or bool(SHARE_COUNT.search(row.label)))
             if value is None or per_share:

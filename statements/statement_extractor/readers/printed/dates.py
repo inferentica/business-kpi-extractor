@@ -175,6 +175,13 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         day = _MONTH_DAY.search(above) or title_day
         if in_order_days:
             day = header_days[columns.index(column)]  # "AS AT JUNE 30, AND DECEMBER 31" over "2023 | 2022" (Brookfield)
+        dotted_all = list(_DOTTED_DATE.finditer(above)) if dotted is not None else []
+        if len(dotted_all) >= 2 and kind != "balance":
+            # "04.01.2014 to 06.30.2014" (Copel's quarters): from the first date to the last.
+            opened, end = _dotted(dotted_all[0], day_first), _dotted(dotted_all[-1], day_first)
+            if opened is not None and end is not None and opened < end:
+                periods[column] = Period(end, opened)
+            continue
         if (numeric is not None or dotted is not None) and not _MONTH_DAY.search(above):
             if numeric is not None:
                 month, day_of, year_of = (int(part) for part in numeric.groups())
@@ -218,6 +225,15 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             continue
         periods[column] = Period(end, end - timedelta(days=days - 1))
     return periods
+
+
+def _dotted(match: re.Match, day_first: bool) -> date | None:
+    first, second, year = (int(part) for part in match.groups())
+    day, month = (first, second) if day_first else (second, first)
+    try:
+        return date(year + (2000 if year < 50 else 1900) if year < 100 else year, month, day)
+    except ValueError:
+        return None
 
 
 def _day_first(text: str) -> bool:
