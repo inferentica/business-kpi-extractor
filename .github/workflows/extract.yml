@@ -23,6 +23,11 @@ on:
         required: true
         default: false
         type: boolean
+      retrace:
+        description: Re-read only filings holding AI figures read before calls were traced (lists stay as they are)
+        required: false
+        default: false
+        type: boolean
       trigger_type:
         description: Audit trigger classification
         required: true
@@ -73,4 +78,5 @@ jobs:
           QUARTERS: ${{ inputs.quarters || '20' }}
           TRIGGER: ${{ inputs.trigger_type || 'manual' }}
           FORCE: ${{ inputs.force_refresh && '--force' || '' }}
-        run: python -m kpi_extractor --run-id "$RUN_ID" --symbols "$SYMBOLS" --quarters "$QUARTERS" --trigger "$TRIGGER" $FORCE
+          RETRACE: ${{ inputs.retrace && '--retrace' || '' }}
+        run: python -m kpi_extractor --run-id "$RUN_ID" --symbols "$SYMBOLS" --quarters "$QUARTERS" --trigger "$TRIGGER" $FORCE $RETRACE

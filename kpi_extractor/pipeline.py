@@ -77,8 +77,11 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
     hand back what they want written."""
 
     def __init__(self, control, symbol: str, quarters: int, force: bool, today: date | None = None, log=print,
-                 wait_for_lock: bool = False, report_quarters: int | None = None, source: FilingSource | None = None):
+                 wait_for_lock: bool = False, report_quarters: int | None = None, source: FilingSource | None = None,
+                 retrace: bool = False):
         self.control = control
+        # A retrace run reads again only filings holding untraced AI figures, and leaves the KPI list as it is.
+        self.retrace = retrace
         # Where the company's filings come from (SEC EDGAR); every listing, download and XBRL read goes through it.
         self.source = source or filing_source()
         self.symbol = symbol
@@ -218,7 +221,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             processed = self._process_releases(releases, spec, version)
             latest_end = releases[-1].period_end if releases else None
             # An evaluation on stored lists scores the readers, so it keeps the list as stored (no audit call).
-            audit = os.environ.get("KPI_EVAL_LISTS") != "stored"
+            audit = os.environ.get("KPI_EVAL_LISTS") != "stored" and not self.retrace
             if audit and not proposed and any(ref.period_end == latest_end for ref in processed):
                 previous_spec = spec
                 updated = self._maintain(spec, version, [ref for ref in releases if ref.period_end == latest_end])

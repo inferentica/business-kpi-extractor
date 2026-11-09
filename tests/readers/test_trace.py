@@ -33,3 +33,26 @@ def test_a_replay_of_a_reading_from_before_tracing_names_its_filing_only():
     read = [_item("revenue", "wafers")]
     trace_replay(read, {"revenue.wafers": {"table": "A_T3"}}, {}, "0001046179-25-000100")
     assert read[0].locator == {"table": "A_T3", "row": 2, "replayed_from": "0001046179-25-000100"}
+
+
+def test_a_figure_is_untraced_only_when_nothing_names_what_read_it():
+    from kpi_extractor.readers.trace import untraced
+    old = {"method": "ai", "validation_status": "verified", "locator": {"table": "A_T3", "row": 2}}
+    assert untraced(old)
+    assert not untraced({**old, "locator": {"table": "A_T3", "ai_call": "c1"}})
+    assert not untraced({**old, "locator": {"table": "A_T3", "replayed_from": "0001"}})
+    assert not untraced({**old, "locator": {"quoted_row": True}})
+    assert not untraced({**old, "owner_decision": "corrected"})  # the owner's decision is its trace
+    assert not untraced({**old, "method": "xbrl"}) and not untraced({**old, "validation_status": "rejected"})
+
+
+def test_a_retrace_run_reads_again_only_filings_holding_untraced_figures():
+    from types import SimpleNamespace
+    from kpi_extractor.steps.loading import FilingLoading
+    values = {1: {"method": "ai", "validation_status": "verified", "source_accession": "OLD", "locator": {"table": "T"}},
+              2: {"method": "ai", "validation_status": "verified", "source_accession": "NEW",
+                  "locator": {"table": "T", "ai_call": "c9"}}}
+    run = SimpleNamespace(values=values, retrace=True)
+    assert FilingLoading._retrace_due(run, "OLD") and not FilingLoading._retrace_due(run, "NEW")
+    # An ordinary run never re-reads for this.
+    assert not FilingLoading._retrace_due(SimpleNamespace(values=values, retrace=False), "OLD")

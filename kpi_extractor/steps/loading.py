@@ -7,6 +7,7 @@ from datetime import date
 
 from ..documents.document import Document, parse_document
 from ..domain.fiscal import learn_year_offset
+from ..readers.trace import untraced
 from ..sources.base import FilingRef
 from .shared import _DONE, _MAX_ATTEMPTS, _XBRL_READER, _folder
 
@@ -15,6 +16,12 @@ _XBRL_KEPT = 6
 
 class FilingLoading:
     """Filings and documents before they are read: what is pending, read-ahead, XBRL and exhibits from the archive."""
+
+    def _retrace_due(self, accession: str) -> bool:
+        """In a retrace run, whether a filing still holds AI figures with no trace to what read them: it is read again
+        so each gets one (and today's checks)."""
+        return bool(getattr(self, "retrace", False)) and any(
+            untraced(value) for value in self.values.values() if value.get("source_accession") == accession)
 
     def _pending(self, ref: FilingRef) -> bool:
         """Whether a filing still has to be read (a spec change can still re-read a finished release)."""

@@ -19,3 +19,16 @@ def trace_replay(read: list, earlier: dict[str, dict], history: dict[str, dict],
         item.locator["replayed_from"] = (history.get(key) or {}).get("source_accession") or accession
         if placed := before.get("ai_call") or before.get("placed_by_call"):
             item.locator["placed_by_call"] = placed
+
+
+# Figures read by code from a table, a tag or another document: traced by their reader, with no AI call of their own.
+CODE_READERS = ("release_table", "quarter_table", "quoted_row", "tagged", "prospectus", "year_ago")
+
+
+def untraced(value: dict) -> bool:
+    """A served AI figure with no trace to what read it: located before AI calls were logged (2026-11-06), so neither a
+    call, a replayed reading nor a code reader names it. An owner's figure is traced by the owner's decision."""
+    locator = value.get("locator") or {}
+    return (value.get("method") == "ai" and value.get("validation_status") != "rejected" and not value.get("owner_decision")
+            and not locator.get("ai_call") and not locator.get("replayed_from")
+            and not any(locator.get(reader) for reader in CODE_READERS))

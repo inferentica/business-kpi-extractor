@@ -26,6 +26,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--symbols", default="", help="Comma-separated tickers; defaults to every company already tracked")
     parser.add_argument("--quarters", type=int, default=20, help="Quarters of history to keep (1-40)")
     parser.add_argument("--force", action="store_true", help="Re-read filings and re-propose KPI lists")
+    parser.add_argument("--retrace", action="store_true",
+                        help="Re-read only filings holding AI figures read before calls were traced; lists stay as they are")
     parser.add_argument("--trigger", default="manual", choices=["scheduled", "manual", "watchlist_add", "backfill"])
     # Companies mostly wait on the AI, but a re-read of every report parses ten years of XBRL at up to 2 GB a company:
     # six at once took the 16 GB runner down (the 22-company runs after reader bumps), so four.
@@ -68,10 +70,12 @@ def run_symbol(symbol: str, run, log=print) -> SymbolResult:
     return SymbolResult(symbol, errors=["unreachable"])
 
 
-def process_symbol(control, symbol: str, quarters: int, force: bool, wait_for_lock: bool = False) -> SymbolResult:
+def process_symbol(control, symbol: str, quarters: int, force: bool, wait_for_lock: bool = False,
+                   retrace: bool = False) -> SymbolResult:
     try:
         return run_symbol(symbol, lambda: SymbolPipeline(control, symbol, quarters, force, log=lambda line: print(line, flush=True),
-                                                         wait_for_lock=wait_for_lock, report_quarters=REPORT_QUARTERS).run())
+                                                         wait_for_lock=wait_for_lock, report_quarters=REPORT_QUARTERS,
+                                                         retrace=retrace).run())
     finally:
         print(f"{symbol}: this process has held at most {peak_gb():.1f} GB", flush=True)
 
@@ -105,7 +109,8 @@ def company_result(result: SymbolResult, lowest_available_gb: float | None = Non
     return data
 
 
-def work_queue(control, pool, workers: int, quarters: int, force: bool, waits: bool, memory=None, log=print) -> str | None:
+def work_queue(control, pool, workers: int, quarters: int, force: bool, waits: bool, memory=None, log=print,
+               retrace: bool = False) -> str | None:
     """Takes the run's companies from its queue a few at a time and reports each as it finishes. If this worker dies,
     its companies go back to the queue and a new worker carries on; the run finishes when its last company does.
     Returns how the run finished, when this worker finished it."""
@@ -133,7 +138,7 @@ def work_queue(control, pool, workers: int, quarters: int, force: bool, waits: b
                     finished = reply.get("finished") or finished
                     break
                 log(f"{symbol}: claimed")
-                in_flight[pool.submit(process_symbol, control, symbol, quarters, force, waits)] = symbol
+                in_flight[pool.submit(process_symbol, control, symbol, quarters, force, waits, retrace)] = symbol
             if not in_flight:
                 return finished
             done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
@@ -157,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         symbols = normalize_symbols(args.symbols)
         started = control.call("start", runId=args.run_id or None, triggerType=args.trigger, symbols=symbols,
                                quarters=max(1, min(args.quarters, 40)), forceRefresh=args.force,
-                               queued=not args.dry_run)
+                               queued=not args.dry_run, retrace=args.retrace)
         control.run_id = started["runId"]
         symbols = normalize_symbols(started.get("symbols") or [])
         quarters, force = int(started.get("quarters") or args.quarters), bool(started.get("forceRefresh"))
@@ -168,8 +173,9 @@ def main(argv: list[str] | None = None) -> int:
         waits = args.trigger in ("manual", "watchlist_add")
         if started.get("queued"):
             with company_pool(workers) as pool, MemoryWatch(pool, log=lambda line: print(line, flush=True)) as memory:
+                # Kept on the run, so a worker that carries on after a lost one retraces too.
                 finished = work_queue(control, pool, workers, quarters, force, waits, memory,
-                                      log=lambda line: print(line, flush=True))
+                                      log=lambda line: print(line, flush=True), retrace=bool(started.get("retrace")))
             print(f"Run {control.run_id}: {'finished, ' + finished if finished else 'this worker is done'}")
             return 0
         with company_pool(workers) as pool:
