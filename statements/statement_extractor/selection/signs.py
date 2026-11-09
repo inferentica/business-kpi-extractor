@@ -11,8 +11,9 @@ def settle_signs(winner: Reading, kept: list[Reading], printed: dict[str, list[f
     filing's printed statement was read, else the sign most presentations give it. An XBRL sign comes from the filing's
     presentation (a negated label), and a filing can drop it: JPM's FY2012 10-K tags its 2010 "total credit losses
     recognized in income" as 100 where its printed statement, and the FY2010 and FY2011 10-Ks, show (100)."""
+    # The same filing's printed statement on the same basis (ASML's 6-Ks print IFRS beside US GAAP, its own signs).
     statement = next((reading for reading in kept if reading is not winner and reading.accession == winner.accession
-                      and reading.source != "xbrl"), None)
+                      and reading.source != "xbrl" and reading.basis == winner.basis), None)
     if statement is not None:
         winner = _signs_from(winner, statement)
     if printed:

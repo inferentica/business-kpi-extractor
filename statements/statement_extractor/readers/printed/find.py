@@ -88,6 +88,8 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             continue
         if any(_NOT_A_PERIOD.match(cell.text) for cells in table.header for cell in cells if cell.start > 0):
             continue
+        if kind == "balance" and any(_INTERIM_SPAN.search(cell.text) for cells in table.header for cell in cells):
+            continue  # a balance sheet is at a date: "THREE MONTHS ENDED" over balances is an average balance table (JPM's MD&A)
         if _is_contents(table):
             continue
         group = [table]
@@ -123,6 +125,7 @@ def _retitled(kind: str, text: str) -> bool:
     return bool(_OTHER_STATEMENT.search(text, last))
 
 
+_INTERIM_SPAN = re.compile(r"\b(months|weeks)\s+ended\b", re.I)
 _GENERIC_TITLE = re.compile(r"\bconsolidated\s+statements\b(?!\s+of)", re.I)
 _EARNINGS_HEAD = re.compile(r"^(earnings|income|operations)\b(\s*\(notes?\b[^)]*\))?$", re.I)
 
