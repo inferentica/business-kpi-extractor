@@ -10,8 +10,10 @@ from .table import _heading
 
 
 # A row label's own scale: "(in millions)", "(millions)", or within a longer note ("Starlink Subscribers (#, in millions,
-# as of period end)", SpaceX).
-_ROW_SCALE = re.compile(r"\((?:in\s+)?(?P<word>thousands|millions|billions)\)|\([^()]*\bin\s+(?P<within>thousands|millions|billions)\b[^()]*\)", re.I)
+# as of period end)", SpaceX). Trillions too: JPMorgan's "Total payments transaction volume (in trillions)" in a table
+# "(in millions)" was read as 1.8 million once the row's own word went unseen.
+_ROW_SCALE = re.compile(r"\((?:in\s+)?(?P<word>thousands|millions|billions|trillions)\)|\([^()]*\bin\s+(?P<within>thousands|millions|billions|trillions)\b[^()]*\)", re.I)
+SCALE_WORDS = {"thousands": 1e3, "millions": 1e6, "billions": 1e9, "trillions": 1e12}
 
 
 # A row priced per unit ("Starlink consumer ARPU ($ per month)") in a table "in millions (except where noted)" is in units.
@@ -26,11 +28,11 @@ def _preceding_scale(text: str, at: int) -> float | None:
         return None
     last = max(headings, key=lambda match: match.start())
     groups = last.groupdict()
-    return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(groups.get("word") or groups.get("within") or groups.get("bare")).lower()]
+    return SCALE_WORDS[(groups.get("word") or groups.get("within") or groups.get("bare")).lower()]
 
 
 # A scale stated without brackets, in the words of a passage: Grifols' "In millions of euros" over its breakdown.
-_BARE_SCALE = re.compile(r"\b(?:in|amounts in)\s+(?P<bare>thousands|millions|billions)\s+of\s+(?:euros?|dollars?|US\$|\w+ dollars)", re.I)
+_BARE_SCALE = re.compile(r"\b(?:in|amounts in)\s+(?P<bare>thousands|millions|billions|trillions)\s+of\s+(?:euros?|dollars?|US\$|\w+ dollars)", re.I)
 
 
 # A row label's short scale, Tesla's "Active FSD Subscriptions (mil)". Never a single letter: "(b)" is a footnote.
@@ -49,11 +51,11 @@ def _row_scale(text: str) -> float | None:
         return 1.0
     # A label naming two measures ("Leases renewed Kilowatt / NRSF (in thousands)"): the scale after the slash is the
     # second's, so the row states none for the first. Digital Realty's 92,670 kilowatts are not 92.7 million.
-    if (slash := re.search(r"\w\s+/\s+\w", text)) and (scaled := re.search(r"\(([^()]*\b(?:thousand|million|billion)s?\b[^()]*)\)", text, re.I)) \
+    if (slash := re.search(r"\w\s+/\s+\w", text)) and (scaled := re.search(r"\(([^()]*\b(?:thousand|million|billion|trillion)s?\b[^()]*)\)", text, re.I)) \
             and scaled.start() > slash.start():
         return None
     if match := _ROW_SCALE.search(text):
-        return {"thousands": 1e3, "millions": 1e6, "billions": 1e9}[(match.group("word") or match.group("within")).lower()]
+        return SCALE_WORDS[(match.group("word") or match.group("within")).lower()]
     if match := _ROW_SCALE_SHORT.search(text):
         return {"bil": 1e9, "bn": 1e9, "mil": 1e6, "mm": 1e6, "mn": 1e6, "thous": 1e3}[match.group("word").lower()]
     # Auna's unit column "# (000)", a row's own "(Mil.)": the column-heading forms, in the row.

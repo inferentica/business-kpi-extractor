@@ -162,6 +162,23 @@ def test_a_row_that_states_its_own_scale_overrides_the_tables():
     assert values[0].notes == []
 
 
+def test_a_row_in_trillions_overrides_a_table_in_millions():
+    # JPM's supplement, Q3 2025: "Total payments transaction volume (in trillions)" 1.8 in a table "(in millions)".
+    document = parse_document("""
+<table>
+<tr><td>(in millions)</td><td>3Q25</td></tr>
+<tr><td>Net revenue</td><td>18,300</td></tr>
+<tr><td>Total payments transaction volume (in trillions)</td><td>1.8</td></tr>
+</table>""", "https://example.com/ex99.htm")
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "tpv", "label": "Total payments transaction volume", "unit": "currency"}]}]})
+    located = Located.model_validate({"period_end": "2025-09-30", "values": [
+        {"kpi": "ops.tpv", "table": table, "row": 2, "col": 1, "scale": 1e12}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == [] and [item.value for item in values] == [1.8e12] and values[0].notes == []
+
+
 
 def test_a_count_read_from_text_takes_its_labels_scale():
     # SpaceX's Q2 2026 release, its table flattened into text: "Starlink Subscribers (#, in millions, ...) 12.0" was 12.
