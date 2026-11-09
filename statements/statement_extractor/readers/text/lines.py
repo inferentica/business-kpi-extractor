@@ -12,6 +12,8 @@ FIGURE = re.compile(r"^\(?-?\d[\d,]*(\.\d+)?\)?$|^\(?-?\.\d+\)?$|^-+$|^—$")
 PERCENT = re.compile(r"^\(?-?[\d.,]+\)?%$")
 RULE = re.compile(r"^[\s\-=_]*$")
 YEAR = re.compile(r"^(19|20)\d{2}$")
+# A scale caption, which a footnote mark can follow; a statement's line can end in "(2)", a figure in brackets.
+_CAPTION_WORDS = re.compile(r"\b(in\s+(thousands?|millions?|billions?)|expressed|figures|amounts\s+in)\b", re.I)
 _MONTH_END = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?$", re.I)
 
 
@@ -60,7 +62,8 @@ def split(line: str) -> Line | None:
     label_chunks, figures = parts[:run], [chunk for chunk in parts[run:] if not PERCENT.match(chunk.text)]
     if label_chunks and figures and _MONTH_END.search(label_chunks[-1].text) and re.fullmatch(r"\d{1,2},?", figures[0].text):
         label_chunks, figures = label_chunks + figures[:1], figures[1:]  # "December   31" and the years after it
-    if label_chunks and figures and all(re.fullmatch(r"\(\d\)", chunk.text) for chunk in figures):
+    if label_chunks and figures and all(re.fullmatch(r"\(\d\)", chunk.text) for chunk in figures) and \
+            _CAPTION_WORDS.search(" ".join(chunk.text for chunk in label_chunks)):
         label_chunks, figures = parts, []  # footnote marks after a caption: "(Expressed in Millions …)  (1)"
     if len(label_chunks) > 1 and re.fullmatch(r"\d{1,2}", label_chunks[0].text):
         label_chunks = label_chunks[1:]  # a note number in the margin: ASML's "3       Total cost of sales"

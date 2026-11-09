@@ -9,6 +9,8 @@ from collections import defaultdict
 from ..domain.model import Reading
 from .lines import line_keys
 from .signs import settle_signs
+from .ties import tie
+from .witnesses import contradicted, verdict
 
 
 _RESTATED = 1e-6  # a line differs when it moved by more than this share of itself (and by more than one unit)
@@ -44,9 +46,13 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         # Among releases, the basis of the annual report closing the year: ASML's December 2012 6-K prints 2011's
         # quarters again on IFRS, beside its US GAAP releases and 20-F.
         annual = annual_bases.get(key[1])
-        winner = max(kept, key=lambda item: (item.scope == "consolidated", item.form != "6-K",
+        # A presentation a filing before it and one after it agree against is a misreading (selection/witnesses.py).
+        set_aside = contradicted(kept)
+        aside = {id(reading) for reading in set_aside}
+        eligible = [reading for reading in kept if id(reading) not in aside] or kept
+        winner = max(eligible, key=lambda item: (item.scope == "consolidated", item.form != "6-K",
                                              item.form != "6-K" or annual is None or item.basis == annual, item.filed,
-                                             item.own, item.source == "xbrl")) if kept else None
+                                             item.own, item.source == "xbrl")) if eligible else None
         record = {
             "statement": key[0], "fiscal_year": key[1], "fiscal_period": key[2], "duration": key[3],
             "period_end": max(reading.period_end for reading in group).isoformat(),
@@ -61,15 +67,18 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
             record.update({
                 "source_accession": winner.accession, "source_form": winner.form, "source_filed": winner.filed.isoformat(),
                 "from_comparative": not winner.own, "currency": winner.currency, "basis": winner.basis,
-                "scope": winner.scope,
+                "scope": winner.scope, "witness": verdict(winner, eligible),
                 "lines": winner.lines,
             })
+            if set_aside:
+                record["set_aside"] = sorted(f"{reading.accession} ({reading.filed.isoformat()})" for reading in set_aside)
             other = _other_bases(winner, kept)
             if other:
                 record["other_bases"] = other
             if own is not None and own is not winner:
                 record["versus_own"] = differences(winner, own)
         chosen.append(record)
+    tie(chosen)  # closing cash against the balance sheet, quarters against the year (selection/ties.py)
     return sorted(chosen, key=lambda item: (item["period_end"], item["statement"], item["duration"]), reverse=True)
 
 

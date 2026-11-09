@@ -43,7 +43,9 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
     """A header line's words as cells over the columns they name: one word per column where there are as many, else
     each column takes the word nearest above it (a span over several columns)."""
     found = chunks(re.sub(r"(?<![A-Za-z.])\$", " ", line))  # a dollar sign alone, not a currency's: "NT$", "U.S.$"
-    found = [chunk for chunk in found if "%" not in chunk.text]  # over a percentage column, which holds no figures
+    # A "%" over no figure column (TSMC prints its percentages as "7%", which are no figures) heads nothing; one over
+    # plain figures (ASML's "EUR  %" with 100.0 below) marks its column as percentages.
+    found = [chunk for chunk in found if "%" not in chunk.text or any(abs(column - chunk.end) <= 2 for column in columns)]
     if not found or not columns:
         return []
     left = [chunk for chunk in found if chunk.end < columns[0] - 12]
