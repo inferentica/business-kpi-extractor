@@ -109,7 +109,9 @@ def _leading(table: Table) -> list:
 
 # Words that put a statement's name inside a sentence ("as reported on the Consolidated Statement of Income").
 _SENTENCE_WORDS = {"the", "on", "in", "of", "our", "its", "their", "to", "from", "see", "with", "by", "and", "these", "this",
-                   "those", "such", "accompanying", "following", "into", "within", "per", "under", "a", "an", "related"}
+                   "those", "such", "accompanying", "following", "into", "within", "per", "under", "a", "an", "related",
+                   # "presents average balance sheets for the three month periods" (SYBT's MD&A): averages, no statement
+                   "average", "presents", "present", "summarized"}
 
 
 def _titled(pattern: re.Pattern, text: str) -> bool:
