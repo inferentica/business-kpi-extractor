@@ -6,10 +6,12 @@ from __future__ import annotations
 from datetime import date
 
 from ..checks.schedules import parse_schedule, schedule_check
-from ..domain.basis import default_basis, stated_basis
+from ..domain.basis import default_basis, default_currency, stated_basis, stated_currency
 from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
 from ..readers.printed.sign_index import printed_figures
+from ..readers.slides.parse import is_slides, parse_slides
+from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.documents import PRINTED_DOCUMENTS, release_documents
@@ -30,8 +32,10 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         except ValueError:
             document_end = None
     attachments = list(ref.filing.attachments)
+    # A 40-F is a cover: a Canadian filer's audited statements are its exhibits (EX-99.1 or EX-99.2 by year).
+    wanted = PRINTED_DOCUMENTS + (("EX-99",) if ref.form.upper().startswith("40-F") else ())
     chosen = set(map(id, release_documents(attachments))) if release else None
-    schedules, filing_basis = [], None
+    schedules, filing_basis, filing_currency = [], None, None
     for attachment in attachments:
         kind = str(attachment.document_type or "").upper()
         if kind.startswith("EX-27"):
@@ -40,7 +44,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             if schedule is not None:
                 schedules.append(schedule)
             continue
-        if (id(attachment) not in chosen) if release else not kind.startswith(PRINTED_DOCUMENTS):
+        if (id(attachment) not in chosen) if release else not kind.startswith(wanted):
             continue
         extension = str(attachment.extension or "").lower()
         content = attachment.content
@@ -49,7 +53,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             notes.append(f"{attachment.document}: too large to read")
             continue
         printed = "html" if extension in (".htm", ".html") or "<tr" in content[:200_000].lower() else "text"
-        reader = read_document if printed == "html" else read_text
+        if printed == "html" and is_slides(content):
+            printed = "slides"  # slide images with their words hidden beneath (ASML's releases from 2025)
+        reader = {"html": read_document, "text": read_text, "slides": read_slides}[printed]
         try:
             readings, document_notes = reader(content, accession=ref.accession, form=ref.form,
                                               filed=ref.filed, document_end=document_end,
@@ -58,19 +64,21 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             notes.append(f"{attachment.document}: unreadable ({type(error).__name__})")
             continue
         if signs is not None:
-            parse = parse_html if printed == "html" else parse_text
+            parse = {"html": parse_html, "text": parse_text, "slides": parse_slides}[printed]
             for key, figures in printed_figures(parse(content)).items():
                 signs.setdefault(key, []).extend(figures)
-        basis = stated_basis(content)
-        filing_basis = filing_basis or basis
+        basis, currency = stated_basis(content), stated_currency(content)
+        filing_basis, filing_currency = filing_basis or basis, filing_currency or currency
         for reading in readings:
             reading.basis = basis
+            reading.currency = reading.currency or currency
         held = {reading.key for reading in found}
         found.extend(reading for reading in readings if reading.key not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
         kinds.append(printed)
     for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
         reading.basis = reading.basis or filing_basis or default_basis(ref.form)
+        reading.currency = reading.currency or filing_currency or default_currency(ref.form)
         check = schedule_check(reading, schedules)
         if check is not None:
             reading.checks.append(check)

@@ -8,7 +8,7 @@ from collections import Counter
 from datetime import date, timedelta
 
 from ...domain.periods import Period
-from .find import TITLES
+from .find import TITLE_PATTERNS
 from ...domain.basis import currencies_named
 from .tables import YEAR_ONLY, Table, figure_columns, header_text
 
@@ -108,7 +108,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     context = first.context[-300:]
     # The header's own date first, else one printed after the statement's title ("… years ended December 31, 2007"):
     # a page names other dates before the title (TSMC's auditors' report, dated April 15, 2011).
-    titled = [match.end() for _, pattern in TITLES for match in pattern.finditer(context)]
+    titled = [match.end() for pattern in TITLE_PATTERNS for match in pattern.finditer(context)]
     title = context[max(titled):] if titled else ""
     in_title = list(_MONTH_DAY.finditer(title))
     title_day = _MONTH_DAY.search(header_all) or (in_title[-1] if in_title else None)

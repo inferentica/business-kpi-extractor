@@ -18,6 +18,7 @@ from .blocks import BLOCK, TAG, tagged, untagged
 from .lines import RULE, YEAR, Chunk, Line, chunks, split
 
 _ALIGN = 3  # characters a figure can sit off its column
+_SPAN_WORDS = re.compile(r"\b(months|weeks|year|quarter)s?\s+ended\b", re.I)
 
 
 def _columns(lines: list[Line]) -> list[int]:
@@ -51,6 +52,12 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
         # One word over each column, in order: Apple's FY1997 "1997" sits four characters off its column and "1996"
         # three, which nearest-word would give both columns to 1996.
         return cells + [Cell(column, 1, chunk.text) for column, chunk in zip(columns, over)]
+    if len(over) > 1 and len(columns) % len(over) == 0 and all(_SPAN_WORDS.search(chunk.text) for chunk in over):
+        # Spans over equal groups of columns, in order: ASML's "Three months ended December 31," over the first two
+        # and "Twelve months ended December 31," over the last two, centred, so the second column sits nearer the next.
+        width = len(columns) // len(over)
+        return cells + [Cell(columns[n * width], columns[n * width + width - 1] - columns[n * width] + 1, chunk.text)
+                        for n, chunk in enumerate(over)]
     owners: dict[int, list[int]] = {}
     for column in columns:
         def distance(chunk: Chunk) -> int:

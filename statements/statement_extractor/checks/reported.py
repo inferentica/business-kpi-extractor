@@ -26,6 +26,9 @@ _CASH_CHANGE = re.compile(r"PeriodIncreaseDecrease|IncreaseDecreaseInCashAndCash
 
 # The exchange-rate line itself ("EffectOfExchangeRateOnCash…"), not a change line named for coming before it.
 _EXCHANGE_EFFECT = re.compile(r"_EffectOfExchangeRate", re.I)
+# Cash moved into or out of assets held for sale, printed beside the balances (Brookfield's "Net change in cash
+# classified within assets held for sale"): it adjusts the period's change like the exchange effect.
+_HELD_FOR_SALE = re.compile(r"cash\w*heldforsale|heldforsale\w*cash|cash\w*classifiedwithinassetsheld", re.I)
 
 
 _SECTION_FLOWS = re.compile(r"NetCashProvidedByUsedIn(Operating|Investing|Financing)Activities(ContinuingOperations)?$|"
@@ -83,12 +86,17 @@ def cash_check(column: Column) -> Check:
         return Check("cash", NONE, "no opening and closing cash")
     opening, closing = column.opening, column.closing
     effects = [figure for _, figure in _find(column, _EXCHANGE_EFFECT)]
-    changes = [figure for concept, figure in _find(column, _CASH_CHANGE) if not _EXCHANGE_EFFECT.search(concept)]
+    held = [figure for _, figure in _find(column, _HELD_FOR_SALE)]
+    changes = [figure for concept, figure in _find(column, _CASH_CHANGE) if not _EXCHANGE_EFFECT.search(concept)
+               and not _HELD_FOR_SALE.search(concept)]
     candidates: list[tuple[float, list[Figure]]] = []
     for change in changes:
         candidates.append((change.value, [change]))
         for effect in effects:
             candidates.append((change.value + effect.value, [change, effect]))
+        for moved in held:
+            candidates.append((change.value + moved.value, [change, moved]))
+            candidates += [(change.value + effect.value + moved.value, [change, effect, moved]) for effect in effects]
     if not changes:
         sections = [figure for _, figure in _find(column, _SECTION_FLOWS)]
         if len(sections) == 3:

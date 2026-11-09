@@ -15,12 +15,14 @@ US_GAAP, IFRS, TAIWAN_IFRS, ROC_GAAP, CANADIAN_GAAP, DUTCH_GAAP = (
 # Each basis by the words that name it, most specific first: IFRS "as endorsed" in Taiwan before IFRS as issued.
 _NAMES = (
     (TAIWAN_IFRS, r"(?:IFRSs?|International\s+Financial\s+Reporting\s+Standards)[^.;]{0,160}?(?:endorsed|recognized)[^.;]{0,80}?"
-                  r"(?:Financial\s+Supervisory\s+Commission|FSC|Republic\s+of\s+China|ROC|Taiwan)|Taiwan[-\s]IFRSs?|"
-                  r"Regulations\s+Governing\s+the\s+Preparation\s+of\s+Financial\s+Reports\s+by\s+Securities\s+Issuers[^.;]{0,200}?IFRS"),
+                  r"(?:Financial\s+Supervisory\s+Commission|FSC|Republic\s+of\s+China|ROC|Taiwan)|Taiwan[-\s]IFRSs?|\bT-?IFRSs?\b|"
+                  # TSMC's reviews from 2013: "the Guidelines Governing the Preparation of Financial Reports by Securities
+                  # Issuers, International Financial Reporting Standard 1 … and International Accounting Standard 34"
+                  r"(?:Regulations|Guidelines)\s+Governing\s+the\s+Preparation\s+of\s+Financial\s+Reports\s+by\s+Securities\s+"
+                  r"Issuers[^.;]{0,300}?(?:IFRS|IAS\b|International\s+(?:Financial\s+Reporting|Accounting)\s+Standards?)"),
     (ROC_GAAP, r"(?:accounting\s+principles|GAAP)\s+generally\s+accepted\s+in\s+(?:the\s+Republic\s+of\s+China|Taiwan)|"
                r"generally\s+accepted\s+accounting\s+principles\s+in\s+Taiwan|\bTaiwan\s+GAAP\b|"
-               r"generally\s+accepted\s+accounting\s+principles\s+(?:in|of)\s+the\s+Republic\s+of\s+China|\bR\.?O\.?C\.?\s+GAAP\b|"
-               r"Regulations\s+Governing\s+the\s+Preparation\s+of\s+Financial\s+Reports\s+by\s+Securities\s+Issuers"),
+               r"generally\s+accepted\s+accounting\s+principles\s+(?:in|of)\s+the\s+Republic\s+of\s+China|\bR\.?O\.?C\.?\s+GAAP\b"),
     (US_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+the\s+United\s+States|"
               r"generally\s+accepted\s+accounting\s+principles\s+(?:in|of)\s+the\s+United\s+States|\bU\.?\s?S\.?\s+GAAP\b"),
     (CANADIAN_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+Canada|Canadian\s+generally\s+accepted|"
@@ -31,8 +33,9 @@ _NAMES = (
 _ANY_NAME = re.compile("|".join(f"(?P<b{index}>{pattern})" for index, (_basis, pattern) in enumerate(_NAMES)), re.I)
 
 # The auditors' opinion: "present fairly, in all material respects, … in conformity with …".
-_OPINION = re.compile(r"present\s+fairly\b.{0,600}?\b(?:in\s+conformity\s+with|in\s+accordance\s+with)\b(.{0,400})",
-                      re.I | re.S)
+# A review's conclusion: "we are not aware of any material modifications … for them to be in conformity with …".
+_OPINION = re.compile(r"(?:present\s+fairly|not\s+aware\s+of\s+any\s+material\s+modifications)\b.{0,600}?"
+                      r"\b(?:in\s+conformity\s+with|in\s+accordance\s+with)\b(.{0,500})", re.I | re.S)
 # A release or a statement's own note: "All figures are based on US GAAP", "prepared in accordance with IFRS".
 _STATED = re.compile(r"\b(?:based\s+on|prepared\s+(?:in\s+accordance\s+with|in\s+conformity\s+with|under|on\s+the\s+basis\s+of)|"
                      r"in\s+(?:conformity|accordance)\s+with)\b(.{0,300})", re.I | re.S)
@@ -113,3 +116,30 @@ _NOTE = re.compile(r"\s*\(\s*notes?\s+\d+[a-z]?\s*\)\s*$", re.I)
 def is_currency_word(text: str) -> bool:
     """A cell that only names a currency: "NT$", "US$", "EUR", "$", "U.S.$ (Note 4)"."""
     return bool(_ONLY_CURRENCY.match(_NOTE.sub("", text or "")))
+
+
+# How a document states the currency of all its figures: Brookfield's "All currency amounts are in United States
+# dollars unless otherwise stated", "the U.S. dollar is the company's reporting currency".
+_STATED_CURRENCY = re.compile(
+    r"\ball\s+(?:currency\s+|dollar\s+|monetary\s+)?(?:amounts|figures)\s+(?:are\s+)?(?:expressed\s+|presented\s+|stated\s+|shown\s+)?"
+    r"in\s+(.{0,50})|\b(?:presentation|reporting)\s+currency\s+(?:is|of)\s+(?:the\s+)?(.{0,40})|"
+    r"([A-Za-z.\s]{0,30}?)\s+is\s+the\s+(?:company|bank|group|corporation)\S*\s+(?:presentation|reporting)\s+currency", re.I)
+
+
+def stated_currency(text: str) -> str | None:
+    """The currency a document says all its figures are in, if it says so."""
+    text = re.sub(r"\s+", " ", re.sub(r"&(nbsp|#160|#xa0);", " ", re.sub(r"<[^>]+>", " ", text or ""), flags=re.I))
+    for match in _STATED_CURRENCY.finditer(text):
+        named = currencies_named(next(group for group in match.groups() if group is not None))
+        if named:
+            return named[0]
+    return None
+
+
+def default_currency(form: str) -> str | None:
+    """A form's currency when nothing says otherwise: a U.S. company's dollars, a Canadian filer's dollars (a 40-F
+    reporting in U.S. dollars says so); a 20-F or a release must state its own."""
+    form = form.upper()
+    if form.startswith(("10-K", "10-Q")):
+        return "USD"
+    return "CAD" if form.startswith("40-F") else None

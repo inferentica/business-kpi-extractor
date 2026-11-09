@@ -118,3 +118,68 @@ def test_the_parent_companys_statements_are_marked_so():
     readings, _ = read_html(parent, accession="m", form="6-K", filed=date(2008, 2, 1), document_end=date(2007, 12, 31),
                             fiscal_year_end="1231", year_offset=0)
     assert readings and all(r.scope == "parent" for r in readings)
+
+
+# ASML's Q2 2025 release: slide images with their words hidden beneath, the navigation naming every statement before
+# the slide's own title.
+def slide(words):
+    return f'<DIV><IMG src="s.jpg"><DIV><FONT size="1" style="font-size:1pt;color:white">{words}</FONT></DIV></DIV>'
+
+
+SLIDES = "<HTML><BODY>" + slide("Contents Consolidated Statements of Operations Consolidated Balance Sheets") + slide(
+    "Three months ended Six months ended Jun 30, Jun 29, Jun 30, Jun 29, (unaudited, in millions &#8364;, except per "
+    "share data) 2024 2025 2024 2025 Net system sales  4,760.9  5,596.1  8,726.8  11,336.5  Total cost of sales  "
+    "(3,030.6)  (3,562.2)  (5,624.0)  (7,124.0)  Income before income taxes  1,822.7  2,688.9  3,240.3  5,476.0  Income "
+    "tax expense  (291.6)  (487.4)  (515.6)  (952.5)  Net income  1,531.1  2,201.5  2,724.7  4,523.5    Summary US GAAP "
+    "Notes ASML Financial statements US GAAP Q2 2025 2 Consolidated Statements of Operations Consolidated Balance Sheets "
+    "Consolidated Statements of Cash Flows Summary US GAAP Consolidated Statements of Operations") + "</BODY></HTML>"
+
+
+def test_a_release_printed_as_slides_with_hidden_words():
+    from statement_extractor.readers.slides.parse import is_slides
+    from statement_extractor.readers.slides.read import read_document as read_slides
+    assert is_slides(SLIDES)
+    readings, _ = read_slides(SLIDES, accession="s", form="6-K", filed=date(2025, 7, 16), document_end=date(2025, 6, 30),
+                              fiscal_year_end="1231", year_offset=0)
+    by_key = {(r.fiscal_year, r.fiscal_period, r.duration): r for r in readings}
+    assert set(by_key) == {("2024", "Q2", "quarter"), ("2025", "Q2", "quarter"), ("2024", "Q2", "ytd"), ("2025", "Q2", "ytd")}
+    latest = by_key[("2025", "Q2", "quarter")]
+    assert latest.statement == "income" and latest.currency == "EUR" and latest.status == "kept"
+    assert latest.lines[0]["value"] == 5_596.1e6 and by_key[("2025", "Q2", "ytd")].lines[0]["value"] == 11_336.5e6
+
+
+ASML_Q4_2003 = """<TABLE>
+<CAPTION>
+ASML - Summary Consolidated Statements of Operations
+                                     Three months ended December 31,   Twelve months ended December 31,
+                                              2002             2003             2002              2003
+(Amounts in thousands except per share data)   EUR              EUR              EUR               EUR
+<S>                                          <C>              <C>            <C>               <C>
+                         Net sales           819,626          525,510        1,958,672         1,542,737
+      Loss before income taxes               (9,630)          23,268         (130,824)         (184,181)
+      Benefit from income taxes                3,270          (7,560)          42,779            59,675
+                Net income (loss)             (6,360)          15,708          (88,045)         (124,506)
+</TABLE>
+"""
+
+
+def test_spans_centred_over_column_pairs_are_taken_in_order():
+    readings, _ = read_text(ASML_Q4_2003, accession="r", form="6-K", filed=date(2004, 1, 15),
+                            document_end=date(2003, 12, 31), fiscal_year_end="1231", year_offset=0)
+    sales = {(r.fiscal_year, r.duration): r.lines[0]["value"] for r in readings}
+    assert sales[("2003", "quarter")] == 525_510e3 and sales[("2003", "year")] == 1_542_737e3
+
+
+def test_one_statement_of_profit_and_comprehensive_income_is_the_income_statement():
+    html = ("<p>Taiwan Semiconductor Manufacturing Company Limited and Subsidiaries CONSOLIDATED STATEMENTS OF "
+            "COMPREHENSIVE INCOME FOR THE THREE MONTHS ENDED MARCH 31, 2013 AND 2012 (In Thousands of New Taiwan "
+            "Dollars)</p><table><tr><td></td><td>2013</td><td>2012</td></tr>" +
+            "".join("<tr>" + cells(label, a, b) + "</tr>" for label, a, b in (
+                ("NET REVENUE", "132,754,996", "105,614,831"), ("COST OF REVENUE", "71,988,726", "55,210,347"),
+                ("GROSS PROFIT", "60,766,270", "50,404,484"), ("INCOME BEFORE INCOME TAX", "45,747,914", "35,673,054"),
+                ("INCOME TAX EXPENSE", "6,170,000", "2,181,054"), ("NET INCOME", "39,577,914", "33,492,000"),
+                ("Exchange differences arising on translation", "1,000", "(2,000)"))) + "</table>")
+    readings, _ = read_html(html, accession="q", form="6-K", filed=date(2013, 5, 20), document_end=date(2013, 3, 31),
+                            fiscal_year_end="1231", year_offset=0)
+    assert {(r.statement, r.fiscal_year, r.fiscal_period, r.duration) for r in readings} == {
+        ("income", "2013", "Q1", "quarter"), ("income", "2012", "Q1", "quarter")}

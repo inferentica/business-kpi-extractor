@@ -84,6 +84,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     printed_signs: dict[str, dict] = {}
     readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
                                          printed_signs))
+    _release_bases(readings)
     readings = align_dates(readings)
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
     chosen = choose(readings, printed_signs)
@@ -131,8 +132,18 @@ def _printed_second_look(symbol, reports, filings, readings, year_ends: dict[str
 
 
 def _period_end(ref) -> date | None:
-    raw = getattr(ref.filing, "period_of_report", None)
-    try:
+    try:  # SEC can answer with an error page for a filing's header; its period is then unknown, not fatal
+        raw = getattr(ref.filing, "period_of_report", None)
         return date.fromisoformat(str(raw)[:10]) if raw else None
-    except ValueError:
+    except Exception:  # noqa: BLE001
         return None
+
+
+def _release_bases(readings) -> None:
+    """A release that states no basis is on the basis of the annual report that closes its fiscal year (TSMC's 2010
+    management reports are on ROC GAAP like its FY2010 20-F)."""
+    annual = {reading.fiscal_year: reading.basis for reading in readings
+              if reading.own and reading.form in ANNUAL_FORMS and reading.basis}
+    for reading in readings:
+        if reading.form == "6-K" and reading.basis is None:
+            reading.basis = annual.get(reading.fiscal_year)

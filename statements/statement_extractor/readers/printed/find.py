@@ -33,6 +33,10 @@ _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|conso
 _NOT_IN_RELEASE = re.compile(_NOT_STATEMENT.pattern.replace("summary|", "").replace("|quarterly|", "|"), re.I)
 
 
+_COMPREHENSIVE = re.compile(r"statements?\s+of\s+(consolidated\s+)?comprehensive\s+income", re.I)
+TITLE_PATTERNS = [pattern for _kind, pattern in TITLES] + [_COMPREHENSIVE]  # where a title ends, for its dates
+
+
 # A link printed atop every page back to the index (TSMC's "Index to Financial Statements"), with a title after it: not
 # the index itself.
 _RUNNING_LINK = re.compile(r"\b(index\s+to\s+(consolidated\s+)?financial\s+statements|table\s+of\s+contents)\b(?=.{40,})", re.I | re.S)
@@ -63,6 +67,9 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             leading = " ".join(row.label for row in _leading(table))
             kind = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
             title_text += " " + leading
+        if kind is None and _COMPREHENSIVE.search(title_text[-300:]) and \
+                any(row.figures and PRETAX.search(row.label) for row in table.rows):
+            kind = "income"  # one statement of profit and other comprehensive income (TSMC's Taiwan-IFRS reports)
         if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
                 len([r for r in table.rows if r.figures]) < 4:
             continue
