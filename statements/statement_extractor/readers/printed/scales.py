@@ -93,3 +93,8 @@ def line_scale(*texts: str) -> float | None:
         if match:
             return _SCALES[next(group for group in match.groups() if group).lower()]
     return None
+
+
+def states_two(group) -> bool:
+    """Whether the statement names two scales (then it is ambiguous, not unstated)."""
+    return bool(re.search(r"\b(thousands?|millions?|billions?)\b", scale_text(group), re.I))

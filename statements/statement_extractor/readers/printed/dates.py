@@ -118,11 +118,15 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     periods: dict[tuple[int, ...], Period] = {}
     columns = figure_columns(first)
     in_order = years_in_order(first, columns)
+    aboves = {column: header_text(first, column[0]) or header_text(first, column[-1]) for column in columns}
     for column in columns:
-        above = header_text(first, column[0]) or header_text(first, column[-1])
+        above = aboves[column]
         numeric = _NUMERIC_DATE.search(above)
         dotted = _DOTTED_DATE.search(above) if numeric is None else None
         years = [in_order[column]] if column in in_order else _YEAR.findall(above)
+        sharing = [other for other in columns if aboves[other] == above]
+        if column not in in_order and len(sharing) >= 2 and len(years) == len(sharing):
+            years = [years[sharing.index(column)]]  # one header cell over two columns, a year for each (TIM's 6-Ks)
         short = _MONTH_YEAR.search(above)
         if short and not years and not numeric:
             # TSMC's 1998-99 balance sheets: "Sep-99 | Jun-99", the month's last day.
@@ -157,6 +161,14 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                 end = None
         elif day is not None:
             end = _date(day.group(1), day.group(2), year)
+            month_named = re.search(rf"\b({_MONTH})\s+(?:19|20)\d{{2}}\b", above, re.I)
+            if month_named and end is not None and _date(month_named.group(1), "1", year).month != end.month:
+                # "June 2023 | December 2022" under "June 30, 2023 and December 31, 2022": the column's own month, on
+                # the title's day for it, else its last day.
+                month = _date(month_named.group(1), "1", year).month
+                titled_day = next((int(match.group(2)) for match in [*_MONTH_DAY.finditer(header_all), *in_title]
+                                   if _date(match.group(1), "1", year).month == month), None)
+                end = date(int(year), month, titled_day or calendar.monthrange(int(year), month)[1])
         elif document_end is not None and (days < 350 and kind != "balance" or kind == "balance" and int(year) == document_end.year):
             end = date(int(year), document_end.month, min(document_end.day, calendar.monthrange(int(year), document_end.month)[1]))
         else:
@@ -167,5 +179,22 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         if kind == "balance":
             periods[column] = Period(end)
             continue
+        if span is None and not _near_year_end(end, fiscal_year_end):
+            # No length printed and an end inside the fiscal year: the year to date, as a quarterly report presents it
+            # (TIM's "2Q23 | June 2023" under "Periods ended June 30, 2023 and 2022": June 2023 is the six months).
+            month, day_of = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
+            year = end.year if (end.month, end.day) > (month, day_of) else end.year - 1
+            opened = date(year, month, min(day_of, calendar.monthrange(year, month)[1])) + timedelta(days=1)
+            periods[column] = Period(end, opened)
+            continue
         periods[column] = Period(end, end - timedelta(days=days - 1))
     return periods
+
+
+def _near_year_end(end: date, fiscal_year_end: str) -> bool:
+    month, day_of = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
+    for year in (end.year - 1, end.year, end.year + 1):
+        nominal = date(year, month, min(day_of, calendar.monthrange(year, month)[1]))
+        if abs((nominal - end).days) <= 7:
+            return True
+    return False

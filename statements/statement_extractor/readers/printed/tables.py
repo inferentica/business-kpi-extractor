@@ -158,7 +158,9 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
     for position in positions:
         if groups:
             last = groups[-1][-1]
-            same_header = under(position) is not None and under(position) == under(last)
+            # A header cell naming two years spans two columns (TIM's "June 2023 June 2022" over both).
+            same_header = under(position) is not None and under(position) == under(last) and \
+                len(re.findall(r"\b(?:19|20)\d{2}\b", next(cell.text for cell in bottom if (cell.start, cell.end) == under(position)))) < 2
             if same_header or (position - last == 1 and under(position) is None):
                 groups[-1].append(position)
                 continue

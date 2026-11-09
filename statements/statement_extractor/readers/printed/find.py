@@ -6,6 +6,7 @@ import re
 
 from ...domain.printed_labels import (ASSETS, BARE_TOTAL, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES_AND_EQUITY, NET_INCOME,
                                       PRETAX, SECTIONS)
+from .side_by_side import SIDE_BY_SIDE
 from .tables import Table, figure_columns
 
 
@@ -77,6 +78,8 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             kind = "income"  # one statement of profit and other comprehensive income (TSMC's Taiwan-IFRS reports)
         # The words before the table count too, though its own first rows extend the title text (UBS's "Comparison UBS
         # Group AG (consolidated) versus UBS AG (consolidated)", then "Income statement" as the table's first row).
+        # A parent company's columns beside the group's are no parent-only statement (side_by_side.py).
+        title_text = SIDE_BY_SIDE.sub(" ", title_text)
         if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
                 not_statement.search(_RUNNING_LINK.sub(" ", table.context[-200:])) or \
                 len([r for r in table.rows if r.figures]) < 4:

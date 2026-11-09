@@ -22,8 +22,9 @@ from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
 from .currency import column_currencies, reporting_currency, translations
 from .dates import column_periods
-from .scales import line_scale, share_scale, statement_scale
+from .scales import line_scale, share_scale, statement_scale, states_two
 from .find import TITLES, find_statements, unlabelled_totals
+from .side_by_side import column_scopes
 from .tables import Table, figure_columns
 
 
@@ -65,7 +66,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if not periods:
                 continue
         scale = statement_scale(group)
-        if scale is None and unstated_scale is not None and not _states_two(group):
+        if scale is None and unstated_scale is not None and not states_two(group):
             scale = unstated_scale
         elif scale is None:
             notes.append(f"{kind}: no single scale stated")
@@ -83,6 +84,10 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             notes.append(f"{kind}: {len(dropped)} convenience translation column(s) left out")
         read_periods.setdefault(kind, set()).update(period.key for period in periods.values())
         kept = [index for index, column in enumerate(dated) if column not in dropped]
+        scopes = column_scopes(group, dated, periods)
+        if scopes is None:
+            notes.append(f"{kind}: parent and group columns side by side, not told apart")
+            continue
         layout = [(group[0], dated)]
         for table in group[1:]:
             own = column_periods(kind, [table], fiscal_year_end, document_end)
@@ -104,16 +109,10 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if reading is None:
                 continue
             reading.accession, reading.form, reading.filed, reading.currency = accession, form, filed, currency
-            reading.scope = _scope(group, form)
+            reading.scope = scopes.get(dated[index]) or _scope(group, form)
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes
-
-
-def _states_two(group: list[Table]) -> bool:
-    """Whether the statement names two scales (then it is ambiguous, not unstated)."""
-    from .scales import scale_text
-    return bool(re.search(r"\b(thousands?|millions?|billions?)\b", scale_text(group), re.I))
 
 
 _FOREIGN_FORMS = ("20-F", "40-F", "6-K")
