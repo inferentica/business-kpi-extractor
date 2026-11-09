@@ -33,7 +33,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
     filing. Sorted newest period first."""
     annual_bases = {reading.fiscal_year: reading.basis for reading in sorted(readings, key=lambda item: item.filed)
                     if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.basis}
-    reporting = _reporting_currency(readings)
+    reporting, by_year = _reporting_currency(readings), _reporting_currencies(readings)
     groups: dict[tuple, list[Reading]] = defaultdict(list)
     for reading in readings:
         groups[reading.key].append(reading)
@@ -43,7 +43,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         # statement (TSMC's archived Q3 2001 nine months in US$): never served, even where nothing else covers the
         # period.
         kept = [reading for reading in group if reading.status == "kept"
-                and (reporting is None or reading.currency in (None, reporting))]
+                and (reading.currency is None or reading.currency in by_year.get(key[1], {reporting} - {None}) or not reporting)]
         own = next((reading for reading in sorted(group, key=lambda item: item.filed) if reading.own), None)
         # A report filed with the SEC (10-K, 20-F, 10-Q) wins over a release for the same period: a release's year and
         # year-end columns are unaudited, and the annual report that follows is the company's statement of them.
@@ -97,6 +97,16 @@ def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
                 newest[reading.basis] = reading
     return [{"basis": basis, "source_accession": reading.accession, "source_filed": reading.filed.isoformat(),
              "currency": reading.currency, "lines": reading.lines} for basis, reading in sorted(newest.items())]
+
+
+def _reporting_currencies(readings: list[Reading]) -> dict[str, set[str]]:
+    """Each fiscal year's reporting currencies: those the annual reports presenting the year state. UBS reported in
+    Swiss francs to 2017 and in U.S. dollars from 2018, its 2018 20-F restating 2016 and 2017 in dollars."""
+    years: dict[str, set[str]] = defaultdict(set)
+    for reading in readings:
+        if reading.form != "6-K" and reading.fiscal_period == "FY" and reading.currency:
+            years[reading.fiscal_year].add(reading.currency)
+    return years
 
 
 def _reporting_currency(readings: list[Reading]) -> str | None:
