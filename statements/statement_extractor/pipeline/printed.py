@@ -89,8 +89,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         for reading in readings:
             reading.basis = basis
             reading.currency = reading.currency or currency
-        held = {reading.key for reading in found}
-        found.extend(reading for reading in readings if reading.key not in held)
+        # One presentation per period and basis: ASML's 6-Ks file an IFRS interim report before the US GAAP release.
+        held = {(reading.key, reading.basis) for reading in found}
+        found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
         kinds.append(printed)
     for reader, content, basis, currency, document in unscaled:
@@ -98,10 +99,10 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         readings, proved = with_proven_scale(reader, content, schedules, list(found), accession=ref.accession,
                                              form=ref.form, filed=ref.filed, document_end=document_end,
                                              fiscal_year_end=fiscal_year_end, year_offset=year_offset)
-        held = {reading.key for reading in found}
+        held = {(reading.key, reading.basis) for reading in found}
         for reading in readings:
             reading.basis, reading.currency = basis, reading.currency or currency
-        found.extend(reading for reading in readings if reading.key not in held)
+        found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
         notes.extend(f"{document}: {note}" for note in proved)
     for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
         reading.basis = reading.basis or filing_basis or default_basis(ref.form)
