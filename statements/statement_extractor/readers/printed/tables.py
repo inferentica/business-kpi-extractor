@@ -142,9 +142,12 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
     positions = [position for position in positions if position not in notes]
     # A row naming each column's currency sits lowest and splits a year's two columns, its own and a translation
     # (TSMC's "2003" over "NT$ | US$"); else the lowest row with years or spans.
-    bottom = next((cells for cells in reversed(table.header) if (money := [cell for cell in cells if cell.start > 0])
-                   and (all(currencies_named(cell.text) for cell in money) or is_subheader(cells))),
-                  None) or next((cells for cells in reversed(table.header) if any(YEAR_ONLY.match(cell.text) or COLUMN_TITLE.search(cell.text)
+    # Only the lowest row that heads the figures, though: KEPCO's "Won | U.S. dollars" sits above its years and spans
+    # three of them, which it must not merge.
+    lowest = next((cells for cells in reversed(table.header) if [cell for cell in cells if cell.start > 0]), None)
+    money = [cell for cell in lowest or [] if cell.start > 0]
+    bottom = (lowest if money and (all(currencies_named(cell.text) for cell in money) or is_subheader(lowest))
+              else None) or next((cells for cells in reversed(table.header) if any(YEAR_ONLY.match(cell.text) or COLUMN_TITLE.search(cell.text)
                                                                                   for cell in cells[1:] or cells)), [])
 
     def under(position: int):

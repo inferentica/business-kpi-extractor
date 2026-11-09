@@ -92,6 +92,10 @@ _CURRENCIES = (
     ("GBP", r"£|\bGBP\b|pounds?\s+sterling"),
     ("JPY", r"¥|\bJPY\b|\byen\b"),
     ("CNY", r"\bRMB\b|\bCNY\b|renminbi"),
+    # KEPCO's 20-Fs head their columns "Won" and "U.S. dollars (Note 2)".
+    ("KRW", r"₩|\bKRW\b|\bKorean\s+won\b|\bwon\b"),
+    ("BRL", r"(?<![A-Z.])R\$|\bBRL\b|\bBrazilian\s+reais?\b|\breais\b"),
+    ("CHF", r"\bCHF\b|\bSwiss\s+francs?\b"),
 )
 _ANY_CURRENCY = re.compile("|".join(f"(?P<c{index}>{pattern})" for index, (_code, pattern) in enumerate(_CURRENCIES)), re.I)
 
