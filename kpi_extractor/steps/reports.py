@@ -11,6 +11,7 @@ from ..store import FilingReading, failed_reading
 from ..readers.segment_income import (GROUP_KEY as INCOME_GROUP, LEFT_OVER_KEY, REVENUE_GROUP_KEY as OWN_REVENUE_GROUP,
                               segment_income, segment_revenue)
 from ..xbrl import extract_breakdowns, member_children, member_key, official_labels, presented_labels
+from ..xbrl.basis import report_basis
 from .shared import _XBRL_READER, value_key
 
 _AI_PENDING = "AI review unavailable; retried next run"
@@ -141,8 +142,10 @@ class ReportReading:
             status = "failed" if ai_pending else "processed" if records else "skipped"
             notes = [_XBRL_READER, *([_AI_PENDING] if ai_pending else [] if records
                                      else ["no revenue breakdown reconciles to reported revenue"])]
+            standard, currency = report_basis(facts)
             return FilingReading(ref, status, records=records, period_end=breakdowns.period_end,
-                                 fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
+                                 fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes,
+                                 accounting_standard=standard, currency=currency)
         except Exception as error:  # noqa: BLE001 - one bad filing must not stop the company
             return failed_reading(ref, error)
 

@@ -45,6 +45,8 @@ class FilingSource(Protocol):
     `description` and `url`. Tagged facts are the source's parsed XBRL (facts as a frame, entity information)."""
 
     name: str
+    # The language its filings are written in (ISO 639-1): labels are kept as reported, in it.
+    language: str
     # Where its documents live: a value's source_url must start with one of these to be stored.
     url_prefixes: tuple[str, ...]
 

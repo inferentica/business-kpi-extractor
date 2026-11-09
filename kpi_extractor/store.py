@@ -41,6 +41,9 @@ class FilingReading:
     notes: list[str] = field(default_factory=list)
     counted: bool = True
     error: Exception | None = None
+    # What a periodic report's figures are reported in (xbrl/basis.py); an earnings release takes its report's.
+    accounting_standard: str | None = None
+    currency: str | None = None
 
 
 def failed_reading(ref: FilingRef, error: Exception, spec_version: int | None = None) -> FilingReading:
@@ -48,9 +51,10 @@ def failed_reading(ref: FilingRef, error: Exception, spec_version: int | None = 
 
 
 class CompanyStore:
-    def __init__(self, control, symbol: str, result, log=print):
+    def __init__(self, control, symbol: str, result, log=print, language: str = "en"):
         self.control = control
         self.symbol = symbol
+        self.language = language  # the source's filing language: labels are kept as reported, in it
         self.result = result
         self.log = log
         self._values: dict[tuple, MappingProxyType] = {}
@@ -103,6 +107,7 @@ class CompanyStore:
             "fiscal_period": reading.fiscal_period, "status": reading.status, "spec_version": reading.spec_version,
             "value_count": sum(1 for record in records if record["validation_status"] != "rejected"), "attempts": min(_STORED_ATTEMPTS, previous.get("attempts", 0) + 1) if previous else 1,
             "notes": [note[:300] for note in reading.notes][:30], "source_url": ref.source_url,
+            "accounting_standard": reading.accounting_standard, "currency": reading.currency, "language": self.language,
         }
         self._send(filings=[filing], values=records)
         self._filings[ref.accession] = filing

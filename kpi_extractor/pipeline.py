@@ -90,7 +90,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.reports_since = (today or date.today()) - timedelta(days=92 * max(quarters, report_quarters or 0) + 120)
         self.log = log
         self.result = SymbolResult(symbol)
-        self.store = CompanyStore(control, symbol, self.result, log)
+        self.store = CompanyStore(control, symbol, self.result, log, getattr(self.source, "language", "en"))
         self.names: dict = {}
         self._xbrl_cache: dict[str, Future] = {}
         self._xbrl_used: set[str] = set()

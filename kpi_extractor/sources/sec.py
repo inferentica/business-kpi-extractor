@@ -399,6 +399,7 @@ class SecSource:
     """SEC EDGAR as a FilingSource."""
 
     name = "sec"
+    language = "en"
     url_prefixes = ("https://www.sec.gov/",)
 
     def open_company(self, symbol: str, archive=None) -> SourceCompany:
