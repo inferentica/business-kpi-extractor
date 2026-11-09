@@ -136,3 +136,42 @@ jobs:
           name: statements-golden
           path: golden_results.json
           retention-days: 30
+
+  # Raw printed rows for hand checks (statements/evals/handcheck/recheck.json), on a commit whose message asks for
+  # them with [handcheck]: here, so the archived reports cached by this branch's reads are at hand.
+  handcheck:
+    if: contains(github.event.head_commit.message, '[handcheck]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+      STATEMENTS_ARCHIVE_CACHE: archive-cache
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - uses: actions/cache/restore@v4
+        with:
+          path: archive-cache-tsm
+          key: statements-archive-TSM-handcheck-${{ github.run_id }}
+          restore-keys: statements-archive-TSM-
+      - uses: actions/cache/restore@v4
+        with:
+          path: archive-cache-asml
+          key: statements-archive-ASML-handcheck-${{ github.run_id }}
+          restore-keys: statements-archive-ASML-
+      - run: mkdir -p archive-cache && (cp -rn archive-cache-tsm/. archive-cache-asml/. archive-cache/ 2>/dev/null || true) && ls archive-cache | wc -l
+      - run: python -m statement_extractor rows statements/evals/handcheck/recheck.json --out rows.md
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: statements-handcheck-rows
+          path: rows.md
+          retention-days: 30

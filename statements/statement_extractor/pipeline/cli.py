@@ -11,6 +11,7 @@ from pathlib import Path
 from ..quality.golden import report_text, score
 from ..quality.report import report
 from .company import read_company
+from .handcheck import write_rows
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -22,7 +23,13 @@ def main(argv: list[str] | None = None) -> int:
     read.add_argument("--out", required=True)
     scored = commands.add_parser("report", help="Score a set of reads")
     scored.add_argument("folders", nargs="+")
+    rows = commands.add_parser("rows", help="Raw printed rows for hand checks of sampled served lines")
+    rows.add_argument("samples")
+    rows.add_argument("--out", required=True)
     args = parser.parse_args(argv)
+    if args.command == "rows":
+        write_rows(Path(args.samples), Path(args.out))
+        return 0
     if args.command == "read":
         summary = read_company(args.symbol.upper(), date.fromisoformat(args.since), Path(args.out))
         print(json.dumps({key: summary[key] for key in ("symbol", "periods", "by_status", "own_kept", "own_expected")}))

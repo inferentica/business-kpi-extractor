@@ -11,7 +11,7 @@ TAG = re.compile(r"</?(S|C|CAPTION|PAGE|FN|F\d+|TABLE)>", re.I)
 
 _UNTAGGED_TITLE = re.compile(r"^[ \t]*(five[-\s]year\s+financial\s+summary|selected\s+(consolidated\s+)?financial\s+(data|information)|"
                              r"(ten|eleven)[-\s]year\s+(financial\s+)?(summary|review))|"
-                             r"^[ \t]*(unaudited\s+(and\s+)?)?(condensed\s+)?((un)?consolidated\s+)?(balance\s+sheets?|income\s+statements?|statements?\s+of\s+(consolidated\s+)?"
+                             r"^[ \t]*(unaudited\s+(and\s+)?)?(condensed\s+)?((un)?consolidated\s+)?(balance\s+sheets?|income\s+statements?|statements?\s+of\s+(consolidated\s+)?(comprehensive\s+)?"
                              r"(income|operations|earnings|cash\s+flows?|financial\s+(position|condition)))\b(?!\s+data\b)", re.I | re.M)
 _UNTAGGED_END = re.compile(r"^\s*(see\s+(accompanying\s+)?notes|the\s+accompanying\s+notes)|<PAGE>|<TABLE>", re.I)
 
