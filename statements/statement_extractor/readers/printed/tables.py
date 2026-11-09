@@ -59,8 +59,8 @@ def clean(text: str) -> str:
 def number(text: str) -> float | None:
     """A printed figure: 1,234 | (1,234) | -1,234 | — (nothing, read as zero). "($000)" is a scale, not a figure
     (Ross's cash flow statements print it beside their year row)."""
-    if re.fullmatch(r"\(\s*\$\s*000'?s?\s*\)|\$\s*000'?s?", text.strip()):
-        return None
+    if re.fullmatch(r"\(\s*\$\s*000'?s?\s*\)|\$\s*000'?s?|\d{1,2}\.\d{1,2}\.(\d{2}|\d{4})", text.strip()):
+        return None  # a scale, or a date written day first (UBS's "31.12.14")
     text = text.replace("$", "").strip()
     if _DASH.match(text):
         return 0.0
@@ -96,6 +96,7 @@ COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)
                            r"^(\s*(first|second|third|fourth)\s+quarter|\s*(three|six|nine|twelve)\s+months)\b|"
                            r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|"
                            r"\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b|"  # PepsiCo's "3/21/09"
+                           r"\b\d{1,2}\.\d{1,2}\.(\d{2}|\d{4})\b|"  # UBS's "31.12.14", day first
                            r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*-\d{2}\b", re.I)  # TSMC's "Sep-99"
 
 

@@ -14,6 +14,8 @@ _MONEY = re.compile(r"\b(?:in|amounts in|dollars in|expressed in|figures(?:\s+in
 # A currency sign before the unit: Scotiabank's "($ millions)", "US$ millions", Lloyds's "£ million" and "£m".
 _DOLLAR_UNIT = re.compile(r"(?:(?:US|C|CDN|NT|HK)?\$|£|€|¥)\s*" + _UNIT + r"\b|"
                           r"(?<![\w.])£m\b|"
+                          # UBS's "CHF million", "USD million": a currency code before the unit
+                          r"\b(?:CHF|USD|EUR|GBP|JPY|CNY|RMB|KRW|BRL|CAD|AUD|HKD|TWD|NTD|INR|MXN|SEK|NOK|DKK)\s+" + _UNIT + r"\b|"
                           # James Hardie's "(Millions of US dollars)"
                           r"\b" + _UNIT + r"\s+of\s+(?:[A-Z.]+\s+|new\s+taiwan\s+|hong\s+kong\s+)?(?:dollars|euros?|pounds|yen|won|reais|francs|yuan|renminbi)\b|"
                           r"\(\s*" + _UNIT + r"\s*(?:,\s*except\b[^)]*)?\)", re.I)  # Brookfield's "(MILLIONS)"

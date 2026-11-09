@@ -73,7 +73,7 @@ PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+b
 
 
 # Kroger 2009: "Net earnings including noncontrolling interests", then the parent's share.
-NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+\((loss|income)\)\s+(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
+NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+profit(\s*/\s*\(loss\)|\s+\(loss\))?$|^net\s+\((loss|income)\)\s+(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"

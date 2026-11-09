@@ -49,8 +49,12 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     found = find_statements(all_tables, release=form == "6-K")
     # A statement printed more than once (in full, and as a summary elsewhere): the fullest table is the statement;
     # the group's statements before the parent company's alone (TSMC's 6-Ks of 2008 print both).
-    found.sort(key=lambda item: (_scope(item[1], form) != "consolidated",
-                                 -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
+    # Among statements of one kind and of like size, the first printed: the registrant's own, before the sections on
+    # its subsidiaries (UBS's quarterly reports print UBS Group AG, then UBS AG and UBS Limited).
+    size = {id(item): sum(len([row for row in table.rows if row.figures]) for table in item[1]) for item in found}
+    largest = {kind: max(size[id(item)] for item in found if item[0] == kind) for kind, _group in found}
+    found.sort(key=lambda item: (_scope(item[1], form) != "consolidated", size[id(item)] < 0.8 * largest[item[0]],
+                                 item[1][0].index if size[id(item)] >= 0.8 * largest[item[0]] else -size[id(item)]))
     read_periods: dict[str, set] = {}
     for kind, group in found:
         periods = column_periods(kind, group, fiscal_year_end, document_end)
@@ -122,8 +126,9 @@ def _scope(group: list[Table], form: str) -> str:
     leading = " ".join(row.label for row in group[0].rows[:4] if not row.figures)  # a title in the table's own rows
     title = (group[0].context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in group[0].header)
              + " " + leading).lower()
-    if re.search(r"\b(unconsolidated|non-consolidated|parent\s+company\s+only)\b", title):
-        return "parent"
+    if re.search(r"\b(unconsolidated|non-consolidated|parent\s+company\s+only)\b", title) or \
+            re.search(r"\bstandalone\b", title[-160:]):
+        return "parent"  # UBS's "UBS AG (standalone) financial information"
     if form.upper() in _FOREIGN_FORMS and "consolidated" not in title:
         return "parent"
     return "consolidated"
@@ -164,6 +169,11 @@ def _close_section(printed: list, section: str | None, index: int | None) -> Non
 # Diluted, which would otherwise read as per-share figures.
 _YEAR_ROW_LABEL = re.compile(r"\bstatements?\s+of\b|\bfor\s+the\s+(years?|quarters?|periods?|(three|six|nine|twelve)\s+months)\b|"
                              r"\byears?\s+ended\b|\bsummary\b|\bforward\s+look", re.I)
+
+
+# A memo line inside the line above it, served but never summed: UBS's "of which: assets pledged as collateral which
+# may be sold or repledged by counterparties", within its trading portfolio assets.
+_MEMO = re.compile(r"^\s*(of\s+which|thereof)\b", re.I)
 
 
 def _caption_only(label: str) -> bool:
@@ -247,7 +257,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 meaning = f"{heading} {row.label}"
             if not row.figures:
                 printed.append((row.label, row.level, None))
-            elif not (per_share or shares):
+            elif not (per_share or shares or _MEMO.match(row.label)):
                 printed.append((meaning, row.level, value))
     _close_section(printed, section, section_total)
     lines = [line for index, line in enumerate(lines) if not line["is_heading"] or _has_lines_below(lines, index)]

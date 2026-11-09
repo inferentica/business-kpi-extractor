@@ -35,6 +35,7 @@ _SPAN = re.compile(rf"\b({'|'.join(sorted(_NUMBERS, key=len, reverse=True))}|\d{
 
 # A date printed in figures: PepsiCo's "3/21/09".
 _NUMERIC_DATE = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})\b")
+_DOTTED_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b")  # day first: UBS's "31.12.14"
 
 
 def _span_days(count: str, unit: str) -> int:
@@ -120,6 +121,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     for column in columns:
         above = header_text(first, column[0]) or header_text(first, column[-1])
         numeric = _NUMERIC_DATE.search(above)
+        dotted = _DOTTED_DATE.search(above) if numeric is None else None
         years = [in_order[column]] if column in in_order else _YEAR.findall(above)
         short = _MONTH_YEAR.search(above)
         if short and not years and not numeric:
@@ -133,7 +135,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         if named is not None and kind != "balance":
             periods[column] = Period(named, named - timedelta(days=90))  # "Q3 2007", "3Q07": that quarter
             continue
-        if not years and not numeric:
+        if not years and not numeric and not dotted:
             continue
         span = _SPAN.search(above) or title_span
         days = 364
@@ -143,8 +145,11 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             days = 91
         year = years[-1] if years else None
         day = _MONTH_DAY.search(above) or title_day
-        if numeric is not None and not _MONTH_DAY.search(above):
-            month, day_of, year_of = (int(part) for part in numeric.groups())
+        if (numeric is not None or dotted is not None) and not _MONTH_DAY.search(above):
+            if numeric is not None:
+                month, day_of, year_of = (int(part) for part in numeric.groups())
+            else:
+                day_of, month, year_of = (int(part) for part in dotted.groups())  # UBS's "31.12.14"
             try:
                 # Two-digit years: "3/21/09" is 2009, Oshkosh's "12/30/95" 1995 (EDGAR's filings start in 1993).
                 end = date(year_of + (2000 if year_of < 50 else 1900) if year_of < 100 else year_of, month, day_of)
