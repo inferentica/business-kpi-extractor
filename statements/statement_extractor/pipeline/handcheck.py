@@ -36,7 +36,8 @@ def _probe(label: str) -> str:
 
 def _html_tables(content: str) -> list[tuple[str, list[str]]]:
     from lxml import html as lxml_html
-    tree = lxml_html.fromstring(content)
+    # An inline XBRL document declares its encoding, which lxml refuses in a str.
+    tree = lxml_html.fromstring(re.sub(r"^\s*<\?xml[^>]*\?>", "", content))
     found, before = [], ""
     for element in tree.iter():
         if element.tag == "table":
@@ -116,8 +117,8 @@ def _documents(sample: dict) -> list[tuple[str, str, str]]:
         content = attachment.content
         content = content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or "")
         # An inline XBRL filing opens with its XBRL header, far longer than 200 KB in TSMC's and ASML's 20-Fs.
-        printed = "html" if "<tr" in content.lower() or str(attachment.document).lower().endswith((".htm", ".html")) \
-            else "text"
+        printed = "html" if str(attachment.document).lower().endswith((".htm", ".html")) or \
+            "<tr" in content[:200_000].lower() or "<html" in content[:5_000].lower() else "text"
         found.append((f"{attachment.document} ({kind})", printed, content))
     return found
 
@@ -141,7 +142,11 @@ def raw_rows(samples: list[dict], log=print) -> str:
             found = []
             for name, printed, content in documents:
                 reader = _html_rows if printed == "html" else _text_rows
-                rows = reader(content, probes[:1], sample["statement"]) or reader(content, probes[1:], sample["statement"])
+                try:
+                    rows = reader(content, probes[:1], sample["statement"]) or \
+                        reader(content, probes[1:], sample["statement"])
+                except Exception as error:  # noqa: BLE001 - one unparseable document never stops the rest
+                    rows = [f"  (document unreadable: {type(error).__name__}: {str(error)[:80]})"]
                 found.extend(f"[{name}]\n{row}" for row in rows)
             sections[sample["id"]] = (
                 f"### {sample['id']}: {sample['statement']} {sample['fiscal_year']} {sample['fiscal_period']} "

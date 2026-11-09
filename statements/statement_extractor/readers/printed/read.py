@@ -150,6 +150,10 @@ def _close_section(printed: list, section: str | None, index: int | None) -> Non
 
 # A heading over share counts: Apple's "Shares used in computing earnings per share (in thousands):" over Basic and
 # Diluted, which would otherwise read as per-share figures.
+_YEAR_ROW_LABEL = re.compile(r"\bstatements?\s+of\b|\bfor\s+the\s+(years?|quarters?|periods?|(three|six|nine|twelve)\s+months)\b|"
+                             r"\byears?\s+ended\b|\bsummary\b|\bforward\s+look", re.I)
+
+
 def _caption_only(label: str) -> bool:
     """A row that is a scale caption ("(In millions, except share amounts)", ASML's "For the year ended December 31
     (Amounts in thousands, except per share data)"). One that names share counts before their scale is a heading:
@@ -182,10 +186,12 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
             last_heading = None
             if not row.figures and (any(pattern.search(label) for _, pattern in TITLES) or _caption_only(label)):
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line
-            if row.figures and any(pattern.search(row.label) for _, pattern in TITLES) and \
-                    all(re.fullmatch(r"(19|20)\d\d", str(int(value))) for value in row.figures.values() if value == int(value)) \
-                    and all(value == int(value) for value in row.figures.values()):
-                continue  # a title over a year row, run together in a PDF's layout (ASML's FY2000 report), not a line
+            if row.figures and _YEAR_ROW_LABEL.search(row.label) and all(
+                    value == int(value) and abs(value - period.end.year) <= 1 for value in row.figures.values()):
+                # A title or a slide's navigation run into a row of years: ASML's "Consolidated Statements of
+                # Comprehensive Income For the year ended December 31  1998", its Q1 2026 release's "Summary US GAAP
+                # … Forward Look  2026". Not a line.
+                continue
             if not row.figures:
                 heading = last_heading = label
                 opened = _SECTION_HEADING.match(row.label)

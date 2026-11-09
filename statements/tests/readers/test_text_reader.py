@@ -317,3 +317,11 @@ def test_margin_note_numbers_and_a_translated_year():
     assert [line["label"] for line in latest.lines][:2] == ["Total net sales", "Total cost of sales"]
     assert latest.lines[1]["level"] == latest.lines[0]["level"] and latest.currency == "EUR"
     assert latest.lines[0]["value"] == 1_958_672e3 and latest.status == "kept"
+
+
+def test_an_income_statement_ends_at_the_comprehensive_income_statement_after_it():
+    # ASML's FY2000 annual report, laid out from its PDF: the comprehensive income statement follows the income
+    # statement's share counts with no page break; its lines are not income statement lines.
+    from statement_extractor.readers.text.blocks import _UNTAGGED_TITLE
+    assert _UNTAGGED_TITLE.match("          Consolidated Statements of Comprehensive Income")
+    assert not _UNTAGGED_TITLE.match("          Consolidated Statements of Operations Data")
