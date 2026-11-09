@@ -42,3 +42,11 @@ def test_each_year_takes_its_own_printed_date():
     header = ('<tr><td colspan="3">As at June 29, 2014 and June 30, 2013 (in millions)</td><td colspan="3">2014</td>'
               '<td colspan="3"></td><td colspan="3">2013</td></tr>')
     assert ends(balance(header), date(2014, 6, 29)) == [date(2013, 6, 30), date(2014, 6, 29)]
+
+
+def test_dotted_dates_in_either_order():
+    from statement_extractor.readers.printed.dates import _day_first
+    assert _day_first("31.12.14 30.9.14 31.12.13")  # UBS
+    assert not _day_first("12.31.2014 12.31.2013")  # Copel
+    assert not _day_first("09.30.2014 06.30.2014")  # month first: each date then ends a month
+    assert _day_first("30.06.2014 31.03.2014")
