@@ -57,7 +57,10 @@ def clean(text: str) -> str:
 
 
 def number(text: str) -> float | None:
-    """A printed figure: 1,234 | (1,234) | -1,234 | — (nothing, read as zero)."""
+    """A printed figure: 1,234 | (1,234) | -1,234 | — (nothing, read as zero). "($000)" is a scale, not a figure
+    (Ross's cash flow statements print it beside their year row)."""
+    if re.fullmatch(r"\(\s*\$\s*000'?s?\s*\)|\$\s*000'?s?", text.strip()):
+        return None
     text = text.replace("$", "").strip()
     if _DASH.match(text):
         return 0.0

@@ -17,6 +17,7 @@ from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.documents import PRINTED_DOCUMENTS, release_documents
+from .unstated_scale import with_proven_scale
 
 _ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
 _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anything far larger is no statement
@@ -43,7 +44,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
     # A 40-F is a cover: a Canadian filer's audited statements are its exhibits (EX-99.1 or EX-99.2 by year).
     wanted = PRINTED_DOCUMENTS + (("EX-",) if ref.form.upper().startswith("40-F") else ())  # Scotiabank 2010-15: EX-1-3
     chosen = set(map(id, release_documents(attachments))) if release else None
-    schedules, filing_basis, filing_currency = [], None, None
+    schedules, filing_basis, filing_currency, unscaled = [], None, None, []
     for attachment in attachments:
         kind = str(attachment.document_type or "").upper()
         if kind.startswith("EX-27"):
@@ -83,6 +84,8 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                                          fiscal_year_end=fiscal_year_end, year_offset=year_offset):
                 summaries.append({**figure, "document": attachment.document, "basis": basis or default_basis(ref.form),
                                   "currency": currency or default_currency(ref.form)})
+        if any("no single scale stated" in note for note in document_notes) and printed != "slides":
+            unscaled.append((reader, content, basis, currency, attachment.document))
         for reading in readings:
             reading.basis = basis
             reading.currency = reading.currency or currency
@@ -90,6 +93,16 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         found.extend(reading for reading in readings if reading.key not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
         kinds.append(printed)
+    for reader, content, basis, currency, document in unscaled:
+        # Statements that print no scale, read only at a scale the filing's own figures prove.
+        readings, proved = with_proven_scale(reader, content, schedules, list(found), accession=ref.accession,
+                                             form=ref.form, filed=ref.filed, document_end=document_end,
+                                             fiscal_year_end=fiscal_year_end, year_offset=year_offset)
+        held = {reading.key for reading in found}
+        for reading in readings:
+            reading.basis, reading.currency = basis, reading.currency or currency
+        found.extend(reading for reading in readings if reading.key not in held)
+        notes.extend(f"{document}: {note}" for note in proved)
     for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
         reading.basis = reading.basis or filing_basis or default_basis(ref.form)
         reading.currency = reading.currency or filing_currency or default_currency(ref.form)
