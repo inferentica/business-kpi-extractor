@@ -143,3 +143,14 @@ def test_the_rule_replay_reads_a_stored_figure_again_and_names_the_change():
     assert result.change == "value" and result.after == 721
     assert replay_value({**stored, "value": 721.0}, fetcher).change == "same"
     assert replay_value({**stored, "locator": {"tagged": True}}, fetcher) is None
+
+
+def test_the_quick_set_scores_one_company_for_each_way_of_reading():
+    import json
+    from pathlib import Path
+    from kpi_extractor.evals.evaluate import QUICK_SET, quick_set
+    golden = json.loads((Path(__file__).parents[2] / "evals" / "golden.json").read_text())
+    quick = quick_set(golden)
+    # Every quick-set company has golden values, and the set stays well under the full set.
+    assert {item["symbol"] for item in quick} == set(QUICK_SET)
+    assert len(quick) == 53 and len(golden) == 92

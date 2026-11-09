@@ -20,6 +20,14 @@ from ..pipeline import SymbolPipeline, SymbolResult
 from ..sources.sec import configure_identity
 
 GOLDEN = Path("evals/golden.json")  # relative to the repository root, where the workflow runs
+# The quick set: one company for each way the extractor reads, about 38% of the full set's cost (2026-11-09: ¥1.54 of
+# ¥4.06) and 53 of its 92 values. Every one of the 18 golden runs with a miss (Nov 4-9) had one in these companies. A push
+# runs it; the full set runs weekly and before a reader or prompt change is done. TSMC: a foreign filer's 6-K release
+# and quarterly report, replays. ASML: a 20-F filer's charts read by OCR. JPMorgan and Morgan Stanley: banks' financial
+# supplement tables (Morgan Stanley missed in 18 runs). Meta: an 8-K release's quoted figures. Nvidia: XBRL segments on a
+# 52/53-week calendar. SpaceX: a recent listing's prospectus. Adobe: KPIs filled from XBRL tags. Alphabet and Apple:
+# U.S. releases with segment tables. Brookfield Asset Management: a 40-F asset manager's fundraising quotes.
+QUICK_SET = ("TSM", "ASML", "JPM", "MS", "META", "NVDA", "SPCX", "ADBE", "GOOGL", "AAPL", "BAM")
 
 
 def fixed_list_row(spec: dict) -> dict:
@@ -201,6 +209,11 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
     }
 
 
+def quick_set(golden: list[dict]) -> list[dict]:
+    """The golden values of the quick set's companies."""
+    return [item for item in golden if item["symbol"] in QUICK_SET]
+
+
 def expected_text(result: dict) -> str:
     return f"{result['value']:,}" if "value" in result else "not served"
 
@@ -210,9 +223,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--golden", default=str(GOLDEN))
     parser.add_argument("--quarters", type=int, default=6)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--quick", action="store_true", help="Score only the quick set's companies (QUICK_SET)")
     args = parser.parse_args(argv)
     configure_identity()
     golden = json.loads(Path(args.golden).read_text())
+    if args.quick:
+        golden = quick_set(golden)
     symbols = sorted({item["symbol"] for item in golden})
     plane = ControlPlane(os.environ["BUSINESS_KPI_WORKFLOW_URL"])
     started = plane.call("start", runId=None, triggerType="eval", symbols=symbols, quarters=args.quarters, forceRefresh=True)

@@ -53,6 +53,14 @@ on:
         options:
           - stored
           - fresh
+      golden_set:
+        description: The golden set to score - full (every company) or quick (one company for each way of reading, about a third of the cost)
+        required: false
+        default: full
+        type: choice
+        options:
+          - full
+          - quick
       platform:
         description: Where the golden set runs - x64 on the runner itself, or arm64 inside the worker image (Dockerfile), as on Oracle's ARM machines
         required: false
@@ -78,6 +86,12 @@ permissions:
   contents: read
   actions: read     # to fetch an earlier run's lists (lists_from)
   id-token: write
+
+# A push scores the quick set, and a newer push replaces a run still going: only the latest code needs scoring. Runs
+# started by hand or by the schedule are never cancelled.
+concurrency:
+  group: ${{ github.event_name == 'push' && 'evaluate-push' || format('evaluate-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   evaluate:
@@ -129,7 +143,8 @@ jobs:
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
           GOLDEN: ${{ inputs.golden || 'evals/golden.json' }}
-        run: python -m kpi_extractor.evals.evaluate --quarters "$QUARTERS" --golden "$GOLDEN"
+          QUICK: ${{ (inputs.golden_set == 'quick' || github.event_name == 'push') && '--quick' || '' }}
+        run: python -m kpi_extractor.evals.evaluate --quarters "$QUARTERS" --golden "$GOLDEN" $QUICK
       - uses: actions/upload-artifact@v6
         if: always()
         with:
