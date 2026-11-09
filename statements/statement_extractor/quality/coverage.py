@@ -29,7 +29,16 @@ def own_period(own: list, form: str) -> dict:
     return {"fiscal_year": ordered[0].fiscal_year, "fiscal_period": "FY" if annual else ordered[0].fiscal_period}
 
 
-def release_coverage(filings, kept: set, parent: set = frozenset()) -> dict:
+def _derivable(year: str, number: int, kept: set, bases: dict) -> bool:
+    """A quarter's income by difference, from two periods kept on one basis: Q2 from the six months less Q1, Q3 from
+    the nine months less the six, Q4 from the year less the nine (TSMC's reviewed reports print the year to date only)."""
+    later = {2: ("Q2", "ytd"), 3: ("Q3", "ytd"), 4: ("FY", "year")}[number]
+    earlier = {2: ("Q1", "quarter"), 3: ("Q2", "ytd"), 4: ("Q3", "ytd")}[number]
+    keys = [("income", year, *later), ("income", year, *earlier)]
+    return all(key in kept for key in keys) and len({bases.get(key) for key in keys}) == 1
+
+
+def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict | None = None) -> dict:
     """A foreign filer's quarters, from the first fiscal year a release came in to its latest release quarter: each
     quarter's income, and for the first three its balance sheet and cash flows (three months or the year to date);
     the fourth quarter's balance sheet is the annual report's."""
@@ -37,7 +46,7 @@ def release_coverage(filings, kept: set, parent: set = frozenset()) -> dict:
     if not quarters:
         return {}
     latest = quarters[-1]
-    expected = found = parent_only = 0
+    expected = found = parent_only = derivable = 0
     missing = []
     for year in range(int(quarters[0][0]), int(latest[0]) + 1):
         for number in range(1, 5):
@@ -54,9 +63,12 @@ def release_coverage(filings, kept: set, parent: set = frozenset()) -> dict:
                 if any(key in kept for key in served):
                     found += 1
                     parent_only += all(key in parent or key not in kept for key in served)
+                elif statement == "income" and number > 1 and _derivable(str(year), number, kept, bases or {}):
+                    derivable += 1
                 else:
                     missing.append(f"{year} {quarter} {statement}")
-    return {"quarters_expected": expected, "quarters_kept": found, "quarters_parent_only": parent_only,
+    return {"quarters_expected": expected, "quarters_kept": found, "quarters_derivable": derivable,
+            "quarters_parent_only": parent_only,
             "quarters_missing": missing[:40]}
 
 
@@ -102,6 +114,8 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
         "readings": len(readings), "rejected_readings": sum(1 for r in readings if r.status == "rejected"),
         "unproven_readings": sum(1 for r in readings if r.status == "unproven"),
         **release_coverage(filings, kept, {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"])
-                                           for item in chosen if item.get("scope") == "parent"}),
+                                           for item in chosen if item.get("scope") == "parent"},
+                           {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"]): item.get("basis")
+                            for item in chosen if item["status"] == "kept"}),
         "ai_calls": AI_CALLS, "cost_cny": 0.0, "seconds": round(seconds),
     }

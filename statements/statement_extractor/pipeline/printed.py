@@ -10,6 +10,8 @@ from ..domain.basis import default_basis, default_currency, stated_basis, stated
 from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
 from ..readers.printed.sign_index import printed_figures
+from ..readers.slides.parse import is_slides, parse_slides
+from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.documents import PRINTED_DOCUMENTS, release_documents
@@ -51,7 +53,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             notes.append(f"{attachment.document}: too large to read")
             continue
         printed = "html" if extension in (".htm", ".html") or "<tr" in content[:200_000].lower() else "text"
-        reader = read_document if printed == "html" else read_text
+        if printed == "html" and is_slides(content):
+            printed = "slides"  # slide images with their words hidden beneath (ASML's releases from 2025)
+        reader = {"html": read_document, "text": read_text, "slides": read_slides}[printed]
         try:
             readings, document_notes = reader(content, accession=ref.accession, form=ref.form,
                                               filed=ref.filed, document_end=document_end,
@@ -60,7 +64,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             notes.append(f"{attachment.document}: unreadable ({type(error).__name__})")
             continue
         if signs is not None:
-            parse = parse_html if printed == "html" else parse_text
+            parse = {"html": parse_html, "text": parse_text, "slides": parse_slides}[printed]
             for key, figures in printed_figures(parse(content)).items():
                 signs.setdefault(key, []).extend(figures)
         basis, currency = stated_basis(content), stated_currency(content)

@@ -33,9 +33,9 @@ def list_reports(company, since: date) -> list[Report]:
 
 
 # A results release comes in the weeks after its quarter closes: ASML's about two weeks on, TSMC's management report
-# about four and its reviewed quarterly statements about six. Monthly sales and other notices in that window are read
-# too and give nothing.
-RELEASE_WINDOW = (5, 50)  # days after the quarter end
+# about four, its reviewed quarterly statements about six to eight and its annual statements about twelve. Monthly
+# sales and other notices are read too and give nothing; reading them costs little.
+RELEASE_WINDOW = (5, 100)  # days after the quarter end
 _PAPER = "9999999997-"  # EDGAR's placeholder for a filing made on paper: no documents to read
 
 

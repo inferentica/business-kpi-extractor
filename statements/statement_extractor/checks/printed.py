@@ -37,6 +37,10 @@ def balance_check(figures) -> Check:
     return Check("balance", NONE, "no total assets and total liabilities and equity")
 
 
+# Cash moved into or out of assets held for sale (Brookfield): it adjusts the change like the exchange effect.
+_HELD_FOR_SALE = re.compile(r"\bcash\b.*\bheld\s+for\s+sale\b|\bheld\s+for\s+sale\b.*\bcash\b", re.I)
+
+
 def cash_check(figures) -> Check:
     opening, closing = first_match(figures, OPENING), first_match(figures, CLOSING)
     dated = [(index, value) for index, (label, _level, value) in enumerate(figures) if DATED_CASH.search(label)]
@@ -52,8 +56,9 @@ def cash_check(figures) -> Check:
     if len(kinds) < 3:
         return Check("cash", NONE, "not every section of the statement was read: " + ", ".join(sorted(kinds) or ["none"]))
     changes = [value for label, _level, value in figures if CHANGE.search(label) and not OPENING.search(label)
-               and not CLOSING.search(label)]
-    effects = [value for label, _level, value in figures if EXCHANGE.search(label) or EFFECT.match(label)]
+               and not CLOSING.search(label) and not _HELD_FOR_SALE.search(label)]
+    effects = [value for label, _level, value in figures if EXCHANGE.search(label) or EFFECT.match(label)
+               or _HELD_FOR_SALE.search(label)]
     # Any other line printed between the change in cash and the opening balance adjusts it too (Kroger 2008: "cash
     # from consolidated variable interest entity").
     first_change = next((index for index, (label, _level, _value) in enumerate(figures) if CHANGE.search(label)

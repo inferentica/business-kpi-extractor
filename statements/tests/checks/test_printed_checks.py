@@ -90,3 +90,13 @@ def test_net_income_chain_through_one_subtotals_lines_alone():
                     ("Loss from discontinued operations before income taxes", -3685), ("Benefits from income tax", 674),
                     ("Net loss from discontinued operations", -3011), ("Net income (loss)", 378047))
     assert income_check(figures).result == "pass"
+
+
+def test_cash_moved_into_assets_held_for_sale_adjusts_the_change():
+    # Brookfield FY2025: the held-for-sale change printed after the closing balance.
+    from statement_extractor.checks.printed import cash_check
+    figures = lines(("Cash flows from (used in) operating activities", 6_000), ("Cash flows from (used in) financing activities", 26_645),
+                    ("Cash flows from (used in) investing activities", -31_777), ("Change in cash and cash equivalents", 868),
+                    ("Foreign currency revaluation", 252), ("Cash and cash equivalents Balance, beginning of period", 15_051),
+                    ("Cash and cash equivalents Balance, end of period", 16_242), ("Net change in cash classified within assets held for sale", 71))
+    assert cash_check(figures).result == "pass"
