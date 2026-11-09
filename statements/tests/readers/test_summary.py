@@ -54,9 +54,9 @@ def test_a_line_missing_a_year_is_left_out_rather_than_guessed():
     assert not any(row["name"] == "total assets" for row in read(text))
 
 
-def income(year, net, filed, status="kept"):
+def income(year, net, filed, accession=None):
     return Reading(statement="income", duration="year", fiscal_year=year, fiscal_period="FY",
-                   period_end=date(int(year), 12, 31), period_start=None, currency="TWD", accession=f"a{year}",
+                   period_end=date(int(year), 12, 31), period_start=None, currency="TWD", accession=accession or f"a{year}",
                    form="20-F", filed=filed, own=True, source="archive", basis="ROC GAAP",
                    lines=[{"line": 0, "concept": "printed_net_income", "label": "Net income", "level": 0,
                            "is_heading": False, "value": net}], checks=[Check("calc", "pass")])
@@ -68,16 +68,18 @@ def chosen_of(readings):
 
 
 def test_a_table_that_agrees_with_the_statements_serves_only_the_years_before_them():
-    statements = [income("2000", 65_106e6, date(2001, 6, 1)), income("2001", 14_483e6, date(2002, 6, 28))]
+    # 1999 as first printed differs: a restatement the FY2001 summary carries, not a reason to doubt it.
+    statements = [income("1999", 24_000e6, date(2000, 6, 1)), income("2000", 65_106e6, date(2002, 6, 28), "fy2001"),
+                  income("2001", 14_483e6, date(2002, 6, 28), "fy2001")]
     result = choose_summaries(read(), statements, chosen_of(statements))
-    assert result["tables"]["fy2001#0"]["verdict"] == "verified"
+    assert result["tables"]["fy2001#0"]["verdict"] == "verified" and result["tables"]["fy2001#0"]["restated"] == 1
     years = {(row["fiscal_year"], row["name"]) for row in result["years"]}
     assert ("1997", "revenue") in years and ("1999", "total assets") in years
     assert ("2000", "net income") not in years and ("2001", "revenue") not in years  # statements cover these
 
 
 def test_a_table_dated_wrong_is_left_out_whole():
-    # The same figures a year off: 2000's statement prints 65,106, the table would say 14,483.
-    statements = [income("2000", 14_483e6, date(2001, 6, 1))]
+    # The same figures a year off: the filing's own 2000 statement prints 14,483 where the table says 65,106.
+    statements = [income("2000", 14_483e6, date(2002, 6, 28), "fy2001")]
     result = choose_summaries(read(), statements, chosen_of(statements))
     assert result["tables"]["fy2001#0"]["verdict"] == "contradicted" and result["years"] == []
