@@ -10,8 +10,8 @@ from ..ai import AiResponseError, Spec
 from ..ops.control import ControlError
 from ..domain.fiscal import fiscal_label
 from ..sources.base import FilingRef
-from ..readers.tagged_metrics import (agrees, refines, fact_lines, learn_tag, learn_tags, quarter_facts, tag_from_locator, unit_fits,
-                              year_ago_facts)
+from ..readers.tagged_metrics import (agrees, concept_units, refines, fact_lines, learn_tag, learn_tags, quarter_facts,
+                                      tag_from_locator, unit_fits, year_ago_facts)
 from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _UNANCHORED, _is_jump, _rounding, value_key
 
 # Where the AI's tag picks are kept between runs, beside the XBRL row curations.
@@ -54,13 +54,16 @@ class TaggedKpiReading:
         if not quarters:
             return []
         facts: dict[tuple[str, str], dict] = {}
+        self._tag_units: dict[tuple[str, str], dict[str, str]] = {}
 
         def facts_of(quarter: tuple[str, str]) -> dict:
             if quarter not in facts:
                 ref, end = quarters[quarter]
                 try:
                     xbrl = self._xbrl(ref)
-                    facts[quarter] = quarter_facts(xbrl.facts.to_dataframe(), end) if xbrl is not None else {}
+                    frame = xbrl.facts.to_dataframe() if xbrl is not None else None
+                    facts[quarter] = quarter_facts(frame, end) if frame is not None else {}
+                    self._tag_units[quarter] = concept_units(frame) if frame is not None else {}
                 except Exception:  # noqa: BLE001 - an unreadable report gives nothing
                     facts[quarter] = {}
             return facts[quarter]
@@ -79,6 +82,15 @@ class TaggedKpiReading:
         if records:
             self.log(f"{self.symbol}: {len(records)} KPI values read from reports' XBRL where the releases do not give them")
         return records
+
+    def _tag_fits(self, kpi, tag, newest_first, kfacts) -> bool:
+        """Whether a tag's unit fits the KPI (a dollar KPI is never a count of shares), from the newest report that tags
+        it. A tag no report in this run's window carries cannot be checked: what it filled before is left as it is."""
+        for quarter in newest_first:
+            if tag in kfacts(quarter):
+                unit = (getattr(self, "_tag_units", {}).get(quarter) or {}).get(tag.concept, "")
+                return unit_fits(kpi.unit, unit, kpi.label, tag.concept)
+        return True
 
     def _kpi_template(self, group, kpi, key: str) -> dict:
         """The stored shape of a KPI no release has given yet."""
@@ -145,13 +157,21 @@ class TaggedKpiReading:
                 if split:
                     records += self._exact_lines(held, readings, quarters, facts_of)  # currency lines: no percent view
                     continue
+                # The tag: one found before (kept on the figures it filled), else learned from the releases' readings,
+                # else, for a KPI the releases never state (Alphabet's revenue backlog), picked from the report's tags.
+                tag = next((found for v in held.values() if (found := tag_from_locator(v.get("locator") or {}))), None)
+                if tag is not None and not self._tag_fits(kpi, tag, newest_first, kfacts):
+                    # A tag of another measure (Brookfield's escrowed options for its monetizations): what it filled goes,
+                    # checked even when no quarter is missing, since its figures took the place of the releases'.
+                    records += [{**v, "validation_status": "rejected",
+                                 "notes": [f"withdrawn: its report tag ({tag.concept.split(':')[-1]}) is not this KPI's unit"]}
+                                for v in held.values() if tag_from_locator(v.get("locator") or {}) == tag
+                                and not v.get("owner_decision") and v["validation_status"] != "rejected"]
+                    continue
                 missing = [quarter for quarter in newest_first if quarter not in held
                            or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
                 if not missing:
                     continue
-                # The tag: one found before (kept on the figures it filled), else learned from the releases' readings,
-                # else, for a KPI the releases never state (Alphabet's revenue backlog), picked from the report's tags.
-                tag = next((found for v in held.values() if (found := tag_from_locator(v.get("locator") or {}))), None)
                 how = "tagged as in the quarters the release states it"
                 if tag is None and kpi.key in picked:
                     tag, how = picked[kpi.key], "the releases do not state it"
@@ -160,7 +180,10 @@ class TaggedKpiReading:
                         continue  # a release gave a different figure: not this tag
                 elif tag is None and len(readings) >= 2:
                     known = [quarter for quarter in newest_first if quarter in readings and quarter in quarters][:6]
-                    tag = learn_tag({quarter: readings[quarter] for quarter in known}, {quarter: kfacts(quarter) for quarter in known})
+                    fitting = [found for found in learn_tags({quarter: readings[quarter] for quarter in known},
+                                                             {quarter: kfacts(quarter) for quarter in known})
+                               if self._tag_fits(kpi, found, newest_first, kfacts)]
+                    tag = fitting[0] if len(fitting) == 1 else None
                 elif tag is None:
                     unread.append((group, kpi, key))
                     continue

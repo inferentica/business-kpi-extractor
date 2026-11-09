@@ -8,7 +8,7 @@ from kpi_extractor.readers.tagged_metrics import Tag, agrees, learn_tag, quarter
 AXIS = "dim_srt_MajorCustomersAxis"
 
 
-def frame(end: str, total: float, commercial: float) -> pd.DataFrame:
+def frame(end: str, total: float, commercial: float, unit: str = "usd") -> pd.DataFrame:
     rows = [
         {"concept": "us-gaap:RevenueRemainingPerformanceObligation", "numeric_value": total, "period_type": "instant",
          "period_instant": end, "period_start": None, "period_end": None, AXIS: None},
@@ -18,7 +18,7 @@ def frame(end: str, total: float, commercial: float) -> pd.DataFrame:
         {"concept": "us-gaap:Revenues", "numeric_value": commercial, "period_type": "duration", "period_instant": None,
          "period_start": "2025-07-01", "period_end": end, AXIS: None},
     ]
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows).assign(unit_ref=unit, currency="USD" if unit == "usd" else None)
 
 
 COMMERCIAL = Tag("us-gaap:RevenueRemainingPerformanceObligation", ((AXIS, "msft:CommercialCustomersMember"),), True)
@@ -402,3 +402,68 @@ def test_a_tagged_figure_replaces_a_stated_one_only_to_more_places():
     assert not refines(32.79, 32.3)                     # TSMC: a closing rate is no average rate
     assert refines(462_300_000_000, 460_000_000_000)      # "$460 billion" is rounded to ten billion: $462.3B refines it
     assert not refines(13_487_000_000, 13_760_000_000)    # a different figure never replaces a stated one
+
+
+def test_a_round_release_figure_is_matched_to_two_significant_digits():
+    from kpi_extractor.readers.tagged_metrics import refines
+    # Brookfield's "$20 billion" of assets sold is not its 15.258 billion escrowed options, nor "$400 million" 410 million.
+    assert not agrees(15.258e9, 20e9) and not refines(15.258e9, 20e9)
+    assert agrees(19.6e9, 20e9) and not agrees(410e6, 400e6) and agrees(403e6, 400e6)
+    assert agrees(9.038e9, 9e9) and refines(4_651_000_000, 4.65e9)
+
+
+def test_a_facts_unit_is_read_through_its_resolved_currency():
+    from kpi_extractor.readers.tagged_metrics import fact_unit, unit_fits
+    assert fact_unit({"unit_ref": "Unit_Standard_EUR_DzninQPyI02xgP6HIeCj9A", "currency": "EUR"}) == "iso4217:EUR"
+    assert fact_unit({"unit_ref": "Unit_Divide_EUR_shares_rFrgpyX0", "currency": "EUR"}) == "iso4217:EUR/shares"
+    assert fact_unit({"unit_ref": "shares", "currency": None}) == "shares"
+    assert unit_fits("currency", fact_unit({"unit_ref": "Unit_Standard_EUR_x", "currency": "EUR"}))
+    assert not unit_fits("currency", fact_unit({"unit_ref": "shares", "currency": None}))
+
+
+def test_a_tag_whose_unit_is_not_the_kpis_is_never_learned_and_what_it_filled_is_withdrawn():
+    from datetime import date as day
+    from types import SimpleNamespace
+
+    from kpi_extractor import ai
+    from kpi_extractor.pipeline import SymbolPipeline
+
+    # The commercial figure is a count of shares here: equal to the releases' dollar figures, but another measure.
+    ends = {"r1": "2025-09-30", "r2": "2025-12-31", "r3": "2026-03-31", "r4": "2026-06-30"}
+    commercial = {"r1": 392e9, "r2": 625e9, "r3": 627e9, "r4": 678e9}
+
+    def pipeline_with(values):
+        pipeline = SymbolPipeline(None, "MSFT", quarters=4, force=False, log=lambda *_: None)
+        pipeline.profile = SimpleNamespace(name="Microsoft", fiscal_year_end="0630", foreign=False)
+        pipeline.offset = 0
+        pipeline.filings = {accession: {"accession": accession, "period_end": end, "status": "processed"}
+                            for accession, end in ends.items()}
+        pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(
+            to_dataframe=lambda: frame(ends[ref.accession], commercial[ref.accession] + 6e9, commercial[ref.accession],
+                                       unit="shares")))
+        pipeline.values = values
+        stored = []
+        pipeline.store.write = stored.extend
+        pipeline.store.curation = lambda *_args: None
+        return pipeline, stored
+
+    def row(period, value, locator=None):
+        return {"group_key": "kpi_operating", "group_kind": "metric", "group_label": "Operating", "group_order": 20,
+                "kpi_key": "rpo", "kpi_label": "Commercial RPO", "kpi_order": 0, "unit": "currency", "currency": "USD",
+                "fiscal_year": "2026", "fiscal_period": period, "period_end": "", "method": "ai",
+                "validation_status": "verified", "value": value, "locator": locator or {}}
+    spec = ai.Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric",
+                                               "kpis": [{"key": "rpo", "label": "Commercial RPO", "unit": "currency"}]}]})
+    reports = [SimpleNamespace(accession=a, form="10-K" if a == "r4" else "10-Q", filed=day(2026, 1, 1), source_url="u")
+               for a in ends]
+    releases = {("kpi_operating", "rpo", "2026", q): row(q, v) for q, v in (("Q1", 392e9), ("Q3", 627e9), ("Q4", 678e9))}
+    pipeline, stored = pipeline_with(dict(releases))
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
+    assert stored == []  # not learned: no quarter is filled from it
+    # A figure an earlier run filled from that tag is withdrawn.
+    filled = row("Q2", 625e9, {"tagged": True, "concept": COMMERCIAL.concept, "dimensions": dict(COMMERCIAL.dimensions),
+                               "instant": True})
+    pipeline, stored = pipeline_with({**releases, ("kpi_operating", "rpo", "2026", "Q2"): filled})
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
+    assert [(v["fiscal_period"], v["validation_status"]) for v in stored] == [("Q2", "rejected")]
+    assert stored[0]["notes"][0].startswith("withdrawn: its report tag (RevenueRemainingPerformanceObligation)")

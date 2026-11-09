@@ -76,7 +76,10 @@ def _tolerance(value: float) -> float:
         return 0.5 * 10 ** -decimals
     whole = abs(int(round(value)))
     step = 1
-    while whole and whole % (step * 10) == 0 and step < 10 ** 12:
+    # A whole figure is taken as stated to at least two significant digits: "$20 billion" is 19.5 to 20.5 billion, not
+    # 15 to 25 (its zeros alone let Brookfield's $15.258 billion of escrowed options pass as its $20 billion sold).
+    largest = 10 ** max(0, len(str(whole)) - 2)
+    while whole and whole % (step * 10) == 0 and step * 10 <= largest:
         step *= 10
     return max(step / 2, 0.5)
 
@@ -137,8 +140,7 @@ def fact_lines(facts: pd.DataFrame, period_end: date) -> list[tuple[Tag, float, 
         concept = str(fact["concept"])
         if concept not in labels and isinstance(fact.get("label"), str):
             labels[concept] = fact["label"]
-        unit = fact.get("unit_ref")
-        if concept not in units and isinstance(unit, str):
+        if concept not in units and (unit := fact_unit(fact)):
             units[concept] = unit
     lines = []
     for tag, value in found.items():
@@ -150,6 +152,27 @@ def fact_lines(facts: pd.DataFrame, period_end: date) -> list[tuple[Tag, float, 
         name = tag.concept.split(":")[-1]
         lines.append((tag, value, f"{label} [{name}]{' | ' + members if members else ''}", units.get(tag.concept, "")))
     return lines
+
+
+def fact_unit(fact) -> str:
+    """A fact's unit as unit_fits reads it: its resolved currency where it has one (a unit's id can be any name, as
+    SAP's "Unit_Standard_EUR_…" are), per share where its unit says so; otherwise its unit id ("shares", "pure")."""
+    unit = fact.get("unit_ref")
+    unit = unit if isinstance(unit, str) else ""
+    currency = fact.get("currency")
+    if isinstance(currency, str) and len(currency) == 3:
+        return f"iso4217:{currency.upper()}" + ("/shares" if "share" in unit.lower() else "")
+    return unit
+
+
+def concept_units(facts: pd.DataFrame) -> dict[str, str]:
+    """Each concept's unit in a report (its first fact's)."""
+    units: dict[str, str] = {}
+    for _, fact in facts.iterrows():
+        concept = str(fact["concept"])
+        if concept not in units and (unit := fact_unit(fact)):
+            units[concept] = unit
+    return units
 
 
 def unit_fits(kpi_unit: str, fact_unit: str, kpi_label: str = "", concept: str = "") -> bool:
