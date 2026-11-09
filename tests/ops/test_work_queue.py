@@ -17,10 +17,13 @@ class Queue:
         self.working: set[str] = set()
         self.done: dict[str, dict] = {}
         self.calls: list[str] = []
+        self.finished = False
 
     def call(self, operation, **payload):
         self.calls.append(operation)
         if operation == "claim":
+            if self.finished:
+                raise AssertionError("claimed after the run finished")  # the control plane: "Run is already finished"
             if self.waiting:
                 symbol = self.waiting.pop(0)
                 self.working.add(symbol)
@@ -37,7 +40,10 @@ class Queue:
         raise AssertionError(operation)
 
     def _settle(self):
-        return {"finished": "succeeded"} if not self.waiting and not self.working and self.done else {}
+        if not self.waiting and not self.working and self.done:
+            self.finished = True
+            return {"finished": "succeeded"}
+        return {}
 
 
 def test_a_worker_reads_every_queued_company_and_the_last_one_finishes_the_run(monkeypatch):
@@ -48,8 +54,8 @@ def test_a_worker_reads_every_queued_company_and_the_last_one_finishes_the_run(m
     assert finished == "succeeded"
     assert sorted(queue.done) == ["AAPL", "ASML", "MSFT", "NVDA", "TSM"]
     assert queue.done["TSM"]["filings"] == 2 and queue.done["TSM"]["ai_calls"] == 7
-    # Never more companies claimed at once than the worker reads at once.
-    assert queue.calls.count("claim") == 6
+    # One claim per company, and at most one that finds the queue empty; none after the run finished (the fake refuses).
+    assert queue.calls.count("claim") in (5, 6)
 
 
 def test_a_lost_pool_stops_the_worker_without_reporting_what_it_had_not_finished(monkeypatch):
@@ -113,3 +119,12 @@ def test_off_peak_runs_do_not_wait():
     cli.wait_for_offpeak(queue, sleep=lambda _s: (_ for _ in ()).throw(AssertionError("waited")),
                          clock=lambda: datetime(2026, 11, 9, 4, 30, tzinfo=timezone.utc))
     assert queue.calls == []
+
+
+def test_a_one_company_run_stops_when_its_company_finishes_the_run(monkeypatch):
+    # A Refresh: one company, read by one process; its completion finishes the run, and nothing is claimed after.
+    monkeypatch.setattr(cli, "process_symbol", lambda control, symbol, *_: SymbolResult(symbol, filings=1))
+    queue = Queue(["BAM"])
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert cli.work_queue(queue, pool, 1, 4, False, False, log=lambda *_: None) == "succeeded"
+    assert queue.calls == ["claim", "complete"]

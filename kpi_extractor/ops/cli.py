@@ -167,7 +167,10 @@ def work_queue(control, pool, workers: int, quarters: int, force: bool, waits: b
                 reply = control.call("complete", symbol=symbol, result=company_result(result, lowest))
                 if not reply.get("accepted"):
                     log(f"{symbol}: no longer this worker's; its result was not kept")
-                finished = reply.get("finished") or finished
+                if reply.get("finished"):
+                    # This completion finished the run: nothing is left to claim (a one-company run, every Refresh,
+                    # asked again and failed on "Run is already finished").
+                    finished, claiming = reply["finished"], False
     finally:
         stop.set()
 
