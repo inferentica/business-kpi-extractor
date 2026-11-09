@@ -21,7 +21,7 @@ class StatedFigures:
         for v in self.values.values():
             notes = list(v.get("notes") or [])
             if (v["validation_status"] == "needs_review" and not v.get("owner_decision") and held_for_jumps_only(notes)
-                    and stated_in_filing(v["unit"], float(v["value"]), v.get("locator"), notes)):
+                    and stated_in_filing(v["unit"], float(v["value"]), v.get("locator"), notes, v.get("kpi_label"))):
                 stood.append({**v, "validation_status": "verified", "notes": [STATED]})
         if stood:
             self.log(f"{self.symbol}: {len(stood)} figures held for a sharp change stand, their filing states them")

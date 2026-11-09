@@ -24,6 +24,10 @@ def test_a_figure_the_filing_does_not_show_as_it_is_is_not_stated():
     assert not stated_in_filing("currency", 1_234e6, {"row_label": "Cloud", "row_numbers": [1234], "scale": 1e6},
                                 ["read without its table's scale: 1000× to match the series"])
     assert not stated_in_filing("currency", 5e6, {})
+    # A cell in a row labelled with a date, not the KPI (Visa's Q4 2017 cross-border growth).
+    assert not stated_in_filing("percent", 10, {"row_label": "September 30, 2017", "row_numbers": [10], "scale": 1},
+                                label="Cross-Border Volume Growth Total")
+    assert stated_in_filing("percent", 53, VISA, label="Cross-Border Volume Growth Excluding Intra-Europe")
 
 
 def _row(period_end, value, locator=None, **fields):

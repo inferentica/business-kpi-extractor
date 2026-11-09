@@ -191,7 +191,7 @@ def _no_sharp_change(figures: list[Figure], previous: dict[str, float], **_conte
         jump = _jump(figure, before)
         # A figure is judged by its filing, not by how far it moved: one the filing states where it was read stands.
         if jump and not stated_in_filing(figure.unit, figure.value, getattr(figure.source, "locator", None),
-                                         getattr(figure.source, "notes", None)):
+                                         getattr(figure.source, "notes", None), figure.label):
             found.append(Finding("no_sharp_change", [figure], jump))
     return found
 
@@ -286,7 +286,7 @@ def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of:
             before, now = float(previous["value"]), float(current["value"])
             jump = _row_jump(current, before, now)
             if jump and not immaterial_row(current) and not stated_in_filing(current["unit"], now, current.get("locator"),
-                                                                              current.get("notes")):
+                                                                              current.get("notes"), current.get("kpi_label")):
                 flagged[key_of(current)] = jump
             elif current["unit"] == "currency" and _significant(now) and _same(now, before) and not _row_shows(current, before, now):
                 flagged[key_of(current)] = "the same figure as the quarter before: check the column"
