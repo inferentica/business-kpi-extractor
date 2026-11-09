@@ -235,3 +235,17 @@ def test_a_figure_read_again_elsewhere_or_dropped_from_the_list_is_replaced():
                [{"accession": "f1", "status": "processed"}])
     store.record(FilingReading(_ref(), "processed", records=[_row("renamed", value=9_833e6)]))
     assert store.values[("kpi_x", "capital_invested", "2026", "Q2")]["validation_status"] == "rejected"
+
+
+def test_a_series_the_filing_also_fed_keeps_its_figures_when_a_re_read_feeds_only_the_other():
+    # Apple's 2016-2018 releases fed both its AI breakdown and the XBRL products series; a re-read fed only the first.
+    store = _store()
+    store.windows = {("kpi_revenue_by_product_type", "iphone"): (None, None), ("products", "iphone"): (None, None)}
+    stated = {"row_label": "iPhone", "row_numbers": [61.0], "scale": 1}
+    store.load([_breakdown("iphone", 61.0, locator=stated, unit="currency"),
+                _breakdown("iphone", 61.0, group="kpi_revenue_by_product_type", locator=stated, unit="currency")],
+               [{"accession": "f1", "status": "processed"}])
+    store.record(FilingReading(_ref(), "processed", records=[
+        _breakdown("iphone", 61.0, group="kpi_revenue_by_product_type", locator=stated, unit="currency")]))
+    assert store.values[("products", "iphone", "2026", "Q2")]["validation_status"] == "verified"
+    assert store.values[("kpi_revenue_by_product_type", "iphone", "2026", "Q2")]["validation_status"] == "verified"

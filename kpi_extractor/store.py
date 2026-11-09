@@ -120,7 +120,10 @@ class CompanyStore:
                        and value["validation_status"] != "rejected"]
             records = _keep_groups(records, earlier)
             fresh = {value_key(record) for record in records}
-            read_again = {(record["fiscal_year"], record["fiscal_period"], _rounded(record["value"])) for record in records}
+            had = {value_key(value) for value in earlier}
+            # Figures the new reading put under keys the earlier one did not have: a renamed line takes its old line's place.
+            read_again = {(record["fiscal_year"], record["fiscal_period"], _rounded(record["value"])) for record in records
+                          if value_key(record) not in had}
             records = records + [
                 {**value, "validation_status": "rejected", "notes": ["replaced by a newer reading of this filing"]}
                 for value in earlier
@@ -274,13 +277,14 @@ def _rounded(value) -> float:
 def _keep_groups(records: list[dict], earlier: list[dict]) -> list[dict]:
     """A breakdown read again keeps the group its earlier reading of the filing used. The KPI list may name a breakdown
     anew (Apple's products became kpi_revenue_by_product_type), and a re-read under the new name moved its lines out of
-    their series. A new group takes an earlier one when it is not itself in the new reading, its lines share their
-    keys, and every shared line reads the same figure."""
-    new_groups = {record["group_key"] for record in records}
+    their series. A group new to the filing's readings takes an earlier one when the earlier one is not in the new
+    reading, its lines share their keys, and every shared line reads the same figure. Groups both readings have stay."""
+    read_now = {record["group_key"] for record in records}
+    new_groups = read_now - {value["group_key"] for value in earlier}
     before: dict[str, dict[tuple, float]] = {}
     template: dict[str, dict] = {}
     for value in earlier:
-        if value["group_key"] in new_groups or value.get("group_kind") != "revenue_breakdown":
+        if value["group_key"] in read_now or value.get("group_kind") != "revenue_breakdown":
             continue
         before.setdefault(value["group_key"], {})[(value["kpi_key"], value["fiscal_year"], value["fiscal_period"])] = \
             _rounded(value["value"])
