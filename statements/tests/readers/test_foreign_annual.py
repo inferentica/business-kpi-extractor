@@ -115,10 +115,9 @@ def test_assets_and_liabilities_printed_side_by_side():
 def test_a_note_number_before_each_label_is_no_statement_beside_it():
     rows = [(label, "", n, "", a, "", b) for label, n, a, b in (
         ("Cash and cash equivalents", "4", "1,904,609", "1,655,857"), ("Accounts receivable, net", "5", "302,572", "672,762"),
-        ("Inventories, net", "6", "817,192", "1,071,385"), ("Total current assets", "", "3,024,373", "3,399,904"),
-        ("Total assets", "", "4,000,000", "4,500,000"), ("Total liabilities", "7", "1,800,000", "2,343,545"),
-        ("Total shareholders' equity", "", "2,200,000", "2,156,455"),
-        ("Total liabilities and shareholders' equity", "", "4,000,000", "4,500,000"))]
+        ("Inventories, net", "6", "817,192", "1,071,385"), ("Total assets", "", "3,024,373", "3,400,004"), ("Total liabilities", "7", "1,024,373", "1,243,549"),
+        ("Total shareholders' equity", "", "2,000,000", "2,156,455"),
+        ("Total liabilities and shareholders' equity", "", "3,024,373", "3,400,004"))]
     html = ("<p>Consolidated Balance Sheets (in thousands)</p><table><tr><td></td><td></td><td>Notes</td><td></td>"
             "<td>2005</td><td></td><td>2006</td></tr>" + "".join("<tr>" + cells(*row) + "</tr>" for row in rows) + "</table>")
     readings, _ = read(html, end=date(2006, 12, 31))
