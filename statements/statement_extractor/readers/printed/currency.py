@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import Counter
 
 from ...domain.basis import currencies_named
+from .find import TITLE_PATTERNS
 from .scales import scale_text
 from .tables import Table, header_text
 
@@ -29,7 +30,11 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
         counts = Counter(named)
         best = max(counts.values())
         return next(currency for currency in named if counts[currency] == best)
-    in_title = currencies_named(scale_text(group))
+    text = scale_text(group)
+    titles = [match.end() for pattern in TITLE_PATTERNS for match in pattern.finditer(text)]
+    # The title's own words first ("Expressed in Millions New Taiwan Dollars (NTD) and U.S. Dollars (USD)"), not the
+    # text before it, which can name another currency.
+    in_title = currencies_named(text[max(titles) - 120:] if titles else text) or currencies_named(text)
     return in_title[0] if in_title else None  # else the document's or the form's (pipeline/printed.py)
 
 

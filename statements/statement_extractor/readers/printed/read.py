@@ -107,7 +107,9 @@ def _scope(group: list[Table], form: str) -> str:
     """A foreign filer's statement is the company's alone when its title does not say consolidated ("TAIWAN
     SEMICONDUCTOR MANUFACTURING COMPANY LTD. BALANCE SHEETS", "UNCONSOLIDATED BALANCE SHEET"). A U.S. filer's is
     taken as its group's: some print a bare "BALANCE SHEETS" though they consolidate."""
-    title = (group[0].context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in group[0].header)).lower()
+    leading = " ".join(row.label for row in group[0].rows[:4] if not row.figures)  # a title in the table's own rows
+    title = (group[0].context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in group[0].header)
+             + " " + leading).lower()
     if re.search(r"\b(unconsolidated|non-consolidated|parent\s+company\s+only)\b", title):
         return "parent"
     if form.upper() in _FOREIGN_FORMS and "consolidated" not in title:

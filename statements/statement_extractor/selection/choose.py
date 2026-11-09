@@ -29,6 +29,8 @@ def differences(later: Reading, earlier: Reading) -> dict:
 def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] | None = None) -> list[dict]:
     """Per statement period: the chosen reading (or why none), its source, and how it differs from the period's own
     filing. Sorted newest period first."""
+    annual_bases = {reading.fiscal_year: reading.basis for reading in sorted(readings, key=lambda item: item.filed)
+                    if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.basis}
     groups: dict[tuple, list[Reading]] = defaultdict(list)
     for reading in readings:
         groups[reading.key].append(reading)
@@ -39,8 +41,12 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         # A report filed with the SEC (10-K, 20-F, 10-Q) wins over a release for the same period: a release's year and
         # year-end columns are unaudited, and the annual report that follows is the company's statement of them.
         # The group's statement wins over the parent company's alone, whatever their filing dates.
-        winner = max(kept, key=lambda item: (item.scope == "consolidated", item.form != "6-K", item.filed, item.own,
-                                             item.source == "xbrl")) if kept else None
+        # Among releases, the basis of the annual report closing the year: ASML's December 2012 6-K prints 2011's
+        # quarters again on IFRS, beside its US GAAP releases and 20-F.
+        annual = annual_bases.get(key[1])
+        winner = max(kept, key=lambda item: (item.scope == "consolidated", item.form != "6-K",
+                                             item.form != "6-K" or annual is None or item.basis == annual, item.filed,
+                                             item.own, item.source == "xbrl")) if kept else None
         record = {
             "statement": key[0], "fiscal_year": key[1], "fiscal_period": key[2], "duration": key[3],
             "period_end": max(reading.period_end for reading in group).isoformat(),
