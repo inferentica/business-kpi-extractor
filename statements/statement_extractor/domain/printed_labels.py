@@ -80,7 +80,7 @@ NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+pr
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
-                         r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit\s+for\s+the\s+(year|period)$|"
+                         r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"
                         # UK GAAP (Lloyds TSB): "Profit for the period attributable to shareholders", before dividends.
                         r"^profit\s+for\s+the\s+(year|period|half-year)\s+attributable\s+to\s+(equity\s+)?shareholders$", re.I)
 
