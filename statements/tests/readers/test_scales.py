@@ -31,3 +31,13 @@ def test_thousands_written_as_zeros():
                     "(In 000s, except per unit amounts)", "($000's)", "(000 omitted)"):
         assert statement_scale([Table(rows=[], header=[], context="Consolidated Balance Sheets " + caption, index=0)]) == 1e3
     assert statement_scale([Table(rows=[], header=[], context="Revenue grew $1,000 in total (in millions)", index=0)]) == 1e6
+
+
+def test_more_ways_of_stating_the_scale():
+    from statement_extractor.readers.printed.tables import Table
+    table = lambda text: [Table(rows=[], header=[], context=text, index=0)]
+    assert statement_scale(table("CONSOLIDATED INCOME STATEMENT for the year ended 31 December Note 2014 £ million 2013 £ million")) == 1e6
+    assert statement_scale(table("Consolidated Balance Sheets March 31 March 31 2009 2008 (Millions of US dollars)")) == 1e6
+    assert statement_scale(table("Consolidated Statements of Operations (Dollar and share amounts in thousands, except per share data)")) == 1e3
+    assert statement_scale(table("CONSOLIDATED STATEMENTS OF CASH FLOWS Won U.S. dollars (Note 2) 2006 2007 2008 2008 "
+                                 "(In millions) (In thousands)")) == 1e6

@@ -11,8 +11,11 @@ _UNIT = r"(thousands?|millions?|billions?)"  # TSMC's 2003 quarterly reports: "I
 _SCALES = {"thousands": 1e3, "millions": 1e6, "billions": 1e9, "thousand": 1e3, "million": 1e6, "billion": 1e9}
 _MONEY = re.compile(r"\b(?:in|amounts in|dollars in|expressed in|figures(?:\s+in)?)\s+(?:[A-Z]{2,3}\$?\s+|US\$\s*|NT\$\s*|€\s*|euros?\s+)?"
                     + _UNIT + r"\b", re.I)
-# A currency sign before the unit: Scotiabank's "($ millions)", "US$ millions".
-_DOLLAR_UNIT = re.compile(r"(?:US|C|CDN|NT|HK)?\$\s*" + _UNIT + r"\b|"
+# A currency sign before the unit: Scotiabank's "($ millions)", "US$ millions", Lloyds's "£ million" and "£m".
+_DOLLAR_UNIT = re.compile(r"(?:(?:US|C|CDN|NT|HK)?\$|£|€|¥)\s*" + _UNIT + r"\b|"
+                          r"(?<![\w.])£m\b|"
+                          # James Hardie's "(Millions of US dollars)"
+                          r"\b" + _UNIT + r"\s+of\s+(?:[A-Z.]+\s+|new\s+taiwan\s+|hong\s+kong\s+)?(?:dollars|euros?|pounds|yen|won|reais|francs|yuan|renminbi)\b|"
                           r"\(\s*" + _UNIT + r"\s*(?:,\s*except\b[^)]*)?\)", re.I)  # Brookfield's "(MILLIONS)"
 # Thousands written as zeros: Ross's "($000, except stores and per share data, unaudited)", Icahn's "(In $000s, except
 # unit amounts)" and "(In 000s ...)", "($000's)", "(000 omitted)".
@@ -37,13 +40,32 @@ def scale_text(group: list[Table]) -> str:
         " ".join(leading)
 
 
+# Money and share counts in one scale: Laureate's "(Dollar and share amounts in thousands, except per share data)".
+_BOTH = re.compile(r"\bdollars?\s+and\s+share\s+amounts\s+(?:are\s+)?in\s+" + _UNIT + r"\b", re.I)
+_CURRENCY_WORDS = re.compile(r"\b(won|yen|euros?|pounds|reais|francs|yuan|renminbi|rmb|nt\$|u\.?s\.?\s*dollars|"
+                             r"new\s+taiwan\s+dollars)\b", re.I)
+
+
+def _scale(match: re.Match) -> float:
+    unit = next((unit for unit in match.groups() if unit), None)
+    return _SCALES[unit.lower()] if unit else 1e6  # "£m"
+
+
 def statement_scale(group: list[Table]) -> float | None:
-    """The money scale, when the statement states one; a scale stated for its share counts is not one."""
-    text = _SHARES_IN.sub(" ", scale_text(group))
-    found = {_SCALES[next(unit for unit in match.groups() if unit).lower()] for pattern in (_MONEY, _DOLLAR_UNIT)
-             for match in pattern.finditer(text)}
+    """The money scale, when the statement states one; a scale stated for its share counts is not one. A statement
+    with a convenience translation states one scale for each currency (KEPCO: "(In millions...)" over its won columns,
+    "(In thousands...)" over the U.S. dollar ones): the first, over the reporting currency's columns, is the money
+    scale; the translated columns are never read."""
+    raw = scale_text(group)
+    both = [_SCALES[match.group(1).lower()] for match in _BOTH.finditer(raw)]
+    text = _SHARES_IN.sub(" ", raw)
+    matches = sorted((match for pattern in (_MONEY, _DOLLAR_UNIT) for match in pattern.finditer(text)),
+                     key=lambda match: match.start())
+    found = {_scale(match) for match in matches} | set(both)
     if _ZEROS.search(text):
         found.add(1e3)
+    if len(found) == 2 and matches and len({word.lower() for word in _CURRENCY_WORDS.findall(raw)}) >= 2:
+        return _scale(matches[0])
     return found.pop() if len(found) == 1 else None
 
 
