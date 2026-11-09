@@ -85,12 +85,12 @@ def taxonomy_basis(concepts: list[str]) -> str | None:
 # Currencies by how a statement prints them, most specific first ("NT$" before "$").
 _CURRENCIES = (
     ("TWD", r"NT\$|\bNTD\b|New\s+Taiwan\s+dollars?|New\s+Taiwan\b"),
-    ("USD", r"US\$|U\.S\.\$|\bUSD\b|U\.\s?S\.\s+dollars?|United\s+States\s+dollars?|US\s+dollars?"),
+    ("USD", r"US\$|U\.S\.\$|\bUSDm?\b|U\.\s?S\.\s+dollars?|United\s+States\s+dollars?|US\s+dollars?"),
     ("CAD", r"C\$|CDN\$|\bCAD\b|Canadian\s+dollars?"),
     ("HKD", r"HK\$|\bHKD\b|Hong\s+Kong\s+dollars?"),
-    ("EUR", r"€|\bEUR\b|\beuros?\b"),
+    ("EUR", r"€|\bEURm?\b|\beuros?\b"),
     ("NLG", r"\bNLG\b|\bguilders?\b|\bNfl\.?"),
-    ("GBP", r"£|\bGBP\b|pounds?\s+sterling"),
+    ("GBP", r"£|\bGBPm?\b|pounds?\s+sterling"),  # Lloyds TSB's "GBPm"
     ("JPY", r"¥|\bJPY\b|\byen\b"),
     ("CNY", r"\bRMB\b|\bCNY\b|renminbi"),
     # KEPCO's 20-Fs head their columns "Won" and "U.S. dollars (Note 2)".

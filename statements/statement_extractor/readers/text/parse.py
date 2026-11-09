@@ -19,6 +19,9 @@ from .lines import RULE, YEAR, Chunk, Line, chunks, split
 
 _ALIGN = 3  # characters a figure can sit off its column
 _SPAN_WORDS = re.compile(r"\b(months|weeks|year|quarter)s?\s+ended\b", re.I)
+# A span or a date heading over a group of columns: "Half-year to", "30 June", "31 December" (Lloyds TSB).
+_GROUP_HEADING = re.compile(r"\b(months|weeks|year|quarter)s?\s+ended\b|\bhalf[-\s]year\b|"
+                            r"^\d{1,2}\s+[A-Za-z]{3,9}$|^[A-Za-z]{3,9}\.?\s+\d{1,2},?$", re.I)
 
 
 def _columns(lines: list[Line]) -> list[int]:
@@ -62,6 +65,8 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
         width = len(columns) // len(over)
         return cells + [Cell(columns[n * width], columns[n * width + width - 1] - columns[n * width] + 1, chunk.text)
                         for n, chunk in enumerate(over)]
+    if 1 < len(over) < len(columns) and all(_GROUP_HEADING.search(chunk.text) for chunk in over):
+        return cells + _grouped(over, columns)
     owners: dict[int, list[int]] = {}
     for column in columns:
         def distance(chunk: Chunk) -> int:
@@ -73,6 +78,21 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
     for index, owned in sorted(owners.items()):
         cells.append(Cell(min(owned), max(owned) - min(owned) + 1, over[index].text))
     return cells
+
+
+def _grouped(over: list[Chunk], columns: list[int]) -> list[Cell]:
+    """Headings over consecutive groups of columns, each centred on its group: the split of the columns, in order, whose
+    groups' centres lie nearest their headings' (Lloyds TSB's "30 June" over 2003 and 2002, "31 December" over 2002).
+    A figure column is placed by its right edge; its middle sits a few characters left of it."""
+    from itertools import combinations
+    best = None
+    for cuts in combinations(range(1, len(columns)), len(over) - 1):
+        bounds = (0, *cuts, len(columns))
+        groups = [columns[bounds[n]:bounds[n + 1]] for n in range(len(over))]
+        cost = sum(abs((chunk.start + chunk.end) / 2 - (sum(group) / len(group) - 3)) for chunk, group in zip(over, groups))
+        if best is None or cost < best[0]:
+            best = (cost, groups)
+    return [Cell(group[0], group[-1] - group[0] + 1, chunk.text) for chunk, group in zip(over, best[1])]
 
 
 _JOINING = re.compile(r"\b(and|or|of|for|in|on|to|the|before|after|from|less|plus|net|by|with|at|due)$|[,\-–]$", re.I)

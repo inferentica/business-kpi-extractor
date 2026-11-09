@@ -17,6 +17,20 @@ _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|a
 
 
 _MONTH_DAY = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}})\b", re.I)
+_DAY_MONTH_YEAR = re.compile(rf"\b(\d{{1,2}})\s+({_MONTH})\s+((?:19|20)\d{{2}})\d?\b", re.I)
+_DAY_MONTH = re.compile(rf"\b(\d{{1,2}})\s+((?:jan(?:uary)?|feb(?:ruary)?|march|april|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|"
+                        rf"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b(?!\s+\d{{1,2}}\b)", re.I)
+_MONTH_YEAR_NOTE = re.compile(rf"\b({_MONTH})\s+((?:19|20)\d{{2}})\d\b", re.I)
+
+
+def month_first(text: str) -> str:
+    """A date as the readers take it, month first: Lloyds prints "30 Jun 2023", and a footnote mark run on to the year
+    ("31 Dec 20221" for 2022, note 1)."""
+    text = _DAY_MONTH_YEAR.sub(lambda m: f"{m.group(2)} {m.group(1)}, {m.group(3)}", text)
+    text = _DAY_MONTH.sub(lambda m: f"{m.group(2)} {m.group(1)}", text)  # "Half-year to 30 June" over its years
+    return _MONTH_YEAR_NOTE.sub(lambda m: f"{m.group(1)} {m.group(2)}", text)
+
+
 _FULL_DATE = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}}),?\s+((?:19|20)\d{{2}})\b", re.I)
 _MONTH_YEAR = re.compile(rf"\b({_MONTH})-(\d{{2}})\b", re.I)
 
@@ -31,7 +45,7 @@ _NUMBERS = {"three": 3, "six": 6, "nine": 9, "twelve": 12, "thirteen": 13, "sixt
 
 # A span in words or digits, in months or weeks: "Nine Months Ended", "12 Weeks Ended" (Costco, PepsiCo), "36 Weeks".
 _SPAN = re.compile(rf"\b({'|'.join(sorted(_NUMBERS, key=len, reverse=True))}|\d{{1,2}})[-\s]+(months?|weeks?)\b|"
-                   r"\b(?:fiscal\s+)?years?\s+ended\b|\b(?:quarter)\s+ended\b|\b(?:first|second|third|fourth)\s+quarter\b", re.I)
+                   r"\b(?:fiscal\s+)?years?\s+ended\b|\bhalf[-\s]year\b|\b(?:quarter)\s+ended\b|\b(?:first|second|third|fourth)\s+quarter\b", re.I)
 
 
 # A date printed in figures: PepsiCo's "3/21/09".
@@ -107,8 +121,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     only ("2002 | 2001" under "Third Quarter") ends on the filing's own period date in that year when it spans less than
     a year (JPM's 2002 10-Qs), and on the fiscal year end otherwise."""
     first = group[0]
-    header_all = " ".join(" ".join(cell.text for cell in cells) for cells in first.header)
-    context = first.context[-300:]
+    header_all = month_first(" ".join(" ".join(cell.text for cell in cells) for cells in first.header))
+    context = month_first(first.context[-300:])
     # The header's own date first, else one printed after the statement's title ("… years ended December 31, 2007"):
     # a page names other dates before the title (TSMC's auditors' report, dated April 15, 2011).
     titled = [match.end() for pattern in TITLE_PATTERNS for match in pattern.finditer(context)]
@@ -119,7 +133,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     periods: dict[tuple[int, ...], Period] = {}
     columns = figure_columns(first)
     in_order = years_in_order(first, columns)
-    aboves = {column: header_text(first, column[0]) or header_text(first, column[-1]) for column in columns}
+    aboves = {column: month_first(header_text(first, column[0]) or header_text(first, column[-1])) for column in columns}
     header_days = list(_MONTH_DAY.finditer(header_all))
     day_first = _day_first(header_all)
     # One day for each column, in order, when no column prints a day of its own.
@@ -153,6 +167,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         days = 364
         if span is not None and span.group(1):
             days = _span_days(span.group(1), span.group(2))
+        elif span is not None and span.group(0).lower().startswith("half"):
+            days = 182  # Lloyds' "Half-year to 30 Jun 2023"
         elif span is not None and "quarter" in span.group(0).lower():
             days = 91
         year = years[-1] if years else None

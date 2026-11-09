@@ -21,9 +21,10 @@ def subtotals(printed) -> dict[int, int]:
     (an unlabelled net figure). An earlier subtotal counts as one line."""
     starts: dict[int, int] = {}
     for index, (label, _level, value) in enumerate(printed):
-        if not _SUBTOTAL_LABEL.search(label) and not _repeats_its_heading(printed, index) \
-                and not _totals_its_others(printed, index):
-            continue  # a line of its own ("Retained earnings"), however its figure happens to add up
+        # A line of its own ("Retained earnings") is no subtotal because its figure happens to equal two lines above
+        # it; one that sums three or more is (Lloyds' "Financial assets at amortised cost" after its four lines).
+        least = 2 if _SUBTOTAL_LABEL.search(label) or _repeats_its_heading(printed, index) \
+            or _totals_its_others(printed, index) or _names_its_lines(printed, index) else 3
         if value is None:
             continue
         sums, position, total = [], index - 1, 0.0
@@ -38,10 +39,12 @@ def subtotals(printed) -> dict[int, int]:
             sums.append((position, total))
             position = block_start(starts, position) - 1
         for count, (start, running) in enumerate(sums, 1):
-            if count >= 2 and close(running, value, count + 1):
+            if count >= least and close(running, value, count + 1):
                 starts[index] = start
                 break
         else:
+            if least > 2:
+                continue
             # A difference of the two lines above: JPM's net interest income, interest income less interest expense,
             # both printed as plain figures.
             if index >= 2 and printed[index - 1][2] is not None and printed[index - 2][2] is not None \
@@ -79,3 +82,14 @@ def _totals_its_others(printed, index: int) -> bool:
     key = re.sub(r"[^a-z0-9]+", " ", printed[index][0].lower()).strip()
     above = re.sub(r"[^a-z0-9]+", " ", printed[index - 1][0].lower()).strip()
     return bool(key) and above == f"other {key}"
+
+
+def _names_its_lines(printed, index: int) -> bool:
+    """A line named after the two lines above it sums them: Lloyds TSB's "Depreciation" and "Amortisation of goodwill",
+    then "Depreciation and amortisation"."""
+    parts = re.split(r"\s+and\s+", printed[index][0].lower().strip())
+    if len(parts) != 2 or index < 2 or None in (printed[index - 1][2], printed[index - 2][2]):
+        return False
+    above = [re.findall(r"[a-z]+", printed[position][0].lower())[:1] for position in (index - 2, index - 1)]
+    named = [re.findall(r"[a-z]+", part)[:1] for part in parts]
+    return all(above) and all(named) and sorted(word[0][:6] for word in above) == sorted(word[0][:6] for word in named)
