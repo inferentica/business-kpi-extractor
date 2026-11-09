@@ -120,6 +120,11 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     columns = figure_columns(first)
     in_order = years_in_order(first, columns)
     aboves = {column: header_text(first, column[0]) or header_text(first, column[-1]) for column in columns}
+    header_days = list(_MONTH_DAY.finditer(header_all))
+    # One day for each column, in order, when no column prints a day of its own.
+    named = [m.group(0).lower() for m in header_days]
+    in_order_days = len(header_days) == len(columns) >= 2 and len(set(named)) == len(named) and all(
+        [m.group(0).lower() for m in _MONTH_DAY.finditer(aboves[column])] in ([], named) for column in columns)
     dated_in_title = {match.group(3): (match.group(1), match.group(2)) for match in _FULL_DATE.finditer(title + " " + header_all)}
     for column in columns:
         above = aboves[column]
@@ -151,6 +156,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             days = 91
         year = years[-1] if years else None
         day = _MONTH_DAY.search(above) or title_day
+        if in_order_days:
+            day = header_days[columns.index(column)]  # "AS AT JUNE 30, AND DECEMBER 31" over "2023 | 2022" (Brookfield)
         if (numeric is not None or dotted is not None) and not _MONTH_DAY.search(above):
             if numeric is not None:
                 month, day_of, year_of = (int(part) for part in numeric.groups())

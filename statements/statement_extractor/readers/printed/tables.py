@@ -111,14 +111,15 @@ def header_text(table: Table, column: int) -> str:
     nearest cell within two columns (a year printed over the "$" beside its figure)."""
     parts = []
     for cells in table.header:
-        covering = [cell for cell in cells if cell.start <= column < cell.end and not (cell is cells[0] and cell.start == 0
-                                                                                        and len(cells) > 1)]
+        # The row's label cell, unless it holds a bare year (Brookfield's year row starts with "2023" at the left edge).
+        label = cells[0] if cells and cells[0].start == 0 and len(cells) > 1 and not YEAR_ONLY.match(cells[0].text) else None
+        covering = [cell for cell in cells if cell.start <= column < cell.end and cell is not label]
         if not covering:
             # Not the row's label cell; on a tie, the cell to the left (over the "$" before the figure). TSMC prints
             # "2002" one column left of its figures and "2003" from one column left of its two: the figure between
             # them is 2002's.
             near = [(min(abs(cell.start - column), abs(cell.end - 1 - column)), cell.end - 1 >= column, cell)
-                    for cell in cells if cell.text and not (cell is cells[0] and cell.start == 0 and len(cells) > 1)]
+                    for cell in cells if cell.text and cell is not label]
             near = [item for item in near if item[0] <= 2]
             covering = [min(near, key=lambda item: item[:2])[2]] if near else []
         parts.extend(cell.text for cell in covering)
