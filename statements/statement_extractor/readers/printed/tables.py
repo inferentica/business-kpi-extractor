@@ -36,6 +36,7 @@ class Row:
     level: int  # the physical column the label starts in
     figures: dict[int, float] = field(default_factory=dict)  # physical column -> figure as printed
     cells: list[Cell] = field(default_factory=list)
+    printed: list[float] = field(default_factory=list)  # a text line's figures in printed order, before columns
 
     @property
     def is_heading(self) -> bool:
@@ -48,6 +49,7 @@ class Table:
     header: list[list[Cell]]  # rows above the first row with figures
     context: str  # the text before the table (its title, scale)
     index: int  # the table's place in the document
+    header_text: str = ""  # a text table's header lines as printed, before their words are given to columns
 
 
 def clean(text: str) -> str:

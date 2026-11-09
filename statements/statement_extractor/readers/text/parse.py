@@ -117,7 +117,8 @@ def _rows(lines: list[Line], columns: list[int]) -> list[Row]:
         rows.append(Row(label=line.label, level=line.indent, cells=[Cell(line.indent, 1, line.label)]))
 
     for line in lines:
-        if line.figures and line.label and all(_nearest(columns, chunk.end) is None for chunk in line.figures):
+        if line.figures and line.label and len(line.figures) < 3 and \
+                all(_nearest(columns, chunk.end) is None for chunk in line.figures):
             line = Line(line.indent, line.label, [])  # a mark in no column ("Shares ('M)  (3)"): a label to join
         if not line.figures:
             continued = rows and rows[-1].figures and not pending and line.label[:1].islower()
@@ -146,7 +147,8 @@ def _rows(lines: list[Line], columns: list[int]) -> list[Row]:
                 figures[column] = value
                 cells.append(Cell(column, 1, chunk.text))
         full = " ".join([*joined, label]).strip()
-        rows.append(Row(label=full, level=indent, figures=figures, cells=cells))
+        printed = [value for value in (number(chunk.text) for chunk in line.figures) if value is not None]
+        rows.append(Row(label=full, level=indent, figures=figures, cells=cells, printed=printed))
     for waiting in pending:
         heading(waiting)
     return _wrapped_names(rows)
@@ -162,7 +164,8 @@ def _wrapped_names(rows: list[Row]) -> list[Row]:
         if name is not None and not name.figures and name.label and not name.label.endswith(":") \
                 and not _capitals(name.label) and row.figures and row.label and after is not None and after.label \
                 and row.level > name.level == after.level:
-            out[-1] = Row(label=f"{name.label} {row.label}", level=name.level, figures=row.figures, cells=row.cells)
+            out[-1] = Row(label=f"{name.label} {row.label}", level=name.level, figures=row.figures, cells=row.cells,
+                          printed=row.printed)
             continue
         out.append(row)
     return out
@@ -193,7 +196,8 @@ def _table(before: str, title_lines: list[str], header_lines: list[str], body: l
     leading_rows = [Line(len(line) - len(line.lstrip()), clean(line), []) for line in leading if line.strip()]
     rows = _rows(leading_rows + parsed, columns)
     context = clean(TAG.sub(" ", before + " " + " ".join(title_lines)))
-    return Table(rows=rows, header=header, context=context[-600:], index=index)
+    return Table(rows=rows, header=header, context=context[-600:], index=index,
+                 header_text=clean(" ".join(line for line in header_lines if not RULE.match(line))))
 
 
 def parse_text(text: str) -> list[Table]:

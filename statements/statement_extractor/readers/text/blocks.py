@@ -9,8 +9,10 @@ from .lines import YEAR, chunks, split
 BLOCK = re.compile(r"<TABLE>(.*?)</TABLE>", re.I | re.S)
 TAG = re.compile(r"</?(S|C|CAPTION|PAGE|FN|F\d+|TABLE)>", re.I)
 
-_UNTAGGED_TITLE = re.compile(r"^[ \t]*(unaudited\s+(and\s+)?)?(condensed\s+)?((un)?consolidated\s+)?(balance\s+sheets?|income\s+statements?|statements?\s+of\s+(consolidated\s+)?"
-                             r"(income|operations|earnings|cash\s+flows?|financial\s+(position|condition)))\b", re.I | re.M)
+_UNTAGGED_TITLE = re.compile(r"^[ \t]*(five[-\s]year\s+financial\s+summary|selected\s+(consolidated\s+)?financial\s+(data|information)|"
+                             r"(ten|eleven)[-\s]year\s+(financial\s+)?(summary|review))|"
+                             r"^[ \t]*(unaudited\s+(and\s+)?)?(condensed\s+)?((un)?consolidated\s+)?(balance\s+sheets?|income\s+statements?|statements?\s+of\s+(consolidated\s+)?"
+                             r"(income|operations|earnings|cash\s+flows?|financial\s+(position|condition)))\b(?!\s+data\b)", re.I | re.M)
 _UNTAGGED_END = re.compile(r"^\s*(see\s+(accompanying\s+)?notes|the\s+accompanying\s+notes)|<PAGE>|<TABLE>", re.I)
 
 
@@ -83,9 +85,12 @@ def untagged(text: str, spans: list[tuple[int, int]]):
         block = []
         has_figures = False
         for number_of_line, line in enumerate(lines):
-            if number_of_line and (_UNTAGGED_END.search(line) or _UNTAGGED_TITLE.match(line) and has_figures):
+            # A title is read with the line after it: "CONSOLIDATED STATEMENTS OF OPERATIONS" / "DATA" is a part of
+            # ASML's five-year summary, not a statement.
+            title = _UNTAGGED_TITLE.match("\n".join(lines[number_of_line:number_of_line + 2]))
+            if number_of_line and (_UNTAGGED_END.search(line) or title and has_figures):
                 break  # the page's end, or the next statement once this one has figures
-            if number_of_line and _UNTAGGED_TITLE.match(line) and not has_figures:
+            if number_of_line and title and not has_figures:
                 block = []  # a title inside the auditors' report's sentences, then the statement's own title
             block.append(line)
             parsed = split(line)
