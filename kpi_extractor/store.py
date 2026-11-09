@@ -7,6 +7,7 @@ from datetime import date
 from types import MappingProxyType
 
 from .ai import KpiSpec
+from .quality.stated import stated_in_filing
 from .sources import accepts_url
 from .sources.base import FilingRef
 from .steps.shared import AI_GROUP_PREFIX, CHART_METHOD, value_key
@@ -114,12 +115,16 @@ class CompanyStore:
         previous = self._filings.get(ref.accession)
         method = "ai" if ref.role == "earnings_release" else "xbrl"
         if reading.status in ("processed", "needs_review"):
+            earlier = [value for value in self._values.values()
+                       if value["method"] == method and value.get("source_accession") == ref.accession
+                       and value["validation_status"] != "rejected"]
+            records = _keep_groups(records, earlier)
             fresh = {value_key(record) for record in records}
+            read_again = {(record["fiscal_year"], record["fiscal_period"], _rounded(record["value"])) for record in records}
             records = records + [
                 {**value, "validation_status": "rejected", "notes": ["replaced by a newer reading of this filing"]}
-                for value in self._values.values()
-                if value["method"] == method and value.get("source_accession") == ref.accession
-                and value["validation_status"] != "rejected" and value_key(value) not in fresh
+                for value in earlier
+                if value_key(value) not in fresh and not self._still_stated(value, read_again)
                 # A group not read this run keeps its rows (flagged, and so not served): they are why it is not read.
                 and value["group_key"].removeprefix(AI_GROUP_PREFIX) not in (unread_groups or set())
             ]
@@ -138,6 +143,19 @@ class CompanyStore:
         self.result.filings += 1
         self.result.needs_review += sum(1 for record in records if record["validation_status"] == "needs_review")
         self.log(f"{self.symbol}: {ref.form} {ref.filed} {reading.status} ({filing['value_count']} values)")
+
+    def _still_stated(self, value, read_again: set[tuple]) -> bool:
+        """A verified figure the new reading of its filing did not produce, kept: its filing states it where it was read,
+        the new reading put that figure under no other key, and its KPI is still listed. A later reading missing a figure
+        is no evidence against it (KKR's Q4 2019 capital invested, $9.8B, dropped by a re-read on 2026-11-09)."""
+        if value["validation_status"] != "verified" or value.get("method") != "ai":
+            return False
+        if (value["fiscal_year"], value["fiscal_period"], _rounded(value["value"])) in read_again:
+            return False  # read again under another key or group: that reading takes its place
+        if self.windows and (value["group_key"], value["kpi_key"]) not in self.windows:
+            return False  # its KPI left the list
+        return stated_in_filing(value.get("unit") or "", float(value["value"]), value.get("locator"), value.get("notes"),
+                                value.get("kpi_label"))
 
     def record_or_fail(self, reading: FilingReading, unread_groups: set[str] | None = None) -> None:
         """As record; a reading that cannot be stored marks its filing failed, so one bad filing does not stop the company."""
@@ -247,6 +265,49 @@ class CompanyStore:
 
 
 REREAD_NOTE = "a new reading of this filing differs from the figure served before:"
+
+
+def _rounded(value) -> float:
+    return round(float(value), 6)
+
+
+def _keep_groups(records: list[dict], earlier: list[dict]) -> list[dict]:
+    """A breakdown read again keeps the group its earlier reading of the filing used. The KPI list may name a breakdown
+    anew (Apple's products became kpi_revenue_by_product_type), and a re-read under the new name moved its lines out of
+    their series. A new group takes an earlier one when it is not itself in the new reading, its lines share their
+    keys, and every shared line reads the same figure."""
+    new_groups = {record["group_key"] for record in records}
+    before: dict[str, dict[tuple, float]] = {}
+    template: dict[str, dict] = {}
+    for value in earlier:
+        if value["group_key"] in new_groups or value.get("group_kind") != "revenue_breakdown":
+            continue
+        before.setdefault(value["group_key"], {})[(value["kpi_key"], value["fiscal_year"], value["fiscal_period"])] = \
+            _rounded(value["value"])
+        template.setdefault(value["group_key"], value)
+    moves: dict[str, str] = {}
+    for group in new_groups:
+        rows = {(r["kpi_key"], r["fiscal_year"], r["fiscal_period"]): _rounded(r["value"]) for r in records
+                if r["group_key"] == group and r.get("group_kind") == "revenue_breakdown"}
+        if not rows:
+            continue
+        matches = [old for old, lines in before.items()
+                   if (shared := set(rows) & set(lines)) and 2 * len(shared) >= len(rows)
+                   and all(rows[key] == lines[key] for key in shared)]
+        if len(matches) == 1 and matches[0] not in moves.values():
+            moves[group] = matches[0]
+    if not moves:
+        return records
+    kept = []
+    for record in records:
+        old = moves.get(record["group_key"])
+        if old is None:
+            kept.append(record)
+            continue
+        model = template[old]
+        kept.append({**record, "group_key": old, "group_label": model["group_label"], "group_order": model.get("group_order"),
+                     "group_kind": model["group_kind"]})
+    return kept
 
 
 def _differs(value, before) -> bool:

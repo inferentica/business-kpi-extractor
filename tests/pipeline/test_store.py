@@ -186,3 +186,52 @@ def test_a_new_reading_that_changes_a_verified_figure_of_its_filing_goes_to_revi
     assert list(held) == ["crpo"]
     assert held["crpo"]["validation_status"] == "needs_review" and held["crpo"]["value"] == 25_900_000_000.0
     assert held["crpo"]["notes"][-1] == "a new reading of this filing differs from the figure served before: 12,800,000,000"
+
+
+def _breakdown(key, value, group="products", accession="f1", **fields):
+    return _row(key, value=value, accession=accession, group_key=group, group_kind="revenue_breakdown",
+                group_label="Net sales by category", group_order=1, kpi_label=key.title(), **fields)
+
+
+def test_a_re_read_keeps_the_group_its_earlier_reading_used():
+    # Apple: its 2018 release lines were read under products; the KPI list since names the breakdown anew.
+    store = _store()
+    store.load([_breakdown("iphone", 61.0), _breakdown("mac", 6.8)], [{"accession": "f1", "status": "processed"}])
+    renamed = [_breakdown("iphone", 61.0, group="kpi_revenue_by_product_type"),
+               _breakdown("mac", 6.8, group="kpi_revenue_by_product_type")]
+    store.record(FilingReading(_ref(), "processed", records=renamed))
+    kept = {key: row for key, row in store.values.items() if row["validation_status"] == "verified"}
+    assert {key[0] for key in kept} == {"products"} and len(kept) == 2
+    assert all(row["group_label"] == "Net sales by category" for row in kept.values())
+
+
+def test_a_re_read_that_reads_other_figures_takes_its_own_group():
+    store = _store()
+    store.load([_breakdown("iphone", 61.0), _breakdown("mac", 6.8)], [{"accession": "f1", "status": "processed"}])
+    store.record(FilingReading(_ref(), "processed", records=[_breakdown("iphone", 70.0, group="kpi_new")]))
+    assert store.values[("kpi_new", "iphone", "2026", "Q2")]["validation_status"] == "verified"
+    assert store.values[("products", "iphone", "2026", "Q2")]["validation_status"] == "rejected"
+
+
+STATED = {"row_label": "Capital invested", "row_numbers": [9833], "scale": 1e6}
+
+
+def test_a_re_read_keeps_a_verified_figure_its_filing_states_that_the_new_reading_missed():
+    # KKR's Q4 2019 capital invested, $9.8B, read from its named row; a re-read on 2026-11-09 did not produce it.
+    store = _store()
+    store.windows = {("kpi_x", "capital_invested"): (None, None), ("kpi_x", "other"): (None, None)}
+    store.load([_row("capital_invested", value=9_833e6, unit="currency", kpi_label="Capital Invested", locator=STATED),
+                _row("other", value=5.0, unit="currency", kpi_label="Other", locator={})],
+               [{"accession": "f1", "status": "processed"}])
+    store.record(FilingReading(_ref(), "processed", records=[_row("fresh", value=1.0)]))
+    assert store.values[("kpi_x", "capital_invested", "2026", "Q2")]["validation_status"] == "verified"
+    assert store.values[("kpi_x", "other", "2026", "Q2")]["validation_status"] == "rejected"  # nothing shows it
+
+
+def test_a_figure_read_again_elsewhere_or_dropped_from_the_list_is_replaced():
+    store = _store()
+    store.windows = {("kpi_x", "renamed"): (None, None)}
+    store.load([_row("capital_invested", value=9_833e6, unit="currency", kpi_label="Capital Invested", locator=STATED)],
+               [{"accession": "f1", "status": "processed"}])
+    store.record(FilingReading(_ref(), "processed", records=[_row("renamed", value=9_833e6)]))
+    assert store.values[("kpi_x", "capital_invested", "2026", "Q2")]["validation_status"] == "rejected"
