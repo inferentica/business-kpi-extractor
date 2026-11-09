@@ -89,6 +89,9 @@ def _currency_row(cells: list[Cell]) -> bool:
     return len(money) > 1 or money[0].start > 0 and bool(currencies_named(money[0].text))
 
 
+_OPEN_ENDED = re.compile(r"\b(at|of|for|and|in|to|from|on|by|with|the|net\s+of|before|after)\s*$", re.I)
+
+
 def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
     """A table's rows, its header rows (those above the first figures) and whether it has figures."""
     rows, header, seen_figures = [], [], False
@@ -116,6 +119,11 @@ def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
                 header.append([cell for cell in cells if cell.text])
             elif row.label:
                 rows.append(Row(label=row.label, level=row.level, cells=cells))
+        elif rows and rows[-1].figures and row.label[:1].islower() and _OPEN_ENDED.search(rows[-1].label):
+            # A label run on below its figures (Scotiabank's May 2003 6-K: "Cash and cash equivalents at  255" /
+            # "end of period").
+            rows[-1] = Row(label=f"{rows[-1].label} {row.label}", level=rows[-1].level, figures=rows[-1].figures,
+                           cells=rows[-1].cells)
         else:
             rows.append(row)
     return rows, header, seen_figures
