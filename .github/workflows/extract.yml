@@ -66,10 +66,6 @@ jobs:
       - run: uv pip install '.[test]'
       # The tests gate every extraction: a commit that breaks them never touches stored data.
       - run: pytest -q -x
-      # A manual run is a backfill that can wait for half-price hours; a scheduled run reads a filing just published.
-      - name: Wait for DeepSeek off-peak prices
-        if: (inputs.trigger_type || 'manual') == 'manual'
-        run: python -m kpi_extractor.ops.offpeak
       - name: Read filings and store KPIs
         # Inputs reach the command as environment variables, never as interpolated shell text.
         env:
@@ -79,4 +75,6 @@ jobs:
           TRIGGER: ${{ inputs.trigger_type || 'manual' }}
           FORCE: ${{ inputs.force_refresh && '--force' || '' }}
           RETRACE: ${{ inputs.retrace && '--retrace' || '' }}
+        # A manual run waits for DeepSeek's half-price hours inside the command, after taking its run (ops/cli.py), so
+        # the watcher never gives it up as never started; a scheduled run reads a filing just published.
         run: python -m kpi_extractor --run-id "$RUN_ID" --symbols "$SYMBOLS" --quarters "$QUARTERS" --trigger "$TRIGGER" $FORCE $RETRACE

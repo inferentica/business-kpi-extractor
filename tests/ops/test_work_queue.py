@@ -94,3 +94,22 @@ def test_a_company_result_is_bounded_and_carries_the_memory_left():
     data = cli.company_result(result, 9.456)
     assert len(data["errors"]) == 5 and all(len(error) == 300 for error in data["errors"])
     assert len(data["q4_gaps"]) == 10 and data["lowest_available_gb"] == 9.46 and data["symbol"] == "TSM"
+
+
+def test_a_manual_run_waits_for_off_peak_after_taking_its_run_and_keeps_it_alive():
+    from datetime import datetime, timedelta, timezone
+    clock = [datetime(2026, 11, 9, 3, 57, 30, tzinfo=timezone.utc)]  # a Monday, 2.5 minutes before peak hours end
+    def sleep(seconds):
+        clock[0] += timedelta(seconds=seconds)
+    queue = Queue([])
+    cli.wait_for_offpeak(queue, log=lambda *_: None, sleep=sleep, clock=lambda: clock[0])
+    assert clock[0] >= datetime(2026, 11, 9, 4, 0, tzinfo=timezone.utc)
+    assert queue.calls == ["renew", "renew", "renew"]  # every minute while waiting, and once at the end
+
+
+def test_off_peak_runs_do_not_wait():
+    from datetime import datetime, timezone
+    queue = Queue([])
+    cli.wait_for_offpeak(queue, sleep=lambda _s: (_ for _ in ()).throw(AssertionError("waited")),
+                         clock=lambda: datetime(2026, 11, 9, 4, 30, tzinfo=timezone.utc))
+    assert queue.calls == []

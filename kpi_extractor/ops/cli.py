@@ -11,9 +11,11 @@ import threading
 import time
 import traceback
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from datetime import datetime, timedelta, timezone
 
 from .control import ControlError, ControlPlane, DryRunControl
 from .memory import MemoryWatch, peak_gb
+from .offpeak import seconds_until_offpeak
 from ..pipeline import SymbolPipeline, SymbolResult
 from ..sources.sec import _temporary, configure_identity
 
@@ -100,6 +102,22 @@ def company_pool(workers: int) -> ProcessPoolExecutor:
 RENEW_SECONDS = 60
 
 
+def wait_for_offpeak(control, log=print, sleep=time.sleep, clock=lambda: datetime.now(timezone.utc)) -> None:
+    """A run that can wait for DeepSeek's half-price hours waits here, after taking its run, renewing it every minute so
+    the watcher sees a live worker. Waiting before taking it, a Refresh pressed early in a peak (up to four hours) was
+    given up as never started every 20 minutes until its attempts ran out (NVDA and AVGO, 2026-11-09)."""
+    remaining = seconds_until_offpeak(clock())
+    if not remaining:
+        return
+    log(f"DeepSeek peak hours: waiting {timedelta(seconds=remaining)} for off-peak prices")
+    while (remaining := seconds_until_offpeak(clock())) > 0:
+        sleep(min(RENEW_SECONDS, remaining))
+        try:
+            control.call("renew", attempts=2)
+        except ControlError as error:
+            log(f"Could not renew the run while waiting: {str(error)[:200]}")
+
+
 def company_result(result: SymbolResult, lowest_available_gb: float | None = None) -> dict:
     """What the control plane keeps of a company's reading, for the run's summary."""
     data = dataclasses.asdict(result)
@@ -172,6 +190,8 @@ def main(argv: list[str] | None = None) -> int:
         # A Refresh (or a newly watched company) waits for a run already on its company; scheduled runs move on.
         waits = args.trigger in ("manual", "watchlist_add")
         if started.get("queued"):
+            if args.trigger == "manual":
+                wait_for_offpeak(control, log=lambda line: print(line, flush=True))
             with company_pool(workers) as pool, MemoryWatch(pool, log=lambda line: print(line, flush=True)) as memory:
                 # Kept on the run, so a worker that carries on after a lost one retraces too.
                 finished = work_queue(control, pool, workers, quarters, force, waits, memory,

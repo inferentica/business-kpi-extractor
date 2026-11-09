@@ -112,7 +112,7 @@ jobs:
           cache-dependency-glob: pyproject.toml
       - run: uv pip install .
       - name: Wait for DeepSeek off-peak prices
-        if: inputs.offpeak != false
+        if: github.event_name != 'workflow_dispatch' || inputs.offpeak  # a push or the schedule waits too (an unset input equals false)
         run: python -m kpi_extractor.ops.offpeak
       - name: Score each prompt
         if: inputs.suite == 'prompts'
@@ -179,7 +179,7 @@ jobs:
           assert '1,234' in words.replace(' ', '') or '1234' in words.replace(',', ''), words
           "
       - name: Wait for DeepSeek off-peak prices
-        if: inputs.offpeak != false
+        if: github.event_name != 'workflow_dispatch' || inputs.offpeak  # a push or the schedule waits too (an unset input equals false)
         run: docker run --rm extractor python -m kpi_extractor.ops.offpeak
       - name: Score against the golden set
         env:
