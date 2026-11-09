@@ -52,3 +52,15 @@ def test_a_row_held_for_itself_or_shared_or_counted_twice_keeps_its_hold():
 def test_a_row_the_next_years_release_confirmed_stands():
     now = row("wealth", 4_757_000.0, "2025-09-30", notes=("parts differ from the total by 36.4%", "confirmed by the next year's release"))
     assert [v["kpi_key"] for v in tied_rows([now])] == ["wealth"]
+
+
+def test_a_jump_the_next_years_release_confirms_stands():
+    # TSMC's 3-nanometer revenue, Q3 2023: NT$29.0 billion after NT$0.5 billion as the node ramped, the same figure the
+    # Q3 2024 report gives for the year before.
+    ramp = row("nm3", 28_994_752_000.0, "2023-09-30", notes=("changed 59.9x in a quarter", "confirmed by the next year's release"))
+    assert [v["kpi_key"] for v in tied_rows([ramp])] == ["nm3"]
+    # Unconfirmed, the jump keeps its hold; so does any other hold of its own.
+    assert tied_rows([row("nm3", 28_994_752_000.0, "2023-09-30", notes=("changed 59.9x in a quarter",))]) == []
+    scaled = row("nm3", 28_994_752_000.0, "2023-09-30",
+                 notes=("changed 59.9x in a quarter", "confirmed by the next year's release", "table declares scale 1e+06, AI said 1e+03"))
+    assert tied_rows([scaled]) == []

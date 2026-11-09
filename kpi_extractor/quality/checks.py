@@ -5,6 +5,7 @@ How a reader reads stays with the reader: a chart's or a release table's rows mu
 all. These checks judge what has been read."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Callable, Iterable
@@ -140,6 +141,11 @@ def _lines_add_up(figures: list[Figure], **_context) -> list[Finding]:
         if abs(error) > (MIX_TOLERANCE / 100 if parent.kind == "mix" else BREAKDOWN_TOLERANCE):
             found.append(Finding("lines_add_up", [parent, *lines], f"lines differ from {parent.label} by {error:.1%}"))
     return found
+
+
+# The notes the jump checks below write. A jump is a sign of a misread, which a later filing stating the same figure
+# disproves: TSMC's 3-nanometer revenue went from NT$0.5 billion to NT$29 billion as the node ramped.
+JUMP_NOTE = re.compile(r"^(?:changed [\d.]+x|moved [+-]?[\d.,]+(?: points)?) in a quarter$")
 
 
 def count_jump(unit: str, before: float, now: float) -> str | None:

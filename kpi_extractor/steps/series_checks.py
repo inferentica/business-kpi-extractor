@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from ..ai import Spec
 from ..domain.derive import derive_periods, same_derivation
 from ..documents.document import Document, parse_number
-from ..quality.checks import count_jump, parts_add_up, reported_matches
+from ..quality.checks import JUMP_NOTE, count_jump, parts_add_up, reported_matches
 from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
 from ..sources.base import FilingRef
 from .shared import (AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
@@ -94,10 +94,11 @@ def tied_rows(values: list[dict]) -> list[dict]:
     """Breakdown rows held only for their group (parts off the total, a total no XBRL figure matches, another row's
     hold) whose own row ties out to last year's accepted figure: UCB's fee lines beside an unlisted remainder, Henry
     Schein's U.S. products, PNC's fee types. A row a second KPI shares (Axia's "Contractual" twice) never stands alone,
-    and a row held for itself (its scale, a jump, its period, a place, a twin row) keeps its hold. Oldest first, so a
-    row cleared this way is last year's figure for the next."""
+    and a row held for itself (its scale, a jump, its period, a place, a twin row) keeps its hold; a jump only until the
+    next year's release states the same figure. Oldest first, so a row cleared this way is last year's figure for the next."""
     def group_held_only(v: dict) -> bool:
-        own = [note for note in v.get("notes") or [] if not note.startswith((*_ASIDE, *_PROOFS)) and not _EXACT_NOTE.match(note)]
+        own = [note for note in v.get("notes") or [] if not note.startswith((*_ASIDE, *_PROOFS)) and not _EXACT_NOTE.match(note)
+               and not (_CONFIRMED_LATER in v["notes"] and JUMP_NOTE.match(note))]  # a later filing's same figure: no misread
         return all(note.startswith(_GROUP_HOLDS) for note in own)
 
     # Last year's figure counts when it is accepted, or held only for its group and read from another filing: two
