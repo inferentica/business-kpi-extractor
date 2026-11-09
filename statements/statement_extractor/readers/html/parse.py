@@ -125,7 +125,9 @@ def _side_by_side(lines: list[list[Cell]]) -> int | None:
             continue
         figured += 1
         for position, (start, is_figure) in enumerate(kinds):
-            if not is_figure and start > 0 and any(f for _s, f in kinds[:position]) and any(f for _s, f in kinds[position + 1:]):
+            # Two figure cells on each side at least: a note number before a label is no statement beside it (ASML).
+            if not is_figure and start > 0 and sum(f for _s, f in kinds[:position]) >= 2 and \
+                    sum(f for _s, f in kinds[position + 1:]) >= 2:
                 starts[start] = starts.get(start, 0) + 1
                 break
     if not starts or figured < 6:
