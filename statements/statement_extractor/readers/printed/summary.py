@@ -77,6 +77,8 @@ def _years(table: Table) -> list[str]:
     return years[-width:]
 
 
+_PER_SHARE_HEADING = re.compile(r"\bper\b.*\b(share|unit|ads)\b|\bper[-\s]share\b", re.I)
+_CAPTION = re.compile(r"\bexcept\b|\bin\s+(millions|thousands|billions)\b", re.I)  # "(in millions, except per share)"
 _BASIS = re.compile(r"^(u\.?s\.?|roc|r\.o\.c\.|canadian|dutch|netherlands|taiwan)?\s*(gaap|ifrs)$", re.I)
 
 
@@ -116,14 +118,21 @@ def read_summaries(tables: list[Table], *, accession: str, form: str, filed: dat
         scale = statement_scale([table])
         if scale is None:
             continue  # no stated scale: a figure in thousands read as millions is worse than none
-        years, first_basis, basis, seen = _years(table), None, None, set()
+        years, first_basis, basis, seen, per_share = _years(table), None, None, set(), False
         for number, row in enumerate(table.rows):
             below = table.rows[number + 1] if number + 1 < len(table.rows) else None
             if not row.label.strip() and below is not None and not below.figures and _key(below.label):
                 row = replace(row, label=below.label)  # a label set below its figures (ASML's FY2001 "Total assets")
-            if not row.figures and _BASIS.match(row.label.strip(" :")):
-                basis = re.sub(r"\W", "", row.label.lower())
-                first_basis = first_basis or basis
+            if not row.figures and not row.printed:
+                if _BASIS.match(row.label.strip(" :")):
+                    basis = re.sub(r"\W", "", row.label.lower())
+                    first_basis = first_basis or basis
+                elif row.label.strip():
+                    # Lines under "Per fully diluted share:" are per share, whatever they are called (Brookfield's
+                    # "Net income  1.02").
+                    per_share = bool(_PER_SHARE_HEADING.search(row.label)) and not _CAPTION.search(row.label)
+                continue
+            if per_share:
                 continue
             name = _key(row.label)
             if name is None or name in seen or basis != first_basis:

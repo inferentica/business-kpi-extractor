@@ -23,6 +23,7 @@ from ..selection.signs import sign_ties
 from ..selection.summaries import choose_summaries, summary_coverage
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
 from ..sources.listing import filing_for, list_reports
+from ..sources.retry import with_network_retries
 from .printed import read_printed
 from .archives import read_archives
 from .releases import read_releases
@@ -41,8 +42,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         fiscal_year_end = year_ends[ref.accession]
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False}
         try:
-            load_submission(ref.filing)
-            xbrl = ref.filing.xbrl()
+            xbrl = with_network_retries(lambda: (load_submission(ref.filing), ref.filing.xbrl())[1])
         except Exception as error:  # noqa: BLE001 - one unreadable filing never stops the company
             record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"
             filings.append(record)
