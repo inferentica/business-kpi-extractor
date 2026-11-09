@@ -142,9 +142,6 @@ def stated_currency(text: str) -> str | None:
 
 
 def default_currency(form: str) -> str | None:
-    """A form's currency when nothing says otherwise: a U.S. company's dollars, a Canadian filer's dollars (a 40-F
-    reporting in U.S. dollars says so); a 20-F or a release must state its own."""
-    form = form.upper()
-    if form.startswith(("10-K", "10-Q")):
-        return "USD"
-    return "CAD" if form.startswith("40-F") else None
+    """A form's currency when nothing says otherwise: a U.S. company's dollars. A 40-F, a 20-F or a release must state
+    its own: Brookfield files 40-Fs and reports in U.S. dollars, saying so only in its XBRL."""
+    return "USD" if form.upper().startswith(("10-K", "10-Q")) else None

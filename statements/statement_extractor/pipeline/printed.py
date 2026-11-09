@@ -3,6 +3,8 @@ periodic report, the furnished exhibits (EX-99) for a results release, in HTML (
 (about 1993-2000). Each document's basis is the one it states; its EX-27 schedules check what it prints."""
 from __future__ import annotations
 
+import re
+
 from datetime import date
 
 from ..checks.schedules import parse_schedule, schedule_check
@@ -20,6 +22,19 @@ from ..sources.documents import PRINTED_DOCUMENTS, release_documents
 from .unstated_scale import with_proven_scale
 
 _ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
+_FILE_NUMBER = re.compile(r"Commission\s+File\s+(?:No\.?|Number)\s*:?\s*(\d{3}-\d{4,6})", re.I)
+
+
+def another_registrant(ref, attachments) -> str | None:
+    """The Commission File Number a 6-K's cover names, when it is not the company's own."""
+    own = str(getattr(ref.filing, "file_number", "") or "").strip()
+    cover = next((item for item in attachments if str(item.document_type or "").upper().startswith("6-K")), None)
+    if not own or cover is None:
+        return None
+    content = cover.content
+    text = re.sub(r"<[^>]+>|&#160;|&nbsp;", " ", content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or ""))
+    match = _FILE_NUMBER.search(text[:20_000])
+    return match.group(1) if match and match.group(1) != own else None
 _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anything far larger is no statement
 
 
@@ -37,6 +52,11 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         except ValueError:
             document_end = None
     attachments = list(ref.filing.attachments)
+    other = another_registrant(ref, attachments) if release else None
+    if other:
+        # A subsidiary's report furnished beside the company's (Lloyds Bank plc's, file 001-35079, under Lloyds
+        # Banking Group's 001-15246): another issuer's statements, never the company's.
+        return [], [f"another registrant's report (Commission File Number {other})"], ["other registrant"]
     if any(str(item.document_type or "").upper().startswith(_ASSET_BACKED) for item in attachments):
         # An asset-backed issuer's report the company files for a trust (Scotiabank's covered bonds): Regulation AB's
         # servicing exhibits, no statements of the company's own.

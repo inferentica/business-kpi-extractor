@@ -99,6 +99,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
                                          printed_signs))
     _release_bases(readings)
+    _filing_currencies(readings)
     readings = align_dates(readings)
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
     chosen = choose(readings, printed_signs)
@@ -158,6 +159,16 @@ def _period_end(ref) -> date | None:
     except Exception:  # noqa: BLE001
         return None
     return None if end is not None and (ref.filed - end).days < 7 else end
+
+
+def _filing_currencies(readings) -> None:
+    """A printed statement that states no currency is in the currency its own filing's XBRL gives the same statement
+    (Brookfield's 40-Fs: their tags are in U.S. dollars, their printed pages name none)."""
+    tagged = {(reading.accession, reading.statement): reading.currency for reading in readings
+              if reading.source == "xbrl" and reading.currency}
+    for reading in readings:
+        if reading.currency is None and reading.source != "xbrl":
+            reading.currency = tagged.get((reading.accession, reading.statement))
 
 
 def _release_bases(readings) -> None:

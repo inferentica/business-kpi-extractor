@@ -102,10 +102,24 @@ def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
 def _reporting_currencies(readings: list[Reading]) -> dict[str, set[str]]:
     """Each fiscal year's reporting currencies: those the annual reports presenting the year state. UBS reported in
     Swiss francs to 2017 and in U.S. dollars from 2018, its 2018 20-F restating 2016 and 2017 in dollars."""
-    years: dict[str, set[str]] = defaultdict(set)
+    # Each year's own annual report states its currency (most of its statements), and a report up to two years later
+    # may restate it in its own; a translation column read in an annual report (KEPCO's US$) is neither.
+    counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for reading in readings:
-        if reading.form != "6-K" and reading.fiscal_period == "FY" and reading.currency:
-            years[reading.fiscal_year].add(reading.currency)
+        if reading.own and reading.form != "6-K" and reading.fiscal_period == "FY" and reading.currency:
+            counts[reading.fiscal_year][reading.currency] += 1
+    own = {int(year): max(by, key=by.get) for year, by in counts.items()}
+    if not own:
+        return {}
+    first, last = min(own), max(own)
+    years: dict[str, set[str]] = {}
+    for year in range(min(first, 1990), max(last, 2100) + 1):
+        later = {own[other] for other in range(year, year + 3) if other in own}
+        # a year with no annual report of its own read: the nearest year's currency
+        nearest = own[min(own, key=lambda other: (abs(other - year), other))]
+        years[str(year)] = later or {nearest}
+        if year not in own:
+            years[str(year)].add(nearest)
     return years
 
 

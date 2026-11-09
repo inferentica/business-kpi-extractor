@@ -43,7 +43,8 @@ def test_a_canadian_banks_statements():
     readings = read(BANK)
     assert readings[("income", "2008")].status == "kept" and readings[("income", "2008")].lines[0]["value"] == 11_246e6
     assert readings[("cash_flow", "2008")].status == "kept"
-    assert default_currency("40-F") == "CAD" and default_currency("20-F") is None
+    # No currency is assumed from the form: Brookfield files 40-Fs in U.S. dollars.
+    assert default_currency("40-F") is None and default_currency("20-F") is None and default_currency("10-K") == "USD"
 
 
 # Brookfield FY2006: "(MILLIONS)", no income before taxes, net income from the subtotal above "Other items".
