@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import multiprocessing
 import os
 import re
 import sys
+import threading
 import time
 import traceback
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 
 from .control import ControlError, ControlPlane, DryRunControl
 from .memory import MemoryWatch, peak_gb
@@ -90,6 +92,63 @@ def company_pool(workers: int) -> ProcessPoolExecutor:
                                initializer=configure_identity)
 
 
+# Every minute the worker tells the control plane it is alive; ten minutes of silence and its companies go to a new one.
+RENEW_SECONDS = 60
+
+
+def company_result(result: SymbolResult, lowest_available_gb: float | None = None) -> dict:
+    """What the control plane keeps of a company's reading, for the run's summary."""
+    data = dataclasses.asdict(result)
+    data["errors"] = [str(error)[:300] for error in data["errors"][:5]]
+    data["q4_gaps"] = data["q4_gaps"][:10]
+    data["lowest_available_gb"] = round(lowest_available_gb, 2) if lowest_available_gb is not None else None
+    return data
+
+
+def work_queue(control, pool, workers: int, quarters: int, force: bool, waits: bool, memory=None, log=print) -> str | None:
+    """Takes the run's companies from its queue a few at a time and reports each as it finishes. If this worker dies,
+    its companies go back to the queue and a new worker carries on; the run finishes when its last company does.
+    Returns how the run finished, when this worker finished it."""
+    in_flight: dict = {}
+    finished = None
+    claiming = True
+    stop = threading.Event()
+
+    def renew():
+        while not stop.wait(RENEW_SECONDS):
+            try:
+                control.call("renew", attempts=2)
+            except ControlError as error:
+                log(f"Could not renew this worker's companies: {str(error)[:200]}")
+
+    renewing = threading.Thread(target=renew, daemon=True)
+    renewing.start()
+    try:
+        while True:
+            while claiming and len(in_flight) < workers:
+                reply = control.call("claim")
+                symbol = reply.get("symbol")
+                if not symbol:
+                    claiming = False
+                    finished = reply.get("finished") or finished
+                    break
+                log(f"{symbol}: claimed")
+                in_flight[pool.submit(process_symbol, control, symbol, quarters, force, waits)] = symbol
+            if not in_flight:
+                return finished
+            done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+            for future in done:
+                symbol = in_flight.pop(future)
+                result = future.result()  # a broken pool raises: the worker is lost and its companies requeued
+                lowest = getattr(memory, "lowest_available_gb", None)
+                reply = control.call("complete", symbol=symbol, result=company_result(result, lowest))
+                if not reply.get("accepted"):
+                    log(f"{symbol}: no longer this worker's; its result was not kept")
+                finished = reply.get("finished") or finished
+    finally:
+        stop.set()
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     configure_identity()
@@ -97,16 +156,23 @@ def main(argv: list[str] | None = None) -> int:
     try:
         symbols = normalize_symbols(args.symbols)
         started = control.call("start", runId=args.run_id or None, triggerType=args.trigger, symbols=symbols,
-                               quarters=max(1, min(args.quarters, 40)), forceRefresh=args.force)
+                               quarters=max(1, min(args.quarters, 40)), forceRefresh=args.force,
+                               queued=not args.dry_run)
         control.run_id = started["runId"]
         symbols = normalize_symbols(started.get("symbols") or [])
         quarters, force = int(started.get("quarters") or args.quarters), bool(started.get("forceRefresh"))
         print(f"Run {control.run_id}: {len(symbols)} companies, {quarters} quarters{' (forced)' if force else ''}")
 
         workers = max(1, min(args.workers, len(symbols) or 1))
+        # A Refresh (or a newly watched company) waits for a run already on its company; scheduled runs move on.
+        waits = args.trigger in ("manual", "watchlist_add")
+        if started.get("queued"):
+            with company_pool(workers) as pool, MemoryWatch(pool, log=lambda line: print(line, flush=True)) as memory:
+                finished = work_queue(control, pool, workers, quarters, force, waits, memory,
+                                      log=lambda line: print(line, flush=True))
+            print(f"Run {control.run_id}: {'finished, ' + finished if finished else 'this worker is done'}")
+            return 0
         with company_pool(workers) as pool:
-            # A Refresh (or a newly watched company) waits for a run already on its company; scheduled runs move on.
-            waits = args.trigger in ("manual", "watchlist_add")
             with MemoryWatch(pool, log=lambda line: print(line, flush=True)) as memory:
                 results = list(pool.map(process_symbol, [control] * len(symbols), symbols,
                                         [quarters] * len(symbols), [force] * len(symbols), [waits] * len(symbols)))
