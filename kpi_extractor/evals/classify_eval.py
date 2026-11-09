@@ -15,6 +15,10 @@ from ..sources.sec import classification_excerpt, company_profile, configure_ide
 CASES = Path("evals/classify.json")
 
 
+def _one_line(text: str) -> str:
+    return " ".join(text.split())
+
+
 def main() -> int:
     configure_identity()
     cases = json.loads(CASES.read_text())
@@ -34,17 +38,17 @@ def main() -> int:
             answer = classify_by_rules(excerpt)
             if answer is None:
                 outcome["left to AI"] += 1
-                undecided.append((symbol, ref.accession, label, titles(excerpt)[:300]))
+                undecided.append((symbol, ref.accession, label, _one_line(titles(excerpt))[:400]))
             elif answer == label:
                 outcome["right"] += 1
             else:
                 outcome["wrong"] += 1
-                wrong.append((symbol, ref.accession, label, answer, titles(excerpt)[:300]))
+                wrong.append((symbol, ref.accession, label, answer, _one_line(titles(excerpt))[:700]))
     found = sum(outcome.values())
     print(f"Classify rules on {found} of {len(cases)} past classifications: {dict(outcome)}")
     for item in wrong:
         print("WRONG", *item, sep=" | ")
-    for item in undecided[:80]:
+    for item in undecided[:260]:
         print("AI", *item, sep=" | ")
     return 1 if wrong else 0
 
