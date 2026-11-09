@@ -1,0 +1,53 @@
+name: Statements hand checks
+
+# Raw printed rows for the sampled served lines in statements/evals/handcheck/sample.json, fetched from each source
+# filing (or its archived PDF) and handed back as an artifact for a person to read. Stores nothing, holds no secrets,
+# calls no AI.
+on:
+  push:
+    branches: ["statements/handcheck"]
+    paths:
+      - "statements/evals/handcheck/**"
+      - "statements/statement_extractor/pipeline/handcheck.py"
+      - ".github/workflows/statements-handcheck.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+      STATEMENTS_ARCHIVE_CACHE: archive-cache
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - uses: actions/cache/restore@v4
+        with:
+          path: archive-cache
+          key: statements-archive-TSM-handcheck
+          restore-keys: statements-archive-TSM-
+      - uses: actions/cache/restore@v4
+        with:
+          path: archive-cache-asml
+          key: statements-archive-ASML-handcheck
+          restore-keys: statements-archive-ASML-
+      - run: cp -rn archive-cache-asml/. archive-cache/ 2>/dev/null || true
+      - run: python -m statement_extractor rows statements/evals/handcheck/sample.json --out rows.md
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: statements-handcheck-rows
+          path: rows.md
+          retention-days: 30

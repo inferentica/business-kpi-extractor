@@ -4,7 +4,7 @@ name: Statements
 # them back as this run's artifacts; it stores nothing anywhere else, holds no secrets and calls no AI.
 on:
   push:
-    branches: ["statements/**"]
+    branches: ["statements/**", "!statements/handcheck"]  # hand-check rows run on their own (statements-handcheck.yml)
     paths:
       - "statements/**"
       - ".github/workflows/statements.yml"
