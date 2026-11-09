@@ -7,9 +7,11 @@ from datetime import date
 
 from ..checks.schedules import parse_schedule, schedule_check
 from ..domain.basis import default_basis, default_currency, stated_basis, stated_currency
+from ..domain.calendar import ANNUAL_FORMS
 from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
 from ..readers.printed.sign_index import printed_figures
+from ..readers.printed.summary import read_summaries
 from ..readers.slides.parse import is_slides, parse_slides
 from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
@@ -21,9 +23,10 @@ _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anythi
 
 
 def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None = None,
-                 document_end: date | None = None) -> tuple[list, list[str], list[str]]:
+                 document_end: date | None = None, summaries: list | None = None) -> tuple[list, list[str], list[str]]:
     """A filing without XBRL, read from its printed documents. A release's own period is its quarter (`document_end`).
-    With `signs`, every figure its tables print is also collected there by label."""
+    With `signs`, every figure its tables print is also collected there by label; with `summaries`, an annual report's
+    multi-year summary figures (readers/printed/summary.py)."""
     found, notes, kinds = [], [], []
     release = ref.form == "6-K"
     if document_end is None and not release:
@@ -74,6 +77,12 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                 signs.setdefault(key, []).extend(figures)
         basis, currency = stated_basis(content), stated_currency(content)
         filing_basis, filing_currency = filing_basis or basis, filing_currency or currency
+        if summaries is not None and ref.form in ANNUAL_FORMS and printed != "slides":
+            tables = (parse_html if printed == "html" else parse_text)(content)
+            for figure in read_summaries(tables, accession=ref.accession, form=ref.form, filed=ref.filed,
+                                         fiscal_year_end=fiscal_year_end, year_offset=year_offset):
+                summaries.append({**figure, "document": attachment.document, "basis": basis or default_basis(ref.form),
+                                  "currency": currency or default_currency(ref.form)})
         for reading in readings:
             reading.basis = basis
             reading.currency = reading.currency or currency

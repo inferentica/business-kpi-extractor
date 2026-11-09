@@ -24,6 +24,17 @@ def report(folders: list[Path]) -> str:
                      f"{status.get('kept', 0)} | {status.get('rejected', 0)} | {status.get('unproven', 0)} | "
                      f"{row['own_kept']}/{row['own_expected']} ({coverage:.1%}) | {row['comparative_only_periods']} | "
                      f"{row['restated_periods']} | {len(row['mixed_vintage_q4'])} | {row['ai_calls']} | {row['cost_cny']:.2f} |")
+    summaries = [(row["symbol"], row["summary_figures"]) for row in sorted(rows, key=lambda item: item["symbol"])
+                 if row.get("summary_figures", {}).get("tables")]
+    if summaries:
+        lines.append("\n| Company | First statement year | Summary years served | Before statements | Tables verified / "
+                     "unverified / contradicted | Figures checked (differ) |\n|---|---|---|---|---|---|")
+        for symbol, figures in summaries:
+            tables, years = figures["tables"], figures["years"]
+            span = f"{years[0]}-{years[-1]} ({len(years)})" if years else "none"
+            lines.append(f"| {symbol} | {figures['first_statement_year']} | {span} | {len(figures['before_statements'])} | "
+                         f"{tables['verified']} / {tables['unverified']} / {tables['contradicted']} | "
+                         f"{figures['checked']} ({figures['differ']}) |")
     if total["expected"]:
         lines.append(f"\nOwn-period coverage, all companies: {total['kept']}/{total['expected']} "
                      f"({total['kept'] / total['expected']:.1%}). AI calls: 0. Cost: ¥0.")

@@ -20,6 +20,7 @@ from ..readers.xbrl.read import read_filing
 from ..selection.choose import choose
 from ..selection.period_dates import align_dates
 from ..selection.signs import sign_ties
+from ..selection.summaries import choose_summaries, summary_coverage
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
 from ..sources.listing import filing_for, list_reports
 from .printed import read_printed
@@ -33,7 +34,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     started = time.time()
     profile, company = company_profile(symbol)
     reports = sorted(list_reports(company, since), key=lambda ref: ref.filed, reverse=True)
-    readings, filings, offset = [], [], None
+    readings, filings, offset, summaries = [], [], None, []
     annual_ends = [end for ref in reports if ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None]
     year_ends = {ref.accession: year_end_for(_period_end(ref), annual_ends, profile.fiscal_year_end) for ref in reports}
     for ref in reports:
@@ -47,7 +48,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
             filings.append(record)
             continue
         if xbrl is None:
-            found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0)
+            found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0, summaries=summaries)
             own = [reading for reading in found if reading.own]
             record.update({"note": "no XBRL", "printed": kinds, "columns": len(found), "notes": notes,
                            "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
@@ -89,9 +90,11 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log)
         filings.extend(records)
         readings.extend(found)
-        records, found = read_archives(symbol, profile.fiscal_year_end, offset or 0, log)  # the years on paper
-        filings.extend(record for record in records if record["filed"] >= since.isoformat())
+        archived_summaries: list[dict] = []
+        records, found = read_archives(symbol, profile.fiscal_year_end, offset or 0, log, archived_summaries)
+        filings.extend(record for record in records if record["filed"] >= since.isoformat())  # the years on paper
         readings.extend(reading for reading in found if reading.filed >= since)
+        summaries.extend(figure for figure in archived_summaries if figure["filed"] >= since.isoformat())
     printed_signs: dict[str, dict] = {}
     readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
                                          printed_signs))
@@ -100,12 +103,15 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
     chosen = choose(readings, printed_signs)
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
+    summary_figures = choose_summaries(summaries, readings, chosen)
+    summary["summary_figures"] = summary_coverage(summary_figures, chosen)
     with (out / "readings.jsonl").open("w") as handle:
         for reading in readings:
             handle.write(json.dumps(reading.to_json(), default=str) + "\n")
     (out / "chosen.json").write_text(json.dumps(chosen, default=str))
     (out / "filings.json").write_text(json.dumps(filings, default=str, indent=1))
     (out / "summary.json").write_text(json.dumps(summary, default=str, indent=1))
+    (out / "summary_figures.json").write_text(json.dumps({**summary_figures, "read": summaries}, default=str))
     return summary
 
 
