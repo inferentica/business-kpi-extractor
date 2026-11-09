@@ -57,7 +57,7 @@ CHANGE = re.compile(r"(increase|decrease|change).*\bcash\b|\bcash\b.*(increase|d
 EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translation", re.I)
 
 
-SECTIONS = re.compile(r"(operating|investing|financing)\s+activities$", re.I)
+SECTIONS = re.compile(r"(operating|investing|financing)\s+activities(\s+(from|of)\s+continuing\s+operations)?$", re.I)
 
 
 # Goldman Sachs: "Pre-tax earnings".

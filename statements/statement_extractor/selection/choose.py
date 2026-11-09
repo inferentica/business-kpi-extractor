@@ -36,7 +36,11 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
     for key, group in groups.items():
         kept = [reading for reading in group if reading.status == "kept"]
         own = next((reading for reading in sorted(group, key=lambda item: item.filed) if reading.own), None)
-        winner = max(kept, key=lambda item: (item.filed, item.own, item.source == "xbrl")) if kept else None
+        # A report filed with the SEC (10-K, 20-F, 10-Q) wins over a release for the same period: a release's year and
+        # year-end columns are unaudited, and the annual report that follows is the company's statement of them.
+        # The group's statement wins over the parent company's alone, whatever their filing dates.
+        winner = max(kept, key=lambda item: (item.scope == "consolidated", item.form != "6-K", item.filed, item.own,
+                                             item.source == "xbrl")) if kept else None
         record = {
             "statement": key[0], "fiscal_year": key[1], "fiscal_period": key[2], "duration": key[3],
             "period_end": max(reading.period_end for reading in group).isoformat(),
@@ -51,6 +55,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
             record.update({
                 "source_accession": winner.accession, "source_form": winner.form, "source_filed": winner.filed.isoformat(),
                 "from_comparative": not winner.own, "currency": winner.currency, "basis": winner.basis,
+                "scope": winner.scope,
                 "lines": winner.lines,
             })
             other = _other_bases(winner, kept)

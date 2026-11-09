@@ -15,3 +15,11 @@ def test_a_filing_takes_the_year_end_of_the_annual_report_that_closes_its_year()
 def test_a_52_53_week_year_keeps_its_usual_year_end():
     annual = [date(2006, 9, 30), date(2007, 9, 29)]
     assert year_end_for(date(2007, 6, 30), annual, "0926") == "0926"
+
+
+def test_a_release_reports_the_latest_quarter_end_five_days_before_it():
+    from datetime import date
+    from statement_extractor.domain.calendar import quarter_end_before
+    assert quarter_end_before(date(2003, 4, 16), "1231") == date(2003, 3, 31)
+    assert quarter_end_before(date(2010, 1, 3), "1231") == date(2009, 9, 30)
+    assert quarter_end_before(date(2010, 2, 20), "0926") == date(2009, 12, 26)

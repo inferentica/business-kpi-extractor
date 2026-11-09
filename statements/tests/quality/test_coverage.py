@@ -14,3 +14,16 @@ def test_a_filing_nothing_was_read_from_counts_as_missing():
     summary = summarise("AAPL", profile, date(1993, 1, 1), filings, [], chosen, 1.0)
     assert summary["own_expected"] == 6 and summary["own_kept"] == 3
     assert summary["own_missing"] == ["10-K 1997-12-05 unread"]
+
+
+def test_release_quarters_are_counted_from_the_first_releases_year():
+    from statement_extractor.quality.coverage import release_coverage
+    filings = [{"form": "6-K", "release_quarter": ["2002", "Q3"]}, {"form": "6-K", "release_quarter": ["2003", "Q1"]},
+               {"form": "6-K", "release_quarter": None}]
+    kept = {("income", "2002", f"Q{n}", "quarter") for n in range(1, 5)} | {("income", "2003", "Q1", "quarter"),
+                                                                            ("balance", "2003", "Q1", "instant"),
+                                                                            ("cash_flow", "2003", "Q1", "quarter")}
+    found = release_coverage(filings, kept, parent={("income", "2002", "Q1", "quarter")})
+    # 2002: four incomes, three balance sheets and three cash flows; 2003 Q1: three.
+    assert (found["quarters_expected"], found["quarters_kept"], found["quarters_parent_only"]) == (13, 7, 1)
+    assert "2002 Q1 balance" in found["quarters_missing"]

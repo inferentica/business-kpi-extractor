@@ -53,6 +53,26 @@ def _date(month: str, day: str, year: str) -> date | None:
         return None
 
 
+# A quarter by name and year: TSMC's "Q3 2007", "3Q 2007", "1Q08", "Third Quarter 2007".
+_QUARTER_NAME = re.compile(r"\b(?:Q([1-4])|([1-4])Q|(first|second|third|fourth)\s+quarter)(?:\s+of)?\s*[,']?\s*((?:19|20)\d{2}|\d{2})\b", re.I)
+_ORDINAL = {"first": 1, "second": 2, "third": 3, "fourth": 4}
+
+
+def _named_quarter(text: str, fiscal_year_end: str) -> date | None:
+    """The end of the fiscal quarter a header names, in the fiscal year it names (the year its fourth quarter ends)."""
+    match = _QUARTER_NAME.search(text)
+    if match is None:
+        return None
+    number = int(match.group(1) or match.group(2) or _ORDINAL[match.group(3).lower()])
+    year = int(match.group(4))
+    year += 2000 if year < 50 else 1900 if year < 100 else 0
+    month, day = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
+    back = month - 3 * (4 - number)
+    end_year, end_month = (year, back) if back > 0 else (year - 1, back + 12)
+    last = calendar.monthrange(end_year, end_month)[1]
+    return date(end_year, end_month, last if day >= 28 else min(day, last))
+
+
 def years_in_order(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[int, ...], str]:
     """Each column's year taken in order from a row of bare years, when that row prints one year for each column in
     the reporting currency: TSMC's FY2002 20-F prints "2000 | 2001 | 2002" a cell left of its figures, so "2001" sits
@@ -100,6 +120,10 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         above = header_text(first, column[0]) or header_text(first, column[-1])
         numeric = _NUMERIC_DATE.search(above)
         years = [in_order[column]] if column in in_order else _YEAR.findall(above)
+        named = _named_quarter(above, fiscal_year_end)
+        if named is not None and kind != "balance":
+            periods[column] = Period(named, named - timedelta(days=90))  # "Q3 2007", "3Q07": that quarter
+            continue
         if not years and not numeric:
             continue
         span = _SPAN.search(above) or title_span

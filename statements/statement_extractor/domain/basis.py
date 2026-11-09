@@ -17,7 +17,8 @@ _NAMES = (
     (TAIWAN_IFRS, r"(?:IFRSs?|International\s+Financial\s+Reporting\s+Standards)[^.;]{0,160}?(?:endorsed|recognized)[^.;]{0,80}?"
                   r"(?:Financial\s+Supervisory\s+Commission|FSC|Republic\s+of\s+China|ROC|Taiwan)|Taiwan[-\s]IFRSs?|"
                   r"Regulations\s+Governing\s+the\s+Preparation\s+of\s+Financial\s+Reports\s+by\s+Securities\s+Issuers[^.;]{0,200}?IFRS"),
-    (ROC_GAAP, r"(?:accounting\s+principles|GAAP)\s+generally\s+accepted\s+in\s+the\s+Republic\s+of\s+China|"
+    (ROC_GAAP, r"(?:accounting\s+principles|GAAP)\s+generally\s+accepted\s+in\s+(?:the\s+Republic\s+of\s+China|Taiwan)|"
+               r"generally\s+accepted\s+accounting\s+principles\s+in\s+Taiwan|\bTaiwan\s+GAAP\b|"
                r"generally\s+accepted\s+accounting\s+principles\s+(?:in|of)\s+the\s+Republic\s+of\s+China|\bR\.?O\.?C\.?\s+GAAP\b|"
                r"Regulations\s+Governing\s+the\s+Preparation\s+of\s+Financial\s+Reports\s+by\s+Securities\s+Issuers"),
     (US_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+the\s+United\s+States|"

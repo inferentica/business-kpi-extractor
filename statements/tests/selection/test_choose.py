@@ -118,3 +118,18 @@ def test_a_period_restated_on_a_new_basis_keeps_its_first_basis_on_record():
     [chosen] = choose([first, again])
     assert chosen["basis"] == "IFRS" and chosen["source_accession"] == "fy2013"
     assert [(item["basis"], item["source_accession"]) for item in chosen["other_bases"]] == [("ROC GAAP", "fy2012")]
+
+
+def test_a_label_printed_twice_takes_each_occurrences_own_sign():
+    # Salesforce FY2012 cash flows: the excess tax benefit is taken away under operating and added under financing.
+    from statement_extractor.selection.signs import _signs_from
+    def flows(source, operating, financing):
+        found = reading("crm", date(2014, 3, 5), 0, own=False, statement="cash_flow")
+        found.source = source
+        found.lines = [{"line": 0, "concept": "c", "label": "Excess tax benefits from employee stock plans", "level": 0,
+                        "is_heading": False, "value": operating},
+                       {"line": 1, "concept": "c", "label": "Excess tax benefits from employee stock plans", "level": 0,
+                        "is_heading": False, "value": financing}]
+        return found
+    settled = _signs_from(flows("xbrl", -6018, -6018), flows("html", -6018, 6018))
+    assert [line["value"] for line in settled.lines] == [-6018, 6018]
