@@ -3,7 +3,9 @@ periodic report, the furnished exhibits (EX-99) for a results release, in HTML (
 (about 1993-2000). Each document's basis is the one it states; its EX-27 schedules check what it prints."""
 from __future__ import annotations
 
+import html
 import re
+import unicodedata
 
 from datetime import date
 
@@ -23,13 +25,14 @@ from .unstated_scale import with_proven_scale
 
 _ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
 _REGISTRANT = re.compile(r"\(\s*(?:Translation\s+of\s+registrant|Exact\s+name\s+of\s+registrant)", re.I)
-_BEFORE_NAME = re.compile(r".*(?:\d{3}-\d{4,6}|\b(?:19|20)\d{2}\b|\b1934\b|\bForm\s+6-K\b)\s*:?", re.I | re.S)
+_BEFORE_NAME = re.compile(r".*(?:\d{1,3}-\d{4,6}|\b(?:19|20)\d{2}\b|\b1934\b|\bForm\s+6-K\b)\s*:?", re.I | re.S)
 _SUFFIXES = {"THE", "PLC", "INC", "CORP", "CORPORATION", "LTD", "LIMITED", "CO", "COMPANY", "SA", "AG", "NV", "LLC", "ON"}
 _NAMES: dict[str, list[str]] = {}
 
 
 def _words(name: str) -> set[str]:
-    return {word for word in re.sub(r"[^A-Z0-9]+", " ", name.upper()).split() if word not in _SUFFIXES}
+    plain = unicodedata.normalize("NFKD", html.unescape(name)).encode("ascii", "ignore").decode()  # "PETRÓLEO"
+    return {word for word in re.sub(r"[^A-Z0-9]+", " ", plain.upper()).split() if word not in _SUFFIXES}
 
 
 def _company_names(filing) -> list[str]:
@@ -60,9 +63,18 @@ def another_registrant(ref, attachments) -> str | None:
     printed = _BEFORE_NAME.sub("", text[max(0, match.start() - 150):match.start()]).strip(" :.,")
     words = _words(printed)
     names = [_words(name) for name in _company_names(ref.filing)]
-    if not words or not names or any(words <= name or name <= words for name in names if name):
+    if not words or not names or any(words <= name or name <= words or "".join(sorted(words)) == "".join(sorted(name))
+                                     or "".join(_ordered(printed)) in ("".join(_ordered(other)) for other in _company_names(ref.filing))
+                                     for name in names if name):
         return None
-    return printed[:80]
+    # Only a name of the company's own family: a subsidiary shares its brand (Lloyds Bank plc beside Lloyds Banking
+    # Group); a name sharing nothing is the company's in another language (Copel's "Energy Company of Paraná").
+    return printed[:80] if any(words & name for name in names) else None
+
+
+def _ordered(name: str) -> list[str]:
+    plain = unicodedata.normalize("NFKD", html.unescape(name)).encode("ascii", "ignore").decode()
+    return [word for word in re.sub(r"[^A-Z0-9]+", " ", plain.upper()).split() if word not in _SUFFIXES]
 _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anything far larger is no statement
 
 
