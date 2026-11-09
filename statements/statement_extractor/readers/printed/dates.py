@@ -16,7 +16,7 @@ from .tables import YEAR_ONLY, Table, figure_columns, header_text
 _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
 
 
-_MONTH_DAY = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}})\b", re.I)
+_MONTH_DAY = re.compile(rf"\b({_MONTH}),?\s+(\d{{1,2}})\b", re.I)  # Petrobras: "December, 31"
 _DAY_MONTH_YEAR = re.compile(rf"\b(\d{{1,2}})\s+({_MONTH})\s+((?:19|20)\d{{2}})\d?\b", re.I)
 _DAY_MONTH = re.compile(rf"\b(\d{{1,2}})\s+((?:jan(?:uary)?|feb(?:ruary)?|march|april|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|"
                         rf"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b(?!\s+\d{{1,2}}\b)", re.I)
@@ -172,7 +172,10 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         elif span is not None and "quarter" in span.group(0).lower():
             days = 91
         year = years[-1] if years else None
-        day = _MONTH_DAY.search(above) or title_day
+        # The column's own date, printed lowest, over a title row's ("March 31, 2012 and December 31, 2011" over
+        # "December, 31" over "2011": Petrobras).
+        own_days = list(_MONTH_DAY.finditer(above))
+        day = own_days[-1] if own_days else title_day
         if in_order_days:
             day = header_days[columns.index(column)]  # "AS AT JUNE 30, AND DECEMBER 31" over "2023 | 2022" (Brookfield)
         dotted_all = list(_DOTTED_DATE.finditer(above)) if dotted is not None else []

@@ -56,4 +56,21 @@ def translations(columns: list[tuple[int, ...]], periods: dict, by_column: dict,
             if key in seen:
                 dropped.add(column)
             seen.add(key)
-    return dropped
+    return dropped | _changes(columns, periods, group)
+
+
+def _changes(columns, periods, group) -> set:
+    """Columns of changes beside the amounts, their heading lost: UBS's "% change from 30.9.14 | 31.12.13" after its
+    three dated columns. Such a column repeats a date printed to its left, and its figures are all percentages beside
+    that column's amounts in the millions."""
+    def figures(column):
+        return [abs(row.figures[position]) for table in group for row in table.rows for position in column if position in row.figures]
+    found, first = set(), {}
+    for column in columns:
+        key = periods[column].key
+        if key in first:
+            mine, theirs = figures(column), figures(first[key])
+            if mine and theirs and max(mine) <= 1000 and max(theirs) > 100 * max(max(mine), 1):
+                found.add(column)
+        first.setdefault(key, column)
+    return found
