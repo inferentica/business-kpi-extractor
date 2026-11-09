@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 
 _REPLAY = "https://web.archive.org/web/{timestamp}id_/{url}"  # "id_": the capture's own bytes, without the Archive's frame
-_CLIENT = "statement-extractor (TradeTracker research; reads archived annual and quarterly reports)"
+_CLIENT = "statement-extractor/1.0"  # a name with spaces or brackets gets the Archive's 404 page instead of the file
 _WAITS = (10, 30, 90, 180, 300)  # the Archive refuses connections for minutes at a time
 _PAUSE = 1.0  # seconds between requests, to go easy on the Archive
 
