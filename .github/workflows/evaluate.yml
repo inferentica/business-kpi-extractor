@@ -53,6 +53,14 @@ on:
         options:
           - stored
           - fresh
+      platform:
+        description: Where the golden set runs - x64 on the runner itself, or arm64 inside the worker image (Dockerfile), as on Oracle's ARM machines
+        required: false
+        default: x64
+        type: choice
+        options:
+          - x64
+          - arm64-image
   # Weekly with fresh lists, and with stored lists whenever the prompts or the reader change.
   schedule:
     - cron: "17 3 * * 1"
@@ -73,6 +81,7 @@ permissions:
 
 jobs:
   evaluate:
+    if: inputs.platform != 'arm64-image'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -121,6 +130,56 @@ jobs:
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
           GOLDEN: ${{ inputs.golden || 'evals/golden.json' }}
         run: python -m kpi_extractor.evals.evaluate --quarters "$QUARTERS" --golden "$GOLDEN"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: evaluation-${{ github.run_id }}
+          path: eval-results
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # The golden set inside the worker image on an ARM runner: what Oracle's Ampere workers would run, with its peak memory
+  # and a real OCR read (the chart tests use recorded OCR words).
+  evaluate-image:
+    if: inputs.platform == 'arm64-image'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build the worker image (its tests run in the build)
+        run: docker build --tag extractor .
+      - name: Read a rendered chart label with OCR
+        run: |
+          docker run --rm extractor python -c "
+          import time
+          from PIL import Image, ImageDraw, ImageFont
+          from rapidocr_onnxruntime import RapidOCR
+          image = Image.new('RGB', (900, 220), 'white')
+          ImageDraw.Draw(image).text((30, 60), 'Systems sold 1,234 units', fill='black', font=ImageFont.load_default(size=64))
+          image.save('/tmp/chart.png')
+          start = time.time()
+          result, _ = RapidOCR()('/tmp/chart.png')
+          words = ' '.join(item[1] for item in result or [])
+          print(f'OCR read {words!r} in {time.time() - start:.1f} s')
+          assert '1,234' in words.replace(' ', '') or '1234' in words.replace(',', ''), words
+          "
+      - name: Wait for DeepSeek off-peak prices
+        if: inputs.offpeak != false
+        run: docker run --rm extractor python -m kpi_extractor.ops.offpeak
+      - name: Score against the golden set
+        env:
+          QUARTERS: ${{ inputs.quarters || '6' }}
+          KPI_EVAL_LISTS: ${{ inputs.lists || 'stored' }}
+          KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
+          GOLDEN: ${{ inputs.golden || 'evals/golden.json' }}
+          BUSINESS_KPI_WORKFLOW_URL: https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow
+        # The job's own OIDC request variables let the container sign in to the control plane as this workflow.
+        run: |
+          mkdir -p eval-results && chmod 777 eval-results
+          docker run --rm -v "$PWD/eval-results:/app/eval-results" \
+            -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN -e BUSINESS_KPI_WORKFLOW_URL \
+            -e KPI_EVAL_LISTS -e KPI_AI_PROFILE \
+            extractor /usr/bin/time -v python -m kpi_extractor.evals.evaluate --quarters "$QUARTERS" --golden "$GOLDEN"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
