@@ -64,11 +64,11 @@ def _signs_from(winner: Reading, printed: Reading) -> Reading:
     by_label: dict[str, list[float]] = {}
     for line in printed.lines:
         if not line["is_heading"] and line["value"]:
-            by_label.setdefault(line["label"].lower(), []).append(line["value"])
+            by_label.setdefault(label_key(line["label"]), []).append(line["value"])
     lines, flipped, seen = [], 0, {}
     for line in winner.lines:
         line = dict(line)
-        label = line["label"].lower()
+        label = label_key(line["label"])  # "plant, and equipment" in XBRL, "plant and equipment" printed (Broadcom)
         occurrence = seen.get(label, 0)
         if not line["is_heading"] and line["value"]:
             seen[label] = occurrence + 1
