@@ -28,6 +28,7 @@ class Schedule:
     multiplier: float
     total_assets: float | None
     net_income: float | None
+    stated: bool = True  # whether the schedule states its <MULTIPLIER>
 
 
 def _date(raw: str) -> date | None:
@@ -61,7 +62,8 @@ def parse_schedule(text: str) -> Schedule | None:
     multiplier = _amount(tags.get("MULTIPLIER", "1")) or 1.0
     assets, income = _amount(tags.get("TOTAL-ASSETS", "")), _amount(tags.get("NET-INCOME", ""))
     return Schedule(end, _DURATIONS.get(tags.get("PERIOD-TYPE", "").strip().upper()), multiplier,
-                    None if assets is None else assets * multiplier, None if income is None else income * multiplier)
+                    None if assets is None else assets * multiplier, None if income is None else income * multiplier,
+                    "MULTIPLIER" in tags)
 
 
 def _unit(reading: Reading) -> float:
@@ -85,9 +87,13 @@ def schedule_check(reading: Reading, schedules: list[Schedule]) -> Check | None:
         figure = schedule.total_assets if reading.statement == "balance" else schedule.net_income
         if figure is None:
             continue
-        tolerance = 0.5 * max(schedule.multiplier, _unit(reading)) + 1e-6
-        if any(line["value"] is not None and abs(line["value"] - figure) <= tolerance for line in reading.lines):
-            return Check("ex27", PASS)
+        # A schedule that states no multiplier (EOG's of 2000, which EDGAR flagged as processed with errors) is in the
+        # statement's own scale, whatever that is: its figure in units, thousands or millions.
+        for multiplier in ((schedule.multiplier,) if schedule.stated else (1.0, 1e3, 1e6)):
+            scaled = figure * multiplier / schedule.multiplier
+            tolerance = 0.5 * max(multiplier, _unit(reading)) + 1e-6
+            if any(line["value"] is not None and abs(line["value"] - scaled) <= tolerance for line in reading.lines):
+                return Check("ex27", PASS, "" if schedule.stated else f"schedule states no multiplier; read as x{multiplier:,.0f}")
         name = "total assets" if reading.statement == "balance" else "net income"
         return Check("ex27", FAIL, f"EX-27 {name} {figure:,.0f} is not among the statement's lines")
     return None

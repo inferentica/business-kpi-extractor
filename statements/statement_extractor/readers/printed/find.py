@@ -69,6 +69,9 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             leading = " ".join(row.label for row in _leading(table))
             kind = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
             title_text += " " + leading
+        if kind is None and _GENERIC_TITLE.search(table.context[-250:]) and any(
+                _EARNINGS_HEAD.match(cell.text) for cells in table.header for cell in cells):
+            kind = "income"  # Tennant's 1990s 10-Qs: "CONSOLIDATED STATEMENTS (UNAUDITED)", "EARNINGS (note 1)" over its columns
         if kind is None and _COMPREHENSIVE.search(title_text[-300:]) and \
                 any(row.figures and PRETAX.search(row.label) for row in table.rows):
             kind = "income"  # one statement of profit and other comprehensive income (TSMC's Taiwan-IFRS reports)
@@ -98,6 +101,10 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
                                                                    for label in labels_in_context(group)) >= 3):
             found.append((kind, group))
     return found
+
+
+_GENERIC_TITLE = re.compile(r"\bconsolidated\s+statements\b(?!\s+of)", re.I)
+_EARNINGS_HEAD = re.compile(r"^(earnings|income|operations)\b(\s*\(notes?\b[^)]*\))?$", re.I)
 
 
 def _leading(table: Table) -> list:
@@ -138,8 +145,11 @@ def unlabelled_totals(group: list[Table]) -> dict[int, str]:
     rows = [row for table in group for row in table.rows]
     # A page that opens with the liabilities in its title (Apple's 1998 10-Q: "BALANCE SHEETS (Continued) LIABILITIES
     # AND SHAREHOLDERS' EQUITY") closes the assets on the page before it.
+    # Or with them in its column header (Delta's 1997 10-Qs: "LIABILITIES AND STOCKHOLDERS' EQUITY  1997  1996").
     page_ends = {id(next((row for row in reversed(table.rows) if row.figures), None))
-                 for table, later in zip(group, group[1:]) if re.search(r"\bliabilities\b", later.context[-160:], re.I)}
+                 for table, later in zip(group, group[1:])
+                 if re.search(r"\bliabilities\b", later.context[-160:] + " " +
+                              " ".join(cell.text for cells in later.header for cell in cells), re.I)}
     named: dict[int, str] = {}
     assets = None
     for index, row in enumerate(rows):
