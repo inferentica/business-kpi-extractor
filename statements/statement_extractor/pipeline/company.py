@@ -23,6 +23,7 @@ from ..selection.signs import sign_ties
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
 from ..sources.listing import filing_for, list_reports
 from .printed import read_printed
+from .archives import read_archives
 from .releases import read_releases
 
 
@@ -88,6 +89,9 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log)
         filings.extend(records)
         readings.extend(found)
+        records, found = read_archives(symbol, profile.fiscal_year_end, offset or 0, log)  # the years on paper
+        filings.extend(record for record in records if record["filed"] >= since.isoformat())
+        readings.extend(reading for reading in found if reading.filed >= since)
     printed_signs: dict[str, dict] = {}
     readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
                                          printed_signs))

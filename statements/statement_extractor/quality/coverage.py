@@ -10,7 +10,7 @@ AI_CALLS = 0
 
 def expected_own(form: str, fiscal_period: str) -> list[tuple[str, str]]:
     """The (statement, duration) a filing's own period should give."""
-    if form.upper().startswith(("10-K", "20-F", "40-F")):
+    if form.upper().startswith(("10-K", "20-F", "40-F", "ARS")):
         return [("income", "year"), ("balance", "instant"), ("cash_flow", "year")]
     flows = "quarter" if fiscal_period == "Q1" else "ytd"
     expected = [("income", "quarter"), ("balance", "instant"), ("cash_flow", flows)]
@@ -25,7 +25,7 @@ def own_period(own: list, form: str) -> dict:
     ordered = sorted(own, key=lambda reading: reading.statement != "balance")
     if not ordered:
         return {"fiscal_year": None, "fiscal_period": None}
-    annual = form.upper().startswith(("10-K", "20-F", "40-F"))
+    annual = form.upper().startswith(("10-K", "20-F", "40-F", "ARS"))
     return {"fiscal_year": ordered[0].fiscal_year, "fiscal_period": "FY" if annual else ordered[0].fiscal_period}
 
 

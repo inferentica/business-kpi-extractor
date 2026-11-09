@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import date
 
-ANNUAL_FORMS = ("10-K", "10-K405", "10-KT", "10-KSB", "20-F", "40-F")
+ANNUAL_FORMS = ("10-K", "10-K405", "10-KT", "10-KSB", "20-F", "40-F", "ARS")  # ARS: an archived annual report
 _YEAR = 375  # days from a period's end to the year end that closes it, at most
 _SAME = 15  # days within which a year end is the company's usual one
 

@@ -9,7 +9,7 @@ description = "Reads the three financial statements from SEC filings, by rules o
 requires-python = ">=3.12"
 # EDGAR access, fiscal labels and document parsing come from the KPI extractor installed beside it (`pip install .
 # ./statements` from the repository root); this package never edits that code and reaches it only through sources/edgar.py.
-dependencies = ["business-kpi-extractor"]
+dependencies = ["business-kpi-extractor", "pdfplumber==0.11.4"]
 
 [project.optional-dependencies]
 test = ["pytest==8.4.2"]
