@@ -165,6 +165,22 @@ class CompanyStore:
                              for kind, keys in (("changed", changed), ("removed", removed), ("added", added), ("renamed", renamed))
                              for key in keys[:5]][:10]}
 
+    def reread_disagreements(self) -> list[dict]:
+        """Verified figures that a new reading of their own filing now gives differently, held for the owner with the
+        figure served before in a note. The retrace of 2026-11-09 re-read 790 filings: it fixed old misreadings and made
+        new ones (Salesforce's cRPO read as its total RPO, JPMorgan's client lines one row down) alike, and no check tells
+        the two apart. The same filing read two ways is a question, not an answer."""
+        rows = []
+        for key, before in self._loaded.items():
+            now = self._values.get(key)
+            if (now is None or before["validation_status"] != "verified" or now["validation_status"] != "verified"
+                    or before.get("owner_decision") or now.get("source_accession") != before.get("source_accession")
+                    or not _differs(now["value"], before["value"])):
+                continue
+            rows.append({**now, "validation_status": "needs_review",
+                         "notes": [*(now.get("notes") or []), f"{REREAD_NOTE} {_figure(before['value'])}"]})
+        return rows
+
     def carry(self, carried: dict) -> None:
         """A finished filing moved to a new KPI list version, its readings kept."""
         self._send(filings=[carried])
@@ -228,6 +244,20 @@ class CompanyStore:
             if (existing and existing.get("owner_decision")) or value_key(value) in self._owner_rejected:
                 continue
             self._values[value_key(value)] = MappingProxyType(value)
+
+
+REREAD_NOTE = "a new reading of this filing differs from the figure served before:"
+
+
+def _differs(value, before) -> bool:
+    """Apart by more than rounding (half a percent)."""
+    value, before = float(value), float(before)
+    return abs(value - before) > 0.005 * max(abs(value), abs(before))
+
+
+def _figure(value) -> str:
+    value = float(value)
+    return f"{value:,.0f}" if value.is_integer() else f"{value:,}"
 
 
 # What a stored row is: a held row equal to the control plane's in these is not sent again.

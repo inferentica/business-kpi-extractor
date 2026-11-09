@@ -172,3 +172,17 @@ def test_a_reading_recorded_while_held_goes_out_at_once():
     assert len(control.calls) == 1 and control.calls[0][1]["filings"][0]["accession"] == "f1"
     store.release()
     assert len(control.calls) == 1  # the recorded row is not sent again
+
+
+def test_a_new_reading_that_changes_a_verified_figure_of_its_filing_goes_to_review():
+    # The 2026-11-09 retrace: Salesforce's cRPO re-read as its total RPO ($12.8B → $25.9B), still verified.
+    store = _store()
+    store.load([_row("crpo", value=12_800_000_000.0), _row("same", value=5.0), _row("rounded", value=6_559.1),
+                _row("other_filing", value=3.0), _row("owner", value=7.0, owner_decision="confirmed"),
+                _row("flagged", value=1.0, status="needs_review")])
+    store.write([_row("crpo", value=25_900_000_000.0), _row("same", value=5.0), _row("rounded", value=6_559.0),
+                 _row("other_filing", value=4.0, accession="f2"), _row("flagged", value=2.0)])
+    held = {row["kpi_key"]: row for row in store.reread_disagreements()}
+    assert list(held) == ["crpo"]
+    assert held["crpo"]["validation_status"] == "needs_review" and held["crpo"]["value"] == 25_900_000_000.0
+    assert held["crpo"]["notes"][-1] == "a new reading of this filing differs from the figure served before: 12,800,000,000"

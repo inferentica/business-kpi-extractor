@@ -271,6 +271,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.store.write(rows)
         self.store.write(self._derive(spec))
         self.store.write(self._harmonize_labels())
+        self.store.write(self.store.reread_disagreements())
         self.store.release()
         self.result.q4_gaps = self._q4_gaps()
         self.result.served_changes = self.store.served_changes()
