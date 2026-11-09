@@ -9,7 +9,7 @@ from .lines import YEAR, chunks, split
 BLOCK = re.compile(r"<TABLE>(.*?)</TABLE>", re.I | re.S)
 TAG = re.compile(r"</?(S|C|CAPTION|PAGE|FN|F\d+|TABLE)>", re.I)
 
-_UNTAGGED_TITLE = re.compile(r"^[ \t]*(condensed\s+)?(consolidated\s+)?(balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?"
+_UNTAGGED_TITLE = re.compile(r"^[ \t]*(unaudited\s+(and\s+)?)?(condensed\s+)?((un)?consolidated\s+)?(balance\s+sheets?|income\s+statements?|statements?\s+of\s+(consolidated\s+)?"
                              r"(income|operations|earnings|cash\s+flows?|financial\s+(position|condition)))\b", re.I | re.M)
 _UNTAGGED_END = re.compile(r"^\s*(see\s+(accompanying\s+)?notes|the\s+accompanying\s+notes)|<PAGE>|<TABLE>", re.I)
 
@@ -85,10 +85,12 @@ def untagged(text: str, spans: list[tuple[int, int]]):
         for number_of_line, line in enumerate(lines):
             if number_of_line and (_UNTAGGED_END.search(line) or _UNTAGGED_TITLE.match(line) and has_figures):
                 break  # the page's end, or the next statement once this one has figures
+            if number_of_line and _UNTAGGED_TITLE.match(line) and not has_figures:
+                block = []  # a title inside the auditors' report's sentences, then the statement's own title
             block.append(line)
             parsed = split(line)
             has_figures = has_figures or bool(parsed and parsed.figures and parsed.label)
-            if len(block) > 160:
+            if len(block) > 240:  # a statement over two pages of an archived PDF
                 break
         first = next((index for index, line in enumerate(block)
                       if (parsed := split(line)) and parsed.figures and parsed.label

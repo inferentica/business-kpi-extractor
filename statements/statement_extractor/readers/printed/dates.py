@@ -17,6 +17,7 @@ _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|a
 
 
 _MONTH_DAY = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}})\b", re.I)
+_MONTH_YEAR = re.compile(rf"\b({_MONTH})-(\d{{2}})\b", re.I)
 
 
 _YEAR = re.compile(r"\b((?:19|20)\d{2})\b")
@@ -120,6 +121,14 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         above = header_text(first, column[0]) or header_text(first, column[-1])
         numeric = _NUMERIC_DATE.search(above)
         years = [in_order[column]] if column in in_order else _YEAR.findall(above)
+        short = _MONTH_YEAR.search(above)
+        if short and not years and not numeric:
+            # TSMC's 1998-99 balance sheets: "Sep-99 | Jun-99", the month's last day.
+            year = int(short.group(2)) + (1900 if int(short.group(2)) > 50 else 2000)
+            month = _date(short.group(1), "1", str(year)).month
+            end = date(year, month, calendar.monthrange(year, month)[1])
+            periods[column] = Period(end) if kind == "balance" else Period(end, end - timedelta(days=90))
+            continue
         named = _named_quarter(above, fiscal_year_end)
         if named is not None and kind != "balance":
             periods[column] = Period(named, named - timedelta(days=90))  # "Q3 2007", "3Q07": that quarter

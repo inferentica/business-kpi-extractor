@@ -9,7 +9,7 @@ from .tables import Table
 
 _UNIT = r"(thousands?|millions?|billions?)"  # TSMC's 2003 quarterly reports: "In Thousand New Taiwan Dollars"
 _SCALES = {"thousands": 1e3, "millions": 1e6, "billions": 1e9, "thousand": 1e3, "million": 1e6, "billion": 1e9}
-_MONEY = re.compile(r"\b(?:in|amounts in|dollars in|expressed in)\s+(?:[A-Z]{2,3}\$?\s+|US\$\s*|NT\$\s*|€\s*|euros?\s+)?"
+_MONEY = re.compile(r"\b(?:in|amounts in|dollars in|expressed in|figures(?:\s+in)?)\s+(?:[A-Z]{2,3}\$?\s+|US\$\s*|NT\$\s*|€\s*|euros?\s+)?"
                     + _UNIT + r"\b", re.I)
 # A currency sign before the unit: Scotiabank's "($ millions)", "US$ millions".
 _DOLLAR_UNIT = re.compile(r"(?:US|C|CDN|NT|HK)?\$\s*" + _UNIT + r"\b|"

@@ -90,7 +90,8 @@ def is_subheader(cells: list[Cell]) -> bool:
 COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)\s+ended\b|\bended\b|"
                            r"^(\s*(first|second|third|fourth)\s+quarter|\s*(three|six|nine|twelve)\s+months)\b|"
                            r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|"
-                           r"\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b", re.I)  # PepsiCo's "3/21/09"
+                           r"\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b|"  # PepsiCo's "3/21/09"
+                           r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*-\d{2}\b", re.I)  # TSMC's "Sep-99"
 
 
 def is_header_figures(row: Row) -> bool:
@@ -129,6 +130,11 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
         return []
     most = max(counts.values())
     positions = sorted(column for column, count in counts.items() if count >= 2 or most < 3)
+    # A "Notes" column's references go before grouping: a currency row spanning it and the next column ("NT$" over
+    # both in TSMC's FY2001 20-F) would merge them.
+    notes = {position for position in positions for cells in table.header for cell in cells
+             if cell.start <= position < cell.end and re.fullmatch(r"notes?", cell.text.strip(), re.I)}
+    positions = [position for position in positions if position not in notes]
     # A row naming each column's currency sits lowest and splits a year's two columns, its own and a translation
     # (TSMC's "2003" over "NT$ | US$"); else the lowest row with years or spans.
     bottom = next((cells for cells in reversed(table.header) if (money := [cell for cell in cells if cell.start > 0])

@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass
 
 from ...domain.basis import is_currency_word
-from ..printed.tables import COLUMN_TITLE, Cell, Row, Table, clean, number
+from ..printed.tables import COLUMN_TITLE, Cell, Row, Table, clean, is_column_word, number
 from .blocks import BLOCK, TAG, tagged, untagged
 from .lines import RULE, YEAR, Chunk, Line, chunks, split
 
@@ -42,15 +42,17 @@ def _nearest(columns: list[int], edge: int) -> int | None:
 def _header(line: str, columns: list[int]) -> list[Cell]:
     """A header line's words as cells over the columns they name: one word per column where there are as many, else
     each column takes the word nearest above it (a span over several columns)."""
-    found = chunks(line.replace("$", " "))
+    found = chunks(re.sub(r"(?<![A-Za-z.])\$", " ", line))  # a dollar sign alone, not a currency's: "NT$", "U.S.$"
+    found = [chunk for chunk in found if "%" not in chunk.text]  # over a percentage column, which holds no figures
     if not found or not columns:
         return []
     left = [chunk for chunk in found if chunk.end < columns[0] - 12]
     over = [chunk for chunk in found if chunk not in left]
     cells = [Cell(0, 1, " ".join(chunk.text for chunk in left))] if left else []
-    if len(over) == len(columns):
+    if len(over) == len(columns) and all(abs(chunk.end - column) <= 6 for column, chunk in zip(columns, over)):
         # One word over each column, in order: Apple's FY1997 "1997" sits four characters off its column and "1996"
-        # three, which nearest-word would give both columns to 1996.
+        # three, which nearest-word would give both columns to 1996. Not when a word heads a column of percentages
+        # instead (TSMC's "1998  1997  YOY" over US$, NT$ and NT$ figures).
         return cells + [Cell(column, 1, chunk.text) for column, chunk in zip(columns, over)]
     if len(over) > 1 and len(columns) % len(over) == 0 and all(_SPAN_WORDS.search(chunk.text) for chunk in over):
         # Spans over equal groups of columns, in order: ASML's "Three months ended December 31," over the first two
@@ -94,8 +96,8 @@ def _continues(before: str, after: str, already: bool, indented: bool = False) -
         return False
     if _capitals(before) and not _capitals(after) and after[:1].isupper():
         return False
-    if _JOINING.search(before) or _LEADING_JOIN.match(after):
-        return True
+    if _JOINING.search(before) or _LEADING_JOIN.match(after) or re.search(r"[’']$", before):
+        return True  # a possessive runs on: "TOTAL LIABILITIES AND SHAREHOLDERS’" / "EQUITY"
     heading = _CAPITAL_HEADING.search(before) and not re.search(r"\b(BEFORE|AFTER|FROM|PER)\b", before)
     if _capitals(before) and _capitals(after) and not heading and (
             indented or _LEADING_JOIN.match(before)):
@@ -171,8 +173,14 @@ def _table(before: str, title_lines: list[str], header_lines: list[str], body: l
         if RULE.match(line):
             continue
         words = chunks(line)
-        if COLUMN_TITLE.search(line) or any(YEAR.match(chunk.text) for chunk in words) or \
-                len(words) > 1 and all(is_currency_word(chunk.text) for chunk in words):  # ASML's "EUR EUR EUR USD"
+        named = words[1:] if words and not is_column_word(words[0].text) else words  # after a label: "ASSETS  USD  NTD"
+        column_words = len(named) > 1 and all(is_column_word(chunk.text) for chunk in named) and \
+            any(is_currency_word(chunk.text) for chunk in named)  # TSMC's "USD  NTD  %  NTD  %  Move  %"
+        if column_words and named is not words:
+            leading.append(line[:named[0].start])  # its label or scale stays: "(Amounts in thousands)  EUR  EUR"
+            line = " " * named[0].start + line[named[0].start:]
+        if COLUMN_TITLE.search(line) or any(YEAR.match(chunk.text) for chunk in words) or column_words or \
+                len(words) > 1 and all(is_currency_word(chunk.text) for chunk in words):
             cells = _header(line, columns)
             if cells:
                 header.append(cells)
