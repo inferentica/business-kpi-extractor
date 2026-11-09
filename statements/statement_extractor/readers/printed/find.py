@@ -20,7 +20,7 @@ TITLES = (
 
 
 # Tables that carry a statement's name but are not the company's own statement.
-_NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bversus\b|\bcomparison\b|quarterly(?!\s+report)|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
+_NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bcomparison\b.{0,120}?\bversus\b|quarterly(?!\s+report)|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
                             r"guarantor|pro\s+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
                             r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b|"
@@ -64,6 +64,8 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
     for position, table in enumerate(all_tables):
         title_text = table.context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in table.header[:2])
         kind = next((name for name, pattern in TITLES if _titled(pattern, title_text)), None)
+        if kind is not None and _retitled(kind, title_text):
+            kind = None  # an earlier statement's title, then this one's (UBS: "Income statement" … "Statement of comprehensive income")
         if kind is None:
             # A title printed as the table's own first rows, above its figures (PepsiCo's 2013 balance sheet), when
             # nothing before the table names it.
@@ -74,7 +76,7 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
                 _EARNINGS_HEAD.match(cell.text) for cells in table.header for cell in cells):
             kind = "income"  # Tennant's 1990s 10-Qs: "CONSOLIDATED STATEMENTS (UNAUDITED)", "EARNINGS (note 1)" over its columns
         if kind is None and _COMPREHENSIVE.search(title_text[-300:]) and \
-                any(row.figures and PRETAX.search(row.label) for row in table.rows):
+                any(row.figures and PRETAX.search(row.label) and not _OCI_ITEM.search(row.label) for row in table.rows):
             kind = "income"  # one statement of profit and other comprehensive income (TSMC's Taiwan-IFRS reports)
         # The words before the table count too, though its own first rows extend the title text (UBS's "Comparison UBS
         # Group AG (consolidated) versus UBS AG (consolidated)", then "Income statement" as the table's first row).
@@ -107,6 +109,18 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
                                                                    for label in labels_in_context(group)) >= 3):
             found.append((kind, group))
     return found
+
+
+# An item of other comprehensive income, stated before its tax (UBS: "Foreign currency translation movements, before
+# tax"): no income before taxes.
+_OCI_ITEM = re.compile(r",\s*before\s+tax$", re.I)
+
+
+def _retitled(kind: str, text: str) -> bool:
+    """Whether another statement's title follows the last title of this kind."""
+    pattern = dict(TITLES)[kind]
+    last = max((match.end() for match in pattern.finditer(text)), default=0)
+    return bool(_OTHER_STATEMENT.search(text, last))
 
 
 _GENERIC_TITLE = re.compile(r"\bconsolidated\s+statements\b(?!\s+of)", re.I)

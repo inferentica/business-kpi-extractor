@@ -50,12 +50,8 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     found = find_statements(all_tables, release=form == "6-K")
     # A statement printed more than once (in full, and as a summary elsewhere): the fullest table is the statement;
     # the group's statements before the parent company's alone (TSMC's 6-Ks of 2008 print both).
-    # Among statements of one kind and of like size, the first printed: the registrant's own, before the sections on
-    # its subsidiaries (UBS's quarterly reports print UBS Group AG, then UBS AG and UBS Limited).
-    size = {id(item): sum(len([row for row in table.rows if row.figures]) for table in item[1]) for item in found}
-    largest = {kind: max(size[id(item)] for item in found if item[0] == kind) for kind, _group in found}
-    found.sort(key=lambda item: (_scope(item[1], form) != "consolidated", size[id(item)] < 0.8 * largest[item[0]],
-                                 item[1][0].index if size[id(item)] >= 0.8 * largest[item[0]] else -size[id(item)]))
+    found.sort(key=lambda item: (_scope(item[1], form) != "consolidated",
+                                 -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
     read_periods: dict[str, set] = {}
     for kind, group in found:
         periods = column_periods(kind, group, fiscal_year_end, document_end)
