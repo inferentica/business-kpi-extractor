@@ -2,6 +2,8 @@
 which currency the filing reports in."""
 from __future__ import annotations
 
+import re
+
 import math
 
 
@@ -35,7 +37,9 @@ def consolidated_figures(facts) -> set[tuple[str, str]]:
     if facts is None or "is_dimensioned" not in facts or "period_key" not in facts:
         return set()
     plain = facts[facts["is_dimensioned"] != True]  # noqa: E712 - pandas mask
-    return {(str(concept).replace(":", "_", 1), str(key)) for concept, key in zip(plain["concept"], plain["period_key"])}
+    # Period keys as the rows carry them, without the line breaks some filings' keys hold (Omega's 10-Ks of 2015-18).
+    return {(str(concept).replace(":", "_", 1), re.sub(r"\s+", "", str(key)))
+            for concept, key in zip(plain["concept"], plain["period_key"])}
 
 
 class ReportingCurrency:
@@ -57,8 +61,8 @@ class ReportingCurrency:
             when = row.get("period_end") if isinstance(row.get("period_end"), str) else row.get("period_instant")
             value = number(row.get("numeric_value"))
             if isinstance(when, str) and value is not None:
-                self.facts.setdefault((str(row["concept"]), when[:10]), []).append(
-                    (str(row["currency"]), value, str(row.get("period_key"))))
+                self.facts.setdefault((str(row["concept"]), when.strip()[:10]), []).append(
+                    (str(row["currency"]), value, re.sub(r"\s+", "", str(row.get("period_key")))))
 
     def value(self, concept: str, when: str, value: float) -> float:
         candidates = self.facts.get((concept.replace("_", ":", 1), when))

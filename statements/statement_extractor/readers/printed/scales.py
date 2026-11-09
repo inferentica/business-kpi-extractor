@@ -14,6 +14,9 @@ _MONEY = re.compile(r"\b(?:in|amounts in|dollars in|expressed in|figures(?:\s+in
 # A currency sign before the unit: Scotiabank's "($ millions)", "US$ millions".
 _DOLLAR_UNIT = re.compile(r"(?:US|C|CDN|NT|HK)?\$\s*" + _UNIT + r"\b|"
                           r"\(\s*" + _UNIT + r"\s*(?:,\s*except\b[^)]*)?\)", re.I)  # Brookfield's "(MILLIONS)"
+# Thousands written as zeros: Ross's "($000, except stores and per share data, unaudited)", Icahn's "(In $000s, except
+# unit amounts)" and "(In 000s ...)", "($000's)", "(000 omitted)".
+_ZEROS = re.compile(r"\(\s*(?:in\s+)?\$?\s*000(?:'?s)?(?:\s+omitted)?\s*[,)]|\bin\s+\$?\s*000'?s\b", re.I)
 # Words that put a scale on share counts rather than money.
 _SHARES_IN = re.compile(r"\bshares?(?:\s+(?:amounts?|data|counts?|outstanding))?(?:\s*,)?(?:\s+which\s+are)?"
                         r"(?:\s+(?:reflected|stated|presented|expressed))?\s+(?:are\s+)?in\s+" + _UNIT + r"\b|"
@@ -39,6 +42,8 @@ def statement_scale(group: list[Table]) -> float | None:
     text = _SHARES_IN.sub(" ", scale_text(group))
     found = {_SCALES[next(unit for unit in match.groups() if unit).lower()] for pattern in (_MONEY, _DOLLAR_UNIT)
              for match in pattern.finditer(text)}
+    if _ZEROS.search(text):
+        found.add(1e3)
     return found.pop() if len(found) == 1 else None
 
 

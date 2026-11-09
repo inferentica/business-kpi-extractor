@@ -67,6 +67,10 @@ def presented_rows(statement, shown: set[str] | None = None) -> list[dict]:
             continue
         if _STRUCTURAL_CONCEPT.search(concept):
             continue
+        if any(re.search(r"\s", key) for key in (row.get("values") or {})):
+            # Period keys with line breaks in them ("duration_\n2017-01-01\n_\n2017-12-31\n", Omega's 10-Ks of
+            # 2015-18): the same periods, which every lookup by a period's key would otherwise miss.
+            row = {**row, "values": {re.sub(r"\s+", "", key): value for key, value in row["values"].items()}}
         rows.append(row)
     return rows
 

@@ -19,7 +19,7 @@ TITLES = (
 
 
 # Tables that carry a statement's name but are not the company's own statement.
-_NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
+_NOT_STATEMENT = re.compile(r"selected|quarterly(?!\s+report)|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
                             r"guarantor|pro\s+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
                             r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b|"
@@ -30,7 +30,9 @@ _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|conso
                             r"reconciliation\s+of|amounts\s+determined\s+under|(under|to|with)\s+u\.?\s?s\.?\s+gaap", re.I)
 
 
-_NOT_IN_RELEASE = re.compile(_NOT_STATEMENT.pattern.replace("summary|", "").replace("|quarterly|", "|"), re.I)
+# "quarterly" names quarterly-data tables, not the report's own running header (Tennant's "Quarterly Report – Form 10-Q"
+# atop every page).
+_NOT_IN_RELEASE = re.compile(_NOT_STATEMENT.pattern.replace("summary|", "").replace("|quarterly(?!\\s+report)|", "|"), re.I)
 
 
 _COMPREHENSIVE = re.compile(r"statements?\s+of\s+(consolidated\s+)?comprehensive\s+income", re.I)

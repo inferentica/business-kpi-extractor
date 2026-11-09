@@ -149,11 +149,15 @@ def _printed_second_look(symbol, reports, filings, readings, year_ends: dict[str
 
 
 def _period_end(ref) -> date | None:
+    """The filing's period, as SEC's index states it. A period ending within a week of the filing date is no report
+    period but the index's mistake (Helix's 10-Ks of 2014 and 2015 'end' on the day they were filed, which made
+    February 21 its fiscal year end and every column of 2013-15 fall off the calendar): unknown."""
     try:  # SEC can answer with an error page for a filing's header; its period is then unknown, not fatal
         raw = getattr(ref.filing, "period_of_report", None)
-        return date.fromisoformat(str(raw)[:10]) if raw else None
+        end = date.fromisoformat(str(raw)[:10]) if raw else None
     except Exception:  # noqa: BLE001
         return None
+    return None if end is not None and (ref.filed - end).days < 7 else end
 
 
 def _release_bases(readings) -> None:
