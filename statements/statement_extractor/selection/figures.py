@@ -33,9 +33,12 @@ def key_figures(statement: str, lines: list[dict]) -> dict[str, float]:
             by_label = [line for line in figures if CLOSING.search(line["label"])]
         chosen = by_concept or by_label
         if chosen:
-            # The last net income and closing cash (after the parent's share and the cash reconciliations), the first
-            # revenue and total assets.
-            found[name] = (chosen[-1] if name in ("net income", "closing cash") else chosen[0])["value"]
+            # The largest net income (not a per-share "Net income" under an earnings-per-share heading), the last
+            # closing cash (after the cash reconciliations), the first revenue and total assets.
+            if name == "net income":
+                found[name] = max(chosen, key=lambda line: abs(line["value"]))["value"]
+            else:
+                found[name] = (chosen[-1] if name == "closing cash" else chosen[0])["value"]
     return found
 
 
