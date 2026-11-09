@@ -86,7 +86,7 @@ def test_a_table_dated_wrong_is_left_out_whole():
     assert result["tables"]["fy2001#0"]["verdict"] == "contradicted" and result["years"] == []
 
 
-# Brookfield's 40-F annual report (EX-99.3, HTML): its only "Net income" line is under a per-share heading.
+# Brookfield's FY2008 40-F five-year review (EX-99.3, HTML): "Net income" a share first, under sub-headings.
 def cells(*texts):
     return "<tr>" + "".join(f"<td>{text}</td>" for text in texts) + "</tr>"
 
@@ -95,9 +95,13 @@ BROOKFIELD = ("<p>FIVE-YEAR FINANCIAL SUMMARY</p><p>(MILLIONS, EXCEPT PER SHARE 
               + cells("", "2008", "2007", "2006", "2005", "2004")
               + cells("Revenues", "12,868", "9,343", "6,897", "5,220", "4,467")
               + cells("Total assets", "80,707", "71,208", "52,302", "38,636", "32,477")
-              + cells("Per fully diluted share", "", "", "", "", "")
-              + cells("Net income", "1.02", "1.24", "1.90", "2.68", "1.08")
-              + cells("Common equity", "11,833", "12,066", "9,488", "8,072", "7,021") + "</table>")
+              + cells("Per Common Share (fully diluted)", "", "", "", "", "")
+              + cells("Book value", "8.93", "11.64", "9.37", "7.87", "5.67")
+              + cells("Cash return on book equity", "", "", "", "", "")
+              + cells("Net income", "1.02", "1.24", "1.90", "2.72", "0.90")
+              + cells("Total (millions)", "", "", "", "", "")
+              + cells("Common equity", "4,918", "6,644", "5,395", "4,514", "3,277")
+              + cells("Net income", "649", "787", "1,170", "1,662", "555") + "</table>")
 
 
 def test_lines_under_a_per_share_heading_are_left_out():
@@ -105,4 +109,4 @@ def test_lines_under_a_per_share_heading_are_left_out():
                           fiscal_year_end="1231", year_offset=0)
     figures = {(row["fiscal_year"], row["name"]): row["value"] for row in rows}
     assert figures[("2004", "revenue")] == 4_467e6 and figures[("2006", "total assets")] == 52_302e6
-    assert not any(name == "net income" for _year, name in figures)  # 1.02 a share is no net income
+    assert figures[("2008", "net income")] == 649e6 and figures[("2004", "net income")] == 555e6  # not 1.02 a share

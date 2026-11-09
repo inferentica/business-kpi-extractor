@@ -77,7 +77,7 @@ def _years(table: Table) -> list[str]:
     return years[-width:]
 
 
-_PER_SHARE_HEADING = re.compile(r"\bper\b.*\b(share|unit|ads)\b|\bper[-\s]share\b", re.I)
+_PER_SHARE_HEADING = re.compile(r"^\W*per\b|\bper\s+(common\s+|ordinary\s+|diluted\s+)?(share|unit|ads)\W*$", re.I)
 _CAPTION = re.compile(r"\bexcept\b|\bin\s+(millions|thousands|billions)\b", re.I)  # "(in millions, except per share)"
 _BASIS = re.compile(r"^(u\.?s\.?|roc|r\.o\.c\.|canadian|dutch|netherlands|taiwan)?\s*(gaap|ifrs)$", re.I)
 
@@ -109,6 +109,10 @@ def _by_year(row, table: Table, years: list[str]) -> dict[str, float]:
     return found
 
 
+def _larger(values: dict[str, float], other: dict[str, float]) -> bool:
+    return max(map(abs, values.values())) > max(map(abs, other.values()))
+
+
 def read_summaries(tables: list[Table], *, accession: str, form: str, filed: date, fiscal_year_end: str,
                    year_offset: int) -> list[dict]:
     """Each year's key figures from every summary table: {fiscal_year, period_end, name, value, label, ...}. Lines
@@ -118,7 +122,7 @@ def read_summaries(tables: list[Table], *, accession: str, form: str, filed: dat
         scale = statement_scale([table])
         if scale is None:
             continue  # no stated scale: a figure in thousands read as millions is worse than none
-        years, first_basis, basis, seen, per_share = _years(table), None, None, set(), False
+        years, first_basis, basis, seen, per_share = _years(table), None, None, {}, False
         for number, row in enumerate(table.rows):
             below = table.rows[number + 1] if number + 1 < len(table.rows) else None
             if not row.label.strip() and below is not None and not below.figures and _key(below.label):
@@ -128,19 +132,25 @@ def read_summaries(tables: list[Table], *, accession: str, form: str, filed: dat
                     basis = re.sub(r"\W", "", row.label.lower())
                     first_basis = first_basis or basis
                 elif row.label.strip():
-                    # Lines under "Per fully diluted share:" are per share, whatever they are called (Brookfield's
-                    # "Net income  1.02").
+                    # Lines under "Net Income Per Common Share:" are per share, whatever they are called, until the
+                    # next heading (Chase's "Selected Balance Sheet Items").
                     per_share = bool(_PER_SHARE_HEADING.search(row.label)) and not _CAPTION.search(row.label)
                 continue
             if per_share:
                 continue
             name = _key(row.label)
-            if name is None or name in seen or basis != first_basis:
+            if name is None or basis != first_basis:
                 continue
             values = _by_year(row, table, years)
             if not values:
                 continue
-            seen.add(name)
+            # A name printed twice: the first line, but the largest net income (Brookfield's five-year review prints
+            # "Net income  1.02" a share under sub-headings before "Net income  649" in millions).
+            if name in seen and not (name == "net income" and _larger(values, seen[name])):
+                continue
+            seen[name] = values
+            figures = [figure for figure in figures if not (figure["table"] == f"{accession}#{table.index}"
+                                                            and figure["name"] == name)]
             for year, value in values.items():
                 month, day = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
                 end = date(int(year), month, min(day, calendar.monthrange(int(year), month)[1]))
