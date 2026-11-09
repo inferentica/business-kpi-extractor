@@ -22,19 +22,47 @@ from ..sources.documents import PRINTED_DOCUMENTS, release_documents
 from .unstated_scale import with_proven_scale
 
 _ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
-_FILE_NUMBER = re.compile(r"Commission\s+File\s+(?:No\.?|Number)\s*:?\s*(\d{3}-\d{4,6})", re.I)
+_REGISTRANT = re.compile(r"\(\s*(?:Translation\s+of\s+registrant|Exact\s+name\s+of\s+registrant)", re.I)
+_BEFORE_NAME = re.compile(r".*(?:\d{3}-\d{4,6}|\b(?:19|20)\d{2}\b|\b1934\b|\bForm\s+6-K\b)\s*:?", re.I | re.S)
+_SUFFIXES = {"THE", "PLC", "INC", "CORP", "CORPORATION", "LTD", "LIMITED", "CO", "COMPANY", "SA", "AG", "NV", "LLC", "ON"}
+_NAMES: dict[str, list[str]] = {}
+
+
+def _words(name: str) -> set[str]:
+    return {word for word in re.sub(r"[^A-Z0-9]+", " ", name.upper()).split() if word not in _SUFFIXES}
+
+
+def _company_names(filing) -> list[str]:
+    """The company's name and its former names, as EDGAR records them."""
+    cik = str(getattr(filing, "cik", "") or "")
+    if cik not in _NAMES:
+        names = [str(getattr(filing, "company", "") or "")]
+        try:
+            from edgar import Company
+            names += [item["name"] for item in (Company(int(cik)).data.former_names or [])]
+        except Exception:  # noqa: BLE001 - without former names, the current one is compared
+            pass
+        _NAMES[cik] = [name for name in names if name]
+    return _NAMES[cik]
 
 
 def another_registrant(ref, attachments) -> str | None:
-    """The Commission File Number a 6-K's cover names, when it is not the company's own."""
-    own = str(getattr(ref.filing, "file_number", "") or "").strip()
+    """The registrant a 6-K's cover names, when it is neither the company nor a name the company once had."""
     cover = next((item for item in attachments if str(item.document_type or "").upper().startswith("6-K")), None)
-    if not own or cover is None:
+    if cover is None:
         return None
     content = cover.content
-    text = re.sub(r"<[^>]+>|&#160;|&nbsp;", " ", content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or ""))
-    match = _FILE_NUMBER.search(text[:20_000])
-    return match.group(1) if match and match.group(1) != own else None
+    text = re.sub(r"<[^>]+>|&#\d+;|&nbsp;", " ", content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or ""))
+    text = re.sub(r"\s+", " ", text[:30_000])
+    match = _REGISTRANT.search(text)
+    if match is None:
+        return None
+    printed = _BEFORE_NAME.sub("", text[max(0, match.start() - 150):match.start()]).strip(" :.,")
+    words = _words(printed)
+    names = [_words(name) for name in _company_names(ref.filing)]
+    if not words or not names or any(words <= name or name <= words for name in names if name):
+        return None
+    return printed[:80]
 _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anything far larger is no statement
 
 
@@ -54,9 +82,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
     attachments = list(ref.filing.attachments)
     other = another_registrant(ref, attachments) if release else None
     if other:
-        # A subsidiary's report furnished beside the company's (Lloyds Bank plc's, file 001-35079, under Lloyds
-        # Banking Group's 001-15246): another issuer's statements, never the company's.
-        return [], [f"another registrant's report (Commission File Number {other})"], ["other registrant"]
+        # A subsidiary's report furnished beside the company's (Lloyds Bank plc's under Lloyds Banking Group): another
+        # issuer's statements, never the company's.
+        return [], [f"another registrant's report ({other})"], ["other registrant"]
     if any(str(item.document_type or "").upper().startswith(_ASSET_BACKED) for item in attachments):
         # An asset-backed issuer's report the company files for a trust (Scotiabank's covered bonds): Regulation AB's
         # servicing exhibits, no statements of the company's own.
