@@ -186,12 +186,6 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
             last_heading = None
             if not row.figures and (any(pattern.search(label) for _, pattern in TITLES) or _caption_only(label)):
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line
-            if row.figures and _YEAR_ROW_LABEL.search(row.label) and all(
-                    value == int(value) and abs(value - period.end.year) <= 1 for value in row.figures.values()):
-                # A title or a slide's navigation run into a row of years: ASML's "Consolidated Statements of
-                # Comprehensive Income For the year ended December 31  1998", its Q1 2026 release's "Summary US GAAP
-                # … Forward Look  2026". Not a line.
-                continue
             if not row.figures:
                 heading = last_heading = label
                 opened = _SECTION_HEADING.match(row.label)
@@ -200,6 +194,12 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                     section, section_total = (opened.group(1).lower() if opened else None), None
             value = _figure(row, column, columns) if row.figures else None
             if row.figures and value is None:
+                continue
+            if value is not None and _YEAR_ROW_LABEL.search(row.label) and any(
+                    figure == int(figure) and abs(figure - period.end.year) <= 1 for figure in row.figures.values()):
+                # A title or a slide's navigation run into the column's year: ASML's "Consolidated Statements of
+                # Comprehensive Income For the year ended December 31  1998", its Q1 2026 release's "Summary US GAAP
+                # … Forward Looking Statements … 2026" (and the slide's page number). Not a line.
                 continue
             # A balance sheet has no per-share lines; "per share" there is a par value in a stock line's label (Kroger's
             # "Common stock, $1 par per share … 955").
