@@ -31,3 +31,8 @@ def test_the_companys_own_name_in_any_form_is_its_own():
                   ["Lloyds Banking Group plc"]) is None
     assert _other("May 2005 Commission File Number: 033-97038 BRASCAN CORPORATION (Translation of registrant's name",
                   ["BROOKFIELD Corp /ON/", "BROOKFIELD ASSET MANAGEMENT INC.", "BRASCAN CORP/"]) is None
+
+
+def test_a_letter_lost_in_decoding_keeps_the_name():
+    assert _other("Commission File Number 1-15106 PETR�LEO BRASILEIRO S.A. - PETROBRAS (Exact name of registrant",
+                  ["PETROLEO BRASILEIRO SA PETROBRAS"]) is None
