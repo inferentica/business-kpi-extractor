@@ -132,6 +132,13 @@ def _from_a_subtotal(figures, net) -> Check:
         for skip in (set(), covered):
             if _chain(figures[start][2], net[1], [value for index, (_l, _v, value) in enumerate(segment) if index not in skip]):
                 return Check("calc", PASS, f"net income from {figures[start][0] or 'the subtotal above it'}")
+    # No subtotal at all: Brookfield's releases from revenues through income tax straight to net income, every line
+    # signed as printed, and their plain sum is net income.
+    above = figures[:net[0]]
+    covered = {position for end, begin in subtotals(above).items() for position in range(begin, end)}
+    lines = [value for index, (_l, _v, value) in enumerate(above) if index not in covered]
+    if len(lines) >= 3 and close(sum(lines), net[1], len(lines) + 1):
+        return Check("calc", PASS, "net income as the sum of the lines above it")
     return Check("calc", NONE, "no income before taxes and net income")
 
 
