@@ -13,6 +13,7 @@ import re
 from datetime import date
 
 from ...checks.reported import Column, Figure, checks_for
+from ...domain.basis import taxonomy_basis
 from ...domain.model import Reading
 from ...domain.periods import OWN_SLACK, Period, label_period, opening_instant, parse_period, presented_periods
 from .facts import ReportingCurrency, consolidated_figures, decimals, load_facts, number
@@ -143,7 +144,7 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
         statement=name, duration=duration, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
         period_end=period.end, period_start=period.start, currency=currency.currency,
         accession="", form="", filed=date.min, own=False, source="xbrl",
-        lines=lines, checks=checks_for(name, column, arcs),
+        basis=taxonomy_basis([line["concept"] for line in lines]), lines=lines, checks=checks_for(name, column, arcs),
     )
 
 

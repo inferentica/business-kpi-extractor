@@ -77,3 +77,16 @@ def test_net_income_chain_through_a_tax_total_and_running_subtotals():
                     ("INCOME FROM CONTINUING OPERATIONS BEFORE EXTRAORDINARY GAIN", 3363),
                     ("Income from discontinued operations, net of taxes", 65), ("NET INCOME", 3428))
     assert income_check(figures).result == "pass"
+
+
+def test_net_income_chain_through_one_subtotals_lines_alone():
+    # ASML FY2000: discontinued operations' loss and tax under their net, beside running subtotals of continuing ones.
+    from statement_extractor.checks.printed import income_check
+    figures = lines(("Income (loss) from continuing operations before income taxes", 551657),
+                    ("(Provision for) benefits from income taxes", -167923),
+                    ("Net income (loss) from continuing operations before effect of accounting changes", 383734),
+                    ("Cumulative effect of change in accounting principle net of tax", -2676),
+                    ("Net income (loss) from continuing operations", 381058),
+                    ("Loss from discontinued operations before income taxes", -3685), ("Benefits from income tax", 674),
+                    ("Net loss from discontinued operations", -3011), ("Net income (loss)", 378047))
+    assert income_check(figures).result == "pass"

@@ -24,7 +24,15 @@ _NOT_STATEMENT = re.compile(r"selected|quarterly|condensed\s+consolidating|conso
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
                             r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b|"
                             # Chase's 1998 reconciliation of reported results to an operating basis, headed "INCOME STATEMENT".
-                            r"operating\s+basis|reported\s+results", re.I)
+                            r"operating\s+basis|reported\s+results|"
+                            # A foreign filer's reconciliation to U.S. GAAP (TSMC: "reconciliation of the significant
+                            # balance sheet accounts to the amounts determined under U.S. GAAP"), its rows "As reported".
+                            r"reconciliation\s+of|amounts\s+determined\s+under|(under|to|with)\s+u\.?\s?s\.?\s+gaap", re.I)
+
+
+# A link printed atop every page back to the index (TSMC's "Index to Financial Statements"), with a title after it: not
+# the index itself.
+_RUNNING_LINK = re.compile(r"\b(index\s+to\s+(consolidated\s+)?financial\s+statements|table\s+of\s+contents)\b(?=.{40,})", re.I | re.S)
 
 
 # Column headings that are no period: a statement's columns are periods, a reconciliation's are its steps (Chase's
@@ -50,7 +58,8 @@ def find_statements(all_tables: list[Table]) -> list[tuple[str, list[Table]]]:
             leading = " ".join(row.label for row in _leading(table))
             kind = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
             title_text += " " + leading
-        if kind is None or _NOT_STATEMENT.search(title_text[-260:]) or len([r for r in table.rows if r.figures]) < 4:
+        if kind is None or _NOT_STATEMENT.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
+                len([r for r in table.rows if r.figures]) < 4:
             continue
         if any(_NOT_A_PERIOD.match(cell.text) for cells in table.header for cell in cells if cell.start > 0):
             continue

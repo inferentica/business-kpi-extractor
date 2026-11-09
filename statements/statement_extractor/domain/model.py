@@ -35,7 +35,8 @@ class Reading:
     form: str
     filed: date
     own: bool  # the filing's own period; False for a comparative column (an earlier period the filing presents again)
-    source: str  # xbrl (later: html, text, release)
+    source: str  # xbrl, html, text
+    basis: str | None = None  # the accounting basis: US GAAP, IFRS, ROC GAAP, Taiwan-IFRS (domain/basis.py)
     lines: list[dict] = field(default_factory=list)  # line, concept, label, level, is_heading, value
     checks: list[Check] = field(default_factory=list)
 

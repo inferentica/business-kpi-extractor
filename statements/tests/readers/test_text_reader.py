@@ -290,3 +290,30 @@ def test_one_year_over_each_column_in_order():
     readings, _ = read(text, "0930", date(1997, 9, 26), form="10-K")
     values = {line["label"]: line["value"] for line in readings[("balance", "1997", "FY", "instant")].lines}
     assert values["Cash and cash equivalents"] == 1_230e6
+
+
+# ASML's FY2002 20-F: note numbers in the margin, a currency under each year and a translation of the latest year.
+ASML_2002 = """<TABLE>
+<CAPTION>
+CONSOLIDATED STATEMENTS OF OPERATIONS
+                                                     For the year ended December 31
+                                                    2001            2002           2002
+                                                     EUR             EUR            USD
+                                         (Amounts in thousands, except per share data)
+<S>                                               <C>             <C>            <C>
+        Total net sales......................     1,589,247       1,958,672      2,053,976
+3       Total cost of sales..................     1,558,234       1,491,068      1,563,620
+        Income (loss) before income taxes....      (594,219)       (130,824)      (137,190)
+17      (Provision for) benefits from taxes..       179,017          42,779         44,861
+        Net income (loss)....................      (415,202)        (88,045)       (92,329)
+</TABLE>
+"""
+
+
+def test_margin_note_numbers_and_a_translated_year():
+    readings, notes = read(ASML_2002, "1231", date(2002, 12, 31), form="20-F")
+    assert sorted(key[1] for key in readings) == ["2001", "2002"]
+    latest = readings[("income", "2002", "FY", "year")]
+    assert [line["label"] for line in latest.lines][:2] == ["Total net sales", "Total cost of sales"]
+    assert latest.lines[1]["level"] == latest.lines[0]["level"] and latest.currency == "EUR"
+    assert latest.lines[0]["value"] == 1_958_672e3 and latest.status == "kept"

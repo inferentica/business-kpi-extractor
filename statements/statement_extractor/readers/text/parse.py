@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from ...domain.basis import is_currency_word
 from ..printed.tables import COLUMN_TITLE, NOTE_MARK, Cell, Row, Table, clean, number
 
 _BLOCK = re.compile(r"<TABLE>(.*?)</TABLE>", re.I | re.S)
@@ -63,9 +64,11 @@ def _split(line: str) -> _Line | None:
     while run > 0 and (_FIGURE.match(chunks[run - 1].text) or _PERCENT.match(chunks[run - 1].text)):
         run -= 1
     label_chunks, figures = chunks[:run], [chunk for chunk in chunks[run:] if not _PERCENT.match(chunk.text)]
+    if len(label_chunks) > 1 and re.fullmatch(r"\d{1,2}", label_chunks[0].text):
+        label_chunks = label_chunks[1:]  # a note number in the margin: ASML's "3       Total cost of sales"
     label = " ".join(chunk.text for chunk in label_chunks)
     label = NOTE_MARK.sub("", re.sub(r"\s*\.{2,}[\s.]*$", "", label)).strip()  # dot leaders: "Net sales........"
-    return _Line(chunks[0].start, clean(label), figures)
+    return _Line(label_chunks[0].start if label_chunks else chunks[0].start, clean(label), figures)
 
 
 def _columns(lines: list[_Line]) -> list[int]:
@@ -215,7 +218,9 @@ def _table(before: str, title_lines: list[str], header_lines: list[str], body: l
     for line in header_lines:
         if _RULE.match(line):
             continue
-        if COLUMN_TITLE.search(line) or any(_YEAR.match(chunk.text) for chunk in _chunks(line)):
+        words = _chunks(line)
+        if COLUMN_TITLE.search(line) or any(_YEAR.match(chunk.text) for chunk in words) or \
+                len(words) > 1 and all(is_currency_word(chunk.text) for chunk in words):  # ASML's "EUR EUR EUR USD"
             cells = _header(line, columns)
             if cells:
                 header.append(cells)

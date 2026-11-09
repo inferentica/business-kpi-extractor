@@ -8,6 +8,7 @@ import re
 
 import lxml.html
 
+from ...domain.basis import currencies_named, is_currency_word
 from ..printed.tables import COLUMN_TITLE, NOTE_MARK, Cell, Row, Table, clean, is_header_figures, number
 
 
@@ -77,6 +78,17 @@ def _row(cells: list[Cell]) -> Row | None:
     return Row(label=label, level=level if level is not None else 0, figures=figures, cells=cells)
 
 
+def _currency_row(cells: list[Cell]) -> bool:
+    """A row naming each column's currency, after a caption at most: TSMC's "NT$ | NT$ | US$", ASML's "Notes | (in
+    thousands, except per share data) | EUR | EUR | EUR | US$"."""
+    named = [cell for cell in cells if cell.text]
+    money = [cell for cell in named if is_currency_word(cell.text)]
+    if not money or not all(cell.start < money[0].start for cell in named if cell not in money):
+        return False
+    # One currency alone names a translation column over its figures (TSMC's 2002 cash flows: "U.S.$ (Note 4)").
+    return len(money) > 1 or money[0].start > 0 and bool(currencies_named(money[0].text))
+
+
 def parse_html(html: str | bytes) -> list[Table]:
     """Every table of a document with rows, its header rows and the text before it."""
     raw = html.encode("utf-8") if isinstance(html, str) else html
@@ -99,6 +111,9 @@ def parse_html(html: str | bytes) -> list[Table]:
             rows, header, seen_figures = [], [], False
             for tr in element.iter("tr"):
                 cells = _cells(tr)
+                if not seen_figures and _currency_row(cells):
+                    header.append([cell for cell in cells if cell.text])
+                    continue
                 row = _row(cells)
                 if row is None:
                     continue
