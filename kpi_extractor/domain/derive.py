@@ -72,11 +72,18 @@ def _signed(row: dict) -> bool:
     return row.get("group_key") == INCOME_GROUP
 
 
-def _kept(row: dict) -> dict | None:
+def _kept(row: dict, inputs: list[dict] | None = None, how: str | None = None) -> dict | None:
     """What a derived figure keeps of its source's locator: the segment it is a line of (AMD's Client under Client and
-    Gaming), so a worked-out Q4 nests where its quarters do."""
+    Gaming), so a worked-out Q4 nests where its quarters do. With its inputs, it also says what it was worked out from:
+    each period with its method and filing, and the arithmetic, so a derived figure traces to the figures behind it."""
     parent = (row.get("locator") or {}).get("parent")
-    return {"parent": parent} if parent else None
+    kept = {"parent": parent} if parent else {}
+    if inputs:
+        kept["derived_as"] = how
+        kept["derived_from"] = [{"period": f"{source.get('fiscal_year')} {source.get('fiscal_period')}",
+                                 "method": source.get("method"), "accession": source.get("source_accession")}
+                                for source in inputs]
+    return kept or None
 
 
 def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dict]:
@@ -102,7 +109,7 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
             "validation_status": "verified" if verified else "needs_review",
             "reconciliation_error_pct": None,
             "notes": notes,
-            "locator": _kept(base),
+            "locator": _kept(base, sources, "year less its quarters" if annual else "sum of its quarters"),
         })
     # Carry the reported revenue total through the same arithmetic, so derived periods still reconcile.
     totals = [_total(period) for period in quarters]
@@ -203,7 +210,8 @@ def _combine_year_to_date(annual: dict, nine: dict, nine_total: float, sources: 
             verified, notes = False, [*notes, "derived Q4 is negative"]
         rows.append({**year, "fiscal_period": "Q4", "value": value, "method": "derived",
                      "validation_status": "verified" if verified else "needs_review",
-                     "reconciliation_error_pct": None, "notes": notes, "locator": _kept(year)})
+                     "reconciliation_error_pct": None, "notes": notes,
+                     "locator": _kept(year, [year, source], "year less its first nine months")})
     annual_total = _total(annual)
     if annual_total is not None:
         total = annual_total - nine_total
@@ -258,3 +266,10 @@ def _method(period: dict) -> str:
 
 def _only_derived(period: dict | None) -> bool:
     return bool(period) and all(value["method"] == "derived" for value in period.values())
+
+
+def same_derivation(stored: dict, derived: dict) -> bool:
+    """Whether a stored derived figure already says what the new one says: its value, its standing and its inputs. One
+    derived before its inputs were kept is written once more to record them (a locator alone makes no new version)."""
+    return (float(stored["value"]) == float(derived["value"]) and stored["validation_status"] == derived["validation_status"]
+            and (stored.get("locator") or {}).get("derived_from") == (derived.get("locator") or {}).get("derived_from"))

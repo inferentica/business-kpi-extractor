@@ -13,6 +13,7 @@ from ..quality.checks import check_period, far_above_quarter, looks_like_part_of
 from ..readers.extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
                        read_values)
 from ..readers.replay import replay
+from ..readers.trace import stamp_call, trace_replay
 from .shared import (AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
 
@@ -251,9 +252,7 @@ class AiReading:
                 f"- {_explain_pointer(problem, document)}" for problem in invalid[:20])
             located = self._ask(retry_text, "locate", Located, thinking_first=thinking_first, model=model)
             read, problems = read_values(document, spec, located, currency)
-        if call := self._call_of(located):
-            for item in read:
-                item.locator["ai_call"] = call
+        stamp_call(read, self._call_of(located))
         return located, read, problems
 
     def _replay_groups(self, document: Document, spec: Spec, expected: date, currency: str | None):
@@ -265,8 +264,8 @@ class AiReading:
         last = self._last_locators(expected, source)
         if not last:
             return [], None, set()
-        accession = next((value.get("source_accession") for key, value in self._ai_history(expected, source).items()
-                          if key in last), None)
+        history = self._ai_history(expected, source)
+        accession = next((value.get("source_accession") for key, value in history.items() if key in last), None)
         notes = (self.filings.get(accession or "") or {}).get("notes") or []
         reported = next((note for note in notes if note.startswith(_NOT_REPORTED)), _NOT_REPORTED)
         not_reported = set(reported.removeprefix(_NOT_REPORTED).split(", ")) if _READ_BY_AI in notes else set()
@@ -297,6 +296,7 @@ class AiReading:
                 continue
             if group.key not in self._confirmed_groups(located, read, spec, expected, document):
                 continue
+            trace_replay(read, mine, history, accession)
             items += read
             done.add(group.key)
             kept_located = kept_located or located

@@ -8,7 +8,7 @@ import re
 from datetime import date, timedelta
 
 from ..ai import Spec
-from ..domain.derive import derive_periods
+from ..domain.derive import derive_periods, same_derivation
 from ..documents.document import Document, parse_number
 from ..quality.checks import count_jump, parts_add_up, reported_matches
 from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
@@ -610,8 +610,7 @@ class SeriesChecks:
             existing = self.values.get(value_key(record))
             if existing and existing["method"] != "derived" and existing["validation_status"] == "verified":
                 continue  # a reported figure wins; a flagged partial reading (TSMC's release percentages) does not
-            if (existing and float(existing["value"]) == float(record["value"])
-                    and existing["validation_status"] == record["validation_status"]):
+            if existing and same_derivation(existing, record):
                 continue
             changed.append(record)
         return changed

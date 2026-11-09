@@ -82,7 +82,10 @@ def test_q4_is_the_year_less_the_third_quarters_nine_months():
     third[1]["locator"] = {"total": 40, "ytd": 30, "ytd_total": 100}
     derived = {row["kpi_key"]: row for row in derive_periods(values + third) if row["fiscal_period"] == "Q4"}
     assert derived["a"]["value"] == 30 and derived["b"]["value"] == 10
-    assert derived["a"]["locator"] == {"total": 40} and derived["a"]["reconciliation_error_pct"] == 0
+    assert derived["a"]["locator"]["total"] == 40 and derived["a"]["reconciliation_error_pct"] == 0
+    # It says what it was worked out from: the year and the third quarter's nine months.
+    assert derived["a"]["locator"]["derived_as"] == "year less its first nine months"
+    assert [source["period"] for source in derived["a"]["locator"]["derived_from"]] == ["2026 FY", "2026 Q3"]
 
 
 def test_quarters_are_laid_out_like_their_year():
