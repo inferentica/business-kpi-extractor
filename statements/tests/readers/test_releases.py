@@ -183,3 +183,9 @@ def test_one_statement_of_profit_and_comprehensive_income_is_the_income_statemen
                             fiscal_year_end="1231", year_offset=0)
     assert {(r.statement, r.fiscal_year, r.fiscal_period, r.duration) for r in readings} == {
         ("income", "2013", "Q1", "quarter"), ("income", "2012", "Q1", "quarter")}
+
+
+def test_a_title_in_the_tables_own_rows_says_consolidated():
+    readings, _ = read_text(ASML_Q1_2003, accession="r", form="6-K", filed=date(2003, 4, 16),
+                            document_end=date(2003, 3, 31), fiscal_year_end="1231", year_offset=0)
+    assert readings and all(r.scope == "consolidated" for r in readings)

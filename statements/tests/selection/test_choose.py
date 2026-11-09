@@ -133,3 +133,15 @@ def test_a_label_printed_twice_takes_each_occurrences_own_sign():
         return found
     settled = _signs_from(flows("xbrl", -6018, -6018), flows("html", -6018, 6018))
     assert [line["value"] for line in settled.lines] == [-6018, 6018]
+
+
+def test_among_releases_the_annual_reports_basis_wins():
+    # ASML 2011 Q2: its US GAAP release, and a December 2012 6-K printing the quarter again on IFRS.
+    annual = reading("20-F", date(2012, 2, 14), 1, own=True)
+    annual.basis, annual.form = "US GAAP", "20-F"
+    first = reading("q2", date(2011, 7, 13), 827.1e6, own=True, period="Q2", duration="ytd")
+    first.basis, first.form = "US GAAP", "6-K"
+    again = reading("ifrs", date(2012, 12, 14), 826.9e6, own=False, period="Q2", duration="ytd")
+    again.basis, again.form = "IFRS", "6-K"
+    chosen = {item["fiscal_period"]: item for item in choose([annual, first, again])}
+    assert chosen["Q2"]["source_accession"] == "q2" and chosen["Q2"]["other_bases"][0]["basis"] == "IFRS"

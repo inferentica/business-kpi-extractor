@@ -72,7 +72,7 @@ YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
 
 # Words a header row prints over each column rather than a period: TSMC's management reports print "USD | NTD | % |
 # NTD | % | … | Amount | %" under their dates.
-_COLUMN_WORD = re.compile(r"^(.{0,12}%.{0,12}|amounts?|change|move|yoy|qoq|notes?|\(?(un)?audited\)?)$", re.I)
+_COLUMN_WORD = re.compile(r"^(.{0,12}%.{0,12}|amounts?|change|chg|move|yoy|qoq|notes?|sales|\(?(un)?audited\)?)$", re.I)
 PERCENT_WORD = re.compile(r"%")  # "%", "% of Sales", "Inc(Dec)%"
 
 
