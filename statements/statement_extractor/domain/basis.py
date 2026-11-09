@@ -28,7 +28,8 @@ _NAMES = (
     (CANADIAN_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+Canada|Canadian\s+generally\s+accepted|"
                     r"\bCanadian\s+GAAP\b"),
     (DUTCH_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+the\s+Netherlands|\bDutch\s+GAAP\b"),
-    (IFRS, r"International\s+Financial\s+Reporting\s+Standards|\bIFRSs?\b"),
+    # ASML's statutory interim reports: "prepared in accordance with IAS 34", IFRS's standard for interim reports.
+    (IFRS, r"International\s+Financial\s+Reporting\s+Standards|\bIFRSs?\b|\bIAS\s*34\b"),
 )
 _ANY_NAME = re.compile("|".join(f"(?P<b{index}>{pattern})" for index, (_basis, pattern) in enumerate(_NAMES)), re.I)
 

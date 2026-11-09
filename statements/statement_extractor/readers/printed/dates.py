@@ -17,6 +17,7 @@ _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|a
 
 
 _MONTH_DAY = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}})\b", re.I)
+_FULL_DATE = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}}),?\s+((?:19|20)\d{{2}})\b", re.I)
 _MONTH_YEAR = re.compile(rf"\b({_MONTH})-(\d{{2}})\b", re.I)
 
 
@@ -29,7 +30,7 @@ _NUMBERS = {"three": 3, "six": 6, "nine": 9, "twelve": 12, "thirteen": 13, "sixt
 
 
 # A span in words or digits, in months or weeks: "Nine Months Ended", "12 Weeks Ended" (Costco, PepsiCo), "36 Weeks".
-_SPAN = re.compile(rf"\b({'|'.join(sorted(_NUMBERS, key=len, reverse=True))}|\d{{1,2}})[-\s]+(months|weeks)\b|"
+_SPAN = re.compile(rf"\b({'|'.join(sorted(_NUMBERS, key=len, reverse=True))}|\d{{1,2}})[-\s]+(months?|weeks?)\b|"
                    r"\b(?:fiscal\s+)?years?\s+ended\b|\b(?:quarter)\s+ended\b|\b(?:first|second|third|fourth)\s+quarter\b", re.I)
 
 
@@ -40,7 +41,7 @@ _DOTTED_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b")  # day fir
 
 def _span_days(count: str, unit: str) -> int:
     number = int(count) if count.isdigit() else _NUMBERS[count.lower()]
-    if unit.lower() == "weeks":
+    if unit.lower().startswith("week"):
         return number * 7
     return {3: 91, 6: 182, 9: 273, 12: 364}.get(number, round(number * 30.4))
 
@@ -119,6 +120,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     columns = figure_columns(first)
     in_order = years_in_order(first, columns)
     aboves = {column: header_text(first, column[0]) or header_text(first, column[-1]) for column in columns}
+    dated_in_title = {match.group(3): (match.group(1), match.group(2)) for match in _FULL_DATE.finditer(title + " " + header_all)}
     for column in columns:
         above = aboves[column]
         numeric = _NUMERIC_DATE.search(above)
@@ -159,6 +161,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                 end = date(year_of + (2000 if year_of < 50 else 1900) if year_of < 100 else year_of, month, day_of)
             except ValueError:
                 end = None
+        elif day is not None and not _MONTH_DAY.search(above) and year in dated_in_title:
+            end = _date(*dated_in_title[year], year)  # "June 29, 2014 and June 30, 2013": each year's own date (ASML)
         elif day is not None:
             end = _date(day.group(1), day.group(2), year)
             month_named = re.search(rf"\b({_MONTH})\s+(?:19|20)\d{{2}}\b", above, re.I)
