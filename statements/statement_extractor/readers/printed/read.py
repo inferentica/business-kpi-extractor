@@ -40,8 +40,10 @@ def _concept(label: str, kind: str) -> str:
 
 
 def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: date, document_end: date | None,
-                fiscal_year_end: str, year_offset: int) -> tuple[list[Reading], list[str]]:
-    """Every statement column of a printed filing, checked; and notes on what it could not read."""
+                fiscal_year_end: str, year_offset: int, unstated_scale: float | None = None,
+                ) -> tuple[list[Reading], list[str]]:
+    """Every statement column of a printed filing, checked; and notes on what it could not read. With
+    `unstated_scale`, a statement that states no scale is read in that one (pipeline/unstated_scale.py proves it)."""
     readings: list[Reading] = []
     notes: list[str] = []
     found = find_statements(all_tables, release=form == "6-K")
@@ -59,9 +61,13 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if not periods:
                 continue
         scale = statement_scale(group)
-        if scale is None:
+        if scale is None and unstated_scale is not None and not _states_two(group):
+            scale = unstated_scale
+        elif scale is None:
             notes.append(f"{kind}: no single scale stated")
             continue
+        elif unstated_scale is not None:
+            continue  # read with its own scale already
         if not periods:
             notes.append(f"{kind}: no dated columns")
             continue
@@ -98,6 +104,12 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes
+
+
+def _states_two(group: list[Table]) -> bool:
+    """Whether the statement names two scales (then it is ambiguous, not unstated)."""
+    from .scales import scale_text
+    return bool(re.search(r"\b(thousands?|millions?|billions?)\b", scale_text(group), re.I))
 
 
 _FOREIGN_FORMS = ("20-F", "40-F", "6-K")

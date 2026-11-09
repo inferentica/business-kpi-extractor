@@ -47,10 +47,11 @@ EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’]?\s
 
 
 # Stock Yards: "Beginning cash and cash equivalents", "Ending cash and cash equivalents".
-OPENING = re.compile(r"\bcash\b.*\b(beginning|start)\b|^(beginning|opening)\b.*\bcash\b", re.I)
+# BCB Bancorp's 2008 10-Qs: "Cash and cash equivalents-begininng" (so spelled) and "Cash and cash equivalents-ending".
+OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(beginning|opening)\b.*\bcash\b", re.I)
 
 
-CLOSING = re.compile(r"\bcash\b.*\bend\b|^(ending|closing)\b.*\bcash\b", re.I)
+CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(ending|closing)\b.*\bcash\b", re.I)
 
 
 CHANGE = re.compile(r"(increase|decrease|change).*\bcash\b|\bcash\b.*(increase|decrease)|^total\s+cash\s+(generated|provided|used)", re.I)
@@ -59,7 +60,9 @@ CHANGE = re.compile(r"(increase|decrease|change).*\bcash\b|\bcash\b.*(increase|d
 EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translation", re.I)
 
 
-SECTIONS = re.compile(r"(operating|investing|financing)\s+activities(\s+(from|of)\s+continuing\s+operations)?$", re.I)
+# EOG 2000: "NET OPERATING CASH INFLOWS", "NET INVESTING CASH OUTFLOWS", "NET FINANCING CASH OUTFLOWS".
+SECTIONS = re.compile(r"(operating|investing|financing)\s+activities(\s+(from|of)\s+continuing\s+operations)?$|"
+                      r"^net\s+(operating|investing|financing)\s+cash\s+(in|out)?flows?$", re.I)
 
 
 # Goldman Sachs: "Pre-tax earnings".
@@ -90,7 +93,8 @@ DATED_CASH = re.compile(r"^cash\b.*\bat\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|o
 # The three sections a cash flow statement must hold before its roll-forward proves anything (a statement's last page
 # alone also rolls forward).
 # The first section word names the section: ASML's "Net cash used in investing activities from operations" is investing.
-SECTION_KINDS = re.compile(r"^(net|cash|total)\b.*?\b(operat|invest|financ)(ing\s+activities|ions\b|ment\s+activities)", re.I)
+SECTION_KINDS = re.compile(r"^(net|cash|total)\b.*?\b(operat|invest|financ)(ing\s+activities|ions\b|ment\s+activities|"
+                           r"ing\s+cash\s+(in|out)?flows?$)", re.I)  # EOG's "NET OPERATING CASH INFLOWS"
 
 # A heading over the cash balances themselves ("CASH AND CASH EQUIVALENTS", "Cash and due from banks"), under which
 # "Balance at beginning of year" names the opening cash; "Cash flows from financing activities" is not one.
