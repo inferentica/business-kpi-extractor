@@ -101,6 +101,14 @@ def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
             continue
         if row.figures and not is_header_figures(row):
             seen_figures = True
+            previous = rows[-1] if rows else None
+            if previous is not None and not previous.figures and previous.label and row.label[:1].islower() \
+                    and not previous.label.rstrip().endswith(":") and row.level >= previous.level:
+                # A label wrapped onto the row below, which holds the figures (Scotiabank's 2003 40-F: "Subordinated"
+                # / "debentures   26   26   45").
+                rows[-1] = Row(label=f"{previous.label} {row.label}", level=previous.level, figures=row.figures,
+                               cells=row.cells)
+                continue
             rows.append(row)
         elif not seen_figures:
             texts = " ".join(cell.text for cell in cells)
