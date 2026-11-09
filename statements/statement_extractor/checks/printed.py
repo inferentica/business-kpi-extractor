@@ -81,6 +81,8 @@ def income_check(figures) -> Check:
     between them sums are read as that subtotal (Prudential's current and deferred tax under total income taxes)."""
     pretax = first_match(figures, PRETAX)
     net = first_match(figures, NET_INCOME, after=pretax[0] if pretax else -1)
+    if not pretax and net:
+        return _from_a_subtotal(figures, net)
     if not pretax or not net:
         return Check("calc", NONE, "no income before taxes and net income")
     between = figures[pretax[0] + 1:net[0]]
@@ -99,6 +101,19 @@ def income_check(figures) -> Check:
         if _chain(pretax[1], net[1], [value for index, (_l, _v, value) in enumerate(between) if index not in skip]):
             return Check("calc", PASS, "net income from income before taxes")
     return Check("calc", FAIL, f"income before taxes {pretax[1]:,.1f} does not lead to net income {net[1]:,.1f}")
+
+
+def _from_a_subtotal(figures, net) -> Check:
+    """A statement with no income before taxes (Brookfield prints its taxes among expenses and other items): net income
+    follows from the last subtotal above it, unlabelled or a total, through the lines between them."""
+    starts = subtotals(figures[:net[0]])
+    candidates = sorted({end for end in starts} | {index for index, (label, _l, _v) in enumerate(figures[:net[0]])
+                                                    if not label or TOTAL.match(label)}, reverse=True)[:2]
+    for start in candidates:
+        between = [value for _label, _level, value in figures[start + 1:net[0]]]
+        if len(between) >= 2 and _chain(figures[start][2], net[1], between):
+            return Check("calc", PASS, f"net income from {figures[start][0] or 'the subtotal above it'}")
+    return Check("calc", NONE, "no income before taxes and net income")
 
 
 def _chain(start: float, end: float, values: list[float]) -> bool:

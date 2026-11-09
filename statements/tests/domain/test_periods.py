@@ -40,3 +40,14 @@ def test_a_sixteen_or_seventeen_week_quarter_is_a_quarter():
     # Costco's fourth quarter: 16 weeks, 17 in a 53-week year (2017-05-08 to 2017-09-03).
     assert parse_period("duration_2017-05-08_2017-09-03").duration == "quarter"
     assert label_period(parse_period("duration_2017-05-08_2017-09-03"), "0903", 0) == ("2017", "Q4", "quarter")
+
+
+def test_a_first_year_begun_within_the_year_is_the_companys_year():
+    from datetime import date
+    from statement_extractor.domain.periods import Period, short_first_year
+    stub, year = Period(date(2022, 12, 31), date(2022, 7, 4)), Period(date(2023, 12, 31), date(2023, 1, 1))
+    assert short_first_year(stub, [year, stub], "1231", 0, "40-F") == ("2022", "FY", "year")
+    # Not a column with an earlier one before it, nor a transition report's months.
+    december = Period(date(2008, 12, 26), date(2008, 11, 29))
+    assert short_first_year(december, [december, Period(date(2008, 11, 28), date(2007, 11, 24))], "1226", 0, "10-K") is None
+    assert short_first_year(stub, [stub], "1231", 0, "10-KT") is None

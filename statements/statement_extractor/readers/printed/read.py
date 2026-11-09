@@ -132,6 +132,18 @@ _CAPTION = re.compile(r"\(\s*(?:in|amounts\s+in|dollars\s+in|expressed\s+in)\s+(
                       r"^\(?unaudited\)?$", re.I)
 
 
+# A cash flow section's heading: "Cash flows from operating activities".
+_SECTION_HEADING = re.compile(r"^(?:cash\s+flows?\s+(?:from|used\s+in|provided\s+by|\(used\s+in\))?.*?\b)?(operat|invest|financ)ing"
+                              r"(?:\s+activities)?\b", re.I)
+
+
+def _close_section(printed: list, section: str | None, index: int | None) -> None:
+    """Names a cash flow section's unlabelled total as the section's net cash, for the checks."""
+    if section and index is not None and index < len(printed):
+        _label, level, value = printed[index]
+        printed[index] = (f"Net cash from {section}ing activities", level, value)
+
+
 # A heading over share counts: Apple's "Shares used in computing earnings per share (in thousands):" over Basic and
 # Diluted, which would otherwise read as per-share figures.
 _SHARE_HEADING = re.compile(r"\bshares\b|weighted[-\s]average|\baverage\s+(number|common)", re.I)
@@ -143,7 +155,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
     lines: list[dict] = []
     printed: list[tuple[str, int, float | None]] = []  # label, level, figure as printed (None: a heading)
     named = unlabelled_totals([table for table, _column, _columns in layout]) if kind == "balance" else {}
-    heading = ""
+    heading, section, section_total = "", None, None
     for table, column, columns in layout:
         base = min((row.level for row in table.rows if row.label), default=0)
         for row in table.rows:
@@ -153,6 +165,10 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line
             if not row.figures:
                 heading = row.label
+                opened = _SECTION_HEADING.match(row.label)
+                if opened or CASH_HEADING.match(row.label):
+                    _close_section(printed, section, section_total)
+                    section, section_total = (opened.group(1).lower() if opened else None), None
             value = _figure(row, column, columns) if row.figures else None
             if row.figures and value is None:
                 continue
@@ -178,6 +194,10 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
             lines.append({"line": len(lines), "concept": _concept(row.label, kind), "label": row.label[:300],
                           "level": max(0, min(20, row.level - base)), "is_heading": not row.figures, "value": amount})
             meaning = named.get(id(row), row.label)
+            if kind == "cash_flow" and row.figures and not row.label and section:
+                # A section closed by an unlabelled total (Scotiabank, Brookfield): its last before the next section
+                # is the net cash of the section (Brookfield's operating section has a subtotal before it).
+                section_total = len(printed)
             if re.match(r"^(balance|net\s*\(?(increase|decrease)|increase|decrease|beginning|end|start)\b", row.label, re.I) \
                     and "cash" not in row.label.lower() \
                     and CASH_HEADING.match(heading):
@@ -188,6 +208,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 printed.append((row.label, row.level, None))
             elif not (per_share or shares):
                 printed.append((meaning, row.level, value))
+    _close_section(printed, section, section_total)
     lines = [line for index, line in enumerate(lines) if not line["is_heading"] or _has_lines_below(lines, index)]
     if not any(not line["is_heading"] for line in lines):
         return None

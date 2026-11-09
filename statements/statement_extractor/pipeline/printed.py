@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import date
 
 from ..checks.schedules import parse_schedule, schedule_check
-from ..domain.basis import default_basis, stated_basis
+from ..domain.basis import default_basis, default_currency, stated_basis, stated_currency
 from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
 from ..readers.printed.sign_index import printed_figures
@@ -30,8 +30,10 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         except ValueError:
             document_end = None
     attachments = list(ref.filing.attachments)
+    # A 40-F is a cover: a Canadian filer's audited statements are its exhibits (EX-99.1 or EX-99.2 by year).
+    wanted = PRINTED_DOCUMENTS + (("EX-99",) if ref.form.upper().startswith("40-F") else ())
     chosen = set(map(id, release_documents(attachments))) if release else None
-    schedules, filing_basis = [], None
+    schedules, filing_basis, filing_currency = [], None, None
     for attachment in attachments:
         kind = str(attachment.document_type or "").upper()
         if kind.startswith("EX-27"):
@@ -40,7 +42,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             if schedule is not None:
                 schedules.append(schedule)
             continue
-        if (id(attachment) not in chosen) if release else not kind.startswith(PRINTED_DOCUMENTS):
+        if (id(attachment) not in chosen) if release else not kind.startswith(wanted):
             continue
         extension = str(attachment.extension or "").lower()
         content = attachment.content
@@ -61,16 +63,18 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             parse = parse_html if printed == "html" else parse_text
             for key, figures in printed_figures(parse(content)).items():
                 signs.setdefault(key, []).extend(figures)
-        basis = stated_basis(content)
-        filing_basis = filing_basis or basis
+        basis, currency = stated_basis(content), stated_currency(content)
+        filing_basis, filing_currency = filing_basis or basis, filing_currency or currency
         for reading in readings:
             reading.basis = basis
+            reading.currency = reading.currency or currency
         held = {reading.key for reading in found}
         found.extend(reading for reading in readings if reading.key not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
         kinds.append(printed)
     for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
         reading.basis = reading.basis or filing_basis or default_basis(ref.form)
+        reading.currency = reading.currency or filing_currency or default_currency(ref.form)
         check = schedule_check(reading, schedules)
         if check is not None:
             reading.checks.append(check)

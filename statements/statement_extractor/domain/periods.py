@@ -93,3 +93,23 @@ def opening_instant(period: Period, instants: dict[date, str]) -> str | None:
         return instants[day_before]
     near = [when for when in instants if timedelta(0) <= day_before - when <= OWN_SLACK]
     return instants[max(near)] if near else None
+
+
+def short_first_year(period: Period, columns: list[Period], fiscal_year_end: str, year_offset: int,
+                     form: str) -> tuple[str, str, str] | None:
+    """A company's first fiscal year when it began within that year: Brookfield Asset Management was formed in July 2022
+    and reports July 4 to December 31, 2022 as its year 2022. Only the statement's earliest column, ending on the year
+    end and at least four weeks long, and never a transition report's (10-KT) months between two year ends."""
+    if form.upper().startswith("10-KT") or period.start is None or not 28 <= period.days < 350:
+        return None
+    if any(other.start is not None and other.start < period.start for other in columns):
+        return None
+    month, day = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
+    year_end = date(period.end.year, month, min(day, 28) if month == 2 else min(day, 30 if month in (4, 6, 9, 11) else 31))
+    if abs((period.end - year_end).days) > 7:
+        return None
+    try:
+        fiscal_year, _period = fiscal_label(period.end, fiscal_year_end, annual=True, year_offset=year_offset)
+    except FiscalCalendarError:
+        return None
+    return fiscal_year, "FY", "year"

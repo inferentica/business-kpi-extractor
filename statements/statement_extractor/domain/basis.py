@@ -113,3 +113,30 @@ _NOTE = re.compile(r"\s*\(\s*notes?\s+\d+[a-z]?\s*\)\s*$", re.I)
 def is_currency_word(text: str) -> bool:
     """A cell that only names a currency: "NT$", "US$", "EUR", "$", "U.S.$ (Note 4)"."""
     return bool(_ONLY_CURRENCY.match(_NOTE.sub("", text or "")))
+
+
+# How a document states the currency of all its figures: Brookfield's "All currency amounts are in United States
+# dollars unless otherwise stated", "the U.S. dollar is the company's reporting currency".
+_STATED_CURRENCY = re.compile(
+    r"\ball\s+(?:currency\s+|dollar\s+|monetary\s+)?(?:amounts|figures)\s+(?:are\s+)?(?:expressed\s+|presented\s+|stated\s+|shown\s+)?"
+    r"in\s+(.{0,50})|\b(?:presentation|reporting)\s+currency\s+(?:is|of)\s+(?:the\s+)?(.{0,40})|"
+    r"([A-Za-z.\s]{0,30}?)\s+is\s+the\s+(?:company|bank|group|corporation)\S*\s+(?:presentation|reporting)\s+currency", re.I)
+
+
+def stated_currency(text: str) -> str | None:
+    """The currency a document says all its figures are in, if it says so."""
+    text = re.sub(r"\s+", " ", re.sub(r"&(nbsp|#160|#xa0);", " ", re.sub(r"<[^>]+>", " ", text or ""), flags=re.I))
+    for match in _STATED_CURRENCY.finditer(text):
+        named = currencies_named(next(group for group in match.groups() if group is not None))
+        if named:
+            return named[0]
+    return None
+
+
+def default_currency(form: str) -> str | None:
+    """A form's currency when nothing says otherwise: a U.S. company's dollars, a Canadian filer's dollars (a 40-F
+    reporting in U.S. dollars says so); a 20-F or a release must state its own."""
+    form = form.upper()
+    if form.startswith(("10-K", "10-Q")):
+        return "USD"
+    return "CAD" if form.startswith("40-F") else None

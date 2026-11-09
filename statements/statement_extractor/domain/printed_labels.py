@@ -61,7 +61,9 @@ SECTIONS = re.compile(r"(operating|investing|financing)\s+activities(\s+(from|of
 
 
 # Goldman Sachs: "Pre-tax earnings".
-PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax|^pre-?\s?tax\s+(earnings|income|profit)\b",
+# Scotiabank: "Income before the undernoted" (the taxes and minority interest printed under it).
+PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax|^pre-?\s?tax\s+(earnings|income|profit)\b|"
+                    r"^income\s+before\s+the\s+undernoted\b",
                     re.I)
 
 

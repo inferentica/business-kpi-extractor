@@ -15,7 +15,8 @@ from datetime import date
 from ...checks.reported import Column, Figure, checks_for
 from ...domain.basis import taxonomy_basis
 from ...domain.model import Reading
-from ...domain.periods import OWN_SLACK, Period, label_period, opening_instant, parse_period, presented_periods
+from ...domain.periods import (OWN_SLACK, Period, label_period, opening_instant, parse_period, presented_periods,
+                               short_first_year)
 from .facts import ReportingCurrency, consolidated_figures, decimals, load_facts, number
 from .rows import (STATEMENT_METHODS, annotated, clean_label, is_instant_line, key_for, label_for, presented_rows,
                    statement_of)
@@ -65,7 +66,8 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
         instants = {period.end: period.key for row in rows for key in (row.get("values") or {})
                     if (period := parse_period(key)) is not None and period.start is None}
         for period in periods:
-            labelled = label_period(period, fiscal_year_end, year_offset)
+            labelled = label_period(period, fiscal_year_end, year_offset) or \
+                short_first_year(period, periods, fiscal_year_end, year_offset, form)
             if labelled is None:
                 notes.append(f"{name}: column {period.key} off the calendar")
                 continue
