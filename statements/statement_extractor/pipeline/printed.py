@@ -6,6 +6,7 @@ from __future__ import annotations
 import html
 import re
 import unicodedata
+from difflib import SequenceMatcher
 
 from datetime import date
 
@@ -55,7 +56,12 @@ def another_registrant(ref, attachments) -> str | None:
     if cover is None:
         return None
     content = cover.content
-    text = re.sub(r"<[^>]+>|&#\d+;|&nbsp;", " ", content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or ""))
+    if isinstance(content, bytes):
+        try:
+            content = content.decode("utf-8")
+        except UnicodeDecodeError:
+            content = content.decode("latin-1")  # Petrobras's covers
+    text = re.sub(r"<[^>]+>|&nbsp;", " ", html.unescape(str(content or "")) if "&" in str(content or "")[:30_000] else str(content or ""))
     text = re.sub(r"\s+", " ", text[:30_000])
     match = _REGISTRANT.search(text)
     if match is None:
@@ -64,7 +70,8 @@ def another_registrant(ref, attachments) -> str | None:
     words = _words(printed)
     names = [_words(name) for name in _company_names(ref.filing)]
     if not words or not names or any(words <= name or name <= words or "".join(sorted(words)) == "".join(sorted(name))
-                                     or "".join(_ordered(printed)) in ("".join(_ordered(other)) for other in _company_names(ref.filing))
+                                     or any(SequenceMatcher(None, "".join(_ordered(printed)), "".join(_ordered(other))).ratio() >= 0.85
+                                            for other in _company_names(ref.filing))  # "PETR?LEO": one letter lost
                                      for name in names if name):
         return None
     # Only a name of the company's own family: a subsidiary shares its brand (Lloyds Bank plc beside Lloyds Banking
