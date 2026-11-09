@@ -100,6 +100,8 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
         notes = [] if verified else ["derived from values that need review"]
         if annual and value < 0 <= annual[key]["value"] and not balancing(key) and not _signed(annual[key]):
             verified, notes = False, [*notes, "derived Q4 is negative"]
+        if annual and _later_basis(parts, annual[key]):
+            verified, notes = False, [*notes, LATER_BASIS_NOTE]
         rows.append({
             **base,
             "fiscal_period": target,
@@ -119,6 +121,16 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
         if total:
             _reconcile(rows, total)
     return rows
+
+
+LATER_BASIS_NOTE = "worked out from quarters a later report restates, less the year as first reported"
+
+
+def _later_basis(parts: list[dict], year: dict) -> bool:
+    """A quarter taken from a later report's year-ago column is on that report's basis; the year as its own report gave
+    it may not be. Apple's 2019 reports restated 2018's quarters for a new revenue standard, and its 2018 10-K's year less
+    them gave a Q4 that matched neither basis (iPhone $38.6B, reported $37.2B)."""
+    return any((part.get("locator") or {}).get("year_ago") for part in parts) and not (year.get("locator") or {}).get("year_ago")
 
 
 def _align(annual: dict, quarter: dict) -> dict:
