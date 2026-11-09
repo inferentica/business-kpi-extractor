@@ -28,7 +28,7 @@ def subtotals(printed) -> dict[int, int]:
         if value is None:
             continue
         sums, position, total = [], index - 1, 0.0
-        while position >= 0 and len(sums) < 12:
+        while position >= 0 and len(sums) < 30:  # Copel sums 13 current assets
             earlier_label, _earlier_level, earlier_value = printed[position]
             if earlier_value is None:
                 if sums and _SPANS_HEADINGS.search(label):
@@ -39,7 +39,8 @@ def subtotals(printed) -> dict[int, int]:
             sums.append((position, total))
             position = block_start(starts, position) - 1
         for count, (start, running) in enumerate(sums, 1):
-            if count >= least and close(running, value, count + 1):
+            # A line no label marks as a subtotal must sum exactly (Apple's "Other" 32 is not 45 - 12 + 0 = 33).
+            if count >= least and close(running, value, count + 1 if least == 2 else 0):
                 starts[index] = start
                 break
         else:

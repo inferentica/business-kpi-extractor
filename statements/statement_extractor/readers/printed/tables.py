@@ -173,9 +173,24 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
     groups = [group for group in groups if not any(cell.start <= group[0] < cell.end and (re.fullmatch(r"notes?", cell.text.strip(), re.I)
                                                                                           or PERCENT_WORD.search(cell.text))
                                                    for cells in table.header for cell in cells)]
+    if len(groups) > 2 and _notes_named(table) and all(
+            # note numbers: "4", "13.2" (and a dash where a line has none)
+            round(value * 10) == value * 10 and 0 <= value < 100 for row in table.rows for position, value in row.figures.items()
+            if position in groups[0]):
+        groups = groups[1:]  # Copel: "Note" heads a row above, not the header; its first column holds note numbers
     if not groups:
         return []
     # A group carrying few figures beside a full one is a stray cell (a footnote figure), not a column.
     sizes = [sum(counts.get(position, 0) for position in group) for group in groups]
     keep = max(sizes) * 0.3
     return [tuple(group) for group, size in zip(groups, sizes) if size >= keep]
+
+
+def _notes_named(table: Table) -> bool:
+    """Whether a "Note" column heading is printed in the table's rows above its first figures."""
+    for row in table.rows:
+        if row.figures:
+            return False
+        if re.search(r"\bnotes?\b", row.label, re.I):
+            return True
+    return False

@@ -45,7 +45,9 @@ def _row(cells: list[Cell]) -> Row | None:
         if text in (")", ")%") and last_figure is not None:
             figures[last_figure] = -abs(figures[last_figure])
             continue
-        if text in ("$", "%", "€", "NT$", "US$") or text.endswith("%") and number(text.rstrip("%")) is not None:
+        # A currency sign in a cell of its own, KEPCO's won sign printed "W" included: no part of the label.
+        if text in ("$", "%", "€", "NT$", "US$", "£", "¥", "₩", "R$") or text == "W" and label_parts \
+                or text.endswith("%") and number(text.rstrip("%")) is not None:
             continue
         value = number(text.rstrip(")")) if text.endswith(")") and not text.startswith("(") else number(text)
         if value is not None and not label_parts and re.fullmatch(r"\d{1,2}", text):
