@@ -4,7 +4,7 @@ filing itself. Nothing here uses the extractor's readers: HTML tables are taken 
 filings line by line, PDFs by pdfplumber's own text. Rows are found by their label only, never by the served figure,
 so a check cannot be steered towards agreeing.
 
-    statement-extractor rows evals/handcheck/recheck.json --out rows.md
+    statement-extractor rows evals/handcheck/queue.json --out rows.md
 """
 from __future__ import annotations
 
