@@ -224,3 +224,17 @@ def test_a_data_caption_in_a_tables_first_rows_is_not_a_title():
         "<tr>" + cells(label, "1,000", "900") + "</tr>" for label in ("Total revenues", "Income before income taxes",
                                                                       "Income taxes", "Net income", "Total assets"))
     assert find_statements(parse_html(html + "</table>")) == []
+
+
+def test_average_balance_sheets_in_the_discussion_are_no_statement():
+    # SYBT's 10-Q MD&A: "The following table presents average balance sheets for the three month periods ended …".
+    html = ("<p>The following table presents average balance sheets for the three month periods ended March 31, 2017 "
+            "and 2016 along with the related calculation of tax-equivalent net interest income.</p><table>"
+            "<tr><td>Three months ended March 31,</td><td>2017</td><td>2016</td></tr>" +
+            "".join("<tr>" + cells(label, a, b) + "</tr>" for label, a, b in (
+                ("Loans", "2,036,437", "1,900,000"), ("Total earning assets", "2,673,842", "2,500,000"),
+                ("Total assets", "2,818,072", "2,640,000"), ("Total liabilities", "2,525,532", "2,370,000"),
+                ("Total stockholders' equity", "292,540", "270,000"),
+                ("Total liabilities and stockholders' equity", "2,818,072", "2,640,000"))) + "</table>")
+    readings, _ = read(html, "1231", date(2017, 3, 31))
+    assert not readings
