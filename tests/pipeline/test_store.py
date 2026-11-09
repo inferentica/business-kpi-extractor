@@ -142,3 +142,33 @@ def test_a_run_says_what_it_changed_among_the_figures_served():
     changes = store.served_changes()
     assert {key: changes[key] for key in ("added", "removed", "changed", "renamed")} == {"added": 2, "removed": 1, "changed": 1, "renamed": 1}
     assert {"change": "changed", "group": "kpi_x", "kpi": "moved", "year": "2026", "period": "Q2"} in changes["examples"]
+
+
+def test_a_held_figure_flagged_and_stood_back_is_not_sent():
+    # One step flags a breakdown line, a later one stands it back: the run's net change is none, so nothing is stored
+    # (each was a dated version lasting seconds, KKR's 835 in a day).
+    control = Control()
+    store = _store(control)
+    store.load([_row("a", notes=["confirmed by review"]), _row("b", value=5.0)])
+    store.hold()
+    store.write([_row("a", status="needs_review", notes=["parts differ from the total by 23.2%"])])
+    store.write([_row("a", notes=["confirmed by review"])])
+    store.write([_row("b", value=6.0, status="needs_review")])
+    store.write([_row("b", value=6.0)])
+    assert control.calls == []  # nothing goes out while held
+    assert store.values[("kpi_x", "a", "2026", "Q2")]["validation_status"] == "verified"  # steps see each other's rows
+    store.release()
+    sent = [value for _operation, payload in control.calls for value in payload["values"]]
+    assert [(value["kpi_key"], value["value"], value["validation_status"]) for value in sent] == [("b", 6.0, "verified")]
+    store.release()  # a second release has nothing left
+    assert len(control.calls) == 1
+
+
+def test_a_reading_recorded_while_held_goes_out_at_once():
+    control = Control()
+    store = _store(control)
+    store.hold()
+    store.record(FilingReading(_ref(), "processed", records=[_row("a")]))
+    assert len(control.calls) == 1 and control.calls[0][1]["filings"][0]["accession"] == "f1"
+    store.release()
+    assert len(control.calls) == 1  # the recorded row is not sent again

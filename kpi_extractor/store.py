@@ -63,6 +63,10 @@ class CompanyStore:
         # Each listed KPI's reported periods (group key, KPI key) -> (since, until): a figure outside them is not kept.
         self.windows: dict[tuple[str, str], tuple[str | None, str | None]] = {}
         self._loaded: dict[tuple, MappingProxyType] = {}
+        # What the control plane holds for each row, as last loaded or sent; and, while held, the rows written since.
+        self._remote: dict[tuple, MappingProxyType] = {}
+        self._holding = False
+        self._touched: set[tuple] = set()
         self._owner_rejected: set[tuple] = set()
         self.values = MappingProxyType(self._values)
         self.filings = MappingProxyType(self._filings)
@@ -75,12 +79,30 @@ class CompanyStore:
         self._values.clear()
         self._values.update({value_key(value): MappingProxyType(dict(value)) for value in values})
         self._loaded = dict(self._values)
+        self._remote = dict(self._values)
         self._filings.clear()
         self._filings.update({filing["accession"]: filing for filing in filings})
 
     def write(self, rows: list) -> None:
         for start in range(0, len(rows), _BATCH):
             self._send(values=rows[start:start + _BATCH])
+
+    def hold(self) -> None:
+        """From here, written rows change the company's figures in memory only, until release(). Steps that each settle
+        a part of the figures (one flags a breakdown, a later one stands it back) were each a stored change: every run
+        left dated versions that lasted seconds (KKR 835 in a day). Readings recorded per filing are never held."""
+        self._holding, self._touched = True, set()
+
+    def release(self) -> None:
+        """Sends each held row whose final state differs from what the control plane holds, once."""
+        self._holding = False
+        rows = [dict(self._values[key]) for key in sorted(self._touched)
+                if key in self._values and _changed(self._values[key], self._remote.get(key))]
+        self._touched = set()
+        for start in range(0, len(rows), _BATCH):
+            self.control.call("store", symbol=self.symbol, filings=[], values=rows[start:start + _BATCH])
+        self._remote.update({value_key(row): MappingProxyType(row) for row in rows})
+        self.result.values += len(rows)
 
     def record(self, reading: FilingReading, unread_groups: set[str] | None = None) -> None:
         """A filing and its rows, in one call. A re-read replaces the filing's earlier reading: values it no longer
@@ -185,7 +207,18 @@ class CompanyStore:
             values = [value for value in values if self._in_window(value)]
         if not values and not filings:
             return
+        if self._holding and not filings:
+            self._apply(values)
+            self._touched.update(value_key(value) for value in values)
+            return
         self.control.call("store", symbol=self.symbol, filings=filings or [], values=values)
+        self._apply(values)
+        self._remote.update({value_key(value): self._values[value_key(value)] for value in values
+                             if value_key(value) in self._values})
+        self.result.values += len(values)
+
+    def _apply(self, values: list[dict]) -> None:
+        """The rows as the control plane keeps them, in memory."""
         for value in values:
             existing = self._values.get(value_key(value))
             if existing and _keeps_verified(existing, value):
@@ -195,4 +228,22 @@ class CompanyStore:
             if (existing and existing.get("owner_decision")) or value_key(value) in self._owner_rejected:
                 continue
             self._values[value_key(value)] = MappingProxyType(value)
-        self.result.values += len(values)
+
+
+# What a stored row is: a held row equal to the control plane's in these is not sent again.
+_STORED_FIELDS = ("value", "validation_status", "method", "unit", "currency", "notes", "locator", "source_accession",
+                  "source_url", "period_end", "group_label", "group_kind", "group_order", "kpi_label", "kpi_order",
+                  "reconciliation_error_pct")
+
+
+def _changed(row, stored) -> bool:
+    if stored is None:
+        return True
+    for field in _STORED_FIELDS:
+        mine, theirs = row.get(field), stored.get(field)
+        if field in ("value", "reconciliation_error_pct") and mine is not None and theirs is not None:
+            if float(mine) != float(theirs):
+                return True
+        elif (mine or None) != (theirs or None):
+            return True
+    return False

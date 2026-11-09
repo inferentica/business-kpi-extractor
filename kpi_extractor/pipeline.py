@@ -253,7 +253,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.store.write(self._fill_tagged_metrics(reports, spec))
             self.store.write(self._fill_quarter_tables(releases))
             self.store.write(self._fill_quoted_rows(releases))
-        # Across periods, in this order: each step sees what the one before wrote.
+        # Across periods, in this order: each step sees what the one before wrote, in memory; what changed is sent once.
+        self.store.hold()
         self.store.write(self._unfile_quarters())
         self.store.write(self._refile_annuals())
         self.store.write(self._recheck_flagged())
@@ -270,6 +271,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.store.write(rows)
         self.store.write(self._derive(spec))
         self.store.write(self._harmonize_labels())
+        self.store.release()
         self.result.q4_gaps = self._q4_gaps()
         self.result.served_changes = self.store.served_changes()
         if self.result.served_changes:
