@@ -55,10 +55,12 @@ OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(begi
 CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(ending|closing)\b.*\bcash\b", re.I)
 
 
-CHANGE = re.compile(r"(increase|decrease|change).*\bcash\b|\bcash\b.*(increase|decrease)|^total\s+cash\s+(generated|provided|used)", re.I)
+# Not Brookfield's "Net change in non-cash working capital balances".
+CHANGE = re.compile(r"(increase|decrease|change).*(?<!non-)(?<!non\s)\bcash\b|(?<!non-)\bcash\b.*(increase|decrease)|"
+                    r"^total\s+cash\s+(generated|provided|used)", re.I)
 
 
-EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translation", re.I)
+EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translation|foreign\s+exchange", re.I)  # Brookfield: "Foreign exchange revaluation"
 
 
 # EOG 2000: "NET OPERATING CASH INFLOWS", "NET INVESTING CASH OUTFLOWS", "NET FINANCING CASH OUTFLOWS".
