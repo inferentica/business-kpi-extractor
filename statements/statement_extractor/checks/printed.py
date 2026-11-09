@@ -108,16 +108,30 @@ def income_check(figures) -> Check:
     return Check("calc", FAIL, f"income before taxes {pretax[1]:,.1f} does not lead to net income {net[1]:,.1f}")
 
 
+_OPERATING_SUBTOTAL = re.compile(r"^(\(?(income|loss|earnings)\)?\s*(\(?(loss|income)\)?\s+)?(from|before)\b|"
+                                 r"(net\s+)?operating\s+(income|loss|\(loss\)\s+income|income\s+\(loss\))\b)", re.I)
+
+
 def _from_a_subtotal(figures, net) -> Check:
     """A statement with no income before taxes (Brookfield prints its taxes among expenses and other items): net income
     follows from the last subtotal above it, unlabelled or a total, through the lines between them."""
     starts = subtotals(figures[:net[0]])
     candidates = sorted({end for end in starts} | {index for index, (label, _l, _v) in enumerate(figures[:net[0]])
                                                     if not label or TOTAL.match(label)}, reverse=True)[:2]
+    # A company that pays no income tax prints no income before taxes: a REIT's "Income from continuing operations"
+    # (Welltower), a loss-making biotech's "Loss from operations" (Vertex) starts the chain instead.
+    candidates += sorted((index for index, (label, _l, _v) in enumerate(figures[:net[0]])
+                          if _OPERATING_SUBTOTAL.match(label) and index not in candidates), reverse=True)[:3]
     for start in candidates:
-        between = [value for _label, _level, value in figures[start + 1:net[0]]]
-        if len(between) >= 2 and _chain(figures[start][2], net[1], between):
-            return Check("calc", PASS, f"net income from {figures[start][0] or 'the subtotal above it'}")
+        segment = figures[start + 1:net[0]]
+        if len(segment) < 2:
+            continue
+        # Lines a subtotal between sums are read through it as well (Welltower's gains and discontinued operations,
+        # then their unlabelled total, then net income).
+        covered = {position for end, begin in subtotals(segment).items() for position in range(begin, end)}
+        for skip in (set(), covered):
+            if _chain(figures[start][2], net[1], [value for index, (_l, _v, value) in enumerate(segment) if index not in skip]):
+                return Check("calc", PASS, f"net income from {figures[start][0] or 'the subtotal above it'}")
     return Check("calc", NONE, "no income before taxes and net income")
 
 

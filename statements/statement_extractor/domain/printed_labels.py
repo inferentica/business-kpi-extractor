@@ -35,7 +35,9 @@ ASSETS = re.compile(r"^total\s+assets$", re.I)
 
 
 # AMD 2009: "Total liabilities and stockholders' equity (deficit)".
-LIABILITIES_AND_EQUITY = re.compile(r"^total\s+liabilities.*\b(equity|investment|deficit|capital)(\s*\(deficit\))?$", re.I)
+# KBR 2007: "Total liabilities, minority interest and shareholders' equity and accumulated other comprehensive loss".
+LIABILITIES_AND_EQUITY = re.compile(r"^total\s+liabilities.*\b(equity|investment|deficit|capital)(\s*\(deficit\))?"
+                                    r"(\s+and\s+accumulated\s+other\s+comprehensive\s+(income|loss|\(loss\)\s+income))?$", re.I)
 
 
 LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
@@ -68,7 +70,7 @@ PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+b
 
 
 # Kroger 2009: "Net earnings including noncontrolling interests", then the parent's share.
-NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
+NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+\((loss|income)\)\s+(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
