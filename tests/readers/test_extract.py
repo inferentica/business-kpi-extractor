@@ -98,14 +98,25 @@ def test_breakdown_must_reconcile_to_its_total():
     assert all(item.status == "needs_review" for item in values if item.group.key == "segments")
 
 
-def test_jumps_against_last_quarter_need_review():
+def test_a_jump_does_not_hold_a_figure_its_quote_states():
+    # Owner, 2026-11-09: a figure is judged by its filing, not by how far it moved. Both jump against last quarter,
+    # and both quotes state them ("DAP was 3.60 billion", "3-nanometer accounted for 30%"), so both stand.
     document = _document()
     values, _ = read_values(document, SPEC, _located(document), "USD")
     validate_groups(values, previous={"operating.dap": 0.9e9, "technology.n3": 70})
     status = {item.kpi.key: item.status for item in values}
-    assert status["dap"] == "needs_review"
-    assert status["n3"] == "needs_review"
+    assert status["dap"] == "verified"
+    assert status["n3"] == "verified"
     assert status["n5"] == "verified"
+
+
+def test_a_jump_still_holds_a_figure_its_filing_does_not_state():
+    document = _document()
+    values, _ = read_values(document, SPEC, _located(document), "USD")
+    for item in values:
+        item.locator = {}  # nothing in the filing shown for it
+    validate_groups(values, previous={"operating.dap": 0.9e9})
+    assert {item.kpi.key: item.status for item in values}["dap"] == "needs_review"
 
 
 def test_check_period():

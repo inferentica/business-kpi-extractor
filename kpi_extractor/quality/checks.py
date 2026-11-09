@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Callable, Iterable
 
+from .stated import stated_in_filing
+
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
 BREAKDOWN_TOLERANCE = 0.01
 PERIOD_TOLERANCE_DAYS = 12
@@ -187,7 +189,9 @@ def _no_sharp_change(figures: list[Figure], previous: dict[str, float], **_conte
         if breakdown and before is not None and previous_total and abs(before) < IMMATERIAL * abs(previous_total):
             continue
         jump = _jump(figure, before)
-        if jump:
+        # A figure is judged by its filing, not by how far it moved: one the filing states where it was read stands.
+        if jump and not stated_in_filing(figure.unit, figure.value, getattr(figure.source, "locator", None),
+                                         getattr(figure.source, "notes", None)):
             found.append(Finding("no_sharp_change", [figure], jump))
     return found
 
@@ -281,7 +285,8 @@ def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of:
                 continue
             before, now = float(previous["value"]), float(current["value"])
             jump = _row_jump(current, before, now)
-            if jump and not immaterial_row(current):
+            if jump and not immaterial_row(current) and not stated_in_filing(current["unit"], now, current.get("locator"),
+                                                                              current.get("notes")):
                 flagged[key_of(current)] = jump
             elif current["unit"] == "currency" and _significant(now) and _same(now, before) and not _row_shows(current, before, now):
                 flagged[key_of(current)] = "the same figure as the quarter before: check the column"

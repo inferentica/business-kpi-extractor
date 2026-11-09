@@ -35,6 +35,7 @@ from .steps.release_flow import ReleaseFlow
 from .steps.ai_reading import AiReading
 from .steps.series_identity import SeriesIdentity
 from .steps.series_checks import SeriesChecks
+from .steps.stated_figures import StatedFigures
 from .store import CompanyStore, FilingReading
 
 _PASSED_OVER = "not an earnings document: no exhibit, or furnished outside the weeks after a quarter end"
@@ -72,7 +73,7 @@ class SymbolResult:
 
 class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReading, ReleaseTableReading,
                      TaggedKpiReading, ListingHistory, KpiListUpkeep, ReleaseFlow, AiReading,
-                     SeriesIdentity, SeriesChecks, RecordBuilding):
+                     SeriesIdentity, SeriesChecks, StatedFigures, RecordBuilding):
     """The run order, and every write of a step's rows: steps read through self.values and self.filings (read-only) and
     hand back what they want written."""
 
@@ -258,6 +259,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.write(self._unfile_quarters())
         self.store.write(self._refile_annuals())
         self.store.write(self._recheck_flagged())
+        self.store.write(self._stand_stated_figures())
         self.store.write(self._release_held_breakdowns())
         self.store.write(self._anchor_ai_breakdowns())
         self.store.write(self._prove_flagged(releases, list_parents(spec)))
