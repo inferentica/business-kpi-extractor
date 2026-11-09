@@ -109,8 +109,12 @@ def _by_year(row, table: Table, years: list[str]) -> dict[str, float]:
     return found
 
 
-def _larger(values: dict[str, float], other: dict[str, float]) -> bool:
-    return max(map(abs, values.values())) > max(map(abs, other.values()))
+def _per_share_sized(values: dict[str, float], table: Table, years: list[str]) -> bool:
+    """A line a thousand times smaller than the table's revenue or total assets is a figure a share, whatever its
+    label: Brookfield's five-year review prints "Net income  1.02" under "Per Common Share" sub-headings."""
+    sizes = [max(map(abs, found.values())) for row in table.rows if _key(row.label) in ("revenue", "total assets")
+             and (found := _by_year(row, table, years))]
+    return bool(sizes) and max(map(abs, values.values())) * 1000 < max(sizes)
 
 
 def read_summaries(tables: list[Table], *, accession: str, form: str, filed: date, fiscal_year_end: str,
@@ -122,7 +126,7 @@ def read_summaries(tables: list[Table], *, accession: str, form: str, filed: dat
         scale = statement_scale([table])
         if scale is None:
             continue  # no stated scale: a figure in thousands read as millions is worse than none
-        years, first_basis, basis, seen, per_share = _years(table), None, None, {}, False
+        years, first_basis, basis, seen, per_share = _years(table), None, None, set(), False
         for number, row in enumerate(table.rows):
             below = table.rows[number + 1] if number + 1 < len(table.rows) else None
             if not row.label.strip() and below is not None and not below.figures and _key(below.label):
@@ -144,13 +148,9 @@ def read_summaries(tables: list[Table], *, accession: str, form: str, filed: dat
             values = _by_year(row, table, years)
             if not values:
                 continue
-            # A name printed twice: the first line, but the largest net income (Brookfield's five-year review prints
-            # "Net income  1.02" a share under sub-headings before "Net income  649" in millions).
-            if name in seen and not (name == "net income" and _larger(values, seen[name])):
+            if name in seen or _per_share_sized(values, table, years):
                 continue
-            seen[name] = values
-            figures = [figure for figure in figures if not (figure["table"] == f"{accession}#{table.index}"
-                                                            and figure["name"] == name)]
+            seen.add(name)
             for year, value in values.items():
                 month, day = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
                 end = date(int(year), month, min(day, calendar.monthrange(int(year), month)[1]))
