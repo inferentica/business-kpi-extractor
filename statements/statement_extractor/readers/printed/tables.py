@@ -7,6 +7,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from ...domain.basis import currencies_named
+
 # A figure may drop its leading zero: Coca-Cola's 1994 "$ .59" a share.
 _NUMBER = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*(\d{1,3}(?:,\d{3})+|\d+|(?=\.\d))(\.\d+)?\s*\)?$")
 
@@ -88,9 +90,13 @@ def header_text(table: Table, column: int) -> str:
         covering = [cell for cell in cells if cell.start <= column < cell.end and not (cell is cells[0] and cell.start == 0
                                                                                         and len(cells) > 1)]
         if not covering:
-            near = [(min(abs(cell.start - column), abs(cell.end - 1 - column)), cell) for cell in cells[1:] if cell.text]
+            # Not the row's label cell; on a tie, the cell to the left (over the "$" before the figure). TSMC prints
+            # "2002" one column left of its figures and "2003" from one column left of its two: the figure between
+            # them is 2002's.
+            near = [(min(abs(cell.start - column), abs(cell.end - 1 - column)), cell.end - 1 >= column, cell)
+                    for cell in cells if cell.text and not (cell is cells[0] and cell.start == 0 and len(cells) > 1)]
             near = [item for item in near if item[0] <= 2]
-            covering = [min(near, key=lambda item: item[0])[1]] if near else []
+            covering = [min(near, key=lambda item: item[:2])[2]] if near else []
         parts.extend(cell.text for cell in covering)
     return " ".join(parts)
 
@@ -106,8 +112,11 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
         return []
     most = max(counts.values())
     positions = sorted(column for column, count in counts.items() if count >= 2 or most < 3)
-    bottom = next((cells for cells in reversed(table.header) if any(YEAR_ONLY.match(cell.text) or COLUMN_TITLE.search(cell.text)
-                                                                    for cell in cells[1:] or cells)), [])
+    # A row naming each column's currency sits lowest and splits a year's two columns, its own and a translation
+    # (TSMC's "2003" over "NT$ | US$"); else the lowest row with years or spans.
+    bottom = next((cells for cells in reversed(table.header) if cells and all(currencies_named(cell.text) for cell in cells)),
+                  None) or next((cells for cells in reversed(table.header) if any(YEAR_ONLY.match(cell.text) or COLUMN_TITLE.search(cell.text)
+                                                                                  for cell in cells[1:] or cells)), [])
 
     def under(position: int):
         return next(((cell.start, cell.end) for cell in bottom if cell.start <= position < cell.end and cell.text), None)
@@ -122,7 +131,9 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
                 continue
         groups.append([position])
     # A "Notes" column holds note references, not figures (TSMC: "Cash and cash equivalents | 6 | 242,695.6").
-    groups = [group for group in groups if not re.fullmatch(r"notes?", header_text(table, group[0]).strip(), re.I)]
+    # Its header is the cell right over it; the rows above and below may reach it from the columns beside it.
+    groups = [group for group in groups if not any(cell.start <= group[0] < cell.end and re.fullmatch(r"notes?", cell.text.strip(), re.I)
+                                                   for cells in table.header for cell in cells)]
     if not groups:
         return []
     # A group carrying few figures beside a full one is a stray cell (a footnote figure), not a column.

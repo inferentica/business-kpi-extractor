@@ -50,9 +50,25 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
             winner = settle_signs(winner, kept, (printed or {}).get(winner.accession))
             record.update({
                 "source_accession": winner.accession, "source_form": winner.form, "source_filed": winner.filed.isoformat(),
-                "from_comparative": not winner.own, "currency": winner.currency, "lines": winner.lines,
+                "from_comparative": not winner.own, "currency": winner.currency, "basis": winner.basis,
+                "lines": winner.lines,
             })
+            other = _other_bases(winner, kept)
+            if other:
+                record["other_bases"] = other
             if own is not None and own is not winner:
                 record["versus_own"] = differences(winner, own)
         chosen.append(record)
     return sorted(chosen, key=lambda item: (item["period_end"], item["statement"], item["duration"]), reverse=True)
+
+
+def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
+    """The newest presentation of the period on each other basis: a change of basis restates the years before it
+    (TSMC's FY2013 20-F prints 2012 on IFRS), and the period as first reported on the old basis stays on record."""
+    newest: dict[str, Reading] = {}
+    for reading in kept:
+        if reading.basis and reading.basis != winner.basis:
+            if reading.basis not in newest or reading.filed > newest[reading.basis].filed:
+                newest[reading.basis] = reading
+    return [{"basis": basis, "source_accession": reading.accession, "source_filed": reading.filed.isoformat(),
+             "currency": reading.currency, "lines": reading.lines} for basis, reading in sorted(newest.items())]

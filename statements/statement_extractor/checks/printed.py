@@ -92,7 +92,10 @@ def income_check(figures) -> Check:
                     for position in range(start, end)}
     # Lines a later subtotal sums are read through that subtotal, or each on its own: a running subtotal (income from
     # continuing operations) can also equal the two lines above it, and must then restart the chain instead.
-    for skip in (covered, under_totals, set()):
+    # Or one subtotal's lines alone: ASML's 2000 loss from discontinued operations and its tax under their net, while
+    # the running subtotals of continuing operations stay in the chain.
+    singles = [set(range(start, end)) for end, start in sorted(starts.items())]
+    for skip in (covered, under_totals, set(), *singles):
         if _chain(pretax[1], net[1], [value for index, (_l, _v, value) in enumerate(between) if index not in skip]):
             return Check("calc", PASS, "net income from income before taxes")
     return Check("calc", FAIL, f"income before taxes {pretax[1]:,.1f} does not lead to net income {net[1]:,.1f}")

@@ -13,6 +13,7 @@ from datetime import date
 from pathlib import Path
 
 from ..checks.schedules import parse_schedule, schedule_check
+from ..domain.basis import default_basis, stated_basis
 from ..domain.calendar import ANNUAL_FORMS, year_end_for
 from ..quality.coverage import own_period, summarise
 from ..readers.html.parse import parse_html
@@ -147,7 +148,7 @@ def _read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | Non
         document_end = date.fromisoformat(str(raw_end)[:10]) if raw_end else None
     except ValueError:
         document_end = None
-    schedules = []
+    schedules, filing_basis = [], None
     for attachment in ref.filing.attachments:
         kind = str(attachment.document_type or "").upper()
         if kind.startswith("EX-27"):
@@ -174,11 +175,16 @@ def _read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | Non
             parse = parse_html if printed == "html" else parse_text
             for key, figures in printed_figures(parse(content)).items():
                 signs.setdefault(key, []).extend(figures)
+        basis = stated_basis(content)
+        filing_basis = filing_basis or basis
+        for reading in readings:
+            reading.basis = basis
         held = {reading.key for reading in found}
         found.extend(reading for reading in readings if reading.key not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
         kinds.append(printed)
     for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
+        reading.basis = reading.basis or filing_basis or default_basis(ref.form)
         check = schedule_check(reading, schedules)
         if check is not None:
             reading.checks.append(check)

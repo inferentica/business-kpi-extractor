@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import calendar
 import re
+from collections import Counter
 from datetime import date, timedelta
 
 from ...domain.periods import Period
 from .find import TITLES
-from .tables import Table, figure_columns, header_text
+from ...domain.basis import currencies_named
+from .tables import YEAR_ONLY, Table, figure_columns, header_text
 
 
 _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
@@ -51,6 +53,31 @@ def _date(month: str, day: str, year: str) -> date | None:
         return None
 
 
+def years_in_order(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[int, ...], str]:
+    """Each column's year taken in order from a row of bare years, when that row prints one year for each column in
+    the reporting currency: TSMC's FY2002 20-F prints "2000 | 2001 | 2002" a cell left of its figures, so "2001" sits
+    right over 2000's. A translation column takes the year of the column before it."""
+    row = next((cells for cells in reversed(table.header)
+                if len(years := [cell for cell in cells if YEAR_ONLY.match(cell.text)]) >= 2
+                and all(YEAR_ONLY.match(cell.text) or re.fullmatch(r"notes?", cell.text, re.I) for cell in cells if cell.text)), None)
+    if row is None:
+        return {}
+    years = [cell.text for cell in row if YEAR_ONLY.match(cell.text)]
+    named = {column: currencies_named(header_text(table, column[0])) for column in columns}
+    counts = Counter(codes[-1] for codes in named.values() if codes)
+    reporting = counts.most_common(1)[0][0] if counts else None
+    own = [column for column in columns if not (named[column] and named[column][-1] != reporting)]
+    if len(own) != len(years) or len(own) == len(columns) and len(row) == len(columns):
+        return {}
+    found, year = {}, None
+    for column in columns:
+        if column in own:
+            year = years[own.index(column)]
+        if year is not None:
+            found[column] = year
+    return found
+
+
 def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                    document_end: date | None = None) -> dict[tuple[int, ...], Period]:
     """Each figure column's period, from the header above it and the statement's title. A column printed with a year
@@ -67,10 +94,12 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     title_day = _MONTH_DAY.search(header_all) or (in_title[-1] if in_title else None)
     title_span = _SPAN.search(header_all) or _SPAN.search(title)
     periods: dict[tuple[int, ...], Period] = {}
-    for column in figure_columns(first):
+    columns = figure_columns(first)
+    in_order = years_in_order(first, columns)
+    for column in columns:
         above = header_text(first, column[0]) or header_text(first, column[-1])
         numeric = _NUMERIC_DATE.search(above)
-        years = _YEAR.findall(above)
+        years = [in_order[column]] if column in in_order else _YEAR.findall(above)
         if not years and not numeric:
             continue
         span = _SPAN.search(above) or title_span

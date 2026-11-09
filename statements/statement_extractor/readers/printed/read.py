@@ -20,6 +20,7 @@ from ...checks.printed import balance_check, cash_check, income_check, total_che
 from ...domain.model import Reading
 from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
+from .currency import column_currencies, reporting_currency, translations
 from .dates import column_periods
 from .scales import line_scale, share_scale, statement_scale
 from .find import TITLES, find_statements, unlabelled_totals
@@ -61,26 +62,35 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         if not periods:
             notes.append(f"{kind}: no dated columns")
             continue
+        dated = sorted(periods)
+        by_column = column_currencies(group[0], dated)
+        currency = reporting_currency(group, by_column, form)
+        dropped = translations(dated, periods, by_column, currency, group)
+        if dropped:
+            notes.append(f"{kind}: {len(dropped)} convenience translation column(s) left out")
         read_periods.setdefault(kind, set()).update(period.key for period in periods.values())
-        ordered = [periods[column] for column in sorted(periods)]
-        layout = [(group[0], sorted(periods))]
+        kept = [index for index, column in enumerate(dated) if column not in dropped]
+        layout = [(group[0], dated)]
         for table in group[1:]:
             own = column_periods(kind, [table], fiscal_year_end, document_end)
-            columns = sorted(own) if own else [c for c in figure_columns(table)][:len(ordered)]
-            if len(columns) != len(ordered):
+            columns = sorted(own) if own else [c for c in figure_columns(table)][:len(dated)]
+            if len(columns) != len(dated):
                 notes.append(f"{kind}: a continuation table's columns do not line up")
                 break
             layout.append((table, columns))
-        for index, period in enumerate(ordered):
+        for index in kept:
+            period = periods[dated[index]]
             labelled = label_period(period, fiscal_year_end, year_offset)
             if labelled is None:
                 notes.append(f"{kind}: column {period.key} off the calendar")
                 continue
+            # Every dated column stays in `columns`, translations too, so a figure off its place is never taken for the
+            # column beside it.
             reading = _read_column(kind, [(table, columns[index], columns) for table, columns in layout], period,
                                    (scale, share_scale(group, scale)), labelled)
             if reading is None:
                 continue
-            reading.accession, reading.form, reading.filed = accession, form, filed
+            reading.accession, reading.form, reading.filed, reading.currency = accession, form, filed, currency
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes

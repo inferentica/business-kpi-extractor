@@ -107,3 +107,14 @@ def test_a_comparative_column_takes_its_periods_own_dates():
     aligned = {r.accession: r for r in align_dates([own, later, far])}
     assert aligned["fy07"].period_end == date(2006, 9, 30) and aligned["fy07"].period_start == date(2005, 9, 25)
     assert aligned["fy08"].period_end == date(2006, 12, 31)  # more than a week apart: another period, left alone
+
+
+def test_a_period_restated_on_a_new_basis_keeps_its_first_basis_on_record():
+    # TSMC 2012: reported on ROC GAAP in its FY2012 20-F, printed again on IFRS by the FY2013 one.
+    first = reading("fy2012", date(2013, 4, 2), 506_249e6, own=True)
+    first.basis = "ROC GAAP"
+    again = reading("fy2013", date(2014, 4, 14), 506_754e6, own=False)
+    again.basis = "IFRS"
+    [chosen] = choose([first, again])
+    assert chosen["basis"] == "IFRS" and chosen["source_accession"] == "fy2013"
+    assert [(item["basis"], item["source_accession"]) for item in chosen["other_bases"]] == [("ROC GAAP", "fy2012")]
