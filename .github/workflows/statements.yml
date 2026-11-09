@@ -167,7 +167,7 @@ jobs:
           path: archive-cache-asml
           key: statements-archive-ASML-handcheck-${{ github.run_id }}
           restore-keys: statements-archive-ASML-
-      - run: mkdir -p archive-cache && cp -rn archive-cache-tsm/. archive-cache-asml/. archive-cache/ 2>/dev/null; ls archive-cache | wc -l
+      - run: mkdir -p archive-cache && (cp -rn archive-cache-tsm/. archive-cache-asml/. archive-cache/ 2>/dev/null || true) && ls archive-cache | wc -l
       - run: python -m statement_extractor rows statements/evals/handcheck/recheck.json --out rows.md
       - uses: actions/upload-artifact@v6
         if: always()
