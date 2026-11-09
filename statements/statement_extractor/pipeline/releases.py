@@ -11,6 +11,7 @@ from ..domain.calendar import quarter_end_before
 from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period
 from ..sources.edgar import load_submission
+from ..sources.retry import with_network_retries
 from ..sources.listing import list_releases
 from .printed import read_printed
 
@@ -25,7 +26,7 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
                   "release_quarter": list(quarter[:2]) if quarter else None, "period_end": ref.period_end.isoformat()}
         try:
-            load_submission(ref.filing)
+            with_network_retries(lambda: load_submission(ref.filing))
             found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=ref.period_end)
         except Exception as error:  # noqa: BLE001 - one unreadable release never stops the company
             record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"

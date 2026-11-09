@@ -4,6 +4,7 @@ from datetime import date
 
 from statement_extractor.domain.model import Check, Reading
 from statement_extractor.readers.printed.summary import read_summaries
+from statement_extractor.readers.html.parse import parse_html
 from statement_extractor.readers.text.parse import parse_text
 from statement_extractor.selection.summaries import choose_summaries
 
@@ -83,3 +84,25 @@ def test_a_table_dated_wrong_is_left_out_whole():
     statements = [income("2000", 14_483e6, date(2002, 6, 28), "fy2001")]
     result = choose_summaries(read(), statements, chosen_of(statements))
     assert result["tables"]["fy2001#0"]["verdict"] == "contradicted" and result["years"] == []
+
+
+# Brookfield's 40-F annual report (EX-99.3, HTML): its only "Net income" line is under a per-share heading.
+def cells(*texts):
+    return "<tr>" + "".join(f"<td>{text}</td>" for text in texts) + "</tr>"
+
+
+BROOKFIELD = ("<p>FIVE-YEAR FINANCIAL SUMMARY</p><p>(MILLIONS, EXCEPT PER SHARE AMOUNTS)</p><table>"
+              + cells("", "2008", "2007", "2006", "2005", "2004")
+              + cells("Revenues", "12,868", "9,343", "6,897", "5,220", "4,467")
+              + cells("Total assets", "80,707", "71,208", "52,302", "38,636", "32,477")
+              + cells("Per fully diluted share", "", "", "", "", "")
+              + cells("Net income", "1.02", "1.24", "1.90", "2.68", "1.08")
+              + cells("Common equity", "11,833", "12,066", "9,488", "8,072", "7,021") + "</table>")
+
+
+def test_lines_under_a_per_share_heading_are_left_out():
+    rows = read_summaries(parse_html(BROOKFIELD), accession="fy2008", form="40-F", filed=date(2009, 3, 31),
+                          fiscal_year_end="1231", year_offset=0)
+    figures = {(row["fiscal_year"], row["name"]): row["value"] for row in rows}
+    assert figures[("2004", "revenue")] == 4_467e6 and figures[("2006", "total assets")] == 52_302e6
+    assert not any(name == "net income" for _year, name in figures)  # 1.02 a share is no net income

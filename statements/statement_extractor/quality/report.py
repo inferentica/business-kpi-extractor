@@ -30,22 +30,6 @@ def report(folders: list[Path]) -> str:
         lines.append("\n| Company | First statement year | Summary years served | Before statements | Tables verified (own "
                      "filing / elsewhere) / unverified / contradicted | Figures checked | Restated since |\n"
                      "|---|---|---|---|---|---|---|")
-    lines = [header]
-    total = {"expected": 0, "kept": 0}
-    for row in sorted(rows, key=lambda item: item["symbol"]):
-        status = row["by_status"]
-        coverage = row["own_kept"] / row["own_expected"] if row["own_expected"] else 0
-        total["expected"] += row["own_expected"]
-        total["kept"] += row["own_kept"]
-        lines.append(f"| {row['symbol']} | {row['filings']} ({row['xbrl_filings']}) | {row['first_period']} | "
-                     f"{status.get('kept', 0)} | {status.get('rejected', 0)} | {status.get('unproven', 0)} | "
-                     f"{row['own_kept']}/{row['own_expected']} ({coverage:.1%}) | {row['comparative_only_periods']} | "
-                     f"{row['restated_periods']} | {len(row['mixed_vintage_q4'])} | {row['ai_calls']} | {row['cost_cny']:.2f} |")
-    summaries = [(row["symbol"], row["summary_figures"]) for row in sorted(rows, key=lambda item: item["symbol"])
-                 if row.get("summary_figures", {}).get("tables")]
-    if summaries:
-        lines.append("\n| Company | First statement year | Summary years served | Before statements | Tables verified / "
-                     "unverified / contradicted | Figures checked (differ) |\n|---|---|---|---|---|---|")
         for symbol, figures in summaries:
             tables, years = figures["tables"], figures["years"]
             span = f"{years[0]}-{years[-1]} ({len(years)})" if years else "none"
