@@ -7,7 +7,7 @@ import re
 
 from ..domain.model import FAIL, NONE, PASS, Check
 from ..domain.printed_labels import (ASSETS, BARE_TOTAL, CHANGE, CLOSING, DATED_CASH, EFFECT, EQUITY, EXCHANGE, LIABILITIES,
-                                     LIABILITIES_AND_EQUITY, NET_INCOME, OPENING, PRETAX, SECTION_KINDS, SECTIONS, TOTAL)
+                                     LIABILITIES_AND_EQUITY, NET_INCOME, OPENING, PRETAX, SECTION_KINDS, SECTION_HEADS, SECTIONS, SHAREHOLDERS_FUNDS, TOTAL)
 from .subtotals import block_start, subtotals
 from .tolerance import close
 
@@ -22,6 +22,9 @@ def first_match(figures, pattern, after: int = -1) -> tuple[int, float] | None:
 def balance_check(figures) -> Check:
     assets = first_match(figures, ASSETS)
     total = first_match(figures, LIABILITIES_AND_EQUITY)
+    labelled = [(index, label, value) for index, (label, _level, value) in enumerate(figures) if label and value is not None]
+    if not total and labelled and LIABILITIES.match(labelled[-1][1]) and any(SHAREHOLDERS_FUNDS.match(label) for label, _l, _v in figures):
+        total = (labelled[-1][0], labelled[-1][2])  # UK GAAP: "Total liabilities" over shareholders' funds too
     bare = [(index, value) for index, (label, _level, value) in enumerate(figures) if BARE_TOTAL.match(label)]
     if len(bare) >= 2:  # TSMC closes each side with a bare "TOTAL"
         assets, total = assets or bare[0], total or bare[-1]
@@ -53,6 +56,7 @@ def cash_check(figures) -> Check:
     if len(openings) > 1:
         opening = (opening[0], sum(openings))
     kinds = {match.group(2).lower() for label, _level, _value in figures if (match := SECTION_KINDS.search(label))}  # operat, invest, financ
+    kinds |= {match.group(1).lower() for label, _level, _value in figures if (match := SECTION_HEADS.match(label))}
     if len(kinds) < 3:
         return Check("cash", NONE, "not every section of the statement was read: " + ", ".join(sorted(kinds) or ["none"]))
     changes = [value for label, _level, value in figures if CHANGE.search(label) and not OPENING.search(label)

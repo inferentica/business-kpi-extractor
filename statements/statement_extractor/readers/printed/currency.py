@@ -33,6 +33,12 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
     start = max(0, max(titles) - 120) if titles else 0
     in_title = currencies_named(text[start:start + 400]) or currencies_named(text)
     named = [currency for currency in by_column.values() if currency]
+    unnamed = [currency for currency in in_title if currency not in named]
+    if named and len(named) * 2 < len(by_column) and unnamed:
+        # Only the translation names its currency (KEPCO's 20-F: "U.S. Dollars" over one column of four, the won
+        # columns' heading lost below the years, under "In millions of Korean Won and in thousands of U.S. dollars"):
+        # the columns that name none are in the title's other currency.
+        return unnamed[0]
     if named:
         counts = Counter(named)
         best = max(counts.values())

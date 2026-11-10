@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ...domain.basis import is_currency_word
+from ...domain.basis import currencies_named, is_currency_word
 from ..printed.tables import COLUMN_TITLE, Cell, Row, Table, clean, is_column_word, number
 from .blocks import BLOCK, TAG, tagged, untagged
 from .lines import RULE, YEAR, Chunk, Line, chunks, split
@@ -65,7 +65,10 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
         width = len(columns) // len(over)
         return cells + [Cell(columns[n * width], columns[n * width + width - 1] - columns[n * width] + 1, chunk.text)
                         for n, chunk in enumerate(over)]
-    if 1 < len(over) < len(columns) and all(_GROUP_HEADING.search(chunk.text) for chunk in over):
+    if 1 < len(over) < len(columns) and all(_GROUP_HEADING.search(chunk.text) or len(currencies_named(chunk.text)) == 1
+                                            for chunk in over):
+        # Spans over groups of columns: dates, or currencies (KEPCO's "Korean Won" over its two won columns and "U.S.
+        # Dollars (Note 2)" over the two translated ones, a character nearer the second won column than its own word).
         return cells + _grouped(over, columns)
     owners: dict[int, list[int]] = {}
     for column in columns:
@@ -85,13 +88,19 @@ def _grouped(over: list[Chunk], columns: list[int]) -> list[Cell]:
     groups' centres lie nearest their headings' (Lloyds TSB's "30 June" over 2003 and 2002, "31 December" over 2002).
     A figure column is placed by its right edge; its middle sits a few characters left of it."""
     from itertools import combinations
-    best = None
+    best, even = None, None
     for cuts in combinations(range(1, len(columns)), len(over) - 1):
         bounds = (0, *cuts, len(columns))
         groups = [columns[bounds[n]:bounds[n + 1]] for n in range(len(over))]
         cost = sum(abs((chunk.start + chunk.end) / 2 - (sum(group) / len(group) - 3)) for chunk, group in zip(over, groups))
         if best is None or cost < best[0]:
             best = (cost, groups)
+        if len({len(group) for group in groups}) == 1:
+            even = (cost, groups)
+    # Groups of equal size where they fit nearly as well: a currency and its translation over two columns each (KEPCO's
+    # "Won | U.S. dollars (note 2)" over 2004 2003 2004 2003, the long heading a little left of its centre).
+    if even is not None and even[0] <= best[0] + 2:
+        best = even
     return [Cell(group[0], group[-1] - group[0] + 1, chunk.text) for chunk, group in zip(over, best[1])]
 
 

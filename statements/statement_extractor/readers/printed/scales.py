@@ -32,6 +32,9 @@ _SHARES_EXCEPTED = re.compile(r"\bexcept\b[^)]*?\b(?<!per )(share|shares)\b(?!\s
 _LINE_UNIT = re.compile(r"\(\s*(?:in\s+)?" + _UNIT + r"(?:\s+of\s+shares)?\s*\)|\bin\s+" + _UNIT + r"\s*\)?\s*:?$", re.I)
 
 
+_UNIT_CELL = re.compile(r"^" + _UNIT + r"(?:,?\s+except\b.*)?$", re.I)
+
+
 def scale_text(group: list[Table]) -> str:
     first = group[0]
     leading = []
@@ -65,9 +68,10 @@ def statement_scale(group: list[Table]) -> float | None:
     matches = sorted((match for pattern in (_MONEY, _DOLLAR_UNIT) for match in pattern.finditer(text)),
                      key=lambda match: match.start())
     found = {_scale(match) for match in matches} | set(both)
-    # A header cell that is the unit alone: Brookfield's 2001-03 releases print "MILLIONS" over their labels.
-    found |= {_SCALES[cell.text.strip().lower()] for cells in group[0].header for cell in cells
-              if cell.text.strip().lower() in ("thousands", "millions", "billions")}
+    # A header cell that is the unit alone: Brookfield's 2001-03 releases print "MILLIONS" (or "MILLIONS, EXCEPT PER
+    # SHARE AMOUNTS") over their labels.
+    found |= {_SCALES[unit.group(1).lower()] for cells in group[0].header for cell in cells
+              if (unit := _UNIT_CELL.match(cell.text.strip()))}
     if _ZEROS.search(text):
         found.add(1e3)
     if len(found) == 2 and matches and len({word.lower() for word in _CURRENCY_WORDS.findall(raw)}) >= 2:

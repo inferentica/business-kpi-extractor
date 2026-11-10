@@ -36,6 +36,16 @@ def tagged(text: str):
         first = next((index for index, line in enumerate(header) if _figure_line(line, 2)), None)
         if first is not None:
             header, body = header[:first], header[first:] + body
+        # Its column headings printed below the marker, the caption holding only the title (Lloyds TSB's 2003 results:
+        # "<S>", then "2002   2001", then "GBPm   GBPm").
+        if not any(re.search(r"\b(19|20)\d{2}\b", line) for line in header):
+            leading = 0
+            for index, line in enumerate(body):
+                if line.strip() and not (_column_header(line, body[index + 1:index + 4]) or _UNITS.match(line)):
+                    break
+                leading += 1
+            if any(_column_header(line, []) for line in body[:leading]):
+                header, body = header + body[:leading], body[leading:]
         cuts = _sections(body)
         yield block.start(), before, title_lines, header, body[:cuts[0]] if cuts else body
         for number, (start, end) in enumerate(zip(cuts, [*cuts[1:], len(body)]), start=1):
@@ -43,6 +53,11 @@ def tagged(text: str):
             heading = next(index for index, line in enumerate(lines) if _column_header(line, lines[index + 1:index + 4]))
             opening = next((index for index, line in enumerate(lines) if _figure_line(line)), len(lines))
             yield block.start() + number, "", lines[:heading], lines[heading:opening], lines[opening:]
+
+
+# A row naming each column's unit and nothing else: "GBPm   GBPm", "$m   $m", "R$ thousand".
+_UNITS = re.compile(r"^\s*((?:GBP|USD|EUR|CHF|US\$|£|\$|€|R\$)?\s?(?:m|bn|000|millions?|thousands?)\s+)*"
+                    r"(?:GBP|USD|EUR|CHF|US\$|£|\$|€|R\$)?\s?(?:m|bn|000|millions?|thousands?)\s*$", re.I)
 
 
 def _figure_line(line: str, least: int = 1) -> bool:

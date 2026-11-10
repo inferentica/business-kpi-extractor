@@ -38,10 +38,17 @@ ASSETS = re.compile(r"^(total\s+)?assets$", re.I)
 # AMD 2009: "Total liabilities and stockholders' equity (deficit)".
 # KBR 2007: "Total liabilities, minority interest and shareholders' equity and accumulated other comprehensive loss".
 LIABILITIES_AND_EQUITY = re.compile(r"^(total\s+liabilities.*|liabilities\s+and\s+(stockholders|shareholders)['’´]?\s+)\b(equity|investment|deficit|capital)(\s*\(deficit\))?"
-                                    r"(\s+and\s+accumulated\s+other\s+comprehensive\s+(income|loss|\(loss\)\s+income))?$", re.I)
+                                    r"(\s+and\s+accumulated\s+other\s+comprehensive\s+(income|loss|\(loss\)\s+income))?$|"
+                                    # KEPCO: "Total Shareholders' Equity and Liabilities"
+                                    r"^total\s+(stockholders|shareholders)['’´]?\s+equity\s+and\s+liabilities$", re.I)
 
 
 LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
+
+
+# UK GAAP's balance sheet (Lloyds TSB to 2004): shareholders' funds are among the liabilities, so "Total liabilities",
+# its last line, is the grand total that equals total assets.
+SHAREHOLDERS_FUNDS = re.compile(r"^(total\s+)?shareholders['’´]?\s+funds\b", re.I)
 
 
 EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’´]?\s+)?equity(\s*\(deficit\))?$", re.I)
@@ -104,6 +111,10 @@ DATED_CASH = re.compile(r"^cash\b.*\bat\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|o
 # The first section word names the section: ASML's "Net cash used in investing activities from operations" is investing.
 SECTION_KINDS = re.compile(r"^(net|cash|total)\b.*?\b(operat|invest|financ)(ing\s+activities|ions\b|ment\s+activities|"
                            r"ing\s+cash\s+(in|out)?flows?$)", re.I)  # EOG's "NET OPERATING CASH INFLOWS"
+
+# A section headed by its kind alone, its total unlabelled (Brascan's 2001 releases: "CONSOLIDATED CASH FLOW FROM
+# OPERATIONS", "FINANCING AND SHAREHOLDER DISTRIBUTIONS", "INVESTING").
+SECTION_HEADS = re.compile(r"^(?:consolidated\s+cash\s+flows?\s+from\s+)?(operat|invest|financ)(?:ing|ions)\b(?!.*\d)", re.I)
 
 # A heading over the cash balances themselves ("CASH AND CASH EQUIVALENTS", "Cash and due from banks"), under which
 # "Balance at beginning of year" names the opening cash; "Cash flows from financing activities" is not one.

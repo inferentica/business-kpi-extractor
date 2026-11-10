@@ -15,6 +15,7 @@ _TAG = re.compile(r"<[^>]+>")
 _PERIOD = re.compile(r"\b(for\s+the\s+(quarter|period|three|six|nine|half|year)|months?\s+ended|half-year|as\s+(at|of)|"
                      r"\d{1,2}[./]\d{1,2}[./]\d{2,4}|(19|20)\d{2})\b", re.I)
 _FIGURE = re.compile(r"(?<![\w.])\(?-?\d{1,3}(,\d{3})+(\.\d+)?\)?(?![\w.%])|(?<![\w.,])\(?\d{2,}(\.\d+)?\)?(?![\w.,%])")
+_SENTENCE = re.compile(r"[a-z]{2,}[.!?]\s+[A-Z]")  # a sentence's end and the next one's start
 # The words a statement's heading may run on into: its period or its unit, never a sentence's next word.
 _HEADING_WORDS = {"for", "as", "at", "in", "of", "year", "years", "three", "six", "nine", "half", "quarter", "months",
                   "period", "continued", "unaudited", "audited", "and", "(unaudited)", "(continued)"}
@@ -47,9 +48,13 @@ def headed_kinds(content: str) -> set[str]:
                 continue  # "Capital and balance sheet", "… compares the Group balance sheet as at …"
             if following[:1].islower() and following.lower() not in _HEADING_WORDS:
                 continue  # "income statement commentaries"
-            if _PERIOD.search(after[:160]) and len(_FIGURE.findall(after)) >= 8:
-                kinds.add(kind)
-                break
+            figures = list(_FIGURE.finditer(after))
+            if not _PERIOD.search(after[:160]) or len(figures) < 8:
+                continue
+            if _SENTENCE.search(after[:figures[7].end()]):
+                continue  # a sentence before its figures: a section of the narrative (Copel's "Balance Sheet (Liabilities)")
+            kinds.add(kind)
+            break
     return kinds
 
 

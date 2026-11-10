@@ -90,3 +90,12 @@ def test_a_year_the_company_filed_nothing_for_is_not_counted():
     found = release_coverage(filings, set())
     # 2012's four quarters are no registrant's; 2011's and 2013's first quarter count (2011 Q2-Q4 too: it filed then).
     assert found["quarters_not_filing"] == 4
+
+
+def test_a_heading_followed_by_a_sentence_is_the_narratives():
+    from statement_extractor.readers.printed.titled import headed_kinds
+    # Copel's 2002 results: "Balance Sheet (Liabilities)" heads a paragraph, then a debt table.
+    text = ("Balance Sheet (Liabilities) COPEL's debt amounted to R$ 2.214 billion, with a net debt-to-equity ratio of"
+            " 46.9% as of December 31, 2002, and its net equity is R$ 4.726 billion. DEBT PROFILE Short Long Total"
+            " 8,756 529,995 538,751 38,851 238,853 277,704 9,073 214,244 223,317")
+    assert headed_kinds(text) == set()
