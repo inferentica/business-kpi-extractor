@@ -254,6 +254,8 @@ def main(argv: list[str] | None = None) -> int:
     report["secondReadReasons"] = {reason: sum(r.second_read_reasons.get(reason, 0) for r in results)
                                    for reason in sorted({k for r in results for k in r.second_read_reasons})}
     report["replayedReads"] = sum(result.replayed_reads for result in results)
+    report["replayOutcomes"] = {why: sum(r.replay_outcomes.get(why, 0) for r in results)
+                                for why in sorted({k for r in results for k in r.replay_outcomes})}
     report["errors"] = {result.symbol: result.errors[:5] for result in results if result.errors}
     # Kept with the run, so a score can be compared with any earlier one; the workflow's artifact expires in 30 days.
     plane.call("finish", summary={**{key: value for key, value in report.items() if key != "results"},

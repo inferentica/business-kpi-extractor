@@ -12,8 +12,9 @@ from ..documents.document import Document, clean
 from ..quality.checks import check_period, far_above_quarter, looks_like_part_of_table, total_label, validate_groups
 from ..readers.extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
                        read_values)
-from ..readers.replay import replay
+from ..readers.replay import _same_place, _source_template, replay
 from ..readers.trace import stamp_call, trace_replay
+from ..rules.period import states_quarter
 from .shared import (AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
 
@@ -22,28 +23,6 @@ MAX_DOCUMENT_CHARS = 120_000
 # A 6-K read from its own document is classified from the report after its cover; one judged on the cover before is
 # asked again once (TSMC's 2016–2019 results and financial statements were all judged on the cover).
 _OWN_6K_DOCUMENT = re.compile(r"6-?k", re.I)
-_PERIOD_WORDS = re.compile(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
-                           r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|first|second|third|fourth|q[1-4])\b")
-
-def _template(text: str) -> str:
-    """A quote with its numbers and period words blanked: "DAP was 3.60 billion on average for June 2026" and the
-    same sentence for September share one template."""
-    return re.sub(r"[\d.,]+", "#", _PERIOD_WORDS.sub("@", clean(text).lower()))
-
-
-def _same_place(now: dict, before: dict) -> bool:
-    """Whether a KPI was found where it was last quarter: the same table row label, or the same sentence shape."""
-    if "quote" in now and "quote" in before:
-        return _template(now["quote"]) == _template(before["quote"])
-    if "row_label" in now and "row_label" in before:
-        return clean(now["row_label"]).lower() == clean(before["row_label"]).lower() and bool(now["row_label"])
-    return False
-
-
-def _source_template(url: str) -> str:
-    """A document's kind from its file name with the dates and numbers taken out ("a2q26e_withguidance.htm")."""
-    return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
-
 _INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in|combined line|row mismatch")
 
 def _explain_pointer(problem: str, document: Document) -> str:
@@ -262,7 +241,13 @@ class AiReading:
         for by the AI unless that reading's AI read noted it as not reported. Returns the kept groups' values."""
         source = _source_template(document.source_url)
         last = self._last_locators(expected, source)
+        outcomes = self.result.replay_outcomes  # per group: replayed, or why the AI read it (the learning loop's measure)
+
+        def missed(why: str) -> None:
+            outcomes[why] = outcomes.get(why, 0) + 1
         if not last:
+            for _group in spec.groups:
+                missed("no earlier reading of this kind of document")
             return [], None, set()
         history = self._ai_history(expected, source)
         accession = next((value.get("source_accession") for key, value in history.items() if key in last), None)
@@ -281,21 +266,27 @@ class AiReading:
         for group in spec.groups:
             mine = {key: locator for key, locator in last.items() if key.split(".", 1)[0] == group.key}
             if not mine:
+                missed("group not read in this kind of document before")
                 continue
             whole = any(locator.get("whole_table") for locator in mine.values())
             listed = {f"{group.key}.{kpi.key}" for kpi in group.kpis if kpi.key != group.total_kpi}
             if not whole and (listed - mine.keys()) - not_reported:
-                continue  # a KPI the list has and nobody has looked for in this kind of document yet
+                missed("a listed KPI not looked for yet")  # nobody has looked for it in this kind of document
+                continue
             located = replay(document, mine, expected)
-            if located is None:
+            if isinstance(located, str):
+                missed(located)
                 continue
             read, problems = read_values(document, spec, located, currency)
             read = [item for item in read if item.group.key == group.key]
             read, problems = self._drop_wrong_columns(read, problems, document, located, expected)
             if problems or not read or self._far_above_quarters(read, expected):
+                missed("a check failed" if problems or not read else "total far above the quarter before")
                 continue
             if group.key not in self._confirmed_groups(located, read, spec, expected, document):
+                missed("not confirmed where it was or by the year-ago column")
                 continue
+            outcomes["replayed"] = outcomes.get("replayed", 0) + 1
             trace_replay(read, mine, history, accession)
             items += read
             done.add(group.key)
@@ -598,7 +589,11 @@ class AiReading:
 
     def _far_above_quarters(self, read: list[ReadValue], period_end: date) -> bool:
         """Whether a breakdown's total is several times the quarter just before it (an annual report read as a
-        quarter). Only the adjacent quarter counts: a fast grower's Q4 is far above its quarters of years ago."""
+        quarter). Only the adjacent quarter counts: a fast grower's Q4 is far above its quarters of years ago. Size is only
+        a reason to look: a breakdown whose every column is headed as a quarter states its period, and stands."""
+        breakdown = [item for item in read if item.group.kind == "revenue_breakdown"]
+        if breakdown and all(states_quarter(str(item.locator.get("header") or "")) for item in breakdown):
+            return False
         for item in read:
             if item.group.kind != "revenue_breakdown" or not (item.is_total or item.kpi.key == item.group.total_kpi):
                 continue

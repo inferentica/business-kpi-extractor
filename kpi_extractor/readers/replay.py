@@ -21,9 +21,33 @@ _PERIOD_WORD = (r"\b(?:" + "|".join(_MONTHS) + r"|jan|feb|mar|apr|jun|jul|aug|se
 _TOKEN = re.compile(r"\d[\d.,]*|" + _PERIOD_WORD, re.I)
 _YEAR = re.compile(r"\b(20\d{2})\b|(?:\bQ[1-4]|\b[1-4]Q|\bFY)\s*'?(\d{2})\b|'(\d{2})\b", re.I)
 
+_PERIOD_WORDS = re.compile(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
+                           r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|first|second|third|fourth|q[1-4])\b")
 
-def replay(document: Document, last: dict[str, dict], expected: date) -> Located | None:
-    """A reading built from last quarter's locators, or None when any of them cannot be found again."""
+
+def _template(text: str) -> str:
+    """A quote with its numbers and period words blanked: "DAP was 3.60 billion on average for June 2026" and the
+    same sentence for September share one template."""
+    return re.sub(r"[\d.,]+", "#", _PERIOD_WORDS.sub("@", clean(text).lower()))
+
+
+def _same_place(now: dict, before: dict) -> bool:
+    """Whether a KPI was found where it was last quarter: the same table row label, or the same sentence shape."""
+    if "quote" in now and "quote" in before:
+        return _template(now["quote"]) == _template(before["quote"])
+    if "row_label" in now and "row_label" in before:
+        return clean(now["row_label"]).lower() == clean(before["row_label"]).lower() and bool(now["row_label"])
+    return False
+
+
+def _source_template(url: str) -> str:
+    """A document's kind from its file name with the dates and numbers taken out ("a2q26e_withguidance.htm")."""
+    return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
+
+
+def replay(document: Document, last: dict[str, dict], expected: date) -> Located | str:
+    """A reading built from last quarter's locators, or, when any of them cannot be found again, why not (counted in the
+    run summary, so the reasons code most often fails on show where it should learn next)."""
     tables: dict[str, list[tuple[str, dict]]] = {}
     values: list[Locator] = []
     for key, locator in last.items():
@@ -31,14 +55,14 @@ def replay(document: Document, last: dict[str, dict], expected: date) -> Located
             tables.setdefault(key.split(".", 1)[0], []).append((key, locator))
             continue
         found = _replay_value(document, key, locator)
-        if found is None:
-            return None
+        if isinstance(found, str):
+            return found
         values.append(found)
     table_locators = []
     for group, rows in tables.items():
         found = _replay_table(document, group, [locator for _key, locator in rows])
-        if found is None:
-            return None
+        if isinstance(found, str):
+            return found
         table_locators.append(found)
     return Located(period_end=reported_period(document, expected).isoformat(), tables=table_locators, values=values)
 
@@ -57,30 +81,39 @@ def reported_period(document: Document, expected: date) -> date:
     return counts.most_common(1)[0][0] if counts else expected
 
 
-def _replay_value(document: Document, key: str, locator: dict) -> Locator | None:
+def _replay_value(document: Document, key: str, locator: dict) -> Locator | str:
     if "quote" in locator:
         return _replay_quote(document, key, locator)
     label = clean(locator.get("row_label") or "").lower()
     col = locator.get("col")
     if not label or col is None:
-        return None
-    matches = []
+        return "row not recorded"
+    matches, misses = [], []  # misses: why each table that has the label does not give the value, last quarter's first
     for table in _tables_by_preference(document, locator.get("table")):
         rows = [index for index, row in enumerate(table.rows)
                 if clean(_row_label(row, col)).lower() == label and parse_number(table.cell(index, col))]
-        if len(rows) == 1 and current_column(table, rows[0], col) and _same_header(table, rows[0], col, locator):
+        if len(rows) > 1:
+            misses.append("row label found more than once")
+        elif rows and not current_column(table, rows[0], col):
+            misses.append("column not the newest period")
+        elif rows and not _same_header(table, rows[0], col, locator):
+            misses.append("column header changed" if "header" in locator else "column header not recorded")
+        elif rows:
             matches.append((table.id, rows[0]))
-    if not matches or (len(matches) > 1 and matches[0][0] != locator.get("table")):
-        return None  # the row is gone, or several tables carry it and none is last quarter's
+    if not matches:
+        return misses[0] if misses else "row label not found"
+    if len(matches) > 1 and matches[0][0] != locator.get("table"):
+        return "row in several tables"  # and none of them is last quarter's
     table_id, row = matches[0]
     return Locator(kpi=key, table=table_id, row=row, col=col, scale=locator.get("scale"))
 
 
-def _replay_table(document: Document, group: str, parts: list[dict]) -> TableLocator | None:
+def _replay_table(document: Document, group: str, parts: list[dict]) -> TableLocator | str:
     first = parts[0]
     col = first.get("col")
     if col is None or "total_row_label" not in first:
-        return None  # read before replays recorded the total row
+        return "total row not recorded"  # read before replays recorded it
+    misses = []  # why each table that has the rows does not give them, last quarter's first
     wanted = {member_key(part["row_label"]) for part in parts}
     total_label = first["total_row_label"]
     for table in _tables_by_preference(document, first.get("table")):
@@ -96,25 +129,27 @@ def _replay_table(document: Document, group: str, parts: list[dict]) -> TableLoc
         if total_row is not None and total_row > last_row:
             last_row = total_row - 1  # rows added since last quarter (a new node) sit above the total
         if total_row is not None and first_row <= total_row <= last_row:
+            misses.append("total row inside the table's rows")
             continue
         if not current_column(table, first_row, col) or not _same_header(table, first_row, col, first):
+            misses.append("column header changed" if "header" in first else "column header not recorded")
             continue
         return TableLocator(group=group, table=table.id, col=col, first_row=first_row, last_row=last_row,
                             total_row=total_row, scale=first.get("scale"))
-    return None
+    return misses[0] if misses else "table rows not found"
 
 
-def _replay_quote(document: Document, key: str, locator: dict) -> Locator | None:
+def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:
     quote, value_text = clean(locator.get("quote") or ""), clean(locator.get("value_text") or "")
     start = quote.find(value_text)
     if not quote or start < 0:
-        return None
+        return "quote not recorded"
     tokens = list(_TOKEN.finditer(quote))
     numbers = [token for token in tokens if token.group()[0].isdigit()]
     # The number the value was read from: the first one inside value_text.
     index = next((i for i, token in enumerate(numbers) if start <= token.start() < start + len(value_text)), None)
     if index is None:
-        return None
+        return "quote not recorded"
     prefix = value_text[:numbers[index].start() - start]
     suffix = value_text[numbers[index].end() - start:]
     found = []
@@ -137,12 +172,12 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | None
         found = [(block.id, match) for block in document.blocks.values() for match in compiled.finditer(block.text)]
         if found:
             break
-    if len(found) != 1:
-        return None  # gone, or more than one sentence of that shape (this year's and last year's)
+    if len(found) != 1:  # gone, or more than one sentence of that shape (this year's and last year's)
+        return "sentence found more than once" if found else "sentence not found"
     block_id, match = found[0]
     new_value = prefix + match.group(value_group) + suffix
     if new_value not in match.group(0):
-        return None
+        return "sentence not found"
     return Locator(kpi=key, block=block_id, quote=match.group(0), value_text=new_value)
 
 

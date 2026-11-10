@@ -58,6 +58,7 @@ class SymbolResult:
     second_read_reasons: dict = field(default_factory=dict)
     flash_only_reads: int = 0
     replayed_reads: int = 0
+    replay_outcomes: dict = field(default_factory=dict)  # per group: "replayed", or why the AI read it
     # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.
     q4_gaps: list[str] = field(default_factory=list)
     skipped: bool = False

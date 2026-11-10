@@ -10,7 +10,7 @@ from kpi_extractor.evals.evaluate import score
 from kpi_extractor.readers.extract import read_values
 from kpi_extractor.pipeline import SymbolPipeline
 from kpi_extractor.store import FilingReading, failed_reading
-from kpi_extractor.steps.ai_reading import _template
+from kpi_extractor.readers.replay import _template
 from kpi_extractor.steps.kpi_list import apply_maintenance, without_xbrl_repeats
 from kpi_extractor.xbrl import XbrlCandidate
 

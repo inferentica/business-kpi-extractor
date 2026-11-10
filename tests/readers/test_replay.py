@@ -102,6 +102,20 @@ def test_a_replayed_quarter_needs_no_ai_call():
     read, problems, _ = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
     assert control.calls == [] and problems == [] and pipeline.result.replayed_reads == 1
     assert {item.kpi.key: item.value for item in read if not item.is_total}["r2nanometer"] == 11_000
+    assert pipeline.result.replay_outcomes == {"replayed": len(SPEC.groups)}
+
+
+def test_each_group_the_ai_reads_instead_says_why():
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    six = report("June 30", 21, 45, 61, 82, 310).replace("Three Months Ended", "Six Months Ended")
+    flash = {"period_end": "2026-06-30", "values": []}
+    pipeline = _pipeline(NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash}), _history(first))
+    pipeline._read(lambda: "prompt", parse_document(six, URL.format(n=2)), SPEC, Q2, version=1)
+    # The table's group is read by the AI, the sentence's group (its column header does not matter) by code.
+    assert pipeline.result.replay_outcomes == {"column header changed": 1, "replayed": 1}
+    fresh = _pipeline(NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash}), [])
+    fresh._read(lambda: "prompt", parse_document(six, URL.format(n=2)), SPEC, Q2, version=1)
+    assert fresh.result.replay_outcomes == {"no earlier reading of this kind of document": len(SPEC.groups)}
 
 
 def test_replay_is_refused_when_a_number_repeats_but_holds_across_a_new_list_version():
@@ -149,7 +163,7 @@ def test_a_prior_year_column_is_never_replayed():
     last = {f"{v['group_key'][4:]}.{v['kpi_key']}": {**v["locator"], "col": 2} for v in _history(first)
             if "quote" not in v["locator"]}
     second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
-    assert replay(second, last, Q2) is None
+    assert replay(second, last, Q2) == "column header changed"
 
 
 def test_the_stated_quarter_end_wins_over_the_nominal_one():
@@ -185,7 +199,7 @@ def test_a_six_month_column_is_never_replayed_as_the_quarter():
     first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
     last = {f"{v['group_key'][4:]}.{v['kpi_key']}": v["locator"] for v in _history(first)}
     six = report("June 30", 21, 45, 61, 82, 310).replace("Three Months Ended", "Six Months Ended")
-    assert replay(parse_document(six, URL.format(n=2)), last, Q2) is None
+    assert replay(parse_document(six, URL.format(n=2)), last, Q2) == "column header changed"
 
 
 def test_a_quote_about_another_node_is_never_taken_for_this_one():
@@ -195,7 +209,7 @@ def test_a_quote_about_another_node_is_never_taken_for_this_one():
     last = {"technology.n3": {"block": block, "quote": "3-nanometer shipments accounted for 28%", "value_text": "28%"}}
     changed = parse_document("<p>In the quarter, 5-nanometer shipments accounted for 35% of wafer revenue.</p>",
                              URL.format(n=2))
-    assert replay(changed, last, Q2) is None
+    assert replay(changed, last, Q2) == "sentence not found"
 
 
 def test_a_six_month_column_written_in_digits_is_never_replayed():
@@ -203,7 +217,7 @@ def test_a_six_month_column_written_in_digits_is_never_replayed():
                            URL.format(n=1))
     last = {f"{v['group_key'][4:]}.{v['kpi_key']}": v["locator"] for v in _history(first)}
     six = report("June 30", 21, 45, 61, 82, 310).replace("Three Months Ended", "6 Months Ended")
-    assert replay(parse_document(six, URL.format(n=2)), last, Q2) is None
+    assert replay(parse_document(six, URL.format(n=2)), last, Q2) == "column header changed"
 
 
 def test_a_quote_about_3_nm_never_becomes_5_nm():
@@ -211,11 +225,11 @@ def test_a_quote_about_3_nm_never_becomes_5_nm():
     block = next(iter(document.blocks))
     last = {"technology.n3": {"block": block, "quote": "3 nm technology accounted for 28%", "value_text": "28%"}}
     changed = parse_document("<p>Revenue from 5 nm technology accounted for 35% of wafer revenue.</p>", URL.format(n=2))
-    assert replay(changed, last, Q2) is None
+    assert replay(changed, last, Q2) == "sentence not found"
 
 
 def test_a_reading_without_header_evidence_goes_back_to_the_ai():
     first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
     last = {f"{v['group_key'][4:]}.{v['kpi_key']}": {k: x for k, x in v["locator"].items() if k != "header"}
             for v in _history(first) if "quote" not in v["locator"]}
-    assert replay(parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2)), last, Q2) is None
+    assert replay(parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2)), last, Q2) == "column header not recorded"

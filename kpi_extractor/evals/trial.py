@@ -102,6 +102,7 @@ def company_report(symbol: str, result: SymbolResult, values: list[dict], filing
         "reviewReasons": Counter(_reason(note) for v in held for note in v.get("notes") or [] if note and note not in _NOT_A_REASON),
         "missingReasons": dict(missing),
         "secondReadReasons": dict(result.second_read_reasons or second),
+        "replayOutcomes": dict(result.replay_outcomes),
         "aiCalls": result.ai_calls,
         # How each release was read: by code alone (the way it was read before), by one AI reading, or by two.
         "reads": {"code": result.replayed_reads, "oneAi": result.flash_only_reads, "twoAi": result.second_reads},

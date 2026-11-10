@@ -5,7 +5,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 from ..quality.stated import FILING_SCALES
-from ..rules.period import states_quarter
 from .. import ai
 from ..ai import Spec
 from ..documents.document import Document, clean
@@ -164,9 +163,7 @@ class ReleaseFlow:
             if not located.annual and (self._reports_full_year(read, period_end) or _annual_columns(read)):
                 located.annual = True
                 problems.append("breakdown reports the full year: stored as the fiscal year")
-            elif not located.annual and fiscal_period == "Q4" and self._far_above_quarters(read, period_end) \
-                    and not all(states_quarter(str(item.locator.get("header") or "")) for item in read
-                                if item.group.kind == "revenue_breakdown"):
+            elif not located.annual and fiscal_period == "Q4" and self._far_above_quarters(read, period_end):
                 # A total far above the quarter before is only a reason to look: a column headed as a quarter stands.
                 for item in read:
                     if item.group.kind == "revenue_breakdown":
