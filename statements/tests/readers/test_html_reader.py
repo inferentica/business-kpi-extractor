@@ -293,3 +293,34 @@ def test_a_mark_moved_up_and_a_trailing_currency_sign_leave_the_label():
             "<tr><td>Profit for the period ￦</td><td>1,234</td></tr></table>")
     assert [row.label for row in parse_html(page)[0].rows if row.figures] == ["Basic Net Income Per Share",
                                                                               "Profit for the period"]
+
+
+def _balance_rows() -> str:
+    return "".join("<tr>" + cells(label, "100", "90") + "</tr>" for label in (
+        "Cash", "Total assets", "Total liabilities", "Total equity", "Total liabilities and equity"))
+
+
+def test_a_reconciliation_titled_in_the_tables_first_rows_is_no_statement():
+    # UBS's Pillar 3 report of Q3 2015: the title row, then a sentence, then column headings naming the balance sheet.
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements
+    html = """<p>The following tables provide the required information.</p><table>
+<tr><td>Table 33: Reconciliation of accounting balance sheet to balance sheet under the regulatory scope of consolidation</td></tr>
+<tr><td>The table below provides a reconciliation of the IFRS balance sheet to the balance sheet according to the regulatory scope.</td></tr>
+<tr><td>CHF million</td><td>Balance sheet in accordance with IFRS scope of consolidation</td><td>Balance sheet in accordance with regulatory scope of consolidation</td></tr>
+<tr><td></td><td>30.9.15</td><td>30.9.15</td></tr>
+<tr><td>Assets</td></tr>""" + _balance_rows() + "</table>"
+    assert find_statements(parse_html(html), release=True) == []
+
+
+def test_a_statements_title_names_its_company():
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements, titled_company
+    html = """<p>See Notes to Consolidated Financial Statements.</p><p>2</p>
+<p>GOLD TOE MORETZ HOLDINGS CORP. AND SUBSIDIARIES</p><p>UNAUDITED CONDENSED INTERIM CONSOLIDATED BALANCE SHEETS</p>
+<p>(Dollars In Thousands)</p><table><tr><td></td><td>2011</td><td>2010</td></tr>""" + _balance_rows() + "</table>"
+    [(kind, group)] = find_statements(parse_html(html), release=True)
+    assert titled_company(kind, group[0]) == "GOLD TOE MORETZ HOLDINGS CORP."
+    plain = "<p>CONSOLIDATED BALANCE SHEETS</p><table><tr><td></td><td>2011</td><td>2010</td></tr>" + _balance_rows() + "</table>"
+    [(kind, group)] = find_statements(parse_html(plain), release=True)
+    assert titled_company(kind, group[0]) is None

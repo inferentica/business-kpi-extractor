@@ -36,3 +36,30 @@ def test_the_companys_own_name_in_any_form_is_its_own():
 def test_a_letter_lost_in_decoding_keeps_the_name():
     assert _other("Commission File Number 1-15106 PETR�LEO BRASILEIRO S.A. - PETROBRAS (Exact name of registrant",
                   ["PETROLEO BRASILEIRO SA PETROBRAS"]) is None
+
+
+def _others(titles: list[str], names: list[str], cover: str | None = None) -> list[str]:
+    printed._NAMES["0"] = names
+
+    class Reading:
+        def __init__(self, titled):
+            self.titled = titled
+
+    class Ref:
+        filing = _Filing
+
+    return printed._other_companies([Reading(title) for title in titles], Ref, cover)
+
+
+def test_an_acquired_companys_statements_are_anothers():
+    # Gildan's 6-K of June 2011: Gold Toe Moretz's statements, from Gildan's business acquisition report.
+    cover = ("Commission File Number: 1-14830 GILDAN ACTIVEWEAR INC. (Translation of Registrant's name into English) "
+             "Indicate by check mark … 99.2 Consolidated Financial Statements … of Gold Toe Moretz Holdings Corp.")
+    assert _others(["GOLD TOE MORETZ HOLDINGS CORP."], ["GILDAN ACTIVEWEAR INC."], cover) == ["GOLD TOE MORETZ HOLDINGS CORP."]
+
+
+def test_a_title_in_the_companys_own_name_is_its_own():
+    assert _others(["Gildan Activewear Inc."], ["GILDAN ACTIVEWEAR INC."]) == []
+    assert _others(["BRASCAN CORPORATION"], ["BROOKFIELD Corp /ON/", "BRASCAN CORP/"]) == []  # a former name
+    cover = "(Commission File No. 1-14668) COMPANHIA PARANAENSE DE ENERGIA - COPEL Energy Company of Parana Indicate by check mark"
+    assert _others(["COMPANHIA PARANAENSE DE ENERGIA - COPEL"], ["ENERGY CO OF PARANA"], cover) == []  # the cover's name

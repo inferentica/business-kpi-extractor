@@ -84,6 +84,12 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             leading = " ".join(row.label for row in _leading(table))
             kind = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
             title_text += " " + leading
+        # A first row naming the statement is its title, wherever it falls among them: UBS's Pillar 3 report heads a
+        # table "Table 33: Reconciliation of accounting balance sheet to balance sheet under the regulatory scope of
+        # consolidation", with two rows of text below it before "Assets".
+        if kind is not None and not_statement.search(next(
+                (row.label for row in _leading(table) if _titled(dict(TITLES)[kind], row.label)), "")):
+            continue
         if kind is None and _GENERIC_TITLE.search(table.context[-250:]) and any(
                 _EARNINGS_HEAD.match(cell.text) for cells in table.header for cell in cells):
             kind = "income"  # Tennant's 1990s 10-Qs: "CONSOLIDATED STATEMENTS (UNAUDITED)", "EARNINGS (note 1)" over its columns
@@ -127,6 +133,33 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
                                                                    for label in labels_in_context(group)) >= 3):
             found.append((kind, group))
     return found
+
+
+# "GOLD TOE MORETZ HOLDINGS CORP. AND SUBSIDIARIES CONSOLIDATED BALANCE SHEETS": the company a statement's title names.
+_SUBSIDIARIES = re.compile(r"\band\s+(?:its\s+)?(?:consolidated\s+)?subsidiar(?:y|ies)\b", re.I)
+_ABBREVIATIONS = {"INC.", "CORP.", "CO.", "LTD.", "S.A.", "N.V.", "L.P.", "PLC.", "B.V.", "AG.", "S.A.B."}
+
+
+def titled_company(kind: str, table: Table) -> str | None:
+    """The company named just before a statement's title, as "<name> and subsidiaries"; None where the title names
+    none that way."""
+    text = table.context[-300:]
+    title = None
+    for title in dict(TITLES)[kind].finditer(text):
+        pass
+    if title is None:
+        return None
+    named = None
+    for named in _SUBSIDIARIES.finditer(text, 0, title.start()):
+        pass
+    if named is None or title.start() - named.end() > 80:
+        return None
+    words: list[str] = []
+    for word in reversed(text[:named.start()].split()[-8:]):
+        if not re.match(r"[A-Z&]", word) or (words and word.endswith(".") and word.upper() not in _ABBREVIATIONS):
+            break  # a page number, a lower-case word or a sentence's end: the text before the name
+        words.insert(0, word)
+    return " ".join(words) or None
 
 
 def _heading(context: str) -> str:

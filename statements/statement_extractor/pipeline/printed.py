@@ -53,8 +53,8 @@ def _company_names(filing) -> list[str]:
     return _NAMES[cik]
 
 
-def another_registrant(ref, attachments) -> str | None:
-    """The registrant a 6-K's cover names, when it is neither the company nor a name the company once had."""
+def _cover_text(attachments) -> str | None:
+    """A 6-K cover's first words as plain text."""
     cover = next((item for item in attachments if str(item.document_type or "").upper().startswith("6-K")), None)
     if cover is None:
         return None
@@ -65,7 +65,14 @@ def another_registrant(ref, attachments) -> str | None:
         except UnicodeDecodeError:
             content = content.decode("latin-1")  # Petrobras's covers
     text = re.sub(r"<[^>]+>|&nbsp;", " ", html.unescape(str(content or "")) if "&" in str(content or "")[:30_000] else str(content or ""))
-    text = re.sub(r"\s+", " ", text[:30_000])
+    return re.sub(r"\s+", " ", text[:30_000])
+
+
+def another_registrant(ref, attachments) -> str | None:
+    """The registrant a 6-K's cover names, when it is neither the company nor a name the company once had."""
+    text = _cover_text(attachments)
+    if text is None:
+        return None
     match = _REGISTRANT.search(text)
     if match is None:
         return None
@@ -80,6 +87,27 @@ def another_registrant(ref, attachments) -> str | None:
     # Only a name of the company's own family: a subsidiary shares its brand (Lloyds Bank plc beside Lloyds Banking
     # Group); a name sharing nothing is the company's in another language (Copel's "Energy Company of Paraná").
     return printed[:80] if any(words & name for name in names) else None
+
+
+_GENERIC = {"AND", "OF", "DE", "DO", "DA", "DAS", "DOS", "THE", "HOLDINGS", "HOLDING", "GROUP", "INCORPORATED"}
+
+
+def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
+    """The names of other companies that the readings' titles name: an acquired company's statements furnished with
+    the company's report (Gildan's 6-K of June 2011 carries Gold Toe Moretz's, "GOLD TOE MORETZ HOLDINGS CORP. AND
+    SUBSIDIARIES CONSOLIDATED BALANCE SHEETS"). A title's name is the company's own when it shares a word with the
+    company's name or a former one, or when the 6-K's cover prints it as the registrant's (Copel's Portuguese name)."""
+    names = [_words(name) - _GENERIC for name in _company_names(ref.filing)]
+    registrant = _words(cover[:cover.lower().find("indicate by check mark")] if cover else "")
+    others = []
+    for printed in {reading.titled for reading in readings if reading.titled}:
+        words = _words(printed) - _GENERIC
+        if not words or not any(names) or words <= registrant or any(words & name for name in names) or any(
+                SequenceMatcher(None, "".join(_ordered(printed)), "".join(_ordered(other))).ratio() >= 0.85
+                for other in _company_names(ref.filing)):
+            continue
+        others.append(printed)
+    return others
 
 
 def _ordered(name: str) -> list[str]:
@@ -107,6 +135,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             document_end = None  # no year end: EDGAR gives Alcon's 2007 20-F 19 March 2006; its statements say which year
     attachments = list(ref.filing.attachments)
     other = another_registrant(ref, attachments) if release else None
+    cover = _cover_text(attachments) if release else None
     if other:
         # A subsidiary's report furnished beside the company's (Lloyds Bank plc's under Lloyds Banking Group): another
         # issuer's statements, never the company's.
@@ -148,6 +177,10 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         except Exception as error:  # noqa: BLE001 - one unreadable document never stops the filing
             notes.append(f"{attachment.document}: unreadable ({type(error).__name__})")
             continue
+        others = _other_companies(readings, ref, cover)
+        if others:
+            readings = [reading for reading in readings if reading.titled not in others]
+            document_notes.append(f"another company's statements left out ({'; '.join(sorted(others))[:120]})")
         printed_titles, document_notes = split_titled(document_notes)
         if titled is not None:
             titled |= printed_titles | {(kind,) for kind in headed_kinds(content)}
@@ -180,6 +213,8 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                                              form=ref.form, filed=ref.filed, document_end=document_end,
                                              fiscal_year_end=fiscal_year_end, year_offset=year_offset)
         held = {(reading.key, reading.basis) for reading in found}
+        others = _other_companies(readings, ref, cover)
+        readings = [reading for reading in readings if reading.titled not in others]
         for reading in readings:
             reading.basis, reading.currency = basis, _decided(reading.currency, currency)
         share_currency(scaled + readings)  # Petrobras' real release prints its cash flow with no scale as well

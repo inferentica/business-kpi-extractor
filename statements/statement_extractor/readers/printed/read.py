@@ -23,7 +23,7 @@ from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
 from .currency import column_currencies, reporting_currency, translations
 from .dates import column_periods
 from .scales import line_scale, share_scale, statement_scale, states_two
-from .find import TITLES, find_statements, unlabelled_totals
+from .find import TITLES, find_statements, titled_company, unlabelled_totals
 from .side_by_side import column_scopes
 from .tables import Table, figure_columns
 from .titled import titled_notes
@@ -108,7 +108,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if reading is None:
                 continue
             reading.accession, reading.form, reading.filed, reading.currency = accession, form, filed, currency
-            reading.scope = scopes.get(dated[index]) or _scope(group, form)
+            reading.scope, reading.titled = scopes.get(dated[index]) or _scope(group, form), titled_company(kind, group[0])
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes
