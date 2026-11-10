@@ -130,9 +130,12 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
 
 
 def _heading(context: str) -> str:
-    """The heading lines just before a table: what follows the last sentence (Visteon's auditor's report ends "… the
-    segment disclosures as discussed in Note 22 …" above its income statement; its words are no title's)."""
-    return re.split(r"[.;]\s+(?=\S)", context)[-1]
+    """The words before a table that describe it. Where the lines just above it are a statement's own title, the
+    sentences before that title are other text (Visteon's auditor's report ends "… the segment disclosures as discussed
+    in Note 22 …" above "CONSOLIDATED STATEMENTS OF OPERATIONS"); otherwise the sentence before it describes the table
+    (JPM's "The following table sets forth selected financial data of the Investment Bank.")."""
+    heading = re.split(r"[.;]\s+(?=\S)", context)[-1]
+    return heading if any(pattern.search(heading) for _kind, pattern in TITLES) else context
 
 
 # The company's own profit before taxes ("INCOME BEFORE INCOME TAX"), not an item of other comprehensive income stated
