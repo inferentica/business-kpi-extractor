@@ -15,7 +15,10 @@ YEAR = re.compile(r"^(19|20)\d{2}$")
 # A scale caption, which a footnote mark can follow; a statement's line can end in "(2)", a figure in brackets.
 _CAPTION_WORDS = re.compile(r"\b(in\s+(thousands?|millions?|billions?)|expressed|figures|amounts\s+in)\b", re.I)
 # A currency sign on a figure, blanked like "$" so columns keep their places: KEPCO's "W53,456,279" and "W 3,200,504".
-_CURRENCY_SIGN = re.compile(r"(?<![\w$])(?:NT\$|R\$|US\$|W|£|€|¥)(?=\s*\(?-?\d)")
+_CURRENCY_SIGN = re.compile(r"(?<![\w$])(?:NT\$|R\$|US\$|W|£|€|¥|₩|KRW|USD|EUR|GBP|CHF|NTD|RMB)(?=\s*\(?-?\d)")  # KEPCO's "KRW 10,425,992"
+# Dot leaders between a label and its figures, a single space before the first (Petrobras's 2002 20-F: "Sales of products
+# and services......... 34,145   23,467"): blanked, so the label and its figures part.
+_LEADERS = re.compile(r"\.{3,}(?=\s*[\d(\-$])")
 _MONTH_END = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?$", re.I)
 
 
@@ -51,6 +54,7 @@ def figures_apart(found: list[Chunk]) -> list[Chunk]:
 
 def split(line: str) -> Line | None:
     """A line's label and the run of figures that ends it ("Net sales  $ 9,188,748  $ 7,976,954")."""
+    line = _LEADERS.sub(lambda match: " " * len(match.group(0)), line)  # dot leaders run into the first figure
     parts = figures_apart(chunks(_CURRENCY_SIGN.sub(lambda match: " " * len(match.group(0)), line).replace("$", " ")))
     for part in parts:  # a footnote mark on a figure: ASML's "(21,836)(3)"
         bare = re.sub(r"(?<=[\d)])\(\d{1,2}\)$", "", part.text)

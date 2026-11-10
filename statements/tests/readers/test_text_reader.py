@@ -325,3 +325,11 @@ def test_an_income_statement_ends_at_the_comprehensive_income_statement_after_it
     from statement_extractor.readers.text.blocks import _UNTAGGED_TITLE
     assert _UNTAGGED_TITLE.match("          Consolidated Statements of Comprehensive Income")
     assert not _UNTAGGED_TITLE.match("          Consolidated Statements of Operations Data")
+
+
+def test_dot_leaders_running_into_the_first_figure_part_label_and_figures():
+    # Petrobras's 2002 20-F: one space between the dots and the first figure, figures one space apart.
+    from statement_extractor.readers.text.lines import split
+    line = split("Value-added and other taxes on sales and services...................... (8,627) (8,829) (5,453)")
+    assert line.label == "Value-added and other taxes on sales and services"
+    assert [chunk.text for chunk in line.figures] == ["(8,627)", "(8,829)", "(5,453)"]
