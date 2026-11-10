@@ -20,20 +20,32 @@ jobs:
                       print(name, r.status, len(body), r.headers.get("content-type")); return body.decode("latin-1", "replace")
               except Exception as e:
                   print(name, "ERROR", type(e).__name__, str(e)[:200]); return ""
-          import urllib.parse
-          base = "https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut={rut}&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3"
-          for rut, mm, aa in (("93007000", "09", "2025"), ("93007000", "12", "2012"), ("93007000", "03", "2008")):
-              data = urllib.parse.urlencode({"forma": "P", "mm": mm, "aa": aa, "tipo": "C", "tipo_norma": "IFRS"}).encode()
-              request = urllib.request.Request(base.format(rut=rut), data=data, headers=agent)
-              try:
-                  with urllib.request.urlopen(request, timeout=90) as r:
-                      body = r.read(); open(f"out/cmf_{rut}_{aa}{mm}.html", "wb").write(body)
-                      text = body.decode("latin-1", "replace")
-                      print(rut, aa, mm, r.status, len(body))
-                      for m in sorted(set(re.findall(r'(?:href|onclick|src)="([^"]+)"', text))):
-                          if any(w in m.lower() for w in ("xbrl", "zip", "pdf", "archivo", "ventana", "txt")): print("   ", html.unescape(m)[:240])
-              except Exception as e:
-                  print(rut, aa, mm, "ERROR", type(e).__name__, str(e)[:200])
+          import urllib.parse, http.cookiejar, zipfile, io
+          jar = http.cookiejar.CookieJar()
+          opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+          site = "https://www.cmfchile.cl/institucional/mercados/"
+          page_url = site + "entidad.php?mercado=V&rut=93007000&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3"
+          data = urllib.parse.urlencode({"forma": "P", "mm": "09", "aa": "2025", "tipo": "C", "tipo_norma": "IFRS"}).encode()
+          text = opener.open(urllib.request.Request(page_url, data=data, headers=agent), timeout=90).read().decode("latin-1", "replace")
+          links = re.findall(r'href="(\.\./inc/inf_financiera/ifrs/safec_ifrs_verarchivo\.php[^"]+)"[^>]*>(.*?)</a>', text, re.S)
+          for href, label in links:
+              label = re.sub(r"<[^>]+>", " ", label).strip()
+              print("LINK", label[:60])
+              if "XBRL" in label:
+                  url = urllib.parse.urljoin(page_url, html.unescape(href))
+                  r = opener.open(urllib.request.Request(url, headers=agent), timeout=180)
+                  body = r.read(); print("XBRL", r.status, len(body), r.headers.get("content-type"), r.headers.get("content-disposition"))
+                  open("out/sqm_202509_xbrl.bin", "wb").write(body)
+                  try:
+                      z = zipfile.ZipFile(io.BytesIO(body)); print("  zip", [(i.filename, i.file_size) for i in z.infolist()][:10])
+                  except zipfile.BadZipFile:
+                      print("  not a zip:", body[:200])
+          log = re.search(r"ventana_modal\('([^']+bitacora_ifrs\.php[^' ]+)", text)
+          if log:
+              url = urllib.parse.urljoin(page_url, html.unescape(log.group(1)))
+              body = opener.open(urllib.request.Request(url, headers=agent), timeout=90).read()
+              open("out/sqm_202509_bitacora.html", "wb").write(body)
+              print("BITACORA", re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", body.decode("latin-1", "replace"))))[:1500])
       - uses: actions/upload-artifact@v6
         with:
           name: latam-probe
