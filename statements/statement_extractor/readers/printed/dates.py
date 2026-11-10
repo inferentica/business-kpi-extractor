@@ -132,11 +132,15 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     title = context[max(titled):] if titled else ""
     in_title = list(_MONTH_DAY.finditer(title))
     title_day = _MONTH_DAY.search(header_all) or (in_title[-1] if in_title else None)
-    title_span = _SPAN.search(header_all) or _SPAN.search(title)
     periods: dict[tuple[int, ...], Period] = {}
     columns = figure_columns(first)
     in_order = years_in_order(first, columns)
     aboves = {column: month_first(header_text(first, column[0]) or header_text(first, column[-1])) for column in columns}
+    # A span over the whole header, not one column's own (Morgan Stanley's "2010 | 2009 | Fiscal 2008 | One Month Ended
+    # December 31, 2008": the month is the last column's alone).
+    shared = [match for match in _SPAN.finditer(header_all)
+              if sum(match.group(0).lower() in aboves[column].lower() for column in columns) in (0, len(columns))]
+    title_span = (shared[0] if shared else None) or _SPAN.search(title)
     header_days = list(_MONTH_DAY.finditer(header_all))
     day_first = _day_first(header_all)
     # One day for each column, in order, when no column prints a day of its own.

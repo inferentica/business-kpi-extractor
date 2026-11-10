@@ -107,3 +107,16 @@ def test_a_sentence_above_the_title_does_not_unmake_the_statement():
             "</tr><tr><td>(Dollars in Millions, Except Per Share Amounts)</td><td>2012</td><td>2011</td><td>2010</td>"
             "<td>2010</td></tr>" + rows + "</table>")
     assert [kind for kind, _group in find_statements(parse_html(page))] == ["income"]
+
+
+def test_a_sentence_describing_the_table_still_counts():
+    # JPM's 10-Q for June 2001: "The following table sets forth selected financial data of the Investment Bank." above
+    # a line-of-business table; it is no statement.
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements
+    rows = "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+        ("Revenue", "7,899", "7,100"), ("Cash Expense", "4,933", "4,500"), ("Income before income taxes", "2,874", "2,600"),
+        ("Income taxes", "900", "800"), ("Net income", "1,974", "1,800"), ("Average assets", "300,000", "290,000")))
+    page = ("<p>INVESTMENT BANK The following table sets forth selected financial data of the Investment Bank.</p>"
+            "<p>CONSOLIDATED STATEMENT OF INCOME DATA</p><table><tr><td></td><td>2Q 2001</td><td>2Q 2000</td></tr>" + rows + "</table>")
+    assert find_statements(parse_html(page)) == []
