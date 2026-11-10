@@ -56,6 +56,9 @@ _NUMERIC_DATE = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})\b")
 _DOTTED_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b")  # day first: UBS's "31.12.14"
 
 
+_LISTED = re.compile(r"^[\s,]*((19|20)\d{2})?[\s,]*$")  # between days listed one per column: commas, a year at most
+
+
 def _standard(span) -> bool:
     """A span a statement period can have: a quarter, half, nine months or year in months, or any count of weeks."""
     return not (span.group(1) and span.group(2).lower().startswith("month")
@@ -194,8 +197,9 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         day = own_days[-1] if own_days else title_day
         # One cell over two columns, a day for each, as for years: "January 31, February 28," over "1996 | 1995".
         same_days = [other for other, days_named in zip(columns, own_named) if days_named == own_named[columns.index(column)]]
-        if len(same_days) >= 2 and len(own_days) == len(same_days):
-            day = own_days[same_days.index(column)]
+        listed = all(_LISTED.match(above[a.end():b.start()]) for a, b in zip(own_days, own_days[1:]))
+        if len(same_days) >= 2 and len(own_days) == len(same_days) and listed:
+            day = own_days[same_days.index(column)]  # never a range: KEPCO's "From Jan. 1, 2006 Through Mar. 31, 2006"
         if in_order_days:
             day = header_days[columns.index(column)]  # "AS AT JUNE 30, AND DECEMBER 31" over "2023 | 2022" (Brookfield)
         dotted_all = list(_DOTTED_DATE.finditer(above)) if dotted is not None else []
