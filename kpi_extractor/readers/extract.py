@@ -15,7 +15,7 @@ from ..rules.scale import (  # noqa: F401 - re-exported for callers of extract
     _row_scale_words, _scale_quoted, _scale_word, _SCALE_WORDS_OF, SCALE_NOT_STATED, ScaleFrom, cell_amount_scale, cell_count_scale,
     number_scale, passage_amount_scale, passage_count_scale, reading_scale)
 from ..rules.table import (  # noqa: F401 - re-exported for callers of extract
-    _heading, _nearest_heading, _section_heading)
+    _heading, _nearest_heading, _section_heading, earlier_twin)
 from ..rules.wording import (  # noqa: F401 - re-exported for callers of extract
     _CAUSE, _COMPARED, _compares_to_a_small_change, _FALL, _FALL_WORD, _figure_forms,
     _FORWARD, _NUMBER, _PERIOD_LIST, _PLAIN_WORDS, explanation_supports, falls,
@@ -65,7 +65,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
         if group is None or group.kind == "metric" or locator.group in table_groups:
             continue
         try:
-            rows = _read_table(document, locator, group, default_currency, located.period_end)
+            rows = _read_table(document, locator, group, default_currency, located.period_end, located.annual)
         except LocateError as error:
             problems.append(f"{locator.group}: {error}")
             continue
@@ -91,6 +91,10 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
                                       f"{kpi.label!r}: point at the row for {kpi.label} itself")
                 if other := net_gross_mismatch(row_label, kpi.label):
                     raise LocateError(f"{locator.table} r{locator.row} is the {other} figure {row_label!r}, not {kpi.label!r}")
+                if not located.annual and (twin := earlier_twin(document, locator.table)):
+                    raise LocateError(f"{locator.table} repeats {twin}'s columns and rows with other figures and names no "
+                                      f"period: a release gives the quarter's first, so the quarter's is {twin}, not "
+                                      f"{locator.table} (the year's or year to date)")
                 row_cells = table.rows[locator.row] if locator.row < len(table.rows) else []
                 first_cell = (row_cells[0] if row_cells else "").strip()  # a bare year has no letters
                 if not located.annual and _YEAR_ROW.match(first_cell) and not _LONG_SPAN_KPI.search(kpi.label):
@@ -250,12 +254,15 @@ def _table_as_text(document: Document, key: str | None) -> TextBlock | None:
 
 
 def _read_table(document: Document, locator: TableLocator, group: GroupSpec, default_currency: str | None,
-                period_end: str | None = None) -> list[ReadValue]:
+                period_end: str | None = None, annual: bool = False) -> list[ReadValue]:
     """Every row of a breakdown or mix table in the reported column, labelled by its own row label. Rows that are the
     sum of other rows (an "advanced technologies" subtotal) are dropped, so each part is counted once."""
     table = document.tables.get(locator.table)
     if table is None:
         raise LocateError(f"unknown table {locator.table}")
+    if not annual and (twin := earlier_twin(document, locator.table)):
+        raise LocateError(f"{locator.table} repeats {twin}'s columns and rows with other figures and names no period: a "
+                          f"release gives the quarter's first, so the quarter's is {twin}, not {locator.table}")
     for index, named in ((locator.first_row, locator.first_label), (locator.last_row, locator.last_label)):
         actual = _row_label(table.rows[index], locator.col) if 0 <= index < len(table.rows) else ""
         if not labels_agree(named, actual):

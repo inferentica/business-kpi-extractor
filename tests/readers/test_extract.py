@@ -879,3 +879,44 @@ def test_one_place_written_two_ways_is_named():
     assert _places("Europe Revenue", own=True) - _places("EMEA") == {"EUROPE"}
     assert _places("Europe, Middle East and Africa Revenue", own=True) == {"EMEA"}
     assert _places("EMEA") <= _places("Europe, Middle East & Africa")
+
+
+KO_Q4 = """<p>Revenues and Volume</p><table>
+<tr><td>Percent Change</td><td>Concentrate Sales1</td><td>Price/Mix</td><td>Unit Case Volume3</td></tr>
+<tr><td>Consolidated</td><td>5</td><td>9</td><td>2</td></tr>
+<tr><td>Europe, Middle East &amp; Africa</td><td>6</td><td>11</td><td>0</td></tr>
+<tr><td>Latin America</td><td>3</td><td>23</td><td>2</td></tr></table>
+<p>Revenues and Volume</p><table>
+<tr><td>Percent Change</td><td>Concentrate Sales1</td><td>Price/Mix</td><td>Unit Case Volume</td></tr>
+<tr><td>Consolidated</td><td>2</td><td>11</td><td>1</td></tr>
+<tr><td>Europe, Middle East &amp; Africa</td><td>(1)</td><td>17</td><td>0</td></tr>
+<tr><td>Latin America</td><td>3</td><td>21</td><td>3</td></tr></table>"""
+
+
+def test_the_later_of_two_tables_alike_is_not_the_quarter():
+    # Coca-Cola's Q4 2024 release: the quarter's volume table, then the full year's with the same columns and rows and
+    # nothing naming either period. The re-read of 2026-11-10 took the year's 1% and 3% for the quarter's 2% and 2%.
+    document = parse_document(KO_Q4, "https://example.com/ko.htm")
+    first, second = list(document.tables)
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "ucv", "label": "Unit Case Volume Growth", "unit": "percent"},
+        {"key": "latam", "label": "Latin America Unit Case Volume Growth", "unit": "percent"}]}]})
+    def read(table):
+        located = Located.model_validate({"period_end": "2024-12-31", "values": [
+            {"kpi": "ops.ucv", "table": table, "row": 1, "col": 3, "row_label": "Consolidated"},
+            {"kpi": "ops.latam", "table": table, "row": 3, "col": 3, "row_label": "Latin America"}]})
+        return read_values(document, spec, located, "USD")
+    values, problems = read(second)
+    assert values == [] and len(problems) == 2 and f"the quarter's is {first}" in problems[0]
+    values, problems = read(first)
+    assert {item.kpi.key: item.value for item in values} == {"ucv": 2, "latam": 2} and problems == []
+
+
+def test_a_table_repeated_whole_or_with_its_own_period_is_no_twin():
+    from kpi_extractor.rules.table import earlier_twin
+    same = parse_document(KO_Q4.split("<p>Revenues and Volume</p>")[1] * 2, "https://example.com/x.htm")
+    assert earlier_twin(same, list(same.tables)[1]) is None  # the same figures again: either reads the same
+    dated = parse_document(KO_Q4.replace("<td>Percent Change</td><td>Concentrate Sales1</td><td>Price/Mix</td><td>Unit Case Volume</td>",
+                                         "<td>Year Ended</td><td>Concentrate Sales1</td><td>Price/Mix</td><td>Unit Case Volume</td>"),
+                           "https://example.com/y.htm")
+    assert earlier_twin(dated, list(dated.tables)[1]) is None

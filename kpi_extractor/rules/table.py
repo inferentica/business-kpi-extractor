@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ..documents.document import parse_number, Table
+import re
+
+from ..documents.document import clean, Document, parse_number, Table
 
 
 def _heading(row: list[str], col: int) -> str:
@@ -31,3 +33,36 @@ def _section_heading(table: Table, row: int) -> str:
             break
         headings.append(" ".join(cells))
     return " ".join(headings)
+
+
+def _shape_words(cell: str) -> str:
+    # A footnote mark run into a heading ("Unit Case Volume3") does not change it.
+    return " ".join(re.findall(r"[a-z]+", re.sub(r"(?<=[a-z]{3})\d{1,2}\b", "", clean(cell or "").lower())))
+
+
+def _shape(table: Table) -> tuple | None:
+    """A table's columns and rows by their names alone: its first row's headings and every row's label."""
+    if len(table.rows) < 3 or len(table.rows[0]) < 3:
+        return None
+    header = tuple(_shape_words(cell) for cell in table.rows[0])
+    labels = tuple(_shape_words(row[0]) if row else "" for row in table.rows[1:])
+    if sum(1 for cell in header if cell) < 2 or sum(1 for label in labels if label) < 2:
+        return None
+    return header, labels
+
+
+def earlier_twin(document: Document, table_id: str) -> str | None:
+    """The earlier table a table repeats in shape, with other figures, when neither names its period: Coca-Cola's Q4
+    release gives the quarter's "Revenues and Volume" table, then the full year's with the same columns and rows and no
+    heading or date telling them apart. A release gives the quarter's first."""
+    table = document.tables.get(table_id)
+    shape = _shape(table) if table is not None else None
+    if shape is None:
+        return None
+    for key in document.order:
+        if key == table_id:
+            return None
+        other = document.tables.get(key)
+        if other is not None and _shape(other) == shape and other.rows != table.rows:
+            return key
+    return None
