@@ -5,6 +5,7 @@ no statements (monthly sales, notices) gives nothing."""
 from __future__ import annotations
 
 import gc
+import time
 import os
 from datetime import date, timedelta
 
@@ -19,7 +20,8 @@ from .prefetch import ahead
 from .printed import read_printed
 
 
-def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_offset: int, log=print):
+def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_offset: int, log=print,
+                  phases: dict | None = None):
     """(filing records, readings) of every release since `since`."""
     records, readings = [], []
     refs = list_releases(company, since, lambda day: quarter_end_before(day, fiscal_year_end))
@@ -39,7 +41,10 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
         try:
             with_network_retries(lambda: load_submission(ref.filing))
             titled: set = set()
+            began = time.time()
             found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=ref.period_end, titled=titled)
+            if phases is not None:  # reading, apart from waiting for the download (pipeline/company.py's phases)
+                phases["releases read"] = round(phases.get("releases read", 0.0) + time.time() - began, 1)
             if not found and not titled and not names_a_statement(ref.filing.attachments) and not any(
                     "unreadable" in note or "too large" in note for note in notes):
                 empty.add(ref.accession)

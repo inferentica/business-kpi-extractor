@@ -36,12 +36,16 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     configure_identity()
     out.mkdir(parents=True, exist_ok=True)
     started = time.time()
+    phases: dict[str, float] = {}  # seconds each part of the read took, kept in the summary (where a round's time goes)
+    mark = time.time()
     profile, company = company_profile(symbol)
     reports = sorted(list_reports(company, since), key=lambda ref: ref.filed, reverse=True)
+    mark = _phase(phases, "listing", mark)
     readings, filings, offset, summaries, regulator_reads = [], [], None, [], []
     # Every report's period is read from its submission, so they are downloaded first, four at a time
     # (pipeline/prefetch.py); each is held on its filing until read, as it was when they came one by one.
     load_all([ref.filing for ref in reports], load_submission)
+    mark = _phase(phases, "reports download", mark)
     annual_ends = [end for ref in reports if ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None]
     year_ends = {ref.accession: year_end_for(_period_end(ref), annual_ends, profile.fiscal_year_end) for ref in reports}
     for ref in reports:
@@ -98,17 +102,21 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         del xbrl
         ref.filing = None
         gc.collect()
+    mark = _phase(phases, "reports read", mark)
     if profile.foreign or any(ref.form in ("20-F", "40-F") for ref in reports):
-        records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log)
+        records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log, phases)
         filings.extend(records)
         readings.extend(found)
         archived_summaries: list[dict] = []
+        mark = _phase(phases, "releases", mark)
         records, found = read_archives(symbol, profile.fiscal_year_end, offset or 0, log, archived_summaries)
         filings.extend(record for record in records if record["filed"] >= since.isoformat())  # the years on paper
         readings.extend(reading for reading in found if reading.filed >= since)
         summaries.extend(figure for figure in archived_summaries if figure["filed"] >= since.isoformat())
+        mark = _phase(phases, "archives", mark)
         regulator_reads, found = read_regulators(symbol, since, profile.fiscal_year_end, offset or 0, readings, log)
         readings.extend(reading for reading in found if reading.filed >= since)
+    mark = _phase(phases, "regulators", mark)
     printed_signs: dict[str, dict] = {}
     readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
                                          printed_signs))
@@ -116,11 +124,14 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     _filing_currencies(readings)
     readings = align_dates(readings)
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
+    mark = _phase(phases, "second looks", mark)
     chosen = choose(readings, printed_signs)
+    mark = _phase(phases, "choose", mark)
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     summary_figures = choose_summaries(summaries, readings, chosen)
     summary["summary_figures"] = summary_coverage(summary_figures, chosen)
     summary["regulator_reads"] = regulator_reads
+    summary["phases"] = phases
     with (out / "readings.jsonl").open("w") as handle:
         for reading in readings:
             handle.write(json.dumps(reading.to_json(), default=str) + "\n")
@@ -162,6 +173,12 @@ def _printed_second_look(symbol, reports, filings, readings, year_ends: dict[str
             f"{len(found)} columns")
         found_all.extend(found)
     return found_all
+
+
+def _phase(phases: dict, name: str, since: float) -> float:
+    now = time.time()
+    phases[name] = round(phases.get(name, 0.0) + now - since, 1)
+    return now
 
 
 def _period_end(ref) -> date | None:
