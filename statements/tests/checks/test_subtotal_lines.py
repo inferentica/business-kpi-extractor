@@ -34,4 +34,4 @@ def test_a_uk_gaap_balance_sheet_closes_on_total_liabilities():
                ("Customer accounts", 1, 230.0), ("Shareholders' funds (equity)", 1, 22.0), ("Total liabilities", 0, 252.0)]
     assert balance_check(figures).result == "pass"
     figures[-1] = ("Total liabilities", 0, 230.0)
-    assert balance_check(figures).result == "fail"
+    assert balance_check(figures).result != "pass"  # no line equal to total assets: unproven, never served

@@ -46,9 +46,10 @@ LIABILITIES_AND_EQUITY = re.compile(r"^(total\s+liabilities.*|liabilities\s+and\
 LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
 
 
-# UK GAAP's balance sheet (Lloyds TSB to 2004): shareholders' funds are among the liabilities, so "Total liabilities",
-# its last line, is the grand total that equals total assets.
-SHAREHOLDERS_FUNDS = re.compile(r"^(total\s+)?shareholders['’´]?\s+funds\b", re.I)
+# Balance sheets whose "Total liabilities" counts equity in too, and so equals total assets: UK GAAP's (Lloyds TSB to
+# 2004, shareholders' funds among the liabilities) and Brazil's CVM forms (Copel's ITRs: "Total liabilities" over
+# "2.05 Stockholders' equity"). The equity section is named by a line such as these.
+EQUITY_SECTION = re.compile(r"\b(stockholders|shareholders|shareowners)['’´]?\s+(equity|funds)\b", re.I)
 
 
 EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’´]?\s+)?equity(\s*\(deficit\))?$", re.I)

@@ -9,7 +9,7 @@ import re
 import lxml.html
 
 from ...domain.basis import currencies_named, is_currency_word
-from ..printed.tables import COLUMN_TITLE, is_subheader, NOTE_MARK, Cell, Row, Table, clean, is_header_figures, number
+from ..printed.tables import ACCOUNT_CODE, COLUMN_TITLE, is_subheader, NOTE_MARK, Cell, Row, Table, clean, is_header_figures, number
 
 
 def _text(element) -> str:
@@ -73,7 +73,7 @@ def _row(cells: list[Cell]) -> Row | None:
         if level is None:
             level = cell.start
         label_parts.append(text)
-    label = NOTE_MARK.sub("", " ".join(label_parts)).strip()
+    label = ACCOUNT_CODE.sub("", NOTE_MARK.sub("", " ".join(label_parts)).strip())
     label = re.sub(r"\s+\d{1,2}(\s*,\s*\d{1,2})+$|\s+\d{1,2},$", "", label)  # "NET SALES 2, 26" in one cell
     if not label and not figures:
         return None

@@ -7,7 +7,7 @@ import re
 
 from ..domain.model import FAIL, NONE, PASS, Check
 from ..domain.printed_labels import (ASSETS, BARE_TOTAL, CHANGE, CLOSING, DATED_CASH, EFFECT, EQUITY, EXCHANGE, LIABILITIES,
-                                     LIABILITIES_AND_EQUITY, NET_INCOME, OPENING, PRETAX, SECTION_KINDS, SECTION_HEADS, SECTIONS, SHAREHOLDERS_FUNDS, TOTAL)
+                                     LIABILITIES_AND_EQUITY, NET_INCOME, OPENING, PRETAX, SECTION_KINDS, SECTION_HEADS, SECTIONS, EQUITY_SECTION, TOTAL)
 from .subtotals import block_start, subtotals
 from .tolerance import close
 
@@ -22,9 +22,10 @@ def first_match(figures, pattern, after: int = -1) -> tuple[int, float] | None:
 def balance_check(figures) -> Check:
     assets = first_match(figures, ASSETS)
     total = first_match(figures, LIABILITIES_AND_EQUITY)
-    labelled = [(index, label, value) for index, (label, _level, value) in enumerate(figures) if label and value is not None]
-    if not total and labelled and LIABILITIES.match(labelled[-1][1]) and any(SHAREHOLDERS_FUNDS.match(label) for label, _l, _v in figures):
-        total = (labelled[-1][0], labelled[-1][2])  # UK GAAP: "Total liabilities" over shareholders' funds too
+    if not total and assets and any(EQUITY_SECTION.search(label) for label, _l, _v in figures):
+        # "Total liabilities" over the equity too (UK GAAP, Brazil's CVM forms): the line that equals total assets.
+        total = next(((index, value) for index, (label, _level, value) in enumerate(figures)
+                      if LIABILITIES.match(label) and value is not None and close(value, assets[1])), None)
     bare = [(index, value) for index, (label, _level, value) in enumerate(figures) if BARE_TOTAL.match(label)]
     if len(bare) >= 2:  # TSMC closes each side with a bare "TOTAL"
         assets, total = assets or bare[0], total or bare[-1]
@@ -164,9 +165,13 @@ def total_check(printed) -> Check:
     and a line headed "Less" is taken away, in brackets or not (Costco's accumulated depreciation). A total with fewer than two lines above it is not tested."""
     verified, failures = 0, []
     starts = subtotals(printed)
+    assets = [value for label, _level, value in printed if value is not None and ASSETS.match(label)]
+    equity_section = any(EQUITY_SECTION.search(label) for label, _level, _value in printed)
     for index, (label, _level, value) in enumerate(printed):
         if value is None or not TOTAL.match(label) or LIABILITIES_AND_EQUITY.match(label) or BARE_TOTAL.match(label):
             continue  # a grand total is proven by the balance identity
+        if equity_section and LIABILITIES.match(label) and any(close(value, total) for total in assets):
+            continue  # so is "Total liabilities" over the equity too (UK GAAP, Brazil's CVM forms)
         if index in starts:
             verified += 1  # proven as a sum or a difference of the lines above it (JPM's total net revenue)
             continue

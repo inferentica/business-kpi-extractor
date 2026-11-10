@@ -209,6 +209,11 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             if opened is not None and end is not None and opened < end:
                 periods[column] = Period(end, opened)
             continue
+        numeric_all = list(_NUMERIC_DATE.finditer(above)) if numeric is not None else []
+        if len(numeric_all) >= 2 and kind != "balance":  # "1/1/2005 to 3/31/2005" (Copel's CVM forms): first to last
+            opened, end = _numeric(numeric_all[0]), _numeric(numeric_all[-1])
+            periods.update({column: Period(end, opened)} if opened and end and opened < end else {})
+            continue
         if (numeric is not None or dotted is not None) and not _MONTH_DAY.search(above):
             if numeric is not None:
                 month, day_of, year_of = (int(part) for part in numeric.groups())
@@ -253,6 +258,14 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             continue
         periods[column] = Period(end, end - timedelta(days=days - 1))
     return periods
+
+
+def _numeric(match: re.Match) -> date | None:  # month first, "3/31/2005" or "3/31/05"
+    month, day_of, year = (int(part) for part in match.groups())
+    try:
+        return date(year + (2000 if year < 50 else 1900) if year < 100 else year, month, day_of)
+    except ValueError:
+        return None
 
 
 def _dotted(match: re.Match, day_first: bool) -> date | None:

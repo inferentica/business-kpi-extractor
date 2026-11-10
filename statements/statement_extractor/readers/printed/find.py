@@ -6,7 +6,7 @@ import re
 from dataclasses import replace
 
 from ...domain.printed_labels import (ASSETS, BARE_TOTAL, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES,
-                                      LIABILITIES_AND_EQUITY, NET_INCOME, PRETAX, SECTIONS, SHAREHOLDERS_FUNDS)
+                                      LIABILITIES_AND_EQUITY, NET_INCOME, PRETAX, SECTIONS, EQUITY_SECTION)
 from .side_by_side import SIDE_BY_SIDE
 from .tables import Table, figure_columns
 
@@ -251,7 +251,7 @@ def _complete(kind: str, group: list[Table]) -> bool:
         bare = sum(1 for label in labels if BARE_TOTAL.match(label))
         return (any(ASSETS.match(label) for label in labels) or bare >= 1) and (
             any(LIABILITIES_AND_EQUITY.match(label) or EQUITY.match(label) for label in labels) or bare >= 2
-            or any(SHAREHOLDERS_FUNDS.match(label) for label in labels) and any(LIABILITIES.match(label) for label in labels))
+            or any(EQUITY_SECTION.search(label) for label in labels) and any(LIABILITIES.match(label) for label in labels))
     if kind == "cash_flow":
         return any(CLOSING.search(label) for label in labels) or sum(1 for label in labels if DATED_CASH.search(label)) >= 2
     return any(NET_INCOME.match(label) or PRETAX.search(label) for label in labels)

@@ -52,6 +52,10 @@ class Table:
     header_text: str = ""  # a text table's header lines as printed, before their words are given to columns
 
 
+# An account code before a label in Brazil's CVM forms: "3.09 Profit before taxation", "1.01.01 Cash and cash equivalents".
+ACCOUNT_CODE = re.compile(r"^\d{1,2}(?:\.\d{2})+\s+(?=[A-Za-z(])")
+
+
 def clean(text: str) -> str:
     return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
 
