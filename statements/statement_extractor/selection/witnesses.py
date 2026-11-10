@@ -5,7 +5,7 @@ filings that follow it. TSMC's FY2002 20-F read FY2000's income into the FY2001 
 print the same FY2001 income, so that presentation is set aside."""
 from __future__ import annotations
 
-from ..domain.model import Reading
+from ..domain.model import REGULATOR_SOURCES, Reading
 from .figures import agree, comparable, key_figures
 
 
@@ -28,9 +28,12 @@ def _agree(left: dict, right: dict) -> bool:
 
 def _alike(left: Reading, right: Reading) -> bool:
     """Two presentations that should print the same figures: one scope, basis and currency (TSMC's parent company
-    and group, or its ROC GAAP and Taiwan-IFRS figures, differ by right)."""
+    and group, or its ROC GAAP and Taiwan-IFRS figures, differ by right), both the SEC's or both a home regulator's.
+    A regulator's key figures are its tagged totals, a printed statement's what its labels give: KEPCO's 6-K revenue
+    reads as "Sales of goods" beside its unlabelled total, so the two families would contradict each other falsely."""
     return left.accession != right.accession and (left.scope, left.basis, left.currency) == (right.scope, right.basis,
-                                                                                            right.currency)
+                                                                                            right.currency) and \
+        (left.source in REGULATOR_SOURCES) == (right.source in REGULATOR_SOURCES)
 
 
 def contradicted(kept: list[Reading]) -> list[Reading]:

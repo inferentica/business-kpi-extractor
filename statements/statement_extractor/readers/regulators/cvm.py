@@ -48,6 +48,8 @@ def cvm_readings(form: str, rows: dict[str, list[dict]], fiscal_year_end: str, y
         unit = _SCALES.get(lines[0]["ESCALA_MOEDA"].upper(), 1000.0)
         ordered = sorted(lines, key=lambda row: _order(row["CD_CONTA"]))
         values = {row["CD_CONTA"]: float(row["VL_CONTA"]) * unit for row in ordered}
+        if not any(values.values()):
+            continue  # a statement filed empty: TIM S.A.'s consolidated forms in quarters it had no subsidiaries
         reading = Reading(
             statement=statement, duration=labelled[2], fiscal_year=labelled[0], fiscal_period=labelled[1],
             period_end=period.end, period_start=period.start, currency=_CURRENCIES.get(lines[0]["MOEDA"].upper()),

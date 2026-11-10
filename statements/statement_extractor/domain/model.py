@@ -15,6 +15,11 @@ DURATIONS = ("quarter", "ytd", "year", "instant")
 PASS, FAIL, NONE = "pass", "fail", "none"  # a check held, failed, or had nothing it could test
 
 
+# Home regulators' own data (pipeline/regulators.py), apart from the SEC's filings: its lines are picked out by code
+# and tag, the SEC's by printed label, so the two are not yet compared as witnesses of one another.
+REGULATOR_SOURCES = ("cvm", "dart")
+
+
 @dataclass
 class Check:
     name: str  # balance | cash | calc

@@ -103,3 +103,14 @@ def test_ifrs_labels_are_read_from_the_label_linkbase():
       <link:labelArc xlink:from="loc_1" xlink:to="res_1"/><link:labelArc xlink:from="loc_1" xlink:to="res_2"/>
       </link:labelLink></link:linkbase>"""
     assert parse_labels(content) == {"Revenue": "Revenue"}
+
+
+def test_a_regulator_and_an_sec_filing_do_not_witness_each_other():
+    from statement_extractor.selection.witnesses import _alike
+    assert not _alike(reading("dart", "DART-Q1", date(2024, 5, 16)), reading("html", "6-K", date(2024, 6, 13)))
+    assert _alike(reading("cvm", "ITR", date(2018, 5, 15)), reading("cvm", "ITR", date(2020, 12, 17)))
+
+
+def test_a_cvm_statement_filed_empty_is_no_statement():
+    empty = [cvm_row(code, name, 0) for code, name, _value in COPEL_Q3]
+    assert cvm_readings("ITR", {"index": INDEX, "DRE_con": empty}, "1231", 0) == []

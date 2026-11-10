@@ -38,6 +38,8 @@ def _concept(tag: str) -> str:
     """The IFRS taxonomy's element ("ifrs-full_Revenue"); "dart_…" DART's own; untagged lines have none."""
     if _ifrs(tag):
         return "ifrs-full_" + _ifrs(tag)
+    if tag == "dart_CashAndCashEquivalentsAtEndOfPeriodCf":
+        return "dart_CashAndCashEquivalents"  # closing cash, the key figure two cash flows are compared on
     if tag.startswith(("dart_", "entity")):
         return tag
     return "dart_untagged"

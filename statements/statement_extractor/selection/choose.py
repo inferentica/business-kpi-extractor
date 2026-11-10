@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from ..domain.model import Reading
+from ..domain.model import REGULATOR_SOURCES, Reading
 from .lines import line_keys
 from .signs import settle_signs
 from .ties import tie
@@ -89,7 +89,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
     return sorted(chosen, key=lambda item: (item["period_end"], item["statement"], item["duration"]), reverse=True)
 
 
-REGULATORS = ("cvm", "dart")  # home regulators' own data (pipeline/regulators.py)
+REGULATORS = REGULATOR_SOURCES  # home regulators' own data (pipeline/regulators.py)
 
 
 def _rank(reading: Reading) -> int:
