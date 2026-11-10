@@ -287,3 +287,21 @@ def test_a_metric_kpi_code_cannot_find_again_is_the_only_one_the_ai_reads():
     # Both carry the list's own group, as the release flow expects when it orders groups by their place in the list.
     assert all(spec.groups.index(item.group) >= 0 for item in read)
     assert pipeline.result.replay_outcomes == {"replayed": 2, "sentence not found": 1}
+
+
+def test_a_column_named_for_its_quarter_replays_only_as_that_quarter():
+    def quarter(name, q, *numbers):
+        return parse_document(report(q, *numbers).replace("Three Months Ended", name), URL.format(n=1 if name == "Q1" else 2))
+    first = quarter("Q1", "March 31", 10, 20, 30, 40, 300)
+    last = {f"{v['group_key'][4:]}.{v['kpi_key']}": v["locator"] for v in _history(first) if "quote" not in v["locator"]}
+    assert not isinstance(replay(quarter("Q2", "June 30", 11, 25, 31, 42, 310), last, Q2, 2), str)
+    # A Q2 filing whose column is still headed Q1 is not this quarter's column.
+    assert replay(quarter("Q1", "June 30", 11, 25, 31, 42, 310), last, Q2, 2) == "column header changed"
+
+
+def test_a_header_compares_without_its_quarters_name_or_its_dates_form():
+    from kpi_extractor.readers.replay import comparable_header
+    same = [("<first quarter>", "<second quarter>"), ("three months ended @ # #", "three months ended @ #"),
+            ("three months endedseptember #", "three months ended @ #"), ("quarterly trends #q#", "quarterly trends <third quarter>")]
+    assert all(comparable_header(a) == comparable_header(b) for a, b in same)
+    assert comparable_header("three months ended @ #") != comparable_header("six months ended @ #")

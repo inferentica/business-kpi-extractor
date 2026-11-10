@@ -55,22 +55,23 @@ def asked_of(last: dict[str, dict], spec) -> dict[str, dict]:
             if key in listed or (locator.get("whole_table") and key.split(".", 1)[0] in groups)}
 
 
-def replay(document: Document, last: dict[str, dict], expected: date) -> Located | str:
+def replay(document: Document, last: dict[str, dict], expected: date, quarter: int | None = None) -> Located | str:
     """A reading built from last quarter's locators, or, when any of them cannot be found again, why not (counted in the
-    run summary, so the reasons code most often fails on show where it should learn next)."""
+    run summary, so the reasons code most often fails on show where it should learn next). `quarter` is the filing's
+    fiscal quarter: a column headed with a quarter's name must name it."""
     tables: dict[str, list[tuple[str, dict]]] = {}
     values: list[Locator] = []
     for key, locator in last.items():
         if locator.get("whole_table"):
             tables.setdefault(key.split(".", 1)[0], []).append((key, locator))
             continue
-        found = _replay_value(document, key, locator)
+        found = _replay_value(document, key, locator, quarter)
         if isinstance(found, str):
             return found
         values.append(found)
     table_locators = []
     for group, rows in tables.items():
-        found = _replay_table(document, group, [locator for _key, locator in rows])
+        found = _replay_table(document, group, [locator for _key, locator in rows], quarter)
         if isinstance(found, str):
             return found
         table_locators.append(found)
@@ -91,7 +92,7 @@ def reported_period(document: Document, expected: date) -> date:
     return counts.most_common(1)[0][0] if counts else expected
 
 
-def _replay_value(document: Document, key: str, locator: dict) -> Locator | str:
+def _replay_value(document: Document, key: str, locator: dict, quarter: int | None = None) -> Locator | str:
     if "quote" in locator:
         return _replay_quote(document, key, locator)
     label = clean(locator.get("row_label") or "").lower()
@@ -106,7 +107,7 @@ def _replay_value(document: Document, key: str, locator: dict) -> Locator | str:
             misses.append("row label found more than once")
         elif rows and not current_column(table, rows[0], col):
             misses.append("column not the newest period")
-        elif rows and not _same_header(table, rows[0], col, locator):
+        elif rows and not _same_header(table, rows[0], col, locator, quarter):
             misses.append("column header changed" if "header" in locator else "column header not recorded")
         elif rows:
             matches.append((table.id, rows[0]))
@@ -118,7 +119,7 @@ def _replay_value(document: Document, key: str, locator: dict) -> Locator | str:
     return Locator(kpi=key, table=table_id, row=row, col=col, scale=locator.get("scale"))
 
 
-def _replay_table(document: Document, group: str, parts: list[dict]) -> TableLocator | str:
+def _replay_table(document: Document, group: str, parts: list[dict], quarter: int | None = None) -> TableLocator | str:
     first = parts[0]
     col = first.get("col")
     if col is None or "total_row_label" not in first:
@@ -141,7 +142,7 @@ def _replay_table(document: Document, group: str, parts: list[dict]) -> TableLoc
         if total_row is not None and first_row <= total_row <= last_row:
             misses.append("total row inside the table's rows")
             continue
-        if not current_column(table, first_row, col) or not _same_header(table, first_row, col, first):
+        if not current_column(table, first_row, col) or not _same_header(table, first_row, col, first, quarter):
             misses.append("column header changed" if "header" in first else "column header not recorded")
             continue
         return TableLocator(group=group, table=table.id, col=col, first_row=first_row, last_row=last_row,
@@ -198,10 +199,33 @@ def _names(text: str, token: re.Match) -> bool:
     return bool(re.match(r"[-\s]?[A-Za-z]", after)) or bool(re.match(r"[A-Za-z]", before))
 
 
-def _same_header(table: Table, first_data_row: int, col: int, locator: dict) -> bool:
-    """The column is headed as last quarter's was (three months, not six; this year's quarter, not a year to date)."""
+def _same_header(table: Table, first_data_row: int, col: int, locator: dict, quarter: int | None = None) -> bool:
+    """The column is headed as last quarter's was (three months, not six; this year's quarter, not a year to date). The
+    quarter's own name and the date's form may differ ("Q2" for "Q1", "June 2026" for "March 31, 2026"), but a column
+    that names its quarter must name this filing's: never a neighbouring quarter's column read as this one."""
     # A reading stored before headers were recorded carries no evidence of its column: the AI reads it once more.
-    return "header" in locator and column_header(table, first_data_row, col) == locator["header"]
+    if "header" not in locator:
+        return False
+    now = column_header(table, first_data_row, col)
+    named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(now)}
+    if named and quarter and named != {quarter}:
+        return False
+    return comparable_header(now) == comparable_header(locator["header"])
+
+
+_QUARTERS = {"first": 1, "second": 2, "third": 3, "fourth": 4}
+_QUARTER_NAME = re.compile(r"<?\b(first|second|third|fourth) quarter\b>?")
+_FULL_MONTH = ("january|february|march|april|june|july|august|september|october|november|december")
+
+
+def comparable_header(header: str) -> str:
+    """A recorded column header with what does not change the period taken out: which quarter it names, whether its
+    date shows the day, and words a document ran together ("endedseptember", "monthsended"). Headers recorded before
+    quarter names were kept ("#q#") compare too."""
+    text = re.sub(rf"(?<=[a-z])(?=(?:{_FULL_MONTH})\b)|(?<=months)(?=ended)", " ", header)
+    text = re.sub(rf"\b(?:{_FULL_MONTH})\b", "@", text)
+    text = _QUARTER_NAME.sub("<quarter>", re.sub(r"(?<![\w<])#q#(?!\w)", "<quarter>", text))
+    return re.sub(r"#(?:\s*#)+", "#", text)
 
 
 def _tables_by_preference(document: Document, table_id: str | None) -> list[Table]:

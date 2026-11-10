@@ -8,6 +8,7 @@ from datetime import date
 
 from ..ai import GroupSpec, Located, Spec
 from ..documents.document import Document
+from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.replay import _source_template, replay
 from ..readers.trace import trace_replay
@@ -99,7 +100,8 @@ class ReplayReading:
     def _replay_part(self, document: Document, part: Spec, locators: dict[str, dict], expected: date,
                      currency: str | None) -> tuple[Located, list[ReadValue]] | str:
         """One group, or one KPI, replayed and checked: its reading and values, or why it does not stand."""
-        located = replay(document, locators, expected)
+        _year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=getattr(self, "offset", 0))
+        located = replay(document, locators, expected, int(period[1]) if period.startswith("Q") else None)
         if isinstance(located, str):
             return located
         keys = {group.key for group in part.groups}
