@@ -66,18 +66,9 @@ class Table:
         return None
 
     def declared_scale(self) -> float | None:
-        """The multiplier a table's own header or caption declares for its amounts, e.g. "(in millions)". A header that
-        declares one scale for counts and another for amounts ("(Units in thousands, Revenue in millions)", Apple's
-        summary data to 2018) gives amounts the scale named for them."""
-        header = " ".join(" ".join(row) for row in self.rows[:4])
-        text = f"{self.context[-160:]} {header}"
-        found = [(text[max(0, match.start() - 24):match.start()], _SCALE_WORDS[match.group("word").lower().rstrip("s")])
-                 for match in _TABLE_SCALE.finditer(text)]
-        if len({scale for _, scale in found}) > 1:
-            named = [scale for before, scale in found if _AMOUNT_WORDS.search(before)]
-            if named:
-                return named[-1]
-        return found[0][1] if found else None
+        """The multiplier a table's header or caption declares for its amounts (rules.scale.table_scale_words)."""
+        from ..rules.scale import table_scale_words
+        return (table_scale_words(self) or (None,))[0]
 
     def render(self) -> str:
         lines = [f"[{self.id}] context: {self.context[-160:]!r}"]
@@ -97,10 +88,9 @@ class TextBlock:
         return f"[{self.id}] {self.text}"
 
     def declared_scale(self) -> float | None:
-        """The one amount scale a text block declares, e.g. "(Unaudited, €, in millions)" over figures that reach us as
-        text (ASML's statements are slide images with their figures as hidden text)."""
-        found = {_SCALE_WORDS[match.group("word").lower().rstrip("s")] for match in _TABLE_SCALE.finditer(self.text)}
-        return found.pop() if len(found) == 1 else None
+        """The one amount scale a text block declares (rules.scale.block_scale_words)."""
+        from ..rules.scale import block_scale_words
+        return (block_scale_words(self) or (None,))[0]
 
 
 @dataclass
@@ -125,14 +115,9 @@ class Document:
         return len(self.render()) <= max_chars
 
     def default_scale(self) -> float | None:
-        """The one amount scale a document declares throughout (TSMC's reports say "in thousands of New Taiwan
-        dollars" only in page headings), or None when it declares none or several."""
-        found = set()
-        for item in [*self.blocks.values(), *self.tables.values()]:
-            text = item.text if isinstance(item, TextBlock) else f"{item.context} {' '.join(' '.join(r) for r in item.rows[:3])}"
-            for match in _TABLE_SCALE.finditer(text):
-                found.add(_SCALE_WORDS[match.group("word").lower().rstrip("s")])
-        return found.pop() if len(found) == 1 else None
+        """The one amount scale a document declares throughout (rules.scale.document_scale_words)."""
+        from ..rules.scale import document_scale_words
+        return (document_scale_words(self) or (None,))[0]
 
     def marked_currency(self) -> str | None:
         """The currency nearly all of a document's marked amounts carry ("$ 22,717", "€1,838"), or None when they are

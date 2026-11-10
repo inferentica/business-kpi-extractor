@@ -12,7 +12,8 @@ from ..xbrl import member_key, remove_subtotals
 from ..rules.scale import (  # noqa: F401 - re-exported for callers of extract
     _ai_scale_notes, _ANY_SCALE, _BARE_SCALE, _COLUMN_SCALE, _column_scale, _PER_UNIT,
     _PER_UNIT_KPI, _preceding_scale, _ROW_SCALE, _row_scale, _ROW_SCALE_SHORT, _SCALE_OF,
-    _scale_quoted, _scale_word, _SCALE_WORDS_OF, SCALE_NOT_STATED)
+    _row_scale_words, _scale_quoted, _scale_word, _SCALE_WORDS_OF, SCALE_NOT_STATED, ScaleFrom, cell_amount_scale, cell_count_scale,
+    number_scale, passage_amount_scale, passage_count_scale, reading_scale)
 from ..rules.table import (  # noqa: F401 - re-exported for callers of extract
     _heading, _nearest_heading, _section_heading)
 from ..rules.wording import (  # noqa: F401 - re-exported for callers of extract
@@ -99,7 +100,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             if (kpi.unit == "count" and locator.table is not None and locator.table in document.tables
                     and _column_currency(document.tables[locator.table], locator.row, locator.col, None)):
                 raise LocateError(f"{locator.table} c{locator.col} is a currency's column, not the count's")
-            value, currency, notes = _read(document, locator, kpi, default_currency)
+            value, currency, notes, scale_from = _read(document, locator, kpi, default_currency)
             if locator.table is not None and locator.table in document.tables and group.kind == "metric":
                 if unnamed := _place_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
                     notes.append(f"{PLACE_NOT_NAMED}: {unnamed}")
@@ -112,8 +113,10 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             continue
         seen.add(locator.kpi)
         held = SCALE_NOT_STATED in notes or SIGN_NOT_STATED in notes or any(note.startswith((PLACE_NOT_NAMED, ROW_NAMED_TWICE)) for note in notes)
-        values.append(ReadValue(group, kpi, value, currency, _locator_record(document, locator, located.period_end, value), notes,
-                                status="needs_review" if held else "verified"))
+        record = _locator_record(document, locator, located.period_end, value)
+        if scale_from is not None:
+            record["scale_from"] = scale_from.record()  # why the figure is in units, thousands or millions
+        values.append(ReadValue(group, kpi, value, currency, record, notes, status="needs_review" if held else "verified"))
     # One gate for every reading (replay, Flash, the reasoning reader): the column's own header outranks a period the AI states.
     kept = []
     for item in values:
@@ -132,15 +135,18 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
 _PEOPLE = re.compile(r"employee|headcount|workforce|staff", re.I)
 
 
-def _read(document: Document, locator: Locator, kpi: KpiSpec, default_currency: str | None) -> tuple[float, str | None, list[str]]:
-    value, currency, notes = _read_raw(document, locator, kpi, default_currency)
+def _read(document: Document, locator: Locator, kpi: KpiSpec, default_currency: str | None
+          ) -> tuple[float, str | None, list[str], ScaleFrom | None]:
+    value, currency, notes, scale_from = _read_raw(document, locator, kpi, default_currency)
     if kpi.unit == "count" and _PEOPLE.search(kpi.label) and value > 5_000_000:
         raise LocateError(f"{kpi.label} of {value:,.0f} is not a plausible headcount")
-    return value, currency, notes
+    return value, currency, notes, scale_from
 
 
-def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_currency: str | None) -> tuple[float, str | None, list[str]]:
+def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_currency: str | None
+              ) -> tuple[float, str | None, list[str], ScaleFrom | None]:
     notes: list[str] = []
+    scale_from: ScaleFrom | None = None
     if locator.table is not None:
         table = document.tables.get(locator.table)
         if table is None:
@@ -156,48 +162,20 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
                 r"%|\bpercent", f"{' '.join(table.rows[locator.row])} {header} {_section_heading(table, locator.row)}", re.I):
             raise LocateError(f"{text!r} is not a percentage")
         value = parsed.value
+        if parsed.scale_word is not None and kpi.unit in ("count", "currency"):
+            scale_from = number_scale(parsed.scale_word)
         if kpi.unit == "count" and parsed.scale_word is None:
-            # A table's "(in millions, except employee data)" describes its amounts, not its counts: a count takes a
-            # scale only from its own row label ("Paid memberships (in millions)"), its column's ("Purchase Trans.
-            # (Mil.)"), or a scale the reading quotes from the document.
-            # FedEx's "Avg. daily package volume (ADV) (000s):" heads the rows under it: the nearest heading's scale is
-            # theirs, never one further up ("Revenue: (in thousands)" over MP Materials' tonnages).
-            row_scale = (_row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col)
-                         or _row_scale(_nearest_heading(table, locator.row)))
-            if row_scale is None and locator.scale in (1e3, 1e6, 1e9):
-                if _scale_quoted(document, table, locator.scale_text, locator.scale):
-                    row_scale = locator.scale
-                    notes.append(f"scale quoted: {clean(locator.scale_text or '')[:40]!r}")
-                else:
-                    notes.append(SCALE_NOT_STATED)
-                    row_scale = locator.scale
-            value *= row_scale or 1
-            return value, None, notes
+            scale_from, scale_notes = cell_count_scale(document, table, locator.row, locator.col, locator)
+            notes.extend(scale_notes)
+            return value * scale_from.factor, None, notes, scale_from
         if kpi.unit == "currency" and parsed.scale_word is None:
-            # A row that states its own scale overrides the table's: JPM's "Debit and credit card sales volume (in
-            # billions)" in a table "(in millions)".
-            own = _row_scale(" ".join(table.rows[locator.row])) or _column_scale(table, locator.row, locator.col) \
-                or (1.0 if _PER_UNIT_KPI.search(kpi.label) else None)
-            declared = own or table.declared_scale()
-            if declared is None:
-                declared = document.default_scale()
-            if own is None and declared is not None and locator.scale in (1e3, 1e6, 1e9) and locator.scale != declared \
-                    and _scale_quoted(document, table, locator.scale_text, locator.scale):
-                # Wording the reader quotes from beside the table beats a caption the table only inherits from the
-                # one before it: Goldman's "$ in billions" assets under supervision after its VaR table "$ in millions".
-                notes.append(f"scale quoted: {clean(locator.scale_text or '')[:40]!r} over the table's {declared:g}")
-                value *= locator.scale
-            elif declared is not None:
-                if locator.scale not in (None, declared):
-                    notes.append(f"table declares scale {declared:g}, AI said {locator.scale:g}")
-                value *= declared
-            elif locator.scale in (1, 1e3, 1e6, 1e9):
-                value *= locator.scale
-                notes.extend(_ai_scale_notes(document, table, locator.scale_text, locator.scale, value))
-            else:
+            scale_from, scale_notes = cell_amount_scale(document, table, locator.row, locator.col, kpi.label, locator, value)
+            if scale_from is None:
                 raise LocateError("amount scale unknown")
+            notes.extend(scale_notes)
+            value *= scale_from.factor
         context = f"{table.context} {' '.join(' '.join(row) for row in table.rows[:4])}"
-        return value, _column_currency(table, locator.row, locator.col, text) or _currency(text, kpi, default_currency, context), notes
+        return value, _column_currency(table, locator.row, locator.col, text) or _currency(text, kpi, default_currency, context), notes, scale_from
     block = document.blocks.get(locator.block or "") or _table_as_text(document, locator.block)
     if block is None:
         raise LocateError(f"unknown text block {locator.block}")
@@ -249,24 +227,21 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         # Vodafone's "declined by 127,000 during the year (Q3: 73,000, Q4: 22,000)" means two falls, but its "declined
         # by 6,000 (Q2: 62,000)" lists a gain: an unsigned figure in such a list has no sign a reader can trust.
         notes.append(SIGN_NOT_STATED)
+    if parsed.scale_word is not None and kpi.unit in ("count", "currency"):
+        scale_from = number_scale(parsed.scale_word)
     if kpi.unit == "count" and parsed.scale_word is None:
-        # A count takes its label's own scale, as a table row's does: "Starlink Subscribers (#, in millions) 12.0".
-        value *= _row_scale(quote[:quote.find(value_text)]) or 1
+        scale_from = passage_count_scale(quote[:quote.find(value_text)])
+        value *= scale_from.factor
     if kpi.unit == "currency" and parsed.scale_word is None:
-        # The last scale heading before the quote in its block: Apollo's highlights page heads its earnings "($ in
-        # millions …)" and, further on, its AUM and business drivers "($ in billions)".
-        # A per-unit amount keeps its units, as in a table: UTI's "$7,300" revenue per student under "($ in millions,
-        # except revenue per student amounts)".
-        declared = 1.0 if _PER_UNIT_KPI.search(kpi.label) else \
-            _preceding_scale(block.text, block.text.find(quote)) or block.declared_scale() or document.default_scale()
-        if declared is None and locator.scale in (1, 1e3, 1e6, 1e9):
-            declared = locator.scale
-            notes.extend(_ai_scale_notes(document, block, locator.scale_text, locator.scale, value * declared))
-        if declared is not None:
-            value *= declared
+        scale_from, scale_notes = passage_amount_scale(document, block, block.text.find(quote), kpi.label, locator, value)
+        notes.extend(scale_notes)
+        if scale_from is not None:
+            value *= scale_from.factor
         elif value < 1_000:
             raise LocateError(f"{value_text!r} has no amount scale")
-    return value, _currency(f"{value_text} {quote}", kpi, default_currency, block.text), notes
+        else:
+            scale_from = ScaleFrom(1.0, "units")  # a large amount written out in full
+    return value, _currency(f"{value_text} {quote}", kpi, default_currency, block.text), notes, scale_from
 
 
 def _table_as_text(document: Document, key: str | None) -> TextBlock | None:
@@ -291,15 +266,12 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
             raise LocateError(f"row mismatch: {locator.table} r{index} is {actual!r}, not the {named!r} you named")
     unit = "percent" if group.kind == "mix" else "currency"
     header = " ".join(" ".join(row) for row in table.rows[:3])
-    scale = 1.0
+    scale, reading_from = 1.0, None
     if unit == "currency":
-        scale = _column_scale(table, locator.first_row, locator.col) or table.declared_scale() or document.default_scale()
-        if scale is None and locator.scale in (1, 1e3, 1e6, 1e9):
-            scale = locator.scale
-            if locator.scale != 1 and not _scale_quoted(document, table, locator.scale_text, locator.scale):
-                raise LocateError(f"scale {locator.scale:g} is not stated in the table: quote the words that state it in scale_text")
-        if scale is None:
-            raise LocateError("amount scale unknown")
+        reading_from, problem = reading_scale(document, table, locator.first_row, locator.col, locator)
+        if reading_from is None:
+            raise LocateError(problem)
+        scale = reading_from.factor
 
     def read_row(index: int, source: Table | None = None, col: int | None = None) -> tuple[str, float, str] | None:
         source, col = source or table, locator.col if col is None else col
@@ -395,6 +367,16 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                   **year_ago_record(document.tables.get(source_table), source_row, source_col, period_end, value)}
         if key in nine and "__total__" in nine:
             record.update({"ytd": nine[key] * scale, "ytd_total": nine["__total__"] * scale})
+        if unit == "currency" and reading_from is not None:
+            row_table = document.tables.get(source_table)
+            row_text = " ".join(row_table.rows[source_row]) if row_table is not None and source_row < len(row_table.rows) else ""
+            parsed_cell = parse_number(row_table.cell(source_row, source_col)) if row_table is not None else None
+            if parsed_cell is not None and parsed_cell.scale_word:
+                row_from = number_scale(parsed_cell.scale_word)
+            else:
+                own = _row_scale_words(row_text)  # a row's own "(in billions)" wins, as read_row reads it
+                row_from = ScaleFrom(own[0], "row", own[1]) if own else reading_from
+            record["scale_from"] = row_from.record()
         values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit,
                                                                             parent=parent_of.get(key)),
                                 value, currency, record))
