@@ -228,6 +228,9 @@ def total_check(printed) -> Check:
         if not matched and _a_part_of_the_next_total(printed, index):
             continue
         matched = matched or _sums_below(printed, index, value)
+        previous = next((earlier for earlier in reversed(printed[:index]) if earlier[2] is not None), None)
+        if not matched and previous is not None and TOTAL.match(previous[0]):
+            continue  # printed straight after another total, with no lines of its own (Lloyds' "Total equity")
         verified += 1
         if not matched:
             failures.append(f"{label[:40]} {value:,.1f}")
