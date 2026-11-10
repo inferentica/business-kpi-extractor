@@ -1,0 +1,50 @@
+# One-off count: US-listed foreign filers (20-F or 40-F annual reports) by headquarters country, from SEC's own data.
+name: fpi-count
+on:
+  push:
+    branches: [statements/fpi-count]
+jobs:
+  count:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Count from SEC's bulk submissions
+        shell: python
+        run: |
+          import collections, csv, io, json, os, urllib.request, zipfile
+          agent = {"User-Agent": "TradeTracker admin@inferentica.com"}
+          def get(url):
+              with urllib.request.urlopen(urllib.request.Request(url, headers=agent), timeout=600) as response:
+                  return response.read()
+          os.makedirs("out", exist_ok=True)
+          bulk = zipfile.ZipFile(io.BytesIO(get("https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip")))
+          rows, listed = [], {"NYSE", "Nasdaq", "NYSE American", "NYSE Arca", "CBOE", "Cboe"}
+          for name in bulk.namelist():
+              if "-submissions-" in name or not name.endswith(".json"):
+                  continue  # older filings pages of a company; its main file names its listings and recent forms
+              data = json.loads(bulk.read(name))
+              exchanges = [e for e in (data.get("exchanges") or []) if e]
+              us = [e for e in exchanges if e in listed]
+              if not us:
+                  continue
+              recent = data.get("filings", {}).get("recent", {})
+              forms, dates = recent.get("form", []), recent.get("filingDate", [])
+              annual = [f for f, d in zip(forms, dates) if f in ("20-F", "40-F", "20-F/A", "40-F/A") and d >= "2024-01-01"]
+              domestic = [f for f, d in zip(forms, dates) if f in ("10-K", "10-K/A") and d >= "2024-01-01"]
+              if not annual or domestic:
+                  continue  # a foreign filer: annual reports on 20-F or 40-F lately, none on 10-K
+              business = (data.get("addresses") or {}).get("business") or {}
+              rows.append({"cik": data.get("cik"), "name": data.get("name"), "tickers": " ".join(data.get("tickers") or []),
+                           "exchanges": " ".join(us), "form": annual[0].replace("/A", ""),
+                           "country": business.get("stateOrCountryDescription") or business.get("stateOrCountry") or "",
+                           "incorporated": data.get("stateOfIncorporationDescription") or data.get("stateOfIncorporation") or "",
+                           "six_k_2025": sum(1 for f, d in zip(forms, dates) if f == "6-K" and d.startswith("2025"))})
+          with open("out/us_listed_foreign_filers.csv", "w", newline="") as handle:
+              writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+              writer.writeheader(); writer.writerows(sorted(rows, key=lambda r: (r["country"], r["name"])))
+          counts = collections.Counter(r["country"] for r in rows)
+          print(len(rows), "US-listed foreign filers")
+          for country, n in counts.most_common(): print(f"{n:5d}  {country}")
+      - uses: actions/upload-artifact@v6
+        with:
+          name: fpi-count
+          path: out/
