@@ -58,3 +58,14 @@ def test_a_selective_run_reads_only_what_its_selector_picked():
     assert ReleaseFlow._read_release(run, SimpleNamespace(accession="OTHER"), None, 2) is None
     ordinary = SimpleNamespace(values=values, reread=None, filings={})
     assert FilingLoading._pending(ordinary, new)
+
+
+def test_a_years_report_keeps_breakdowns_but_no_metric_figure():
+    from kpi_extractor.ai import Spec
+    from kpi_extractor.steps.release_flow import spec_kind, year_figures
+    spec = Spec.model_validate({"groups": [
+        {"key": "operating", "label": "Operating Metrics", "kind": "metric", "kpis": [{"key": "systems", "label": "Systems sold", "unit": "count"}]},
+        {"key": "products", "label": "Products", "kind": "revenue_breakdown", "kpis": [{"key": "euv", "label": "EUV", "unit": "currency"}]}]})
+    metric, part = (SimpleNamespace(group=group) for group in spec.groups)
+    assert year_figures([metric, part]) == [part]
+    assert (spec_kind(spec, "operating.systems"), spec_kind(spec, "products.euv")) == ("metric", "revenue_breakdown")

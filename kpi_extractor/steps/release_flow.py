@@ -60,6 +60,16 @@ def _annual_columns(read: list[ReadValue]) -> bool:
     return bool(headers) and all(_annual_header(header) for header in headers)
 
 
+def year_figures(read: list[ReadValue]) -> list[ReadValue]:
+    """What a year's report gives that is kept: breakdowns and mixes, never a metric's figure. A KPI list's metrics are
+    quarterly only (owner, 2026-11-10)."""
+    return [item for item in read if item.group.kind != "metric"]
+
+
+def spec_kind(spec: Spec, key: str) -> str | None:
+    return next((group.kind for group in spec.groups if group.key == key.split(".", 1)[0]), None)
+
+
 def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
     """The listed KPIs a document did not report, apart from breakdowns read as whole tables (their rows vary)."""
     whole = {item.group.key for item in read if item.locator.get("whole_table")}
@@ -179,6 +189,7 @@ class ReleaseFlow:
                                                           year_offset=self.offset)
                 read, dropped = _year_columns_only(read)
                 problems.extend(dropped)
+                read = year_figures(read)
             validate_groups(read, self._previous(period_end, annual=located.annual))
             self._flag_scale_outliers(read, period_end, annual=located.annual)
             self._mark_year_ago_agreement(read, document, period_end, annual=located.annual)
@@ -187,7 +198,8 @@ class ReleaseFlow:
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
             verified = sum(1 for record in records if record["validation_status"] == "verified")
             status = "processed" if verified else "needs_review" if records else "skipped"
-            unreported = _unreported(spec, read)
+            unreported = [key for key in _unreported(spec, read)
+                          if not (located.annual and spec_kind(spec, key) == "metric")]  # not looked for in a year's report
             reasons = {key: located.missing_reasons.get(key, "unstated") for key in unreported} if how == _READ_BY_AI else {}
             reasons.update(dict.fromkeys(self._left_out_naming(document, spec, list(reasons)), "left_out_names_it"))
             second = getattr(self._local, "second_read", None) if how == _READ_BY_AI else None
