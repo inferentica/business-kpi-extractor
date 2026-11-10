@@ -10,16 +10,19 @@ jobs:
       - name: CVM register rows for our names
         shell: python
         run: |
-          import csv, io, re, urllib.request
+          import csv, io, re, unicodedata, urllib.request
           url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
           text = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "TradeTracker admin@inferentica.com"}), timeout=120).read().decode("latin-1")
           rows = list(csv.DictReader(io.StringIO(text), delimiter=";"))
           print(list(rows[0].keys()))
-          names = ["AMBEV", "AZUL", "BRADESCO", "BRASKEM", "SANTANDER", "BRASILAGRO", "SANEAMENTO BASICO DO ESTADO DE SAO PAULO",
+          plain = lambda s: unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().upper()
+          names = ["ITAU UNIBANCO", "PETROLEO BRASILEIRO", "SANEAMENTO BASICO", "ENERGETICA DE MINAS", "TELEFONICA BRASIL",
+                   "TIM PARTICIPACOES", "INTER & CO", "BANCO INTER", "NU HOLDINGS", "NU PAGAMENTOS"]
+          old_names = ["AMBEV", "AZUL", "BRADESCO", "BRASKEM", "SANTANDER", "BRASILAGRO", "SANEAMENTO BASICO DO ESTADO DE SAO PAULO",
                    "EMBRAER", "ENERGETICA DE MINAS GERAIS", "GERDAU S", "ITAU UNIBANCO HOLDING", "SIDERURGICA NACIONAL",
                    "PETROLEO BRASILEIRO", "SUZANO S", "TELEFONICA BRASIL", "TIM S", "TIM PARTICIPACOES", "ULTRAPAR", "VALE S",
                    "BR PARTNERS", "INTER & CO", "NU HOLDINGS", "PARANAENSE"]
           for row in rows:
               name = row.get("DENOM_SOCIAL", "")
-              if any(n in name.upper() for n in names):
+              if any(n in plain(name) for n in names):
                   print(row.get("CNPJ_CIA"), row.get("CD_CVM"), row.get("SIT"), row.get("CATEG_REG"), row.get("SETOR_ATIV"), "|", name)
