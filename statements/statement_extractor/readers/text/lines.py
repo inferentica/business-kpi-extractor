@@ -15,10 +15,12 @@ YEAR = re.compile(r"^(19|20)\d{2}$")
 # A scale caption, which a footnote mark can follow; a statement's line can end in "(2)", a figure in brackets.
 _CAPTION_WORDS = re.compile(r"\b(in\s+(thousands?|millions?|billions?)|expressed|figures|amounts\s+in)\b", re.I)
 # A currency sign on a figure, blanked like "$" so columns keep their places: KEPCO's "W53,456,279" and "W 3,200,504".
-_CURRENCY_SIGN = re.compile(r"(?<![\w$])(?:NT\$|R\$|US\$|W|£|€|¥|₩|KRW|USD|EUR|GBP|CHF|NTD|RMB)(?=\s*\(?-?\d)")  # KEPCO's "KRW 10,425,992"
+# Only where a column starts, two spaces or more after the text before it: a code inside a label stays as printed (ASML's
+# "ordinary shares, EUR 0.02 nominal value").
+_CURRENCY_SIGN = re.compile(r"(?:^|(?<=\s\s))(?:NT\$|R\$|US\$|W|£|€|¥|₩|KRW|USD|EUR|GBP|CHF|NTD|RMB)(?=\s*\(?-?\d)")  # KEPCO's "KRW 10,425,992"
 # Dot leaders between a label and its figures, a single space before the first (Petrobras's 2002 20-F: "Sales of products
 # and services......... 34,145   23,467"): blanked, so the label and its figures part.
-_LEADERS = re.compile(r"\.{3,}(?=\s*[\d(\-$])")
+_LEADERS = re.compile(r"(?<=[A-Za-z)\]:%])\s*\.{3,}(?=\s*[\d(\-$])")  # after a word, never after a number in the label
 _MONTH_END = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?$", re.I)
 
 

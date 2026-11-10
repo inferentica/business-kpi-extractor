@@ -40,8 +40,11 @@ def test_a_uk_gaap_balance_sheet_closes_on_total_liabilities():
 def test_parts_printed_below_their_total_count_once():
     # Copel's CVM quarterly forms: each account, then the accounts it sums.
     from statement_extractor.checks.printed import income_check
-    figures = [("Profit before taxation", 0, 126363.0), ("Provision for income tax and social contribution", 0, -54877.0),
-               ("Income tax", 0, -39517.0), ("Social contribution", 0, -15360.0), ("Deferred income tax", 0, 11733.0),
-               ("Income tax", 0, 8519.0), ("Social contribution", 0, 3214.0), ("Minority interest", 0, -4812.0),
-               ("Net income for the period", 0, 78407.0)]
+    figures = [("Profit before taxation", 20, 126363.0), ("Provision for income tax and social contribution", 20, -54877.0),
+               ("Income tax", 40, -39517.0), ("Social contribution", 40, -15360.0), ("Deferred income tax", 20, 11733.0),
+               ("Income tax", 40, 8519.0), ("Social contribution", 40, 3214.0), ("Minority interest", 20, -4812.0),
+               ("Net income for the period", 20, 78407.0)]
     assert income_check(figures).result == "pass"
+    # Lines at the total's own level that happen to sum to it are no parts (Morgan Stanley's 2006 income).
+    flat = [(label, 0, value) for label, _level, value in figures]
+    assert income_check(flat).result != "pass"

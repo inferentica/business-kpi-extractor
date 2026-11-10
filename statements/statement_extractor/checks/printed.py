@@ -98,9 +98,9 @@ def _without_parts(lines: list) -> list:
         if value is None:
             continue
         running = 0.0
-        for count, (_l, _v, part) in enumerate(lines[index + 1:index + 7], start=1):
-            if part is None:
-                break
+        for count, (_l, part_level, part) in enumerate(lines[index + 1:index + 7], start=1):
+            if part is None or part_level <= level:
+                break  # parts sit below their total, a level deeper (the CVM forms' account codes)
             running += part
             if count >= 2 and close(running, value, 0) and (value != 0 or count == 2):
                 skip = count
