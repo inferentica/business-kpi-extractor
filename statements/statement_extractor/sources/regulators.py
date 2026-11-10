@@ -19,13 +19,23 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
-# Each company's identity at its regulator. Copel files with CVM as code 014311; TIM Brasil as TIM S.A. (from its 2020
-# merger) and before that TIM Participações. KEPCO is DART corporation 00159193. Petrobras files with CVM too, in reais,
-# but its SEC statements are in US dollars, so CVM's would be translations by our rule: not read.
+# Each US-listed company's identity at its home regulator: its CNPJs at CVM (TIM Brasil files as TIM S.A. since its
+# 2020 merger, as TIM Participações before), its stock code at the Korea Exchange for OpenDART. Brazil's banks are left
+# out: their CVM forms are on the central bank's accounting, not the IFRS of their 20-Fs (Itaú, Bradesco, Santander
+# Brasil, BR Partners). Companies whose SEC statements are in US dollars (Petrobras, Vale, Embraer) are read too: their
+# CVM figures in reais are translations by the selection's currency rule and are never served.
 REGULATED = {
-    "ELPC": ("cvm", ("76.483.817/0001-20",)),
-    "TIMB": ("cvm", ("02.421.421/0001-11", "02.558.115/0001-21")),
-    "KEP": ("dart", ("00159193",)),
+    "ABEV": ("cvm", ("07.526.557/0001-00",)), "AZUL": ("cvm", ("09.305.994/0001-29",)),
+    "BAK": ("cvm", ("42.150.391/0001-70",)), "LND": ("cvm", ("07.628.528/0001-59",)),
+    "SBS": ("cvm", ("43.776.517/0001-80",)), "EMBJ": ("cvm", ("07.689.002/0001-89",)),
+    "CIG": ("cvm", ("17.155.730/0001-64",)), "ELPC": ("cvm", ("76.483.817/0001-20",)),
+    "GGB": ("cvm", ("33.611.500/0001-19",)), "SID": ("cvm", ("33.042.730/0001-04",)),
+    "PBR": ("cvm", ("33.000.167/0001-01",)), "SUZ": ("cvm", ("16.404.287/0001-55",)),
+    "VIV": ("cvm", ("02.558.157/0001-62",)), "TIMB": ("cvm", ("02.421.421/0001-11", "02.558.115/0001-21")),
+    "UGP": ("cvm", ("33.256.439/0001-39",)), "VALE": ("cvm", ("33.592.510/0001-54",)),
+    "KEP": ("dart", ("015760",)), "KB": ("dart", ("105560",)), "SHG": ("dart", ("055550",)),
+    "WF": ("dart", ("316140",)), "PKX": ("dart", ("005490",)), "SKM": ("dart", ("017670",)),
+    "KT": ("dart", ("030200",)), "LPL": ("dart", ("034220",)),
 }
 
 _CVM = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC"
@@ -103,3 +113,26 @@ def dart_rows(corp_code: str, year: int, report: str, scope: str = "CFS") -> lis
         kept.parent.mkdir(parents=True, exist_ok=True)
         kept.write_text(json.dumps(rows, ensure_ascii=False))
     return rows
+
+
+def dart_corp_code(stock_code: str) -> str:
+    """OpenDART's corporation code for a Korea Exchange stock code, from its register of every filer (corpCode.xml),
+    kept in the run's cache for a week."""
+    import xml.etree.ElementTree as ET
+    cache = _cache()
+    kept = cache / "dart_corp_codes.json" if cache else None
+    if kept is not None and kept.exists() and time.time() - kept.stat().st_mtime < 7 * 86400:
+        codes = json.loads(kept.read_text())
+    else:
+        key = os.environ.get("DART_API_KEY")
+        if not key:
+            raise RuntimeError("DART_API_KEY is not set")
+        register = zipfile.ZipFile(io.BytesIO(_get(f"{_DART}/corpCode.xml?crtfc_key={urllib.parse.quote(key)}")))
+        codes = {(item.findtext("stock_code") or "").strip(): item.findtext("corp_code")
+                 for item in ET.fromstring(register.read(register.namelist()[0])) if (item.findtext("stock_code") or "").strip()}
+        if kept is not None:
+            kept.parent.mkdir(parents=True, exist_ok=True)
+            kept.write_text(json.dumps(codes))
+    if stock_code not in codes:
+        raise RuntimeError(f"no OpenDART filer for stock code {stock_code}")
+    return codes[stock_code]

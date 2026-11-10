@@ -1,0 +1,8 @@
+{
+  "since": "2010-01-01",
+  "note": "Phase 4 s4-regulators (2026-11-11): the US-listed filers of Brazil's CVM and Korea's OpenDART beyond the foreign set's Copel, TIM, Petrobras and KEPCO, read from 2010, when the regulators' data begins, so their quarters can be checked against their 6-Ks. Brazil's banks are not here: their CVM forms are not on IFRS.",
+  "symbols": [
+    "ABEV", "AZUL", "BAK", "LND", "SBS", "EMBJ", "CIG", "GGB", "SID", "SUZ", "VIV", "UGP", "VALE",
+    "KB", "SHG", "WF", "PKX", "SKM", "KT", "LPL"
+  ]
+}

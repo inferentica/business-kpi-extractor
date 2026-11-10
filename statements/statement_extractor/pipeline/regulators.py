@@ -12,7 +12,7 @@ from datetime import date
 from ..domain.ifrs_labels import english_names
 from ..readers.regulators.cvm import cvm_readings
 from ..readers.regulators.dart import dart_readings
-from ..sources.regulators import DART_REPORTS, REGULATED, cvm_rows, dart_rows
+from ..sources.regulators import DART_REPORTS, REGULATED, cvm_rows, dart_corp_code, dart_rows
 
 _CVM_FIRST = {"ITR": 2011, "DFP": 2010}  # the first year of each form in CVM's open data
 _DART_FIRST = 2015
@@ -43,11 +43,16 @@ def read_regulators(symbol: str, since: date, fiscal_year_end: str, year_offset:
                 readings.extend(found)
         _name_accounts(readings, _translated_accounts(printed))
     else:
+        try:
+            corp_code = dart_corp_code(identity[0])
+        except Exception as error:  # noqa: BLE001
+            log(f"{symbol}: OpenDART register unreadable ({type(error).__name__}: {str(error)[:120]})")
+            return [{"regulator": "DART", "note": f"unreadable ({type(error).__name__})"}], []
         for year in range(max(_DART_FIRST, since.year), this_year + 1):
             for report in DART_REPORTS:
                 record = {"regulator": "DART", "report": report, "year": year}
                 try:
-                    found = dart_readings(dart_rows(identity[0], year, report), year, report, "CFS",
+                    found = dart_readings(dart_rows(corp_code, year, report), year, report, "CFS",
                                           fiscal_year_end, year_offset)
                 except Exception as error:  # noqa: BLE001
                     record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"
