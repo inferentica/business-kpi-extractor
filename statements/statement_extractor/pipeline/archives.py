@@ -16,6 +16,7 @@ from ..readers.printed.titled import headed_kinds, split_titled
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.archives import archived, fetch
+from .printed import _decided
 
 
 def read_archives(symbol: str, fiscal_year_end: str, year_offset: int, log=print, summaries: list | None = None):
@@ -53,7 +54,7 @@ def read_archives(symbol: str, fiscal_year_end: str, year_offset: int, log=print
             for reading in document:
                 reading.source = "archive"
                 reading.basis = reading.basis or basis or default_basis(form)
-                reading.currency = reading.currency or currency or default_currency(form)
+                reading.currency = _decided(_decided(reading.currency, currency), default_currency(form))
             found.extend(reading for reading in document if reading.key not in held)
             held |= {reading.key for reading in document}
             notes.extend(f"{item.url.rsplit('/', 1)[-1]}: {note}" for note in document_notes)

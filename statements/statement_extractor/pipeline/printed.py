@@ -11,7 +11,8 @@ from difflib import SequenceMatcher
 from datetime import date
 
 from ..checks.schedules import parse_schedule, schedule_check
-from ..domain.basis import default_basis, default_currency, stated_basis, stated_currency
+from ..domain.basis import (BARE_DOLLARS, BARE_PESOS, default_basis, default_currency, same_kind, stated_basis,
+                             stated_currency)
 from ..domain.calendar import ANNUAL_FORMS
 from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
@@ -166,7 +167,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             unscaled.append((reader, content, basis, currency, attachment.document, readings))
         for reading in readings:
             reading.basis = basis
-            reading.currency = reading.currency or currency
+            reading.currency = _decided(reading.currency, currency)
         share_currency(readings)
         # One presentation per period and basis: ASML's 6-Ks file an IFRS interim report before the US GAAP release.
         held = {(reading.key, reading.basis) for reading in found}
@@ -180,7 +181,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                                              fiscal_year_end=fiscal_year_end, year_offset=year_offset)
         held = {(reading.key, reading.basis) for reading in found}
         for reading in readings:
-            reading.basis, reading.currency = basis, reading.currency or currency
+            reading.basis, reading.currency = basis, _decided(reading.currency, currency)
         share_currency(scaled + readings)  # Petrobras' real release prints its cash flow with no scale as well
         found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
         notes.extend(f"{document}: {note}" for note in split_titled(proved)[1])
@@ -188,7 +189,8 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         _own_year(found, ref.filed)
     for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
         reading.basis = reading.basis or filing_basis or default_basis(ref.form)
-        reading.currency = reading.currency or filing_currency or default_currency(ref.form)
+        # A U.S. company's "($ in millions)" is its dollars, as an unmarked statement of its 10-K is (default_currency).
+        reading.currency = _decided(_decided(reading.currency, filing_currency), default_currency(ref.form))
         check = schedule_check(reading, schedules)
         if check is not None:
             reading.checks.append(check)
@@ -231,3 +233,11 @@ def share_currency(readings: list) -> None:
     if len(named) == 1 and len(kinds) >= 2:
         for reading in readings:
             reading.currency = reading.currency or next(iter(named))
+
+
+def _decided(printed: str | None, stated: str | None) -> str | None:
+    """A statement's currency: its own, else the one its document states; a bare "$" or "pesos" takes the stated
+    currency of its kind (Embraer's releases state U.S. dollars, their statements print "$"), else stays marked."""
+    if printed in (BARE_DOLLARS, BARE_PESOS):
+        return stated if same_kind(printed, stated) else printed
+    return printed or stated

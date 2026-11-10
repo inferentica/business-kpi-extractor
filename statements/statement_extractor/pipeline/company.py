@@ -14,11 +14,12 @@ from datetime import date
 from pathlib import Path
 
 from ..checks.across import cash_against_balances
+from ..domain.basis import BARE_DOLLARS, BARE_PESOS, same_kind
 from ..domain.calendar import ANNUAL_FORMS, year_end_for
 from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period, summarise
 from ..readers.xbrl.read import read_filing
-from ..selection.choose import choose
+from ..selection.choose import _reporting_currencies, choose
 from ..selection.period_dates import align_dates
 from ..selection.signs import sign_ties
 from ..selection.summaries import choose_summaries, summary_coverage
@@ -122,6 +123,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
                                          printed_signs))
     _release_bases(readings)
     _filing_currencies(readings)
+    _bare_currencies(readings)
     readings = align_dates(readings)
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
     mark = _phase(phases, "second looks", mark)
@@ -199,8 +201,22 @@ def _filing_currencies(readings) -> None:
     tagged = {(reading.accession, reading.statement): reading.currency for reading in readings
               if reading.source == "xbrl" and reading.currency}
     for reading in readings:
-        if reading.currency is None and reading.source != "xbrl":
-            reading.currency = tagged.get((reading.accession, reading.statement))
+        if reading.source == "xbrl":
+            continue
+        own = tagged.get((reading.accession, reading.statement))
+        if reading.currency is None or reading.currency in (BARE_DOLLARS, BARE_PESOS) and same_kind(reading.currency, own):
+            reading.currency = own or reading.currency
+
+
+def _bare_currencies(readings) -> None:
+    """A statement printing only "$" or "pesos" is in the company's own reporting currency of that kind that year
+    (Alcon's "($ millions)" in US dollars, Scotiabank's in Canadian dollars, GAP's "thousands of pesos" in Mexican
+    pesos); a year whose annual reports give no single one of that kind leaves it without."""
+    by_year = _reporting_currencies(readings)
+    for reading in readings:
+        if reading.currency in (BARE_DOLLARS, BARE_PESOS):
+            kinds = [currency for currency in by_year.get(reading.fiscal_year, set()) if same_kind(reading.currency, currency)]
+            reading.currency = kinds[0] if len(kinds) == 1 else None
 
 
 def _release_bases(readings) -> None:

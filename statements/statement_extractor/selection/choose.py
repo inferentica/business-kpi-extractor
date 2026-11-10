@@ -122,7 +122,7 @@ def _reporting_currencies(readings: list[Reading]) -> dict[str, set[str]]:
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for reading in readings:
         if reading.own and reading.form != "6-K" and reading.fiscal_period == "FY" and reading.currency and \
-                reading.source not in REGULATORS:
+                reading.source not in REGULATORS and len(reading.currency) == 3:
             counts[reading.fiscal_year][reading.currency] += 1
     own = {int(year): max(by, key=by.get) for year, by in counts.items()}
     if not own:
@@ -144,6 +144,6 @@ def _reporting_currency(readings: list[Reading]) -> str | None:
     counts: dict[str, int] = defaultdict(int)
     for reading in readings:
         if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.currency and \
-                reading.source not in REGULATORS:
+                reading.source not in REGULATORS and len(reading.currency) == 3:
             counts[reading.currency] += 1
     return max(counts, key=counts.get) if counts else None

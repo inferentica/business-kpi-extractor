@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from ...domain.basis import currencies_named
+from ...domain.basis import bare_currency, currencies_named
 from .find import TITLE_PATTERNS
 from .scales import scale_text
 from .tables import Table, header_text
@@ -47,7 +47,10 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
         tied = [currency for currency in counts if counts[currency] == best]
         # A tie goes to the currency the title names first: its reporting currency, the other its translation.
         return next((currency for currency in in_title if currency in tied), tied[0])
-    return in_title[0] if in_title else None  # else the document's or the form's (pipeline/printed.py)
+    if in_title:
+        return in_title[0]
+    # Only the kind ("$ millions", "thousands of pesos"): marked, and decided by the company's own reporting currency.
+    return bare_currency(text[start:start + 400] if titles else text)  # else the document's or the form's
 
 
 def translations(columns: list[tuple[int, ...]], periods: dict, by_column: dict, reporting: str | None,

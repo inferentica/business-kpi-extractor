@@ -85,7 +85,8 @@ def taxonomy_basis(concepts: list[str]) -> str | None:
 # Currencies by how a statement prints them, most specific first ("NT$" before "$").
 _CURRENCIES = (
     ("TWD", r"NT\$|\bNTD\b|New\s+Taiwan\s+dollars?|New\s+Taiwan\b"),
-    ("USD", r"US\$|U\.S\.\$|\bUSDm?\b|U\.\s?S\.\s+dollars?|United\s+States\s+dollars?|US\s+dollars?"),
+    # Embraer's "in millions of U.S.dollars": no space after the stop.
+    ("USD", r"US\$|U\.S\.\$|\bUSDm?\b|U\.\s?S\.\s*dollars?|United\s+States\s+dollars?|US\s+dollars?"),
     ("CAD", r"C\$|CDN\$|\bCAD\b|Canadian\s+dollars?"),
     ("HKD", r"HK\$|\bHKD\b|Hong\s+Kong\s+dollars?"),
     ("EUR", r"€|\bEURm?\b|\beuros?\b"),
@@ -97,7 +98,41 @@ _CURRENCIES = (
     ("KRW", r"₩|\bKRW\b|\bKorean\s+won\b|\bwon\b"),
     ("BRL", r"(?<![A-Z.])R\$|\bBRL\b|\bBrazilian\s+reais?\b|\breais\b"),
     ("CHF", r"\bCHF\b|\bSwiss\s+francs?\b"),
+    # The other home currencies of US-listed foreign filers (Televisa's "In thousands of Mexican pesos", Enel Chile's
+    # "In thousands of Chilean pesos", Andina's "ThCh$").
+    ("MXN", r"\bMXN\b|\bMexican\s+pesos?\b|\bMx\$"),
+    ("CLP", r"\bCLP\b|\bChilean\s+pesos?\b|\bThCh\$|\bCh\$"),
+    ("ARS", r"\bARS\b|\bArgentine\s+pesos?\b"),
+    ("COP", r"\bCOP\b|\bColombian\s+pesos?\b"),
+    ("PEN", r"\bPEN\b|\bPeruvian\s+soles\b|\bsoles\b"),
+    ("AUD", r"A\$|\bAUD\b|Australian\s+dollars?"),
+    ("SGD", r"S\$|\bSGD\b|Singapore\s+dollars?"),
+    ("ILS", r"\bNIS\b|\bILS\b|\bshekels?\b"),
+    ("INR", r"\bINR\b|\bIndian\s+rupees?\b|\brupees?\b"),
 )
+
+# A statement printing only "$" or "dollars", or "pesos" (Alcon's "($ millions)", Petrobras' "(In millions of
+# Dollars)", GAP's "(in thousands of pesos)"): the kind of currency, not which; the company's own reporting currency of
+# that kind decides it (pipeline/company.py), else none.
+BARE_DOLLARS, BARE_PESOS = "$", "pesos"
+DOLLAR_CURRENCIES = {"USD", "CAD", "AUD", "HKD", "SGD", "TWD"}
+PESO_CURRENCIES = {"MXN", "CLP", "ARS", "COP"}
+_BARE_DOLLARS = re.compile(r"\(\s*\$|\$\s*(?:in\s+)?(?:millions?|thousands?|billions?|000)\b|"
+                           r"\b(?:millions?|thousands?|billions?)\s+of\s+dollars\b|\bin\s+dollars\b", re.I)
+_BARE_PESOS = re.compile(r"\b(?:millions?|thousands?|billions?)\s+of\s+pesos\b|\bin\s+pesos\b", re.I)
+
+
+def bare_currency(text: str) -> str | None:
+    """"$" or "pesos" where a text names a currency's kind only."""
+    if _BARE_DOLLARS.search(text or ""):
+        return BARE_DOLLARS
+    if _BARE_PESOS.search(text or ""):
+        return BARE_PESOS
+    return None
+
+
+def same_kind(bare: str, currency: str | None) -> bool:
+    return currency in (DOLLAR_CURRENCIES if bare == BARE_DOLLARS else PESO_CURRENCIES)
 _ANY_CURRENCY = re.compile("|".join(f"(?P<c{index}>{pattern})" for index, (_code, pattern) in enumerate(_CURRENCIES)), re.I)
 
 

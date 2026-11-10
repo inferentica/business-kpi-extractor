@@ -76,10 +76,20 @@ def tagged_readings(facts: list[Fact], roles: dict[str, list], english: dict[str
             unit = 10.0 ** -sample.decimals if sample.decimals is not None and sample.decimals < 0 else 1.0
             readings.append(Reading(
                 statement=statement, duration=labelled[2], fiscal_year=labelled[0], fiscal_period=labelled[1],
-                period_end=end, period_start=start, currency=sample.currency, accession=accession, form=form,
+                period_end=end, period_start=start, currency=_currency(values.values()), accession=accession, form=form,
                 filed=filed, own=end == document_end, source=source, basis="IFRS", scope=scope, lines=lines,
                 checks=tagged_checks(statement, tagged, unit, tuple(line["value"] for line in lines))))
     return readings
+
+
+def _currency(facts) -> str | None:
+    """The currency most of a period's facts carry: a per-share or share-count fact carries none (Televisa's earnings
+    per share first left whole statements without one)."""
+    counts: dict[str, int] = {}
+    for fact in facts:
+        if fact.currency:
+            counts[fact.currency] = counts.get(fact.currency, 0) + 1
+    return max(counts, key=counts.get) if counts else None
 
 
 def _line(index: int, name: str, depth: int, value: float, english: dict[str, str], kind: str = "") -> dict:
