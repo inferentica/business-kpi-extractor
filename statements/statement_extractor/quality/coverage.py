@@ -90,8 +90,11 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
             titles = printed.get((str(year), quarter), set())
             for statement, keys in wanted:
                 served = [(statement, str(year), period, duration) for period, duration in keys]
+                # Dated evidence of what the quarter's releases print decides over a heading alone: a year-end
+                # release prints the year, so its fourth quarter's three months count only if a table dates them.
+                dated = any(len(title) > 1 and title[0] == statement for title in titles)
                 shown = (str(year), quarter) in unknown or (str(year), quarter) not in printed or \
-                    (statement,) in titles or any(key in titles for key in served)
+                    (statement,) in titles and not dated or any(key in titles for key in served)
                 if any(key in kept for key in served):
                     expected += 1
                     found += 1

@@ -99,3 +99,12 @@ def test_a_heading_followed_by_a_sentence_is_the_narratives():
             " 46.9% as of December 31, 2002, and its net equity is R$ 4.726 billion. DEBT PROFILE Short Long Total"
             " 8,756 529,995 538,751 38,851 238,853 277,704 9,073 214,244 223,317")
     assert headed_kinds(text) == set()
+
+
+def test_a_year_end_release_printing_the_year_does_not_print_the_fourth_quarter():
+    from statement_extractor.quality.coverage import release_coverage
+    # Lloyds' full-year results: the year dated, a heading too; no table dates the fourth quarter's three months.
+    filings = [{"form": "6-K", "release_quarter": ["2011", "Q4"], "notes": [],
+                "titled": [["income", "2011", "FY", "year"], ["income"]]}]
+    found = release_coverage(filings, set())
+    assert found["quarters_unprinted_list"] == ["2011 Q4 income"]  # Q1-Q3 have no release on file and count in full

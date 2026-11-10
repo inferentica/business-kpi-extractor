@@ -94,7 +94,9 @@ NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+pr
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
                          r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"
                         # UK GAAP (Lloyds TSB): "Profit for the period attributable to shareholders", before dividends.
-                        r"^profit\s+for\s+the\s+(year|period|half-year)\s+attributable\s+to\s+(equity\s+)?shareholders$", re.I)
+                        r"^profit\s+for\s+the\s+(year|period|half-year)\s+attributable\s+to\s+(equity\s+)?shareholders$|"
+                        # Lloyds' quarterly updates since 2025: "Profit before tax", "Tax expense", "Profit after tax".
+                        r"^(net\s+)?profit\s+(\(loss\)\s+)?after\s+tax(ation)?$", re.I)
 
 
 TOTAL = re.compile(r"^total\b", re.I)
