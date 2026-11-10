@@ -23,7 +23,7 @@ jobs:
             ls -la $name | head -40
             for csv in $name/*.csv; do
               head -1 "$csv" | iconv -f latin1 -t utf-8 > "copel_$(basename $csv)"
-              iconv -f latin1 -t utf-8 "$csv" | grep -i "COMPANHIA PARANAENSE DE ENERGIA" >> "copel_$(basename $csv)" || true
+              iconv -f latin1 -t utf-8 "$csv" | grep -iE "PARANAENSE DE ENERGIA|76\.483\.817" >> "copel_$(basename $csv)" || true
             done
             rm -rf $name $name.zip
           done
