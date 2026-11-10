@@ -17,11 +17,17 @@ _XBRL_KEPT = 6
 class FilingLoading:
     """Filings and documents before they are read: what is pending, read-ahead, XBRL and exhibits from the archive."""
 
-    def _retrace_due(self, accession: str) -> bool:
-        """In a retrace run, whether a filing still holds AI figures with no trace to what read them: it is read again
-        so each gets one (and today's checks)."""
-        return bool(getattr(self, "retrace", False)) and any(
-            untraced(value) for value in self.values.values() if value.get("source_accession") == accession)
+    def _reread_due(self, accession: str) -> bool:
+        """In a selective re-read (ops/reread.py), whether this filing is one the run's selector picked: it is read again
+        with today's checks. Picked once, before anything is read again, so the run's own readings never change it."""
+        name = getattr(self, "reread", None)
+        if not name:
+            return False
+        if getattr(self, "_reread_picked", None) is None:
+            from ..ops.reread import picked_filings
+            self._reread_picked = picked_filings(name, self.values)
+            getattr(self, "log", print)(f"{getattr(self, 'symbol', '')}: {len(self._reread_picked)} filings to read again ({name})")
+        return accession in self._reread_picked
 
     def _pending(self, ref: FilingRef) -> bool:
         """Whether a filing still has to be read (a spec change can still re-read a finished release)."""

@@ -52,7 +52,7 @@ def test_a_retrace_run_reads_again_only_filings_holding_untraced_figures():
     values = {1: {"method": "ai", "validation_status": "verified", "source_accession": "OLD", "locator": {"table": "T"}},
               2: {"method": "ai", "validation_status": "verified", "source_accession": "NEW",
                   "locator": {"table": "T", "ai_call": "c9"}}}
-    run = SimpleNamespace(values=values, retrace=True)
-    assert FilingLoading._retrace_due(run, "OLD") and not FilingLoading._retrace_due(run, "NEW")
+    run = SimpleNamespace(values=values, reread="untraced", log=lambda *_: None)
+    assert FilingLoading._reread_due(run, "OLD") and not FilingLoading._reread_due(run, "NEW")
     # An ordinary run never re-reads for this.
-    assert not FilingLoading._retrace_due(SimpleNamespace(values=values, retrace=False), "OLD")
+    assert not FilingLoading._reread_due(SimpleNamespace(values=values, reread=None), "OLD")

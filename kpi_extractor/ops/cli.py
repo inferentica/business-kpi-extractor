@@ -18,6 +18,7 @@ from .memory import MemoryWatch, peak_gb
 from .offpeak import seconds_until_offpeak
 from ..pipeline import SymbolPipeline, SymbolResult
 from ..sources.sec import _temporary, configure_identity
+from .reread import SELECTORS
 
 _SYMBOL = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
@@ -30,6 +31,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--force", action="store_true", help="Re-read filings and re-propose KPI lists")
     parser.add_argument("--retrace", action="store_true",
                         help="Re-read only filings holding AI figures read before calls were traced; lists stay as they are")
+    parser.add_argument("--reread", default="", choices=["", *sorted(SELECTORS)],
+                        help="Re-read only the filings a selector picks (ops/reread.py); lists stay as they are")
     parser.add_argument("--trigger", default="manual", choices=["scheduled", "manual", "watchlist_add", "backfill"])
     # Companies mostly wait on the AI, but a re-read of every report parses ten years of XBRL at up to 2 GB a company:
     # six at once took the 16 GB runner down (the 22-company runs after reader bumps), so four.
@@ -73,11 +76,11 @@ def run_symbol(symbol: str, run, log=print) -> SymbolResult:
 
 
 def process_symbol(control, symbol: str, quarters: int, force: bool, wait_for_lock: bool = False,
-                   retrace: bool = False) -> SymbolResult:
+                   reread: str | None = None) -> SymbolResult:
     try:
         return run_symbol(symbol, lambda: SymbolPipeline(control, symbol, quarters, force, log=lambda line: print(line, flush=True),
                                                          wait_for_lock=wait_for_lock, report_quarters=REPORT_QUARTERS,
-                                                         retrace=retrace).run())
+                                                         reread=reread).run())
     finally:
         print(f"{symbol}: this process has held at most {peak_gb():.1f} GB", flush=True)
 
@@ -128,7 +131,7 @@ def company_result(result: SymbolResult, lowest_available_gb: float | None = Non
 
 
 def work_queue(control, pool, workers: int, quarters: int, force: bool, waits: bool, memory=None, log=print,
-               retrace: bool = False) -> str | None:
+               reread: str | None = None) -> str | None:
     """Takes the run's companies from its queue a few at a time and reports each as it finishes. If this worker dies,
     its companies go back to the queue and a new worker carries on; the run finishes when its last company does.
     Returns how the run finished, when this worker finished it."""
@@ -156,7 +159,7 @@ def work_queue(control, pool, workers: int, quarters: int, force: bool, waits: b
                     finished = reply.get("finished") or finished
                     break
                 log(f"{symbol}: claimed")
-                in_flight[pool.submit(process_symbol, control, symbol, quarters, force, waits, retrace)] = symbol
+                in_flight[pool.submit(process_symbol, control, symbol, quarters, force, waits, reread)] = symbol
             if not in_flight:
                 return finished
             done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
@@ -183,11 +186,14 @@ def main(argv: list[str] | None = None) -> int:
         symbols = normalize_symbols(args.symbols)
         started = control.call("start", runId=args.run_id or None, triggerType=args.trigger, symbols=symbols,
                                quarters=max(1, min(args.quarters, 40)), forceRefresh=args.force,
-                               queued=not args.dry_run, retrace=args.retrace)
+                               queued=not args.dry_run, retrace=args.retrace, reread=args.reread or None)
+        # The run keeps what to re-read, so a worker that carries on after a lost one re-reads the same.
+        reread = started.get("reread") or ("untraced" if started.get("retrace") else None) or args.reread or None
         control.run_id = started["runId"]
         symbols = normalize_symbols(started.get("symbols") or [])
         quarters, force = int(started.get("quarters") or args.quarters), bool(started.get("forceRefresh"))
-        print(f"Run {control.run_id}: {len(symbols)} companies, {quarters} quarters{' (forced)' if force else ''}")
+        print(f"Run {control.run_id}: {len(symbols)} companies, {quarters} quarters{' (forced)' if force else ''}"
+              f"{f', re-reading what {reread} picks' if reread else ''}")
 
         workers = max(1, min(args.workers, len(symbols) or 1))
         # A Refresh (or a newly watched company) waits for a run already on its company; scheduled runs move on.
@@ -196,15 +202,15 @@ def main(argv: list[str] | None = None) -> int:
             if args.trigger == "manual":
                 wait_for_offpeak(control, log=lambda line: print(line, flush=True))
             with company_pool(workers) as pool, MemoryWatch(pool, log=lambda line: print(line, flush=True)) as memory:
-                # Kept on the run, so a worker that carries on after a lost one retraces too.
                 finished = work_queue(control, pool, workers, quarters, force, waits, memory,
-                                      log=lambda line: print(line, flush=True), retrace=bool(started.get("retrace")))
+                                      log=lambda line: print(line, flush=True), reread=reread)
             print(f"Run {control.run_id}: {'finished, ' + finished if finished else 'this worker is done'}")
             return 0
         with company_pool(workers) as pool:
             with MemoryWatch(pool, log=lambda line: print(line, flush=True)) as memory:
                 results = list(pool.map(process_symbol, [control] * len(symbols), symbols,
-                                        [quarters] * len(symbols), [force] * len(symbols), [waits] * len(symbols)))
+                                        [quarters] * len(symbols), [force] * len(symbols), [waits] * len(symbols),
+                                        [reread] * len(symbols)))
         summary = {
             "companies": len(results),
             "filings": sum(result.filings for result in results),

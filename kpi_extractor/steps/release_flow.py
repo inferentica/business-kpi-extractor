@@ -135,7 +135,7 @@ class ReleaseFlow:
         if not self.force and previous and previous.get("spec_version") == version and (
                 previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS) and not release_reread_due(previous) \
                 and not self._reader3_due(previous, ref.accession) and not self._skipped_groups_due(previous, ref.accession, spec) \
-                and not self._retrace_due(ref.accession):
+                and not self._reread_due(ref.accession):
             return None
         if not spec.groups:
             return FilingReading(ref, "skipped", spec_version=version, notes=["no KPIs tracked for this company"])
@@ -353,7 +353,7 @@ class ReleaseFlow:
         each other in date order, as reading them one by one would have."""
         before = {key for key, value in self.values.items() if value["method"] == "ai"}
         self._dead = self._never_verified()
-        pending = [ref for ref in refs if self.force or self._pending(ref) or self._retrace_due(ref.accession) or
+        pending = [ref for ref in refs if self.force or self._pending(ref) or self._reread_due(ref.accession) or
                    (self.filings.get(ref.accession) or {}).get("spec_version") != version]
         done: set[str] = set()
 
