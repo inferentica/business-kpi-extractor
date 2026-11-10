@@ -65,7 +65,7 @@ def cvm_checks(statement: str, values: dict[str, float], unit: float, fixed: set
     return checks
 
 
-def tagged_checks(statement: str, values: dict[str, float], unit: float) -> list[Check]:
+def tagged_checks(statement: str, values: dict[str, float], unit: float, filed: tuple[float, ...] = ()) -> list[Check]:
     """IFRS-tagged totals (OpenDART; DART's own tags by their names without "dart_"): assets equal equity and liabilities, and current plus non-current assets; profit
     is the owners' share plus the non-controlling interests'; the change in cash is closing less opening cash, else
     the cash flows' sections and the exchange effect."""
@@ -93,11 +93,21 @@ def tagged_checks(statement: str, values: dict[str, float], unit: float) -> list
     sections = ("CashFlowsFromUsedInOperatingActivities", "CashFlowsFromUsedInInvestingActivities",
                 "CashFlowsFromUsedInFinancingActivities")
     change = values.get("IncreaseDecreaseInCashAndCashEquivalents")
+    if change is None and has("IncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChanges",
+                              "EffectOfExchangeRateChangesOnCashAndCashEquivalents"):
+        # LG Display tags the change before the exchange effect and the effect, not their sum.
+        change = values["IncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChanges"] + \
+            values["EffectOfExchangeRateChangesOnCashAndCashEquivalents"]
     if change is not None and has("CashAndCashEquivalentsAtBeginningOfPeriodCf", "CashAndCashEquivalentsAtEndOfPeriodCf"):
         # Closing less opening cash: KEPCO's Q3 2025 report reconciles its sections with an untagged line (assets
         # moved to held for sale) the sections' sum leaves out.
         moved = values["CashAndCashEquivalentsAtEndOfPeriodCf"] - values["CashAndCashEquivalentsAtBeginningOfPeriodCf"]
         same = _close(change, moved, unit, 2)
+        if not same and has(*sections) and _close(change, sum(values[tag] for tag in sections), unit, 3) and any(
+                _close(value, moved - change, unit, 2) for value in filed):
+            # The change tagged before the exchange effect, which the statement files on a line of its own, untagged
+            # (LG Display's 2015 report: -179.8 bn won from its sections, 41.7 bn of exchange effect, -138.2 bn in all).
+            return [Check("cash", PASS, "change before an untagged reconciling line")]
         return [Check("cash", PASS if same else FAIL, "" if same else f"change {change:,.0f} != closing - opening {moved:,.0f}")]
     if change is None or not has(*sections):
         return [Check("cash", NONE)]

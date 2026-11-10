@@ -97,7 +97,7 @@ def dart_readings(rows: list[dict], year: int, report: str, scope: str, fiscal_y
                 lines=[{"line": index, "concept": _concept(row["account_id"]), "code": row["account_id"],
                         "label": row["account_nm"], "level": 0, "is_heading": value is None, "value": value}
                        for index, (row, value) in enumerate(values)],
-                checks=tagged_checks(statement, tagged, 1e6)))
+                checks=tagged_checks(statement, tagged, 1e6, tuple(value for _, value in values if value is not None))))
     return readings
 
 

@@ -114,3 +114,18 @@ def test_a_regulator_and_an_sec_filing_do_not_witness_each_other():
 def test_a_cvm_statement_filed_empty_is_no_statement():
     empty = [cvm_row(code, name, 0) for code, name, _value in COPEL_Q3]
     assert cvm_readings("ITR", {"index": INDEX, "DRE_con": empty}, "1231", 0) == []
+
+
+def test_a_dart_change_before_an_untagged_exchange_effect_reconciles():
+    # LG Display's 2015 report: sections -179.8 bn, tagged change -179.8 bn, untagged exchange effect 41.7 bn.
+    rows = [dart_row("CF", "ifrs_CashFlowsFromUsedInOperatingActivities", "영업", thstrm_amount="2726600000000"),
+            dart_row("CF", "ifrs_CashFlowsFromUsedInInvestingActivities", "투자", thstrm_amount="-2731900000000"),
+            dart_row("CF", "ifrs_CashFlowsFromUsedInFinancingActivities", "재무", thstrm_amount="-174500000000"),
+            dart_row("CF", "-표준계정코드 미사용-", "환율변동효과", thstrm_amount="41673000000"),
+            dart_row("CF", "ifrs_IncreaseDecreaseInCashAndCashEquivalents", "순증가", thstrm_amount="-179800000000"),
+            dart_row("CF", "dart_CashAndCashEquivalentsAtBeginningOfPeriodCf", "기초", thstrm_amount="889800000000"),
+            dart_row("CF", "dart_CashAndCashEquivalentsAtEndOfPeriodCf", "기말", thstrm_amount="751673000000")]
+    own = [r for r in dart_readings(rows, 2015, "11011", "CFS", "1231", 0) if r.own]
+    assert own[0].status == "kept"
+    rows[3] = dart_row("CF", "-표준계정코드 미사용-", "기타", thstrm_amount="5000000000")  # no line closes the gap
+    assert [r for r in dart_readings(rows, 2015, "11011", "CFS", "1231", 0) if r.own][0].status == "rejected"
