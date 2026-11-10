@@ -62,3 +62,12 @@ MILLIONS                                             2001        2000
 def test_a_share_line_in_units_takes_no_scale():
     # Copel's CVM income statements, in thousands of reais: "NUMBER OF SHARES, EXCEPT TREASURY (Units)".
     assert line_scale("NUMBER OF SHARES, EXCEPT TREASURY (Units)") == 1.0
+
+
+def test_a_currency_named_before_the_title_is_another_sections():
+    # RPM's 1999 annual report: "EURO CURRENCY CONVERSION" in its MD&A, then a balance sheet "(In thousands...)".
+    from statement_extractor.readers.printed.currency import reporting_currency
+    rpm = table("EURO CURRENCY CONVERSION On January 1, 1999, eleven of the fifteen members of the European Union "
+                "adopted the Euro as their common legal currency. " + "x " * 200 +
+                "CONSOLIDATED BALANCE SHEETS RPM, Inc. and Subsidiaries (In thousands, except per share amounts)")
+    assert reporting_currency(rpm, {}, "10-K") is None

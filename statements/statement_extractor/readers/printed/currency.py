@@ -31,7 +31,9 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
     # The title's own words ("Expressed in Millions New Taiwan Dollars (NTD) and U.S. Dollars (USD)"), not the text
     # before it, which can name another currency.
     start = max(0, max(titles) - 120) if titles else 0
-    in_title = currencies_named(text[start:start + 400]) or currencies_named(text)
+    # Past a title, the text before it is another section's: RPM's 1999 annual report discusses the euro's
+    # introduction just above its balance sheet, which names no currency.
+    in_title = currencies_named(text[start:start + 400]) or currencies_named(text[start:])
     named = [currency for currency in by_column.values() if currency]
     unnamed = [currency for currency in in_title if currency not in named]
     if named and len(named) * 2 < len(by_column) and unnamed:
