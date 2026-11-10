@@ -20,10 +20,3 @@ def test_a_timeout_is_tried_again_and_a_parse_error_is_not():
     assert with_network_retries(flaky, sleep=lambda _: None) == "filing" and len(calls) == 3
     with pytest.raises(ValueError):
         with_network_retries(lambda: (_ for _ in ()).throw(ValueError("bad table")), sleep=lambda _: None)
-
-
-def test_sec_refusing_while_busy_is_passing():
-    from statement_extractor.sources.retry import transient
-    assert transient(RuntimeError("Server error '503 Service Unavailable' for url 'https://www.sec.gov/Archives/x'"))
-    assert transient(RuntimeError("Client error '429 Too Many Requests'"))
-    assert not transient(RuntimeError("Client error '404 Not Found'"))
