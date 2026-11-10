@@ -12,7 +12,7 @@ requires-python = ">=3.12"
 dependencies = ["business-kpi-extractor", "pdfplumber==0.11.4"]
 
 [project.optional-dependencies]
-test = ["pytest==8.4.2"]
+test = ["pytest==8.4.2", "hypothesis==6.131.0"]
 
 [project.scripts]
 statement-extractor = "statement_extractor.pipeline.cli:main"
