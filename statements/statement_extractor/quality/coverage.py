@@ -61,19 +61,28 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
     """A foreign filer's quarters, from the first fiscal year a release came in to its latest release quarter: each
     quarter's income, and for the first three its balance sheet and cash flows (three months or the year to date);
     the fourth quarter's balance sheet is the annual report's. A statement counts where a release printed it, was kept,
-    or follows from two kept periods; quarters no release printed are listed apart (`quarters_unprinted`)."""
+    or follows from two kept periods; quarters no release printed are listed apart (`quarters_unprinted`), and quarters of
+    a year the company filed nothing for are not counted (`quarters_not_filing`)."""
     quarters = sorted({tuple(f["release_quarter"]) for f in filings if f["form"] == "6-K" and f.get("release_quarter")})
     if not quarters:
         return {}
     latest = quarters[-1]
     printed, unknown = _printed(filings)
-    expected = found = parent_only = derivable = 0
+    released = {year for year, _quarter in quarters}
+    # A year with neither a release nor an annual report is one the company filed nothing for: it was no registrant
+    # then (Alcon inside Novartis, April 2011 to its spin-off in April 2019).
+    reported = {str(f.get("fiscal_year")) for f in filings if f.get("fiscal_year")
+                and f["form"].upper().startswith(("20-F", "40-F", "10-K", "ARS"))}
+    expected = found = parent_only = derivable = not_filing = 0
     missing, unprinted = [], []
     for year in range(int(quarters[0][0]), int(latest[0]) + 1):
         for number in range(1, 5):
             quarter = f"Q{number}"
             if (str(year), quarter) > latest:
                 break
+            if str(year) not in released and str(year) not in reported:
+                not_filing += 1
+                continue
             wanted = [("income", [(quarter, "quarter")])]
             if number < 4:
                 wanted.append(("balance", [(quarter, "instant")]))
@@ -97,7 +106,7 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
                     unprinted.append(f"{year} {quarter} {statement}")
     return {"quarters_expected": expected, "quarters_kept": found, "quarters_derivable": derivable,
             "quarters_parent_only": parent_only,
-            "quarters_missing": missing[:40], "quarters_unprinted": len(unprinted),
+            "quarters_missing": missing[:40], "quarters_unprinted": len(unprinted), "quarters_not_filing": not_filing,
             "quarters_unprinted_list": unprinted[:120]}
 
 

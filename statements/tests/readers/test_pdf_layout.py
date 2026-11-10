@@ -1,7 +1,8 @@
 """Archived PDF reports laid out as text by their words' positions, then read by the plain-text reader."""
 from datetime import date
 
-from statement_extractor.readers.pdf.layout import _glyphs, _line_text, _page_text, _without_marks
+from statement_extractor.readers.pdf.layout import _glyphs, _line_text, _page_text
+from statement_extractor.readers.printed.marks import without_marks
 from statement_extractor.readers.text.read import read_document
 
 
@@ -21,7 +22,7 @@ def test_figures_by_their_right_edge_and_phrases_one_space_apart():
 
 def test_superscripts_page_numbers_and_glyph_codes():
     words = [word("Consolidated", 80, 140), word("Operations", 150, 200), word("1", 201, 204, size=6.0)]
-    assert [w["text"] for w in _without_marks(words)] == ["Consolidated", "Operations"]
+    assert [w["text"] for w in without_marks(words)] == ["Consolidated", "Operations"]
     assert _line_text([word("-", 300, 303), word("4", 305, 310), word("-", 312, 315)], 5.0) == ""
     assert _glyphs("SHAREHOLDERS(cid:146) EQUITY") == "SHAREHOLDERS’ EQUITY"
 
