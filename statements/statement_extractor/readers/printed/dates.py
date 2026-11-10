@@ -56,6 +56,12 @@ _NUMERIC_DATE = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})\b")
 _DOTTED_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b")  # day first: UBS's "31.12.14"
 
 
+def _standard(span) -> bool:
+    """A span a statement period can have: a quarter, half, nine months or year in months, or any count of weeks."""
+    return not (span.group(1) and span.group(2).lower().startswith("month")
+                and _span_days(span.group(1), span.group(2)) not in (91, 182, 273, 364))
+
+
 def _span_days(count: str, unit: str) -> int:
     number = int(count) if count.isdigit() else _NUMBERS[count.lower()]
     if unit.lower().startswith("week"):
@@ -136,11 +142,9 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     columns = figure_columns(first)
     in_order = years_in_order(first, columns)
     aboves = {column: month_first(header_text(first, column[0]) or header_text(first, column[-1])) for column in columns}
-    # A span over the whole header, not one column's own (Morgan Stanley's "2010 | 2009 | Fiscal 2008 | One Month Ended
-    # December 31, 2008": the month is the last column's alone).
-    shared = [match for match in _SPAN.finditer(header_all)
-              if sum(match.group(0).lower() in aboves[column].lower() for column in columns) in (0, len(columns))]
-    title_span = (shared[0] if shared else None) or _SPAN.search(title)
+    # The header's span, never a span no statement period has (Morgan Stanley's "2010 | 2009 | Fiscal 2008 | One Month
+    # Ended December 31, 2008": the month is its last column's alone).
+    title_span = next((match for match in _SPAN.finditer(header_all) if _standard(match)), None) or _SPAN.search(title)
     header_days = list(_MONTH_DAY.finditer(header_all))
     day_first = _day_first(header_all)
     # One day for each column, in order, when no column prints a day of its own.
@@ -177,7 +181,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         days = 364
         if span is not None and span.group(1):
             days = _span_days(span.group(1), span.group(2))
-            if span.group(2).lower().startswith("month") and days not in (91, 182, 273, 364):
+            if not _standard(span):
                 continue  # one, two or four months is no quarter or year to date (Delta's fresh start in 2007)
         elif span is not None and span.group(0).lower().startswith("half"):
             days = 182  # Lloyds' "Half-year to 30 Jun 2023"
