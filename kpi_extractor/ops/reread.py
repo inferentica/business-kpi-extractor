@@ -12,6 +12,7 @@ import re
 from collections.abc import Callable
 
 from ..readers.trace import untraced
+from ..rules.identity import PLACE_NOT_NAMED
 from ..steps.release_flow import SCALE_OUTLIER
 
 # Holds a figure's size alone once raised, which a figure the filing confirms no longer stays under (2026-11-10).
@@ -39,6 +40,11 @@ def _sum_held(value: dict) -> bool:
             and any(str(note).startswith(("parts differ from the total", "lines differ from ")) for note in value.get("notes") or []))
 
 
+def _place_held(value: dict) -> bool:
+    return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
+            and any(str(note).startswith(PLACE_NOT_NAMED) for note in value.get("notes") or []))
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -50,6 +56,8 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
                      "states one period", _repeat_held),
     "sum-holds": ("figures held because their breakdown's parts or lines did not add up, read again once the KPI list "
                   "says which line sits within which (KKR's capital markets fees within its transaction fees)", _sum_held),
+    "place-holds": ("figures held because their row named no place their KPI names, before a place written two ways "
+                    "counted as named (Coca-Cola's EMEA row reads Europe, Middle East & Africa)", _place_held),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }

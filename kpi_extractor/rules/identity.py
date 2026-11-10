@@ -148,9 +148,21 @@ _PLACE = re.compile(r"\b(Japan|China|U\.?S\.?|United States|North America|Latin 
 _NOT_THE_PLACE = re.compile(r"(?:excluding|excl\.?|ex|intra|non|outside|other than)[- ]\s*$", re.I)
 
 
+# Names of one place written two ways: Coca-Cola's "EMEA Unit Case Volume Growth" is read from its "Europe, Middle East
+# & Africa" row, Asia Pacific is APAC, the U.S. the United States.
+_SAME_PLACE = {"APAC": "ASIA PACIFIC", "UNITED STATES": "US", "UNITED KINGDOM": "UK", "TÜRKIYE": "TURKEY"}
+_EMEA = {"EUROPE", "MIDDLE EAST", "AFRICA"}
+
+
 def _places(text: str, own: bool = False) -> set[str]:
-    return {match.group(0).replace(".", "").upper() for match in _PLACE.finditer(text)
-            if not (own and _NOT_THE_PLACE.search(text[:match.start()][-16:]))}
+    places = {_SAME_PLACE.get(name, name) for name in (match.group(0).replace(".", "").upper() for match in _PLACE.finditer(text)
+              if not (own and _NOT_THE_PLACE.search(text[:match.start()][-16:])))}
+    if _EMEA <= places:
+        # Europe, the Middle East and Africa together are EMEA. A figure named for all three is EMEA's (its row may say
+        # EMEA); a row naming all three names EMEA too, and still each one, but a row that says only EMEA never names
+        # Europe alone.
+        places = (places - _EMEA if own else places) | {"EMEA"}
+    return places
 
 
 def _place_not_named(label: str, table: Table, row: int, col: int) -> str | None:

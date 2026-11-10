@@ -861,3 +861,21 @@ def test_a_table_reading_keeps_the_releases_own_figure_for_the_year_before():
     twice = Table(id="T3", context="", rows=[["", "2026", "2025", "2026", "2025"], ["Units", "10", "9", "20", "18"]])
     assert year_ago_value(twice, 1, 1, date(2026, 12, 31), 10) is None
     assert year_ago_value(dated, 2, 1, None, 1_234_000_000) is None
+
+
+def test_one_place_written_two_ways_is_named():
+    # Coca-Cola's "EMEA Unit Case Volume Growth" is read from its "Europe, Middle East & Africa" row.
+    from kpi_extractor.readers.extract import _places
+    from kpi_extractor.rules.identity import _place_not_named
+    html = """<table><tr><td></td><td>Unit Case Volume</td></tr>
+<tr><td>Europe, Middle East &amp; Africa</td><td>5%</td></tr><tr><td>Latin America</td><td>2%</td></tr>
+<tr><td>U.S.</td><td>1%</td></tr></table>"""
+    document = parse_document(html, "https://example.com/x.htm")
+    table = document.tables[next(iter(document.tables))]
+    assert _place_not_named("EMEA Unit Case Volume Growth", table, 1, 1) is None
+    assert _place_not_named("United States Unit Case Volume Growth", table, 3, 1) is None
+    assert _place_not_named("APAC Unit Case Volume Growth", table, 2, 1) == "ASIA PACIFIC"
+    # A row that says only EMEA never names Europe alone; a figure named for all three is EMEA's.
+    assert _places("Europe Revenue", own=True) - _places("EMEA") == {"EUROPE"}
+    assert _places("Europe, Middle East and Africa Revenue", own=True) == {"EMEA"}
+    assert _places("EMEA") <= _places("Europe, Middle East & Africa")

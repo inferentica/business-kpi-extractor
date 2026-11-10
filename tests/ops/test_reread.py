@@ -88,3 +88,10 @@ def test_failed_filings_picks_filings_that_failed_outright():
     filings = {"KKR-Q3-2018": {"status": "failed", "attempts": 4}, "DONE": {"status": "processed"}}
     assert picked_filings("failed-filings", {}, filings) == {"KKR-Q3-2018"}
     assert parse_args(["--reread", "failed-filings"]).reread == "failed-filings"
+
+
+def test_place_holds_picks_figures_held_for_a_place_their_row_never_named():
+    values = {1: held("KO", "the row and its headings name no: EMEA"),
+              2: held("SUMS", "parts differ from the total by 4%"),
+              3: held("DONE", "the row and its headings name no: EMEA", owner_decision="rejected")}
+    assert picked_filings("place-holds", values) == {"KO"}
