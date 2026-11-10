@@ -97,11 +97,13 @@ def test_a_sentence_above_the_title_does_not_unmake_the_statement():
     # discussed in Note 22 …" just above "CONSOLIDATED STATEMENTS OF OPERATIONS"; the income statement had been skipped.
     from statement_extractor.readers.html.parse import parse_html
     from statement_extractor.readers.printed.find import find_statements
-    rows = "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+    rows = "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
         ("Products", "6,857", "7,532"), ("Services", "260", "392"), ("Net sales", "7,117", "7,924"),
         ("Income before income taxes", "300", "250"), ("Provision for income taxes", "100", "90"), ("Net income", "200", "160")))
     page = ("<p>… and the change in the presentation of the segment disclosures as discussed in Note 22, as to which the date"
             " is February 28, 2013.</p><p>57 Table of Contents</p><p>VISTEON CORPORATION AND SUBSIDIARIES</p>"
             "<p>CONSOLIDATED STATEMENTS OF OPERATIONS</p><table><tr><td></td><td>Year Ended December 31</td>"
-            "<td>Year Ended December 31</td></tr><tr><td></td><td>2012</td><td>2011</td></tr>" + rows + "</table>")
+            "<td>Year Ended December 31</td><td>Three Months Ended December 31</td><td>Nine Months Ended October 1</td>"
+            "</tr><tr><td>(Dollars in Millions, Except Per Share Amounts)</td><td>2012</td><td>2011</td><td>2010</td>"
+            "<td>2010</td></tr>" + rows + "</table>")
     assert [kind for kind, _group in find_statements(parse_html(page))] == ["income"]
