@@ -55,9 +55,11 @@ OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(begi
 CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(ending|closing)\b.*\bcash\b", re.I)
 
 
-# Not Brookfield's "Net change in non-cash working capital balances".
-CHANGE = re.compile(r"(increase|decrease|change).*(?<!non-)(?<!non\s)\bcash\b|(?<!non-)\bcash\b.*(increase|decrease)|"
-                    r"^total\s+cash\s+(generated|provided|used)", re.I)
+# Not Brookfield's "Net change in non-cash working capital balances", nor an exchange line ("Effects of exchange rate
+# differences on cash"); UBS's "Net cash flow from / (used in) operating, investing and financing activities" is one.
+CHANGE = re.compile(r"\b(increase|decrease|change).*(?<!non-)(?<!non\s)\bcash\b|(?<!non-)\bcash\b.*\b(increase|decrease)|"
+                    r"^total\s+cash\s+(generated|provided|used)|"
+                    r"^net\s+cash\s+flows?\b.*\boperating,\s+investing,?\s+and\s+financing\s+activities$", re.I)
 
 
 EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translation|foreign\s+exchange", re.I)  # Brookfield: "Foreign exchange revaluation"

@@ -41,3 +41,19 @@ def test_more_ways_of_stating_the_scale():
     assert statement_scale(table("Consolidated Statements of Operations (Dollar and share amounts in thousands, except per share data)")) == 1e3
     assert statement_scale(table("CONSOLIDATED STATEMENTS OF CASH FLOWS Won U.S. dollars (Note 2) 2006 2007 2008 2008 "
                                  "(In millions) (In thousands)")) == 1e6
+
+
+def test_a_header_cell_that_is_the_unit_alone_is_the_scale():
+    # Brascan's (Brookfield's) 2001 releases: "MILLIONS" over the label column, "MARCH 31 | December 31" over the figures.
+    from statement_extractor.readers.text.parse import parse_text
+    from statement_extractor.readers.printed.scales import statement_scale
+    text = """<TABLE>
+CONSOLIDATED BALANCE SHEET
+                                                   MARCH 31   December 31
+MILLIONS                                             2001        2000
+<S>                                                <C>        <C>
+  Cash and cash equivalents                         $   199     $   347
+  Securities                                          2,348       2,371
+                                                    $ 2,547     $ 2,718
+</TABLE>"""
+    assert statement_scale([parse_text(text)[0]]) == 1e6

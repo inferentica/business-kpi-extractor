@@ -13,7 +13,8 @@ _MONEY = re.compile(r"\b(?:in|amounts in|dollars in|expressed in|figures(?:\s+in
                     + _UNIT + r"\b", re.I)
 # A currency sign before the unit: Scotiabank's "($ millions)", "US$ millions", Lloyds's "£ million" and "£m".
 _DOLLAR_UNIT = re.compile(r"(?:(?:US|C|CDN|NT|HK)?\$|£|€|¥)\s*" + _UNIT + r"\b|"
-                          r"(?<![\w.])(?:£|GBP|USD|EUR|US\$)m\b|"  # Lloyds TSB's text releases: "GBPm" over each column
+                          # Lloyds TSB's text releases: "GBPm" over each column; UBS since 2023: "USD m" over the labels
+                          r"(?<![\w.])(?:£|GBP|USD|EUR|US\$|CHF)\s?m\b|"
                           # UBS's "CHF million", "USD million": a currency code before the unit
                           r"\b(?:CHF|USD|EUR|GBP|JPY|CNY|RMB|KRW|BRL|CAD|AUD|HKD|TWD|NTD|INR|MXN|SEK|NOK|DKK)\s+" + _UNIT + r"\b|"
                           # James Hardie's "(Millions of US dollars)"
@@ -64,6 +65,9 @@ def statement_scale(group: list[Table]) -> float | None:
     matches = sorted((match for pattern in (_MONEY, _DOLLAR_UNIT) for match in pattern.finditer(text)),
                      key=lambda match: match.start())
     found = {_scale(match) for match in matches} | set(both)
+    # A header cell that is the unit alone: Brookfield's 2001-03 releases print "MILLIONS" over their labels.
+    found |= {_SCALES[cell.text.strip().lower()] for cells in group[0].header for cell in cells
+              if cell.text.strip().lower() in ("thousands", "millions", "billions")}
     if _ZEROS.search(text):
         found.add(1e3)
     if len(found) == 2 and matches and len({word.lower() for word in _CURRENCY_WORDS.findall(raw)}) >= 2:

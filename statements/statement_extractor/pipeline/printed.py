@@ -17,6 +17,7 @@ from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
 from ..readers.printed.sign_index import printed_figures
 from ..readers.printed.summary import read_summaries
+from ..readers.positioned.layout import is_positioned, positioned_text
 from ..readers.printed.titled import headed_kinds, split_titled
 from ..readers.slides.parse import is_slides, parse_slides
 from ..readers.slides.read import read_document as read_slides
@@ -134,7 +135,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         printed = "html" if extension in (".htm", ".html") or "<tr" in content[:200_000].lower() else "text"
         if printed == "html" and is_slides(content):
             printed = "slides"  # slide images with their words hidden beneath (ASML's releases from 2025)
-        reader = {"html": read_document, "text": read_text, "slides": read_slides}[printed]
+        elif printed == "html" and is_positioned(content):
+            printed, content = "positioned", positioned_text(content)  # pages of placed text, no tables (UBS since 2023)
+        reader = {"html": read_document, "text": read_text, "positioned": read_text, "slides": read_slides}[printed]
         try:
             readings, document_notes = reader(content, accession=ref.accession, form=ref.form,
                                               filed=ref.filed, document_end=document_end,
@@ -146,7 +149,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         if titled is not None:
             titled |= printed_titles | {(kind,) for kind in headed_kinds(content)}
         if signs is not None:
-            parse = {"html": parse_html, "text": parse_text, "slides": parse_slides}[printed]
+            parse = {"html": parse_html, "text": parse_text, "positioned": parse_text, "slides": parse_slides}[printed]
             for key, figures in printed_figures(parse(content)).items():
                 signs.setdefault(key, []).extend(figures)
         basis, currency = stated_basis(content), stated_currency(content)

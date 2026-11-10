@@ -12,6 +12,8 @@ import io
 import re
 import statistics
 
+from ..printed.marks import without_marks
+
 _FIGURE = re.compile(r"^\(?-?\$?[\d,]*\.?\d+\)?%?$|^[—–-]$")
 _LINE_SLACK = 2.5  # points two words' tops can differ by on one printed line
 
@@ -23,20 +25,17 @@ def pdf_text(content: bytes) -> str:
     with pdfplumber.open(io.BytesIO(content)) as pdf:
         # Words split where the font size changes, so a superscript footnote mark is a word of its own
         # ("Operations¹", "2001²" in ASML's FY2001 20-F) and can be left out.
-        pages = [_without_marks(page.extract_words(keep_blank_chars=False, use_text_flow=False, extra_attrs=["size"]))
-                 for page in pdf.pages]
+        pages = [page.extract_words(keep_blank_chars=False, use_text_flow=False, extra_attrs=["size"]) for page in pdf.pages]
+    return lay_out(pages)
+
+
+def lay_out(pages: list[list[dict]]) -> str:
+    """Pages of words with their places ({text, x0, x1, top, size}) as lines of text, pages apart by a form feed.
+    One character width for the whole document, so a statement's columns stay in place from one page to the next."""
+    pages = [without_marks(words) for words in pages]
     widths = [(word["x1"] - word["x0"]) / len(word["text"]) for words in pages for word in words if len(word["text"]) >= 3]
     unit = statistics.median(widths) if widths else 5.0
     return "\n\f\n".join(_page_text(words, unit) for words in pages)  # a break a statement can run on across
-
-
-def _without_marks(words: list[dict]) -> list[dict]:
-    """Superscript marks: one or two characters set much smaller than the page's text."""
-    sizes = [word["size"] for word in words if len(word["text"]) >= 3]
-    if not sizes:
-        return words
-    usual = statistics.median(sizes)
-    return [word for word in words if not (len(word["text"]) <= 2 and word["size"] < usual * 0.8)]
 
 
 def _page_text(words: list[dict], unit: float) -> str:
