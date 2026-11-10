@@ -37,6 +37,7 @@ class Row:
     figures: dict[int, float] = field(default_factory=dict)  # physical column -> figure as printed
     cells: list[Cell] = field(default_factory=list)
     printed: list[float] = field(default_factory=list)  # a text line's figures in printed order, before columns
+    code: str = ""  # a CVM account code printed before the label ("3.01"), kept beside it
 
     @property
     def is_heading(self) -> bool:

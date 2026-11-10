@@ -27,6 +27,7 @@ from ..sources.listing import filing_for, list_reports
 from ..sources.retry import with_network_retries
 from .printed import read_printed
 from .archives import read_archives
+from .regulators import read_regulators
 from .releases import read_releases
 
 
@@ -36,7 +37,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     started = time.time()
     profile, company = company_profile(symbol)
     reports = sorted(list_reports(company, since), key=lambda ref: ref.filed, reverse=True)
-    readings, filings, offset, summaries = [], [], None, []
+    readings, filings, offset, summaries, regulator_reads = [], [], None, [], []
     annual_ends = [end for ref in reports if ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None]
     year_ends = {ref.accession: year_end_for(_period_end(ref), annual_ends, profile.fiscal_year_end) for ref in reports}
     for ref in reports:
@@ -102,6 +103,8 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         filings.extend(record for record in records if record["filed"] >= since.isoformat())  # the years on paper
         readings.extend(reading for reading in found if reading.filed >= since)
         summaries.extend(figure for figure in archived_summaries if figure["filed"] >= since.isoformat())
+        regulator_reads, found = read_regulators(symbol, since, profile.fiscal_year_end, offset or 0, readings, log)
+        readings.extend(reading for reading in found if reading.filed >= since)
     printed_signs: dict[str, dict] = {}
     readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
                                          printed_signs))
@@ -113,6 +116,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     summary_figures = choose_summaries(summaries, readings, chosen)
     summary["summary_figures"] = summary_coverage(summary_figures, chosen)
+    summary["regulator_reads"] = regulator_reads
     with (out / "readings.jsonl").open("w") as handle:
         for reading in readings:
             handle.write(json.dumps(reading.to_json(), default=str) + "\n")

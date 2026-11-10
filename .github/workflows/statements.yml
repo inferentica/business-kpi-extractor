@@ -90,6 +90,7 @@ jobs:
     env:
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
       STATEMENTS_ARCHIVE_CACHE: archive-cache  # archived reports fetched once, kept between runs
+      DART_API_KEY: ${{ secrets.DART_API_KEY }}  # OpenDART (Korea's FSS) for KEPCO's own filings
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v10.2.0

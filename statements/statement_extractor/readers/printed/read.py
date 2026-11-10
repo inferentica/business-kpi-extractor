@@ -162,8 +162,7 @@ def _close_section(printed: list, section: str | None, index: int | None) -> Non
         printed[index] = (f"Net cash from {section}ing activities", level, value)
 
 
-# A heading over share counts: Apple's "Shares used in computing earnings per share (in thousands):" over Basic and
-# Diluted, which would otherwise read as per-share figures.
+# A title or a slide's navigation run into a column's year (its use in _read_column says whose).
 _YEAR_ROW_LABEL = re.compile(r"\bstatements?\s+of\b|\bfor\s+the\s+(years?|quarters?|periods?|(three|six|nine|twelve)\s+months)\b|"
                              r"\byears?\s+ended\b|\bsummary\b|\bforward\s+look", re.I)
 
@@ -243,7 +242,8 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
             else:
                 amount = value * scale
             lines.append({"line": len(lines), "concept": _concept(row.label, kind), "label": row.label[:300],
-                          "level": max(0, min(20, row.level - base)), "is_heading": not row.figures, "value": amount})
+                          "level": max(0, min(20, row.level - base)), "is_heading": not row.figures, "value": amount,
+                          **({"code": row.code} if row.code else {})})
             meaning = named.get(id(row), row.label)
             if kind == "cash_flow" and row.figures and not row.label and section:
                 # A section closed by an unlabelled total (Scotiabank, Brookfield): its last before the next section

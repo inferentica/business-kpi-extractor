@@ -32,7 +32,8 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
     """Per statement period: the chosen reading (or why none), its source, and how it differs from the period's own
     filing. Sorted newest period first."""
     annual_bases = {reading.fiscal_year: reading.basis for reading in sorted(readings, key=lambda item: item.filed)
-                    if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.basis}
+                    if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.basis
+                    and reading.source not in REGULATORS}
     reporting, by_year = _reporting_currency(readings), _reporting_currencies(readings)
     groups: dict[tuple, list[Reading]] = defaultdict(list)
     for reading in readings:
@@ -55,7 +56,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         set_aside = contradicted(kept)
         aside = {id(reading) for reading in set_aside}
         eligible = [reading for reading in kept if id(reading) not in aside] or kept
-        winner = max(eligible, key=lambda item: (item.scope == "consolidated", item.form != "6-K",
+        winner = max(eligible, key=lambda item: (item.scope == "consolidated", _rank(item),
                                              item.form != "6-K" or annual is None or item.basis == annual, item.filed,
                                              item.own, item.source == "xbrl")) if eligible else None
         record = {
@@ -68,7 +69,8 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
                                   for check in reading.checks if check.result == "fail"})[:5],
         }
         if winner is not None:
-            winner = settle_signs(winner, kept, (printed or {}).get(winner.accession))
+            if winner.source not in REGULATORS:  # a regulator's lines are served with their signs as filed
+                winner = settle_signs(winner, kept, (printed or {}).get(winner.accession))
             record.update({
                 "source_accession": winner.accession, "source_form": winner.form, "source_filed": winner.filed.isoformat(),
                 "from_comparative": not winner.own, "currency": winner.currency, "basis": winner.basis,
@@ -85,6 +87,19 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         chosen.append(record)
     tie(chosen, readings)  # closing cash against the balance sheet, quarters against the year (selection/ties.py)
     return sorted(chosen, key=lambda item: (item["period_end"], item["statement"], item["duration"]), reverse=True)
+
+
+REGULATORS = ("cvm", "dart")  # home regulators' own data (pipeline/regulators.py)
+
+
+def _rank(reading: Reading) -> int:
+    """A report filed with the SEC, then a home regulator's form, then a release: a regulator's quarterly form is the
+    reviewed statement a 6-K release translates (Copel's ITR, KEPCO's quarterly report), so it stands with the SEC's
+    reports for a quarter; for a year the 20-F, the statement filed with the SEC, stays first and the regulator's
+    annual form is its witness."""
+    if reading.source in REGULATORS:
+        return 1 if reading.fiscal_period == "FY" else 2
+    return 0 if reading.form == "6-K" else 2
 
 
 def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
@@ -106,7 +121,8 @@ def _reporting_currencies(readings: list[Reading]) -> dict[str, set[str]]:
     # may restate it in its own; a translation column read in an annual report (KEPCO's US$) is neither.
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for reading in readings:
-        if reading.own and reading.form != "6-K" and reading.fiscal_period == "FY" and reading.currency:
+        if reading.own and reading.form != "6-K" and reading.fiscal_period == "FY" and reading.currency and \
+                reading.source not in REGULATORS:
             counts[reading.fiscal_year][reading.currency] += 1
     own = {int(year): max(by, key=by.get) for year, by in counts.items()}
     if not own:
@@ -127,6 +143,7 @@ def _reporting_currency(readings: list[Reading]) -> str | None:
     """The currency of the company's own annual reports (their most common), if they state one."""
     counts: dict[str, int] = defaultdict(int)
     for reading in readings:
-        if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.currency:
+        if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.currency and \
+                reading.source not in REGULATORS:
             counts[reading.currency] += 1
     return max(counts, key=counts.get) if counts else None
