@@ -326,11 +326,14 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
             total_table, total_index, total_col = reached
     total_row = read_row(total_index, total_table, total_col) if total_index is not None else None
     total = total_row[1] if total_row else (100.0 if unit == "percent" else None)
-    kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total)
-    if total and unit == "currency" and total_index is not None and abs(sum(kept.values()) - total) > abs(total) * 0.001:
-        block = _block_summing_to(parts, total_index, total)
-        if block:
-            kept = {key: parts[key][1] for key in block}
+    if (listed := _listed_whole(group, parts, total if unit == "currency" else None)) is not None:
+        kept = listed
+    else:
+        kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total)
+        if total and unit == "currency" and total_index is not None and abs(sum(kept.values()) - total) > abs(total) * 0.001:
+            block = _block_summing_to(parts, total_index, total)
+            if block:
+                kept = {key: parts[key][1] for key in block}
     # A subtotal the list names as a parent (the owner's Total Optum over Optum Health, Insight and Rx) is kept beside its
     # lines: they are checked against it.
     parents = {kpi.parent for kpi in group.kpis if kpi.parent}
@@ -389,6 +392,21 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         values.append(ReadValue(group, KpiSpec(key=group.total_kpi or "total", label="Total", unit=unit), total_row[1],
                                 currency, record, is_total=True))
     return values
+
+
+def _listed_whole(group: GroupSpec, parts: dict[str, tuple[str, float, int]], total: float | None) -> dict[str, float] | None:
+    """The rows the list names, when they add up to the table's total on their own: then they are the breakdown, and any
+    other row is a line within one of them, not a part. Morgan Stanley's Advisory, Equity underwriting and Fixed income
+    underwriting rows sit under its Investment Banking row, which the list names beside Equity, Fixed Income and Other;
+    taken for parts beside them, they held 22 quarters whose four listed rows give the total exactly. Only for a list
+    with no lines of its own (a list naming parents places its lines below)."""
+    if not total or group.kind != "revenue_breakdown" or any(kpi.parent for kpi in group.kpis):
+        return None
+    listed = {key: value for key, (label, value, _index) in parts.items()
+              if (kpi := _listed_kpi(group, label)) is not None and kpi.key != group.total_kpi}
+    if len(listed) < 2 or abs(sum(listed.values()) - total) > abs(total) * 0.001:
+        return None
+    return listed
 
 
 def _place_unlisted_rows(group: GroupSpec, parts: dict[str, tuple[str, float, int]], kept: dict[str, float],

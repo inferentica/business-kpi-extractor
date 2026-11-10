@@ -309,3 +309,37 @@ def test_a_metric_reported_as_its_own_total_is_read():
     located = ai.Located.model_validate({"period_end": "2026-06-30", "values": [{"kpi": "operating.aum", "table": table, "row": 1, "col": 1}]})
     read, problems = read_values(document, spec, located, "USD")
     assert not problems and read[0].value == 4_312e9
+
+
+MS_LINES = """<p>Institutional Securities (in millions)</p><table>
+<tr><td></td><td>3Q26</td></tr>
+<tr><td>Investment Banking</td><td>$ 2,159</td></tr>
+<tr><td>Advisory</td><td>887</td></tr>
+<tr><td>Equity underwriting</td><td>525</td></tr>
+<tr><td>Fixed income underwriting</td><td>747</td></tr>
+<tr><td>Equity</td><td>5,799</td></tr>
+<tr><td>Fixed Income</td><td>2,011</td></tr>
+<tr><td>Other</td><td>60</td></tr>
+<tr><td>Net revenues</td><td>$ 10,029</td></tr></table>"""
+
+
+def test_listed_rows_that_give_the_total_are_the_breakdown_and_lines_under_them_are_not_parts():
+    # Morgan Stanley lists Investment Banking, Equity, Fixed Income and Other; the table also shows Investment Banking's
+    # own lines under it. Read as parts, they held 22 quarters whose four listed rows give the total exactly.
+    spec = Spec.model_validate({"groups": [{"key": "lines", "label": "Revenue by Business Line", "kind": "revenue_breakdown",
+        "total_kpi": "net_revenues", "kpis": [
+            {"key": "investment_banking", "label": "Investment Banking", "unit": "currency"},
+            {"key": "equity", "label": "Equity", "unit": "currency"},
+            {"key": "fixed_income", "label": "Fixed Income", "unit": "currency"},
+            {"key": "other", "label": "Other", "unit": "currency"},
+            {"key": "net_revenues", "label": "Net revenues", "unit": "currency"}]}]})
+    document = parse_document(MS_LINES, "https://www.sec.gov/ms.htm")
+    table = next(iter(document.tables))
+    located = ai.Located.model_validate({"period_end": "2026-09-30", "tables": [
+        {"group": "lines", "table": table, "col": 1, "first_row": 1, "last_row": 7, "total_row": 8}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert problems == []
+    parts = {item.kpi.key: item.value for item in values if not item.is_total}
+    assert parts == {"investment_banking": 2_159e6, "equity": 5_799e6, "fixed_income": 2_011e6, "other": 60e6}
+    validate_groups(values, previous={})
+    assert all(item.status == "verified" for item in values)
