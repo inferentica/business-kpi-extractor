@@ -6,7 +6,9 @@ today's parse of its filing, with a wrong answer planted beside it:
   fixed by the case: the right pick scores, "none" or the planted cell does not.
 - explain: steady figures given a planted near-doubling (or halving) that the document cannot explain, which must be
   refused, and genuine explained changes (the stored ones), which should stand.
-- select: long documents and the tables their verified figures came from, which Select should keep.
+- select: long documents and the tables their verified figures came from, which Select should keep, both with the
+  company's KPI list (as Locate asks) and with none (as Propose asks for a new company: UBS got no list when Select
+  dropped its segment tables).
 Each document is one call per prompt, as in production: its cases are asked together.
 """
 from __future__ import annotations
@@ -156,9 +158,15 @@ class Runner:
         stub = SimpleNamespace(_ai_history=lambda _day: {})
         named = AiReading._sections_naming_kpis(stub, document, spec)
         needed = set(case["needed"])
+        # As Propose asks it: no list yet, only what to look for (steps/ai_reading.py _prompt_document with no spec).
+        unlisted_text = ai.prompt(self.company(case["symbol"]), document.outline(), ai.SELECT_TASK,
+                                  "KPIs:\n(no list yet: revenue breakdowns and operating metrics)")
+        unlisted = self.ask(case["symbol"], "select", unlisted_text, ai.Selection, thinking_first=False)
+        unlisted_chosen = {item for item in unlisted.ids if item in document.tables or item in document.blocks}
         return [{"symbol": case["symbol"], "url": case["url"], "needed": len(needed), "select_kept": len(needed & chosen),
                  "with_names_kept": len(needed & (chosen | named)), "chosen": len(chosen),
-                 "missed": sorted(needed - (chosen | named))}]
+                 "missed": sorted(needed - (chosen | named)),
+                 "unlisted_kept": len(needed & unlisted_chosen), "unlisted_missed": sorted(needed - unlisted_chosen)}]
 
 
 def summarize(results: dict[str, list[dict]]) -> dict:
@@ -180,7 +188,9 @@ def summarize(results: dict[str, list[dict]]) -> dict:
                     "growthPlanted": len(growth), "growthPlantedStands": sum(1 for i in growth if i["stands"])},
         "select": {"documents": len(select), "tablesNeeded": needed, "selectKept": sum(i["select_kept"] for i in select),
                    "withNamesKept": sum(i["with_names_kept"] for i in select),
-                   "documentsComplete": sum(1 for i in select if i["with_names_kept"] == i["needed"])},
+                   "documentsComplete": sum(1 for i in select if i["with_names_kept"] == i["needed"]),
+                   "unlistedKept": sum(i.get("unlisted_kept", 0) for i in select),
+                   "unlistedComplete": sum(1 for i in select if i.get("unlisted_kept") == i["needed"])},
     }
 
 
@@ -194,7 +204,9 @@ def lines_of(summary: dict, calls: int) -> list[str]:
             f"said real before the quote checks {e['plantedSaidReal']}; genuine changes kept {e['genuineStands']}/{e['genuine']}; "
             f"growth-rate KPIs (a planted jump may be real there) passed {e['growthPlantedStands']}/{e['growthPlanted']}",
             f"Select: kept {s['selectKept']}/{s['tablesNeeded']} needed tables alone, {s['withNamesKept']} with the KPI-name rule; "
-            f"{s['documentsComplete']}/{s['documents']} documents complete"]
+            f"{s['documentsComplete']}/{s['documents']} documents complete",
+            f"Select with no list (as Propose asks a new company): kept {s.get('unlistedKept', 0)}/{s['tablesNeeded']} needed tables; "
+            f"{s.get('unlistedComplete', 0)}/{s['documents']} documents complete"]
     return out
 
 
