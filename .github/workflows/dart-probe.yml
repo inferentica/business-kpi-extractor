@@ -1,0 +1,44 @@
+# One-off probe: KEPCO's quarterly and annual statements from OpenDART (Korea's FSS), as a worker reads them.
+name: dart-probe
+on:
+  push:
+    branches: [statements/dart-probe]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      DART_API_KEY: ${{ secrets.DART_API_KEY }}
+    steps:
+      - name: KEPCO from OpenDART
+        shell: python
+        run: |
+          import io, json, os, time, urllib.parse, urllib.request, zipfile, xml.etree.ElementTree as ET
+          key = os.environ["DART_API_KEY"]
+          os.makedirs("out", exist_ok=True)
+          def get(path, **params):
+              url = f"https://opendart.fss.or.kr/api/{path}?" + urllib.parse.urlencode({"crtfc_key": key, **params})
+              with urllib.request.urlopen(url, timeout=60) as response:
+                  return response.read()
+          codes = zipfile.ZipFile(io.BytesIO(get("corpCode.xml"))).read("CORPCODE.xml")
+          corp = next(item for item in ET.fromstring(codes) if (item.findtext("stock_code") or "").strip() == "015760")
+          corp_code = corp.findtext("corp_code")
+          print("KEPCO", corp_code, corp.findtext("corp_name"), corp.findtext("corp_eng_name"))
+          summary = {}
+          for year in range(2015, 2027):
+              for report in ("11013", "11012", "11014", "11011"):  # Q1, half-year, Q3, annual
+                  for scope in ("CFS", "OFS"):
+                      data = json.loads(get("fnlttSinglAcntAll.json", corp_code=corp_code, bsns_year=year,
+                                            reprt_code=report, fs_div=scope))
+                      rows = data.get("list") or []
+                      summary[f"{year}-{report}-{scope}"] = [data.get("status"), len(rows)]
+                      if rows:
+                          json.dump(rows, open(f"out/kepco_{year}_{report}_{scope}.json", "w"), ensure_ascii=False)
+                      time.sleep(0.2)
+          filings = json.loads(get("list.json", corp_code=corp_code, bgn_de="20150101", pblntf_ty="A", page_count=100))
+          json.dump(filings, open("out/kepco_periodic_filings.json", "w"), ensure_ascii=False)
+          json.dump(summary, open("out/summary.json", "w"), indent=1)
+          print(json.dumps(summary))
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dart-probe
+          path: out/
