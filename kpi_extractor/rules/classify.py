@@ -17,6 +17,10 @@ EARNINGS = [re.compile(pattern, re.I) for pattern in (
     r"\binterim (?:financial )?(?:report|statements)\b",
     r"\bconsolidated financial statements\b",
     r"\breports? (?:record |strong )?(?:\w+ )?(?:quarter|q[1-4]) (?:results|eps|earnings|net)\b",
+    # "ASML reports €7.5 billion total net sales and €2.1 billion net income in Q3 2025" (PDF text may split words).
+    r"\b(?:report ?s?|exceeds)\s+(?:€|eur\b|\$|usd\b)\s?[\d.,]+\s+(?:billion|million)\b[^|]{0,120}?\bin (?:q[1-4] )?20\d\d\b",
+    r"quarterly ?resul",  # the release's file name, pressreleasequarterlyresul.htm
+    r"\bfinancial statements (?:originally issued in|for the (?:years?|three|six|nine|quarters?)\b)",
 )]
 OTHER = [re.compile(pattern, re.I) for pattern in (
     rf"\b(?:{_MONTHS})(?:\s+\d{{4}})?\s+(?:net\s+)?(?:revenue|sales)s?\b",
@@ -27,6 +31,14 @@ OTHER = [re.compile(pattern, re.I) for pattern in (
     r"\btransactions? (?:under|in) (?:its|the) (?:share|stock)",
     r"\bnotice of\b",
     r"\b(?:cash )?dividend (?:declaration|payment|record date)\b",
+    r"\b(?:record|ex-dividend) date\b",
+    r"\bcash dividend (?:per share|of)\b",
+    r"\bchanges in the shareholdings\b",
+    r"\bshareholders[’']? (?:meeting|approve|elect)\b",
+    r"\b(?:directors|board of directors)[’']? resolutions?\b",
+    r"\bcandidates for (?:the )?board\b",
+    r"\bsenior (?:unsecured )?notes\b",
+    r"\bdifferences between (?:ifrss?|international financial reporting standards)\b",
 )]
 
 # What a rule reads: each exhibit's name, description and opening; the whole body would carry a results release's own
