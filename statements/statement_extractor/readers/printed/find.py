@@ -98,7 +98,7 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         # Group AG (consolidated) versus UBS AG (consolidated)", then "Income statement" as the table's first row).
         # A parent company's columns beside the group's are no parent-only statement (side_by_side.py).
         title_text = SIDE_BY_SIDE.sub(" ", title_text)
-        if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", _heading(title_text)[-260:])) or \
+        if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
                 not_statement.search(_RUNNING_LINK.sub(" ", _heading(table.context[-200:]))) or \
                 len([r for r in table.rows if r.figures]) < 4:
             continue
