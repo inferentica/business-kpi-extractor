@@ -78,6 +78,7 @@ def _row(cells: list[Cell]) -> Row | None:
     if code:  # a CVM account code: its depth is the line's level ("3.10" over "3.10.01")
         label, level = label[code.end():], (level or 0) + 20 * code.group(0).count(".")
     label = re.sub(r"\s+\d{1,2}(\s*,\s*\d{1,2})+$|\s+\d{1,2},$", "", label)  # "NET SALES 2, 26" in one cell
+    label = re.sub(r"\s+(?:￦|₩|R\$|US\$|NT\$|\$|£|€|¥)$", "", label)  # KEPCO's "Profit for the period ￦" before its figure
     if not label and not figures:
         return None
     return Row(label=label, level=level if level is not None else 0, figures=figures, cells=cells)
@@ -167,6 +168,11 @@ def parse_html(html: str | bytes) -> list[Table]:
     # superscript before "/" is a fraction's numerator (PepsiCo's "1<sup>2</sup>/3¢" par value) and stays.
     raw = re.sub(rb"(?is)<sup[^>]*>\s*(?:<[^>]+>\s*)*(?:[\w*]|\xe2\x80[\xa0\xa1]){1,2}\s*(?:</[^>]+>\s*)*</sup>(?!\s*(?:<[^>]+>\s*)*[/\xe2\x81\x84])",
                  b"", raw)
+    # The same mark set as a raised run of type (Lloyds' 2025 releases: a <font> styled vertical-align: super holding
+    # "1"; Coca-Cola's 10-Qs: a small <span> moved up by position: relative), which would otherwise run into the label
+    # as "Other income1".
+    raw = re.sub(rb"(?is)<(font|span)\b[^>]*(?:vertical-align:\s*super|position:\s*relative;\s*top:\s*-\d)[^>]*>\s*[\w*]{1,2}\s*(?:<font[^>]*>\s*</font>\s*)?</\1>"
+                 rb"(?!\s*(?:<[^>]+>\s*)*[/\xe2\x81\x84])", b"", raw)
     tree = lxml.html.fromstring(raw)
     found = []
     previous_text: list[str] = []

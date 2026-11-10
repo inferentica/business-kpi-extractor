@@ -167,6 +167,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         for reading in readings:
             reading.basis = basis
             reading.currency = reading.currency or currency
+        share_currency(readings)
         # One presentation per period and basis: ASML's 6-Ks file an IFRS interim report before the US GAAP release.
         held = {(reading.key, reading.basis) for reading in found}
         found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
@@ -217,3 +218,13 @@ def _year_end(day: date, fiscal_year_end: str) -> bool:
         if abs((day - end).days) <= 10:
             return True
     return False
+
+
+def share_currency(readings: list) -> None:
+    """A statement naming no currency is in the one its document's other statements all name: Petrobras' real release
+    heads its balance sheet and income "R$ million" and its cash flow nothing, beside a US dollar release of the same
+    quarter filed the same day."""
+    named = {reading.currency for reading in readings if reading.currency}
+    if len(named) == 1:
+        for reading in readings:
+            reading.currency = reading.currency or next(iter(named))

@@ -273,3 +273,23 @@ def test_a_share_heading_wrapped_over_two_lines():
     readings, _ = read(html, "0929", date(2007, 9, 29))
     values = [(line["label"], line["value"]) for line in readings[("income", "2007")].lines]
     assert ("Basic", 125_609e3) in values
+
+
+def test_a_raised_footnote_mark_is_not_part_of_the_label():
+    # Lloyds' 2025 releases set the mark as a <font> styled vertical-align: super, not a <sup>.
+    from statement_extractor.readers.html.parse import parse_html
+    mark = '<font style="font-size: 5.2pt; vertical-align: super;">1<font style="display: inline-block;"></font></font>'
+    page = (f"<table><tr><td></td><td>2025</td></tr><tr><td><font>Other income</font>{mark}</td><td>1,342</td></tr>"
+            "</table>")
+    table = parse_html(page)[0]
+    assert [(row.label, row.figures) for row in table.rows if row.figures] == [("Other income", {1: 1342.0})]
+
+
+def test_a_mark_moved_up_and_a_trailing_currency_sign_leave_the_label():
+    from statement_extractor.readers.html.parse import parse_html
+    mark = '<span style="font-size:5.85pt;position:relative;top:-3.15pt;vertical-align:baseline">1</span>'
+    page = ('<meta charset="utf-8"><table><tr><td></td><td>2026</td></tr>'
+            f"<tr><td><span>Basic Net Income Per Share</span>{mark}</td><td>0.86</td></tr>"
+            "<tr><td>Profit for the period ￦</td><td>1,234</td></tr></table>")
+    assert [row.label for row in parse_html(page)[0].rows if row.figures] == ["Basic Net Income Per Share",
+                                                                              "Profit for the period"]

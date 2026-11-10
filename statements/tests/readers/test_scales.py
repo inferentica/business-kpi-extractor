@@ -57,3 +57,8 @@ MILLIONS                                             2001        2000
                                                     $ 2,547     $ 2,718
 </TABLE>"""
     assert statement_scale([parse_text(text)[0]]) == 1e6
+
+
+def test_a_share_line_in_units_takes_no_scale():
+    # Copel's CVM income statements, in thousands of reais: "NUMBER OF SHARES, EXCEPT TREASURY (Units)".
+    assert line_scale("NUMBER OF SHARES, EXCEPT TREASURY (Units)") == 1.0

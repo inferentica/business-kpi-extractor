@@ -101,6 +101,8 @@ def line_scale(*texts: str) -> float | None:
         short = re.search(r"\(\s*'?\s*(M|K|000)\s*\)", text or "")  # TSMC's "Weighted Average Outstanding Shares ('M)",
         if short:                                                       # its 1999-2000 releases' "Shares Outstanding ('K)"
             return 1e6 if short.group(1) == "M" else 1e3
+        if re.search(r"\(\s*(in\s+)?units?\s*\)", text or "", re.I):  # Copel's CVM "NUMBER OF SHARES, EXCEPT TREASURY (Units)"
+            return 1.0
         match = _LINE_UNIT.search(text or "")
         if match:
             return _SCALES[next(group for group in match.groups() if group).lower()]

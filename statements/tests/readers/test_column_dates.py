@@ -147,3 +147,19 @@ def test_a_column_printing_its_own_range_ends_on_the_ranges_last_day():
     table = parse_html("<p>STATEMENT OF INCOME for the first three months of 2006 and 2005</p><table>" + head + body + "</table>")[0]
     periods = column_periods("income", [table], "1231", date(2006, 3, 31))
     assert sorted(p.end for p in periods.values()) == [date(2005, 3, 31), date(2006, 3, 31)]
+
+
+def test_a_range_start_set_day_first_among_month_first_ones():
+    # Copel's June 2004 ITR: "04/01/2004 a 6/30/2004 | 01/01/2004 a 6/30/2004 | 01/04/2003 a 6/30/2003 | ...".
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.dates import column_periods
+    head = ("<tr><td>Code</td><td>Description</td><td>04/01/2004 a 6/30/2004</td><td>01/01/2004 a 6/30/2004</td>"
+            "<td>01/04/2003 a 6/30/2003</td><td>01/01/2003 a 6/30/2003</td></tr>")
+    body = "".join(f"<tr><td>3.0{n}</td><td>{label}</td><td>1,263</td><td>2,538</td><td>996</td><td>2,008</td></tr>"
+                   for n, label in enumerate(("Gross sales and/or services", "Net sales and/or services",
+                                              "Operating profit (loss)", "Net income for the period"), 1))
+    table = parse_html("<p>03.01- Statement of Income (in thousands of reais)</p><table>" + head + body + "</table>")[0]
+    periods = column_periods("income", [table], "1231", date(2004, 6, 30))
+    assert sorted((p.start, p.end) for p in periods.values()) == [
+        (date(2003, 1, 1), date(2003, 6, 30)), (date(2003, 4, 1), date(2003, 6, 30)),
+        (date(2004, 1, 1), date(2004, 6, 30)), (date(2004, 4, 1), date(2004, 6, 30))]

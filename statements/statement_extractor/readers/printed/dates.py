@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from ...domain.periods import Period
 from .find import TITLE_PATTERNS
 from ...domain.basis import currencies_named
+from .ranges import dotted_date as _dotted, mended_starts, numeric_date as _numeric
 from .tables import YEAR_ONLY, Table, figure_columns, header_text
 
 
@@ -158,6 +159,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     in_order_days = len(header_days) == len(columns) >= 2 and len(set(named)) == len(named) and all(
         not own or own == named or named[index] in own for index, own in enumerate(own_named))
     dated_in_title = {match.group(3): (match.group(1), match.group(2)) for match in _FULL_DATE.finditer(title + " " + header_all)}
+    ranged: set = set()
     for column in columns:
         above = aboves[column]
         numeric = _NUMERIC_DATE.search(above)
@@ -213,6 +215,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         if len(numeric_all) >= 2 and kind != "balance":  # "1/1/2005 to 3/31/2005" (Copel's CVM forms): first to last
             opened, end = _numeric(numeric_all[0]), _numeric(numeric_all[-1])
             periods.update({column: Period(end, opened)} if opened and end and opened < end else {})
+            ranged.add(column)
             continue
         if (numeric is not None or dotted is not None) and not _MONTH_DAY.search(above):
             if numeric is not None:
@@ -257,24 +260,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             periods[column] = Period(end, opened)
             continue
         periods[column] = Period(end, end - timedelta(days=days - 1))
+    mended_starts(periods, ranged)
     return periods
-
-
-def _numeric(match: re.Match) -> date | None:  # month first, "3/31/2005" or "3/31/05"
-    month, day_of, year = (int(part) for part in match.groups())
-    try:
-        return date(year + (2000 if year < 50 else 1900) if year < 100 else year, month, day_of)
-    except ValueError:
-        return None
-
-
-def _dotted(match: re.Match, day_first: bool) -> date | None:
-    first, second, year = (int(part) for part in match.groups())
-    day, month = (first, second) if day_first else (second, first)
-    try:
-        return date(year + (2000 if year < 50 else 1900) if year < 100 else year, month, day)
-    except ValueError:
-        return None
 
 
 def _day_first(text: str) -> bool:
