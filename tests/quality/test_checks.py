@@ -92,3 +92,20 @@ def test_a_smaller_breakdown_read_from_the_tables_own_total_is_the_whole_table()
     # The same shrink read from the row the table calls its total stands: size alone is no reason.
     assert not looks_like_part_of_table(2, 40, 6, 100, "Total net revenue")
     assert not looks_like_part_of_table(2, 40, 6, 100, "Net sales")
+
+
+def test_a_repeat_is_held_only_when_its_source_shows_another_period():
+    # APO's fee-generating credit AUM: $135 billion in Q3 2025 and again in Q3 2026, read from a chart of the quarter alone.
+    def pair(locator):
+        return [_row("credit", 135e9, year="2025", period="Q3", end="2025-09-30", method="ai"),
+                _row("credit", 135e9, year="2026", period="Q3", end="2026-09-30", method="ai", locator=locator)]
+    assert date_order_findings(pair({"quote": "$135 $85 Credit Equity"}), None, _key) == {}
+    assert date_order_findings(pair({"quote": "Uncalled Commitments of $135 billion, up 3% year-over-year"}), None, _key) == {}
+    # A quote that sets an earlier period beside it, or a row printing two figures, may have given the earlier one.
+    held = "the same figure as a year earlier: check the column"
+    assert held in date_order_findings(pair({"quote": "AUM of $140 billion, up from $135 billion a year ago"}), None, _key).values()
+    assert held in date_order_findings(pair({"quote": "Q3 2026 $140 Q3 2025 $135"}), None, _key).values()
+    assert held in date_order_findings(pair({"row_numbers": [135, 140]}), None, _key).values()
+    # A row with one figure states one period; one printing the same figure twice is the company's own repeat.
+    assert date_order_findings(pair({"row_numbers": [135]}), None, _key) == {}
+    assert date_order_findings(pair({"row_numbers": [135, 135]}), None, _key) == {}

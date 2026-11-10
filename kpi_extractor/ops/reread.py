@@ -28,6 +28,12 @@ def _size_held(value: dict) -> bool:
             and any(_SIZE_HOLD.search(note or "") for note in value.get("notes") or []))
 
 
+def _repeat_held(value: dict) -> bool:
+    return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
+            and any(str(note).startswith("the same figure as ") and str(note).endswith(": check the column")
+                    for note in value.get("notes") or []))
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -35,6 +41,8 @@ def _read_by_anchor_rule(value: dict) -> bool:
 SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
     "untraced": ("AI figures read before calls were traced", _untraced),
     "size-holds": ("figures held for their size alone, before checks judged only against the filing", _size_held),
+    "repeat-holds": ("figures held for repeating an earlier period's figure, before a repeat stood when its source "
+                     "states one period", _repeat_held),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }

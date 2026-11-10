@@ -69,3 +69,10 @@ def test_a_years_report_keeps_breakdowns_but_no_metric_figure():
     metric, part = (SimpleNamespace(group=group) for group in spec.groups)
     assert year_figures([metric, part]) == [part]
     assert (spec_kind(spec, "operating.systems"), spec_kind(spec, "products.euv")) == ("metric", "revenue_breakdown")
+
+
+def test_repeat_holds_picks_figures_held_for_repeating_an_earlier_period():
+    values = {1: held("APO", "the same figure as a year earlier: check the column"),
+              2: held("KKR", "the same figure as the quarter before: check the column"),
+              3: held("SUMS", "parts differ from the total by 4%")}
+    assert picked_filings("repeat-holds", values) == {"APO", "KKR"}

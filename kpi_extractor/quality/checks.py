@@ -301,16 +301,43 @@ def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of:
             if jump and not immaterial_row(current) and not stated_in_filing(current["unit"], now, current.get("locator"),
                                                                               current.get("notes"), current.get("kpi_label")):
                 flagged[key_of(current)] = jump
-            elif current["unit"] == "currency" and _significant(now) and _same(now, before) and not _row_shows(current, before, now):
+            elif (current["unit"] == "currency" and _significant(now) and _same(now, before) and not _row_shows(current, before, now)
+                  and not states_one_period(current)):
                 flagged[key_of(current)] = "the same figure as the quarter before: check the column"
         by_end = {v["period_end"][:7]: v for v in rows}
         for current in rows:
             year_ago = by_end.get(f"{int(current['period_end'][:4]) - 1}{current['period_end'][4:7]}")
             if (judged(current) and year_ago and current["unit"] == "currency" and _significant(float(current["value"]))
                     and _same(float(current["value"]), float(year_ago["value"]))
-                    and not _row_shows(current, float(year_ago["value"]), float(current["value"]))):
+                    and not _row_shows(current, float(year_ago["value"]), float(current["value"]))
+                    and not states_one_period(current)):
                 flagged[key_of(current)] = "the same figure as a year earlier: check the column"
     return flagged
+
+
+# Words that put an earlier period beside the figure in a quote ("up from $108 billion a year ago"): only then could the
+# figure read be the earlier one. A growth rate ("up 3% year-over-year") names no earlier figure.
+_EARLIER = re.compile(r"\b(?:a year (?:ago|earlier)|year[- ]ago|prior[- ](?:year|quarter|period)|previous (?:year|quarter)|last "
+                      r"(?:year|quarter)|same (?:period|quarter) (?:of|last)|compared (?:to|with)|versus|vs\.?|(?:up|down) from|from \$)",
+                      re.I)
+_YEAR = re.compile(r"(?<![\d.,$])(?:19|20)\d{2}(?![\d.,])")
+
+
+def states_one_period(current: dict) -> bool:
+    """Whether a figure's source states only its own period, so a repeat of an earlier period's figure is the company's
+    own and not an earlier column or clause read by mistake (APO's fee-generating credit AUM, $135 billion in Q3 2025 and
+    Q3 2026, read from a chart that shows only the quarter): a table row with one figure, or a quote that names no
+    earlier period or year. Owner, 2026-11-10: a repeat alone is no reason to hold a figure its filing states."""
+    locator = current.get("locator") or {}
+    numbers = [number for number in locator.get("row_numbers") or [] if number is not None]
+    if numbers:
+        return len(numbers) == 1
+    quote = str(locator.get("quote") or "")
+    if not quote:
+        return False
+    years = {int(year) for year in _YEAR.findall(quote)}
+    own = {int(str(current.get("period_end") or "0")[:4]), int(str(current.get("fiscal_year") or "0") or 0)}
+    return not _EARLIER.search(quote) and years <= own
 
 
 def _row_shows(current: dict, other: float, now: float) -> bool:
