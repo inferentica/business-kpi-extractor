@@ -76,3 +76,9 @@ def test_repeat_holds_picks_figures_held_for_repeating_an_earlier_period():
               2: held("KKR", "the same figure as the quarter before: check the column"),
               3: held("SUMS", "parts differ from the total by 4%")}
     assert picked_filings("repeat-holds", values) == {"APO", "KKR"}
+
+
+def test_sum_holds_picks_breakdowns_whose_parts_did_not_add_up():
+    values = {1: held("KKR", "parts differ from the total by 21.6%"), 2: held("GS", "lines differ from Management Fees by 3%"),
+              3: held("APO", "the same figure as a year earlier: check the column")}
+    assert picked_filings("sum-holds", values) == {"KKR", "GS"}

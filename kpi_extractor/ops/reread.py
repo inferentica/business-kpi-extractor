@@ -34,6 +34,11 @@ def _repeat_held(value: dict) -> bool:
                     for note in value.get("notes") or []))
 
 
+def _sum_held(value: dict) -> bool:
+    return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
+            and any(str(note).startswith(("parts differ from the total", "lines differ from ")) for note in value.get("notes") or []))
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -43,6 +48,8 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
     "size-holds": ("figures held for their size alone, before checks judged only against the filing", _size_held),
     "repeat-holds": ("figures held for repeating an earlier period's figure, before a repeat stood when its source "
                      "states one period", _repeat_held),
+    "sum-holds": ("figures held because their breakdown's parts or lines did not add up, read again once the KPI list "
+                  "says which line sits within which (KKR's capital markets fees within its transaction fees)", _sum_held),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }
