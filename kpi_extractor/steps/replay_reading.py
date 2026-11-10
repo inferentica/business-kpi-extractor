@@ -10,7 +10,9 @@ from ..ai import GroupSpec, Located, Spec
 from ..documents.document import Document
 from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
-from ..readers.replay import _source_template, replay
+from ..readers.anchor import KIND as ANCHOR, anchor_locator
+from ..readers.replay import _source_template, replay, reported_period
+from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..readers.trace import trace_replay
 from .shared import AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI
 
@@ -84,11 +86,13 @@ class ReplayReading:
                 parts = [(mine, Spec.model_validate({"groups": [group.model_dump()]}), group.key)]
             for locators, part, key in parts:
                 found = self._replay_part(document, part, locators, expected, currency)
+                if isinstance(found, str) and kpi_by_kpi(group) and "quote" in locators[key]:
+                    found = self._by_rule(document, part, locators, key, expected, currency, found)
                 if isinstance(found, str):
                     missed(found)
                     continue
                 located, read = found
-                missed(REPLAYED)
+                missed(f"read by learned rule {ANCHOR}" if read[0].locator.get("rule") else REPLAYED)
                 trace_replay(read, locators, history, accession)
                 items += read
                 done.add(key)
@@ -104,9 +108,17 @@ class ReplayReading:
         located = replay(document, locators, expected, int(period[1]) if period.startswith("Q") else None)
         if isinstance(located, str):
             return located
+        return self._checked(document, part, located, expected, currency)
+
+    def _checked(self, document: Document, part: Spec, located: Located, expected: date, currency: str | None,
+                 mark: dict | None = None) -> tuple[Located, list[ReadValue]] | str:
+        """A reading code made (a replay, or a learned rule's), kept only when it passes every check a Flash-only
+        reading must. `mark` names the rule that read it, on each value's locator."""
         keys = {group.key for group in part.groups}
         read, problems = read_values(document, part, located, currency)
         read = [item for item in read if item.group.key in keys]
+        for item in read:
+            item.locator.update(mark or {})
         read, problems = self._drop_wrong_columns(read, problems, document, located, expected)
         if problems or not read:
             return "a check failed"
@@ -115,6 +127,42 @@ class ReplayReading:
         if not keys <= self._confirmed_groups(located, read, part, expected, document):
             return "not confirmed where it was or by the year-ago column"
         return located, read
+
+    def _by_rule(self, document: Document, part: Spec, locators: dict[str, dict], key: str, expected: date,
+                 currency: str | None, miss: str) -> tuple[Located, list[ReadValue]] | str:
+        """A quoted metric KPI replay could not find, tried by the anchor-phrase rule. Live, its reading stands (but in
+        one filing in ten the AI reads too, as a spot check); in shadow, or spot-checked, it waits beside the AI's
+        reading and the two are compared (_settle_rule_evidence). Otherwise the replay's miss stands."""
+        status = (getattr(self, "learned_rules", None) or {}).get(ANCHOR)
+        if status not in (SHADOW, LIVE):
+            return miss
+        found = anchor_locator(document, key, locators[key])
+        if isinstance(found, str):
+            return miss
+        locator, anchor = found
+        located = Located(period_end=reported_period(document, expected).isoformat(), values=[locator])
+        checked = self._checked(document, part, located, expected, currency, {"rule": ANCHOR, "anchor": anchor})
+        if isinstance(checked, str):
+            return miss
+        accession = getattr(self._local, "accession", None)
+        if status == LIVE and accession and not spot_checked(accession):
+            return checked
+        self._local.__dict__.setdefault("rule_candidates", {})[key] = ("spot-check" if status == LIVE else SHADOW, checked[1][0])
+        return miss
+
+    def _settle_rule_evidence(self, accession: str, read: list[ReadValue]) -> None:
+        """Each learned rule's figure beside the AI's accepted reading of the same KPI in this filing: the evidence the
+        service promotes or demotes the rule by. A KPI the AI did not read gives no evidence either way."""
+        candidates = getattr(self._local, "rule_candidates", None) or {}
+        self._local.rule_candidates = {}
+        accepted = {f"{item.group.key}.{item.kpi.key}": item for item in read
+                    if not item.locator.get("rule") and item.status != "rejected"}
+        for key, (mode, item) in candidates.items():
+            if key in accepted:
+                row = evidence(ANCHOR, mode, accession, key, item, accepted[key])
+                self.result.rule_evidence.append(row)
+                outcome = f"{ANCHOR} {mode} {'agreed' if row['agreed'] else 'disagreed'}"
+                self.result.replay_outcomes[outcome] = self.result.replay_outcomes.get(outcome, 0) + 1
 
     def _not_reported_before(self, accession: str | None, expected: date) -> set[str]:
         """KPIs the nearest reading's AI looked for and did not find: not looked for again this quarter. In the newest

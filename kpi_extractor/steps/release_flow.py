@@ -155,7 +155,9 @@ class ReleaseFlow:
                 return ai.prompt(self.company, self._prompt_document(document, spec), ai.LOCATE_TASK,
                                  ai.locate_data(period_hint, subset or spec, self._hints(expected) if hints else {}))
 
+            self._local.accession, self._local.rule_candidates = ref.accession, {}
             read, problems, located = self._read(text, document, spec, expected, version)
+            self._settle_rule_evidence(ref.accession, read)
             self._keep_listed_series(read)
             how = _READ_BY_REPLAY if getattr(self._local, "replayed", False) else _READ_BY_AI
             period_problem = check_period(located, expected)

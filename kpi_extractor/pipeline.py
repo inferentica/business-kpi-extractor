@@ -60,6 +60,7 @@ class SymbolResult:
     flash_only_reads: int = 0
     replayed_reads: int = 0
     replay_outcomes: dict = field(default_factory=dict)  # per group: "replayed", or why the AI read it
+    rule_evidence: list = field(default_factory=list)  # learned rules' figures beside the AI's (ops/learned.py)
     # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.
     q4_gaps: list[str] = field(default_factory=list)
     skipped: bool = False
@@ -158,6 +159,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self._curations = {(row["group_key"], row["members_key"]): list(row["chosen"])
                            for row in state.get("curations") or []}
         self.store.load(state.get("values") or [], state.get("filings") or [], state.get("ownerRejected") or [])
+        self.learned_rules = {row["kind"]: row["status"] for row in state.get("learnedRules") or []}
         self.names = (state.get("spec") or {}).get("names") or {}
         # Which filing gave each stored statement period: a quarter read from releases belongs to the newest release
         # that presents it.
@@ -279,6 +281,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.write(self._derive(spec))
         self.store.write(self._harmonize_labels())
         self.store.write(self.store.reread_disagreements())
+        if self.result.rule_evidence:
+            self.log(f"{self.symbol}: learned rules now {self.store.rule_evidence(self.result.rule_evidence)}")
         self.store.release()
         self.result.q4_gaps = self._q4_gaps()
         self.result.served_changes = self.store.served_changes()

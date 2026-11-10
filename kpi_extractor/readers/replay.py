@@ -10,6 +10,7 @@ from datetime import date
 from ..ai import Located, Locator, TableLocator
 from ..documents.document import Document, Table, clean, parse_number
 from ..quality.checks import PERIOD_TOLERANCE_DAYS
+from .anchor import anchor_words
 from .extract import _row_label, column_header
 from ..xbrl import member_key
 
@@ -33,7 +34,11 @@ def _template(text: str) -> str:
 
 
 def _same_place(now: dict, before: dict) -> bool:
-    """Whether a KPI was found where it was last quarter: the same table row label, or the same sentence shape."""
+    """Whether a KPI was found where it was last quarter: the same table row label, or the same sentence shape; for a
+    learned rule's reading, the same words before the figure (readers/anchor.py)."""
+    if now.get("anchor") and "quote" in before:
+        words = tuple(str(now["anchor"]).split())
+        return anchor_words(before["quote"], before.get("value_text") or "", len(words)) == words
     if "quote" in now and "quote" in before:
         return _template(now["quote"]) == _template(before["quote"])
     if "row_label" in now and "row_label" in before:

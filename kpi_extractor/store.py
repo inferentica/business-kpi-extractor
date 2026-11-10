@@ -213,6 +213,14 @@ class CompanyStore:
     def spec(self, payload: dict) -> None:
         self.control.call("store", symbol=self.symbol, spec=payload)
 
+    def rule_evidence(self, rows: list[dict]) -> list:
+        """Learned rules' evidence from this company, and each rule's state after it (the service moves states)."""
+        states: list = []
+        for start in range(0, len(rows), 500):
+            reply = self.control.call("store", symbol=self.symbol, filings=[], values=[], ruleEvidence=rows[start:start + 500])
+            states = (reply or {}).get("rules") or states
+        return states
+
     def curation(self, group_key: str, members_key: str, chosen: list[str]) -> None:
         self.control.call("store", symbol=self.symbol, filings=[], values=[], curations=[
             {"group_key": group_key, "members_key": members_key, "chosen": chosen}])
