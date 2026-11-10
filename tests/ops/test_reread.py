@@ -44,3 +44,17 @@ def test_a_retrace_is_the_untraced_selector():
         return SymbolPipeline(control, "TSM", quarters=4, force=False, log=lambda *_: None, **options).reread
     assert run(retrace=True) == "untraced" and run(reread="size-holds") == "size-holds" and run() is None
     assert parse_args(["--reread", "size-holds"]).reread == "size-holds"
+
+
+def test_a_selective_run_reads_only_what_its_selector_picked():
+    from kpi_extractor.steps.release_flow import ReleaseFlow
+    values = {1: held("JUMP", "changed 2.4x in a quarter")}
+    run = SimpleNamespace(values=values, reread="size-holds", log=lambda *_: None, filings={}, force=False)
+    run._reread_due = lambda accession: FilingLoading._reread_due(run, accession)
+    picked, new = SimpleNamespace(accession="JUMP", role="earnings_release"), SimpleNamespace(accession="NEW", role="periodic_report")
+    # A filing never read is due in an ordinary run; in a selective one it waits for an ordinary run.
+    assert FilingLoading._pending(run, picked) and not FilingLoading._pending(run, new)
+    # A release due for another reason (here: never read) is not read either.
+    assert ReleaseFlow._read_release(run, SimpleNamespace(accession="OTHER"), None, 2) is None
+    ordinary = SimpleNamespace(values=values, reread=None, filings={})
+    assert FilingLoading._pending(ordinary, new)

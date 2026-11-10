@@ -30,7 +30,11 @@ class FilingLoading:
         return accession in self._reread_picked
 
     def _pending(self, ref: FilingRef) -> bool:
-        """Whether a filing still has to be read (a spec change can still re-read a finished release)."""
+        """Whether a filing still has to be read (a spec change can still re-read a finished release). In a selective
+        re-read only what its selector picked: whatever else an ordinary run would read waits for one, so the run
+        costs and changes what its selector says (GS's pending list-version re-read came along with a 2-filing trial)."""
+        if getattr(self, "reread", None):
+            return self._reread_due(ref.accession)
         previous = self.filings.get(ref.accession)
         return not previous or (previous["status"] not in _DONE and previous.get("attempts", 0) < _MAX_ATTEMPTS) or (
             ref.role == "periodic_report" and _XBRL_READER not in (previous.get("notes") or []))

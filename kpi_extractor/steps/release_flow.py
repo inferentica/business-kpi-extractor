@@ -132,6 +132,8 @@ class ReleaseFlow:
 
     def _read_release(self, ref: FilingRef, spec: Spec, version: int) -> FilingReading | None:
         previous = self.filings.get(ref.accession)
+        if getattr(self, "reread", None) and not self._reread_due(ref.accession):
+            return None  # a selective re-read reads only what its selector picked
         if not self.force and previous and previous.get("spec_version") == version and (
                 previous["status"] in _DONE or previous.get("attempts", 0) >= _MAX_ATTEMPTS) and not release_reread_due(previous) \
                 and not self._reader3_due(previous, ref.accession) and not self._skipped_groups_due(previous, ref.accession, spec) \
@@ -353,8 +355,8 @@ class ReleaseFlow:
         each other in date order, as reading them one by one would have."""
         before = {key for key, value in self.values.items() if value["method"] == "ai"}
         self._dead = self._never_verified()
-        pending = [ref for ref in refs if self.force or self._pending(ref) or self._reread_due(ref.accession) or
-                   (self.filings.get(ref.accession) or {}).get("spec_version") != version]
+        pending = [ref for ref in refs if self._reread_due(ref.accession)] if getattr(self, "reread", None) else [
+            ref for ref in refs if self.force or self._pending(ref) or (self.filings.get(ref.accession) or {}).get("spec_version") != version]
         done: set[str] = set()
 
         def read(ref: FilingRef) -> None:
