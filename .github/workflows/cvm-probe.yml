@@ -1,4 +1,4 @@
-# One-off probe: can a GitHub worker reach CVM's open data, and what do Copel's quarterly forms hold there?
+# One-off probe: CVM's register of listed companies, for the CNPJs of the Brazilian companies listed in the US.
 name: cvm-probe
 on:
   push:
@@ -7,28 +7,19 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Copel's rows from CVM's ITR and DFP files
+      - name: CVM register rows for our names
+        shell: python
         run: |
-          set -u
-          mkdir -p out && cd out
-          base=https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC
-          curl -sS -o itr_index.html -w "itr index %{http_code}\n" $base/ITR/DADOS/
-          curl -sS -o dfp_index.html -w "dfp index %{http_code}\n" $base/DFP/DADOS/
-          grep -o '[a-z_]*_[0-9]\{4\}\.zip' itr_index.html dfp_index.html | sort -u > files.txt || true
-          cat files.txt
-          for f in ITR/DADOS/itr_cia_aberta_2011.zip ITR/DADOS/itr_cia_aberta_2018.zip ITR/DADOS/itr_cia_aberta_2024.zip DFP/DADOS/dfp_cia_aberta_2024.zip; do
-            name=$(basename $f .zip)
-            curl -sS -o $name.zip -w "$name %{http_code} %{size_download}\n" $base/$f || continue
-            mkdir -p $name && unzip -q -o $name.zip -d $name || continue
-            ls -la $name | head -40
-            for csv in $name/*.csv; do
-              head -1 "$csv" | iconv -f latin1 -t utf-8 > "copel_$(basename $csv)"
-              iconv -f latin1 -t utf-8 "$csv" | grep -iE "PARANAENSE DE ENERGIA|76\.483\.817" >> "copel_$(basename $csv)" || true
-            done
-            rm -rf $name $name.zip
-          done
-          wc -l copel_* | tail -40
-      - uses: actions/upload-artifact@v6
-        with:
-          name: cvm-probe
-          path: out/
+          import csv, io, re, urllib.request
+          url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
+          text = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "TradeTracker admin@inferentica.com"}), timeout=120).read().decode("latin-1")
+          rows = list(csv.DictReader(io.StringIO(text), delimiter=";"))
+          print(list(rows[0].keys()))
+          names = ["AMBEV", "AZUL", "BRADESCO", "BRASKEM", "SANTANDER", "BRASILAGRO", "SANEAMENTO BASICO DO ESTADO DE SAO PAULO",
+                   "EMBRAER", "ENERGETICA DE MINAS GERAIS", "GERDAU S", "ITAU UNIBANCO HOLDING", "SIDERURGICA NACIONAL",
+                   "PETROLEO BRASILEIRO", "SUZANO S", "TELEFONICA BRASIL", "TIM S", "TIM PARTICIPACOES", "ULTRAPAR", "VALE S",
+                   "BR PARTNERS", "INTER & CO", "NU HOLDINGS", "PARANAENSE"]
+          for row in rows:
+              name = row.get("DENOM_SOCIAL", "")
+              if any(n in name.upper() for n in names):
+                  print(row.get("CNPJ_CIA"), row.get("CD_CVM"), row.get("SIT"), row.get("CATEG_REG"), row.get("SETOR_ATIV"), "|", name)
