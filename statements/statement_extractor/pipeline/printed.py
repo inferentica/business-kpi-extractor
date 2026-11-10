@@ -17,7 +17,7 @@ from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
 from ..readers.printed.sign_index import printed_figures
 from ..readers.printed.summary import read_summaries
-from ..readers.printed.titled import split_titled
+from ..readers.printed.titled import headed_kinds, split_titled
 from ..readers.slides.parse import is_slides, parse_slides
 from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
@@ -144,7 +144,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             continue
         printed_titles, document_notes = split_titled(document_notes)
         if titled is not None:
-            titled |= printed_titles
+            titled |= printed_titles | {(kind,) for kind in headed_kinds(content)}
         if signs is not None:
             parse = {"html": parse_html, "text": parse_text, "slides": parse_slides}[printed]
             for key, figures in printed_figures(parse(content)).items():

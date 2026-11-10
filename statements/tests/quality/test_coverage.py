@@ -67,3 +67,15 @@ def test_a_found_statement_notes_the_own_periods_it_prints():
     notes = titled_notes("income", periods, date(2011, 6, 30), "1231", 0) + ["income: no single scale stated"]
     assert split_titled(notes) == ({("income", "2011", "Q2", "ytd")}, ["income: no single scale stated"])
     assert titled_notes("balance", {}, date(2011, 6, 30), "1231", 0) == ["titled: balance"]
+
+
+def test_a_statement_heading_in_the_text_counts_without_tables():
+    from statement_extractor.readers.printed.titled import headed_kinds
+    figures = " ".join(f"{n},{n:03d}" for n in range(1, 13))
+    # UBS since 2023: pages laid out without tables, the statements headed in the text.
+    page = f"<div>Income statement</div><div>For the quarter ended USD m Note 31.3.24 31.12.23 31.3.23 {figures}</div>"
+    assert headed_kinds(page) == {"income"}
+    # A sentence naming a statement, or a heading run into a sentence, is no statement.
+    assert headed_kinds(f"compares the Group balance sheet as at 31 March 2011 with {figures}") == set()
+    assert headed_kinds(f"income statement commentaries compare the three months ended 31 March 2011 {figures}") == set()
+    assert headed_kinds("Balance sheet as at 31 March 2011: ratios 148% 154% 116% 120% 49% 50% 61% 62% 70%") == set()

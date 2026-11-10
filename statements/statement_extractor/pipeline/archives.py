@@ -12,7 +12,7 @@ from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period
 from ..readers.pdf.layout import pdf_text
 from ..readers.printed.summary import read_summaries
-from ..readers.printed.titled import split_titled
+from ..readers.printed.titled import headed_kinds, split_titled
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.archives import archived, fetch
@@ -43,7 +43,7 @@ def read_archives(symbol: str, fiscal_year_end: str, year_offset: int, log=print
                 notes.append(f"{item.url.rsplit('/', 1)[-1]}: unreadable ({type(error).__name__}: {str(error)[:80]})")
                 continue
             printed_titles, document_notes = split_titled(document_notes)
-            titled |= printed_titles
+            titled |= printed_titles | {(kind,) for kind in headed_kinds(text)}
             basis, currency = stated_basis(text), stated_currency(text)
             if summaries is not None and form in ("20-F", "ARS"):
                 for figure in read_summaries(parse_text(text), accession=first.accession, form=form, filed=first.filed,
