@@ -59,6 +59,24 @@ class Figure:
     # What the group's list says each KPI is a line of, for a parent that was not read.
     listed_parents: dict[str, str | None] = field(default_factory=dict)
     source: object = None
+    # Where it was read: its filing and the table cell, so a cell read twice counts once.
+    cell: tuple | None = None
+
+
+def cell_of(locator: object, accession: object = None) -> tuple | None:
+    if not isinstance(locator, dict) or locator.get("table") is None or locator.get("row") is None or locator.get("col") is None:
+        return None
+    return (accession, str(locator["table"]), int(locator["row"]), int(locator["col"]))
+
+
+def _once(figures: list[Figure]) -> list[Figure]:
+    """One figure per cell: UnitedHealthcare's Employer & Individual row was read as the list's Domestic and again under
+    its own name, and counted twice its parts overshot the total by 36%. A listed KPI's reading is the one kept."""
+    first: dict[tuple, Figure] = {}
+    for figure in sorted(figures, key=lambda item: item.key not in item.listed_parents):
+        if figure.cell is not None:
+            first.setdefault(figure.cell, figure)
+    return [figure for figure in figures if figure.cell is None or first[figure.cell] is figure]
 
 
 @dataclass
@@ -91,7 +109,9 @@ def findings(checks: Iterable[Check], figures: list[Figure], widened: bool = Fal
 
 
 def _top_level(parts: list[Figure]) -> list[Figure]:
-    """The parts a total is made of: those the list puts at the top, and the lines of a parent not read this quarter."""
+    """The parts a total is made of: those the list puts at the top, and the lines of a parent not read this quarter,
+    each cell once."""
+    parts = _once(parts)
     read = {figure.key for figure in parts}
 
     def counted(figure: Figure) -> bool:
@@ -135,6 +155,7 @@ def _breakdown_adds_up(figures: list[Figure], **_context) -> list[Finding]:
 def _lines_add_up(figures: list[Figure], **_context) -> list[Finding]:
     """Each parent the list names against its lines: a parent and its lines that do not add up need review."""
     found = []
+    figures = _once(figures)
     for parent in figures:
         lines = [figure for figure in figures if figure.parent == parent.key]
         if not lines or not parent.value:
@@ -212,7 +233,7 @@ def reading_figures(items: list) -> list[Figure]:
     listed = {kpi.key: kpi.parent for kpi in items[0].group.kpis}
     return [Figure(group=item.group.key, kind=item.group.kind, key=item.kpi.key, unit=item.kpi.unit, value=item.value,
                    is_total=item.is_total or item.kpi.key == item.group.total_kpi, parent=item.kpi.parent, label=item.kpi.label,
-                   listed_parents=listed, source=item) for item in items]
+                   listed_parents=listed, source=item, cell=cell_of(item.locator)) for item in items]
 
 
 def _flag(items: Iterable, note: str) -> None:
@@ -381,7 +402,8 @@ def row_figures(rows: list[dict], parents: dict[tuple[str, str], str] | None = N
     listed = {key: parent for (group, key), parent in parents.items() if group == rows[0]["group_key"]}
     figures = [Figure(group=row["group_key"], kind=row["group_kind"], key=row["kpi_key"], unit=row["unit"], value=float(row["value"]),
                       parent=listed.get(row["kpi_key"]) or (row.get("locator") or {}).get("parent"), label=row["kpi_label"],
-                      method=row["method"], listed_parents=listed, source=row)
+                      method=row["method"], listed_parents=listed, source=row,
+                      cell=cell_of(row.get("locator"), row.get("source_accession")))
                for row in rows]
     total = next((t for row in rows if isinstance(t := (row.get("locator") or {}).get("total"), (int, float))), None)
     if total is not None:

@@ -265,3 +265,17 @@ def test_a_re_read_keeps_the_exact_figure_over_its_rounding():
     written = {row["kpi_key"]: row["value"] for row in store.reread_disagreements()}
     # The rounded ones go back to the exact figures served before; a more exact new reading stands unheld.
     assert written == {"uncalled": 107_592_000_000.0, "credit": 5.25, "raised_q3": 25_171_000_000.0}
+
+
+def test_a_found_row_on_a_listed_kpis_cell_is_set_aside_as_its_copy():
+    from kpi_extractor.store import cell_copies
+    record = lambda key, value, row=16: {"group_key": "kpi_customers", "kpi_key": key, "kpi_label": key, "fiscal_year": "2016",
+        "fiscal_period": "Q2", "value": value, "validation_status": "verified", "notes": [], "locator": {"table": "A_T8", "row": row, "col": 1}}
+    records = [record("employer_individual_domestic", 13_509.0), record("unitedhealthcareemployerandindividual", 13_509.0),
+               record("medicare_retirement", 13_000.0, row=18)]
+    listed = {("kpi_customers", "employer_individual_domestic"): (None, None), ("kpi_customers", "medicare_retirement"): (None, None)}
+    out = {item["kpi_key"]: item for item in cell_copies(records, listed)}
+    assert out["unitedhealthcareemployerandindividual"]["validation_status"] == "rejected"
+    assert out["unitedhealthcareemployerandindividual"]["notes"] == ["the same cell as employer_individual_domestic"]
+    assert out["employer_individual_domestic"]["validation_status"] == out["medicare_retirement"]["validation_status"] == "verified"
+    assert cell_copies(records, {}) == records  # no list known: nothing is decided

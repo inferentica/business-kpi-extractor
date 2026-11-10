@@ -109,3 +109,20 @@ def test_a_repeat_is_held_only_when_its_source_shows_another_period():
     # A row with one figure states one period; one printing the same figure twice is the company's own repeat.
     assert date_order_findings(pair({"row_numbers": [135]}), None, _key) == {}
     assert date_order_findings(pair({"row_numbers": [135, 135]}), None, _key) == {}
+
+
+def test_a_cell_read_twice_counts_once():
+    # UnitedHealthcare's Employer & Individual row read as the list's Domestic and again under its own name: counted
+    # twice, the parts overshot the total by 36%.
+    cell = {"table": "A_T8", "row": 16, "col": 1, "total": 37_556.0}
+    rows = [_row("employer_individual_domestic", 13_509.0, locator=dict(cell), source_accession="X"),
+            _row("unitedhealthcareemployerandindividual", 13_509.0, locator=dict(cell), source_accession="X"),
+            _row("employer_individual_global", 1_490.0, locator={**cell, "row": 17}, source_accession="X"),
+            _row("medicare_retirement", 13_000.0, locator={**cell, "row": 18}, source_accession="X"),
+            _row("community_state", 9_557.0, locator={**cell, "row": 19}, source_accession="X")]
+    assert parts_add_up(rows, {("kpi_rev", "employer_individual_domestic"): None, ("kpi_rev", "employer_individual_global"): None,
+                               ("kpi_rev", "medicare_retirement"): None, ("kpi_rev", "community_state"): None})
+    # The same figure from another filing's same cell is another reading, not a copy.
+    other = [dict(row) for row in rows]
+    other[1]["source_accession"] = "Y"
+    assert not parts_add_up(other)

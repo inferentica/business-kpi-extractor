@@ -133,6 +133,7 @@ class CompanyStore:
                 # A group not read this run keeps its rows (flagged, and so not served): they are why it is not read.
                 and value["group_key"].removeprefix(AI_GROUP_PREFIX) not in (unread_groups or set())
             ]
+        records = cell_copies(records, self.windows)
         filing = {
             "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(), "document_role": ref.role,
             "period_end": reading.period_end.isoformat() if reading.period_end else None, "fiscal_year": reading.fiscal_year,
@@ -368,3 +369,26 @@ def _changed(row, stored) -> bool:
         elif (mine or None) != (theirs or None):
             return True
     return False
+
+
+def cell_copies(records: list[dict], listed: object) -> list[dict]:
+    """A row a reading found that its list does not have, read from the very cell one of the list's KPIs of its group was
+    read from in the same period, is that KPI's copy, not a line of its own: set aside, so it is never served beside it
+    (UnitedHealthcare's "UnitedHealthcare Employer & Individual" row, stored again beside the list's Domestic)."""
+    if not listed:
+        return records
+    def cell(record: dict) -> tuple | None:
+        locator = record.get("locator") or {}
+        if not isinstance(locator, dict) or locator.get("table") is None or locator.get("row") is None or locator.get("col") is None:
+            return None
+        return (record["group_key"], record["fiscal_year"], record["fiscal_period"], str(locator["table"]), int(locator["row"]), int(locator["col"]))
+    owners = {cell(record): record for record in records if record["validation_status"] != "rejected"
+              and (record["group_key"], record["kpi_key"]) in listed and cell(record) is not None}
+    out = []
+    for record in records:
+        owner = owners.get(cell(record)) if (record["group_key"], record["kpi_key"]) not in listed else None
+        if owner is not None and record["validation_status"] != "rejected" and float(owner["value"]) == float(record["value"]):
+            record = {**record, "validation_status": "rejected",
+                      "notes": [*(record.get("notes") or []), f"the same cell as {owner.get('kpi_label') or owner['kpi_key']}"]}
+        out.append(record)
+    return out
