@@ -26,6 +26,9 @@ from .scales import line_scale, share_scale, statement_scale, states_two
 from .find import TITLES, find_statements, unlabelled_totals
 from .side_by_side import column_scopes
 from .tables import Table, figure_columns
+from .titled import titled_notes
+
+_FOREIGN_FORMS = ("20-F", "40-F", "6-K")
 
 
 def _concept(label: str, kind: str) -> str:
@@ -54,6 +57,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     read_periods: dict[tuple, set] = {}  # by kind and scope: Copel prints the parent's quarter, then the group's
     for kind, group in found:
         periods = column_periods(kind, group, fiscal_year_end, document_end)
+        notes.extend(titled_notes(kind, periods, document_end, fiscal_year_end, year_offset))
         seen = (kind, _scope(group, form))
         if seen in read_periods:
             # A statement printed again gives only the periods it prints of its own: Chase's 1995 10-Qs print the three
@@ -93,8 +97,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
                 break
             layout.append((table, columns))
         for index in kept:
-            period = periods[dated[index]]
-            labelled = label_period(period, fiscal_year_end, year_offset)
+            labelled = label_period(period := periods[dated[index]], fiscal_year_end, year_offset)
             if labelled is None:
                 notes.append(f"{kind}: column {period.key} off the calendar")
                 continue
@@ -109,9 +112,6 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes
-
-
-_FOREIGN_FORMS = ("20-F", "40-F", "6-K")
 
 
 def _scope(group: list[Table], form: str) -> str:

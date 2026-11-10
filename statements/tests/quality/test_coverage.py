@@ -40,3 +40,30 @@ def test_a_quarter_derivable_on_a_shared_basis_counts_apart():
     assert found["quarters_derivable"] == 3 and "2013 Q2 income" not in found["quarters_missing"]
     bases[("income", "2013", "FY", "year")] = {"IFRS"}
     assert release_coverage(filings, kept, bases=bases)["quarters_derivable"] == 2
+
+
+def test_a_quarter_counts_only_the_statements_its_releases_print():
+    from statement_extractor.quality.coverage import release_coverage
+    # Lloyds 2011: Q1 and Q3 updates print no statements, the half-year prints six months, the year's results its
+    # three months' income; a release that could not be opened counts every statement.
+    filings = [{"form": "6-K", "release_quarter": ["2011", "Q1"], "titled": [], "notes": []},
+               {"form": "6-K", "release_quarter": ["2011", "Q2"], "notes": [],
+                "titled": [["income", "2011", "Q2", "ytd"], ["balance", "2011", "Q2", "instant"],
+                           ["cash_flow", "2011", "Q2", "ytd"]]},
+               {"form": "6-K", "release_quarter": ["2011", "Q3"], "note": "unreadable (HTTPError: 500)"},
+               {"form": "6-K", "release_quarter": ["2011", "Q4"], "titled": [["income"]], "notes": []}]
+    kept = {("balance", "2011", "Q2", "instant"), ("cash_flow", "2011", "Q2", "ytd")}
+    found = release_coverage(filings, kept)
+    assert (found["quarters_expected"], found["quarters_kept"]) == (6, 2)
+    assert found["quarters_missing"] == ["2011 Q3 income", "2011 Q3 balance", "2011 Q3 cash_flow", "2011 Q4 income"]
+    assert found["quarters_unprinted_list"] == ["2011 Q1 income", "2011 Q1 balance", "2011 Q1 cash_flow", "2011 Q2 income"]
+
+
+def test_a_found_statement_notes_the_own_periods_it_prints():
+    from datetime import date
+    from statement_extractor.domain.periods import Period
+    from statement_extractor.readers.printed.titled import split_titled, titled_notes
+    periods = {1: Period(date(2011, 6, 30), date(2011, 1, 1)), 2: Period(date(2010, 6, 30), date(2010, 1, 1))}
+    notes = titled_notes("income", periods, date(2011, 6, 30), "1231", 0) + ["income: no single scale stated"]
+    assert split_titled(notes) == ({("income", "2011", "Q2", "ytd")}, ["income: no single scale stated"])
+    assert titled_notes("balance", {}, date(2011, 6, 30), "1231", 0) == ["titled: balance"]
