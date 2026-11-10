@@ -305,3 +305,25 @@ def test_a_header_compares_without_its_quarters_name_or_its_dates_form():
             ("three months endedseptember #", "three months ended @ #"), ("quarterly trends #q#", "quarterly trends <third quarter>")]
     assert all(comparable_header(a) == comparable_header(b) for a, b in same)
     assert comparable_header("three months ended @ #") != comparable_header("six months ended @ #")
+
+
+def _replayed(before: str, value: str, now: str):
+    document = parse_document(f"<p>{now}</p>", URL.format(n=2))
+    block = next(iter(document.blocks))
+    found = replay(document, {"operating.members": {"block": block, "quote": before, "value_text": value}}, Q2)
+    return found if isinstance(found, str) else found.values[0].value_text
+
+
+def test_a_sentences_dates_and_other_figures_change_with_the_quarter():
+    assert _replayed("DAP was 2.26 billion on average for December 2019, an increase of 11% year-over-year.", "2.26 billion",
+                     "DAP was 2.36 billion on average for March 2020, an increase of 12% year-over-year.") == "2.36 billion"
+    assert _replayed("ARR increased $435 million quarter-over-quarter to $10.69 billion", "$10.69 billion",
+                     "ARR increased $518 million quarter-over-quarter to $11.21 billion") == "$11.21 billion"
+    assert _replayed("Perpetual Capital AUM as of 3Q'22 was comprised of Athene ($229 billion)", "$229 billion",
+                     "Perpetual Capital AUM as of 4Q'22 was comprised of Athene ($236 billion)") == "$236 billion"
+    assert _replayed("$48bn $97bn$153bn", "$153bn", "$50bn $90bn$156bn") == "$156bn"
+
+
+def test_a_value_that_repeats_in_its_sentence_is_never_replayed():
+    # Which 192 was read (last quarter's column or this quarter's) is not recorded: the AI reads it again.
+    assert _replayed("Equity1 189 192 192 1.6% 792 761", "192", "Equity1 189 192 201 6.3% 802 773") == "value repeats in the sentence"

@@ -17,8 +17,9 @@ _MONTHS = ("january", "february", "march", "april", "may", "june", "july", "augu
            "november", "december")
 _DATE = re.compile(r"\b(" + "|".join(_MONTHS) + r")\s+(\d{1,2}),?\s+(20\d{2})\b", re.I)
 _PERIOD_WORD = (r"\b(?:" + "|".join(_MONTHS) + r"|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec"
-                r"|first|second|third|fourth|q[1-4])\b")
-_TOKEN = re.compile(r"\d[\d.,]*|" + _PERIOD_WORD, re.I)
+                r"|first|second|third|fourth|q[1-4]|[1-4]q)\b")
+# Period words first, so a quarter's label ("3Q'22") is one period word, not a number glued to a letter.
+_TOKEN = re.compile(_PERIOD_WORD + r"|\d[\d.,]*", re.I)
 _YEAR = re.compile(r"\b(20\d{2})\b|(?:\bQ[1-4]|\b[1-4]Q|\bFY)\s*'?(\d{2})\b|'(\d{2})\b", re.I)
 
 _PERIOD_WORDS = re.compile(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
@@ -155,8 +156,10 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:
     start = quote.find(value_text)
     if not quote or start < 0:
         return "quote not recorded"
+    if quote.count(value_text) > 1:
+        return "value repeats in the sentence"  # "Equity 189 192 192": which 192 was read is not recorded
     tokens = list(_TOKEN.finditer(quote))
-    numbers = [token for token in tokens if token.group()[0].isdigit()]
+    numbers = [token for token in tokens if _is_number(token)]
     # The number the value was read from: the first one inside value_text.
     index = next((i for i, token in enumerate(numbers) if start <= token.start() < start + len(value_text)), None)
     if index is None:
@@ -169,11 +172,11 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:
         pattern, position, group, value_group = [], 0, 0, None
         for token in tokens:
             pattern.append(re.escape(quote[position:token.start()]))
-            if token is numbers[index] or (loose and token.group()[0].isdigit() and not _names(quote, token)):
+            if token is numbers[index] or (loose and _is_number(token) and not _names(quote, token)):
                 group += 1
                 value_group = group if token is numbers[index] else value_group
                 pattern.append(r"(\d[\d.,]*)")
-            elif token.group()[0].isdigit():
+            elif _is_number(token):
                 pattern.append(re.escape(token.group()))
             else:
                 pattern.append(r"[A-Za-z0-9]+")
@@ -192,11 +195,21 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:
     return Locator(kpi=key, block=block_id, quote=match.group(0), value_text=new_value)
 
 
+# What makes a number part of a name: a letter glued after it ("5G", "3nm") but not a scale ("$97bn"), a hyphened word
+# ("3-nanometer"), or a process node's unit ("3 nm"). A figure followed by a word ("2019, an increase", "$435 million")
+# is a figure: it changes with the quarter.
+_NAMING_AFTER = re.compile(r"(?!(?:bn|mn|bps)\b)[A-Za-z]|-[A-Za-z]|\s(?:nm|nanomet(?:er|re)s?)\b", re.I)
+
+
+def _is_number(token: re.Match) -> bool:
+    return token.group()[0].isdigit() and not token.group()[-1].isalpha()  # "3Q" is a period word
+
+
 def _names(text: str, token: re.Match) -> bool:
-    """Whether a number is part of a name rather than a figure: "3-nanometer", "5G", "M365" keep their number."""
-    before, after = text[max(0, token.start() - 1):token.start()], text[token.end():token.end() + 3]
-    # "3-nanometer", "3 nm", "5G", "M365": a number that a word follows or precedes names something.
-    return bool(re.match(r"[-\s]?[A-Za-z]", after)) or bool(re.match(r"[A-Za-z]", before))
+    """Whether a number is part of a name rather than a figure: "3-nanometer", "3 nm", "5G", "M365" keep their number."""
+    before = text[max(0, token.start() - 1):token.start()]
+    glued_after = token.group()[-1].isdigit() and _NAMING_AFTER.match(text, token.end())
+    return bool(glued_after) or bool(re.match(r"[A-Za-z]", before))
 
 
 def _same_header(table: Table, first_data_row: int, col: int, locator: dict, quarter: int | None = None) -> bool:
