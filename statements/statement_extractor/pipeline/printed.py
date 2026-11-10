@@ -163,7 +163,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                 summaries.append({**figure, "document": attachment.document, "basis": basis or default_basis(ref.form),
                                   "currency": currency or default_currency(ref.form)})
         if any("no single scale stated" in note for note in document_notes) and printed != "slides":
-            unscaled.append((reader, content, basis, currency, attachment.document))
+            unscaled.append((reader, content, basis, currency, attachment.document, readings))
         for reading in readings:
             reading.basis = basis
             reading.currency = reading.currency or currency
@@ -173,7 +173,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
         kinds.append(printed)
-    for reader, content, basis, currency, document in unscaled:
+    for reader, content, basis, currency, document, scaled in unscaled:
         # Statements that print no scale, read only at a scale the filing's own figures prove.
         readings, proved = with_proven_scale(reader, content, schedules, list(found), accession=ref.accession,
                                              form=ref.form, filed=ref.filed, document_end=document_end,
@@ -181,6 +181,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         held = {(reading.key, reading.basis) for reading in found}
         for reading in readings:
             reading.basis, reading.currency = basis, reading.currency or currency
+        share_currency(scaled + readings)  # Petrobras' real release prints its cash flow with no scale as well
         found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
         notes.extend(f"{document}: {note}" for note in split_titled(proved)[1])
     if document_end is None and ref.form in ANNUAL_FORMS:
@@ -223,8 +224,10 @@ def _year_end(day: date, fiscal_year_end: str) -> bool:
 def share_currency(readings: list) -> None:
     """A statement naming no currency is in the one its document's other statements all name: Petrobras' real release
     heads its balance sheet and income "R$ million" and its cash flow nothing, beside a US dollar release of the same
-    quarter filed the same day."""
+    quarter filed the same day. Two of the group's statements must name it: one parent-only table naming US dollars
+    in Scotiabank's Canadian dollar reports says nothing of the rest."""
     named = {reading.currency for reading in readings if reading.currency}
-    if len(named) == 1:
+    kinds = {reading.statement for reading in readings if reading.currency and reading.scope == "consolidated"}
+    if len(named) == 1 and len(kinds) >= 2:
         for reading in readings:
             reading.currency = reading.currency or next(iter(named))
