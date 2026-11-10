@@ -46,6 +46,9 @@ jobs:
 
   plan:
     needs: test
+    # Reads run on a run branch (statements/run-round, statements/run-<set>) or by hand; a push to any other branch
+    # (statements/foundation) only tests, so its pilot reads do not take runners from the round that reads them too.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref_name, 'statements/run-')
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.list.outputs.matrix }}
