@@ -133,3 +133,17 @@ def test_a_one_month_column_is_its_own_not_the_headers_span():
     table = parse_html("<p>Consolidated Statements of Income (dollars in millions)</p><table>" + head + body + "</table>")[0]
     periods = column_periods("income", [table], "1231", date(2010, 12, 31))
     assert sorted((p.end.year, p.duration) for p in periods.values() if p.duration) == [(2008, "year"), (2009, "year"), (2010, "year")]
+
+
+def test_a_column_printing_its_own_range_ends_on_the_ranges_last_day():
+    # KEPCO's releases: "From Jan. 1, 2006 Through Mar. 31, 2006 | From Jan. 1, 2005 Through Mar. 31, 2005".
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.dates import column_periods
+    head = ("<tr><td>(unit: in billions of Korean Won)</td><td>From Jan. 1, 2006 Through Mar. 31, 2006</td>"
+            "<td>From Jan. 1, 2005 Through Mar. 31, 2005</td></tr>")
+    body = "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+        ("Operating revenues", "6,852", "6,400"), ("Operating expenses", "6,000", "5,700"),
+        ("Income before income taxes", "852", "700"), ("Net income", "600", "500")))
+    table = parse_html("<p>STATEMENT OF INCOME for the first three months of 2006 and 2005</p><table>" + head + body + "</table>")[0]
+    periods = column_periods("income", [table], "1231", date(2006, 3, 31))
+    assert sorted(p.end for p in periods.values()) == [date(2005, 3, 31), date(2006, 3, 31)]
