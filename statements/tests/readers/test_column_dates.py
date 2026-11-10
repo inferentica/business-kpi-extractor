@@ -120,3 +120,16 @@ def test_a_sentence_describing_the_table_still_counts():
     page = ("<p>INVESTMENT BANK The following table sets forth selected financial data of the Investment Bank.</p>"
             "<p>CONSOLIDATED STATEMENT OF INCOME DATA</p><table><tr><td></td><td>2Q 2001</td><td>2Q 2000</td></tr>" + rows + "</table>")
     assert find_statements(parse_html(page)) == []
+
+
+def test_a_one_month_column_is_its_own_not_the_headers_span():
+    # Morgan Stanley's 2010 10-K after moving its year end from November to December: "2010 | 2009 | Fiscal 2008 | One
+    # Month Ended December 31, 2008". Its three years are read; the one month had emptied the whole statement.
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.dates import column_periods
+    head = ("<tr><td></td><td>2010</td><td>2009</td><td>Fiscal 2008</td><td>One Month Ended December 31, 2008</td></tr>")
+    body = "".join(f"<tr><td>{label}</td>" + "".join(f"<td>{n}</td>" for n in range(1, 5)) + "</tr>"
+                   for label in ("Net revenues", "Non-interest expenses", "Income before income taxes", "Net income"))
+    table = parse_html("<p>Consolidated Statements of Income (dollars in millions)</p><table>" + head + body + "</table>")[0]
+    periods = column_periods("income", [table], "1231", date(2010, 12, 31))
+    assert sorted((p.end.year, p.duration) for p in periods.values() if p.duration) == [(2008, "year"), (2009, "year"), (2010, "year")]
