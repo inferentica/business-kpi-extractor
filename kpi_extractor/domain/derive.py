@@ -98,17 +98,20 @@ def _combine(annual: dict | None, quarters: list[dict], target: str) -> list[dic
         sources = [*parts, *([annual[key]] if annual else [])]
         verified = all(source["validation_status"] == "verified" for source in sources)
         notes = [] if verified else ["derived from values that need review"]
+        rejected = False
         if annual and value < 0 <= annual[key]["value"] and not balancing(key) and not _signed(annual[key]):
             verified, notes = False, [*notes, "derived Q4 is negative"]
         if annual and _later_basis(parts, annual[key]):
-            verified, notes = False, [*notes, LATER_BASIS_NOTE]
+            # No filing states a Q4 worked out across two bases, so none is served: the owner rejected all 14 such
+            # (JPM and MSFT 2016, 2026-11-10) when they were only held for review.
+            verified, rejected, notes = False, True, [*notes, LATER_BASIS_NOTE]
         rows.append({
             **base,
             "fiscal_period": target,
             "period_end": base["period_end"],
             "value": value,
             "method": "derived",
-            "validation_status": "verified" if verified else "needs_review",
+            "validation_status": "rejected" if rejected else "verified" if verified else "needs_review",
             "reconciliation_error_pct": None,
             "notes": notes,
             "locator": _kept(base, sources, "year less its quarters" if annual else "sum of its quarters"),

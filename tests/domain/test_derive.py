@@ -223,13 +223,13 @@ def test_a_derived_period_is_checked_on_its_top_level():
     assert all(row["validation_status"] == "verified" for row in annual)
 
 
-def test_a_q4_from_restated_quarters_and_the_year_as_first_reported_is_held_for_review():
+def test_a_q4_from_restated_quarters_and_the_year_as_first_reported_is_not_served():
     # Apple's 2018: quarters from 2019's year-ago columns (restated), the year from its own 10-K.
     values = [_value("FY", "a", 100), _value("FY", "b", 40)]
     for period, a, b in (("Q1", 20, 10), ("Q2", 25, 10), ("Q3", 30, 10)):
         values += [{**_value(period, "a", a), "locator": {"year_ago": True}}, {**_value(period, "b", b), "locator": {"year_ago": True}}]
     derived = {(row["fiscal_period"], row["kpi_key"]): row for row in derive_periods(values)}
-    assert derived[("Q4", "a")]["validation_status"] == "needs_review"
+    assert derived[("Q4", "a")]["validation_status"] == "rejected"
     assert any("later report restates" in note for note in derived[("Q4", "a")]["notes"])
 
 

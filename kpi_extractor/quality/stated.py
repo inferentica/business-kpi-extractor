@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 
 from ..documents.document import parse_number
+from ..rules.wording import falls
 
 # A scale adopted to fit the series rather than stated by the filing: such a figure is not the filing's own statement.
 _SCALE_FROM_SERIES = "to match the series"
@@ -32,7 +33,8 @@ def stated_in_filing(unit: str, value: float, locator: dict | None, notes: list[
                      label: str | None = None) -> bool:
     """True when the filing states this very figure where it was read:
     - its quote holds the value text, and that text is the figure, scale word included ("$792 million" is 792,000,000;
-      a bare "792" with the scale taken from elsewhere does not count);
+      a bare "792" with the scale taken from elsewhere does not count), or its negative when the quote says it fell
+      (Mastercard's "A decrease in cross-border volume of 45%" is -45);
     - or the table cell it was read from holds the figure at the scale the table states, in a row whose own label names
       the KPI (the read cell is the first of the row's numbers, kept as printed)."""
     if any(_SCALE_FROM_SERIES in note for note in notes or []):
@@ -41,8 +43,9 @@ def stated_in_filing(unit: str, value: float, locator: dict | None, notes: list[
     quote, text = str(at.get("quote") or ""), str(at.get("value_text") or "")
     if quote and text and text in quote:
         parsed = parse_number(text)
-        if parsed is not None and _same(parsed.value, value) and (parsed.scale_word or parsed.percent or unit != "currency"
-                                                                   or abs(value) < 1e5):
+        signed = parsed is not None and (_same(parsed.value, value) or (value < 0 < parsed.value and _same(parsed.value, -value)
+                                                                        and falls(quote, text)))
+        if signed and (parsed.scale_word or parsed.percent or unit != "currency" or abs(value) < 1e5):
             return True
     numbers = at.get("row_numbers") or []
     if (at.get("row_label") and _names(str(at["row_label"]), label) and numbers and isinstance(numbers[0], (int, float))

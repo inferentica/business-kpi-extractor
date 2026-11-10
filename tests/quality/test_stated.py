@@ -66,3 +66,11 @@ def test_figures_held_only_for_a_jump_that_their_filing_states_stand():
     stood = {row["value"]: row for row in company._stand_stated_figures()}
     assert sorted(stood) == [53, 792e6] and len(company._stand_stated_figures()) == 2
     assert all(row["validation_status"] == "verified" and row["notes"] == [STATED] for row in stood.values())
+
+
+def test_a_fall_the_quote_states_in_words_is_stated():
+    # Mastercard Q2 2020: "A decrease in cross-border volume of 45%" is the -45% stored; held as a 44-point jump until now.
+    quote = {"quote": "A decrease in cross-border volume of 45% on a local currency basis.", "value_text": "45%"}
+    assert stated_in_filing("percent", -45, quote)
+    # The same number with no fall in the words is not this figure.
+    assert not stated_in_filing("percent", -45, {"quote": "Cross-border volume grew 45% on a local currency basis.", "value_text": "45%"})
