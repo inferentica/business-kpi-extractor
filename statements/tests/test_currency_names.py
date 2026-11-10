@@ -41,3 +41,12 @@ def test_a_release_printing_dollars_takes_the_annual_reports_dollar_currency():
     pesos = [reading("20-F", "FY", "USD"), reading("6-K", "Q1", BARE_PESOS)]  # an annual report in dollars: no peso
     _bare_currencies(pesos)
     assert pesos[1].currency is None
+
+
+def test_figures_printed_with_a_dollar_sign_are_a_bare_dollar():
+    # Alcon's 2010 releases: "(in millions, except share data)" over "Sales  $  1,812".
+    from statement_extractor.readers.printed.currency import reporting_currency
+    from statement_extractor.readers.printed.tables import Cell, Row, Table
+    rows = [Row(label="Sales", level=0, figures={3: 1812.0}, cells=[Cell(0, 1, "Sales"), Cell(2, 1, "$"), Cell(3, 1, "1,812")])]
+    group = [Table(rows=rows, header=[], context="Consolidated Statements of Earnings (in millions, except share data)", index=0)]
+    assert reporting_currency(group, {(3,): None}, "6-K") == BARE_DOLLARS

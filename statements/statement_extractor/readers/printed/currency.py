@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from ...domain.basis import bare_currency, currencies_named
+from ...domain.basis import BARE_DOLLARS, bare_currency, currencies_named
 from .find import TITLE_PATTERNS
 from .scales import scale_text
 from .tables import Table, header_text
@@ -50,7 +50,10 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
     if in_title:
         return in_title[0]
     # Only the kind ("$ millions", "thousands of pesos"): marked, and decided by the company's own reporting currency.
-    return bare_currency(text[start:start + 400] if titles else text)  # else the document's or the form's
+    bare = bare_currency(text[start:start + 400] if titles else text)
+    if bare is None and any(cell.text.strip() == "$" for table in group for row in table.rows for cell in row.cells):
+        bare = BARE_DOLLARS  # its figures printed "$ 1,812" (Alcon's releases to 2011, "(in millions, except share data)")
+    return bare  # else the document's or the form's (pipeline/printed.py)
 
 
 def translations(columns: list[tuple[int, ...]], periods: dict, by_column: dict, reporting: str | None,
