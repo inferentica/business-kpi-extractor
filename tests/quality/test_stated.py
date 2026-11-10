@@ -74,3 +74,12 @@ def test_a_fall_the_quote_states_in_words_is_stated():
     assert stated_in_filing("percent", -45, quote)
     # The same number with no fall in the words is not this figure.
     assert not stated_in_filing("percent", -45, {"quote": "Cross-border volume grew 45% on a local currency basis.", "value_text": "45%"})
+
+
+def test_a_bare_quoted_number_is_stated_when_the_filing_states_its_scale_nearby():
+    # Apollo's "($ in billions)" heading over "AUM of $908": the reading recorded where the scale came from.
+    locator = {"quote": "Total AUM of $908", "value_text": "$908",
+               "scale_from": {"factor": 1e9, "source": "passage", "words": "($ in billions)"}}
+    assert stated_in_filing("currency", 908e9, locator)
+    # The reader's own scale is no statement of the filing's.
+    assert not stated_in_filing("currency", 908e9, {**locator, "scale_from": {"factor": 1e9, "source": "reader"}})

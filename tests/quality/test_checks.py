@@ -83,3 +83,12 @@ def test_parts_add_up_counts_a_parent_once_and_needs_a_stated_total():
     assert not parts_add_up(rows)
     assert parts_add_up(rows, {("kpi_rev", "fee_a"): "fees"})
     assert parts_add_up([_row("a", 1.0), _row("b", 2.0)])
+
+
+def test_a_smaller_breakdown_read_from_the_tables_own_total_is_the_whole_table():
+    from kpi_extractor.quality.checks import looks_like_part_of_table
+    # TSMC's 2nm and 3nm under "advanced technologies": fewer rows, a subtotal for the total, held.
+    assert looks_like_part_of_table(2, 40, 6, 100, "Advanced technologies")
+    # The same shrink read from the row the table calls its total stands: size alone is no reason.
+    assert not looks_like_part_of_table(2, 40, 6, 100, "Total net revenue")
+    assert not looks_like_part_of_table(2, 40, 6, 100, "Net sales")

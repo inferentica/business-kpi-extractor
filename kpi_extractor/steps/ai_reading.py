@@ -9,7 +9,7 @@ from .. import ai
 from ..ai import AiResponseError, Located, Spec
 from ..ops.control import ControlError
 from ..documents.document import Document, clean
-from ..quality.checks import check_period, far_above_quarter, looks_like_part_of_table, validate_groups
+from ..quality.checks import check_period, far_above_quarter, looks_like_part_of_table, total_label, validate_groups
 from ..readers.extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
                        read_values)
 from ..readers.replay import replay
@@ -407,7 +407,7 @@ class AiReading:
             newest = max(value["period_end"] for value in reference)
             before = [value for value in reference if value["period_end"] == newest]
             before_total = next((float(v["locator"]["total"]) for v in before if (v.get("locator") or {}).get("total")), None)
-            if looks_like_part_of_table(len(parts), total, len(before), before_total):
+            if looks_like_part_of_table(len(parts), total, len(before), before_total, total_label(items)):
                 for item in items:
                     item.status = "needs_review"
                     item.notes.append("fewer rows and under half the total of the quarter compared: likely part of the table")

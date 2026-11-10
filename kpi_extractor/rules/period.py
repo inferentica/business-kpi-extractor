@@ -193,3 +193,12 @@ def year_ago_record(table: Table | None, row: int, col: int, period_end: str | N
         end = None
     earlier = year_ago_value(table, row, col, end, value) if table is not None else None
     return {"year_ago_value": earlier} if earlier is not None else {}
+
+
+_STATES_QUARTER = re.compile(r"\bthree months\b|\b(?:1[23]|thirteen|twelve) weeks\b|\bquarter\b|\b[1-4]q(?:'?\d{2,4})?\b|\bq[1-4](?:'?\d{2,4})?\b", re.I)
+
+
+def states_quarter(header: str) -> bool:
+    """Whether a column header itself says its figures are a quarter's ("Three Months Ended", "Q4 2025", "4Q25"):
+    the filing's own word on the period, which a total far above the quarter before cannot outweigh."""
+    return bool(_STATES_QUARTER.search(header or ""))

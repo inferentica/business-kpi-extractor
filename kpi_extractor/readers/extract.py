@@ -132,15 +132,11 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
     return kept, problems
 
 
-_PEOPLE = re.compile(r"employee|headcount|workforce|staff", re.I)
-
-
 def _read(document: Document, locator: Locator, kpi: KpiSpec, default_currency: str | None
           ) -> tuple[float, str | None, list[str], ScaleFrom | None]:
-    value, currency, notes, scale_from = _read_raw(document, locator, kpi, default_currency)
-    if kpi.unit == "count" and _PEOPLE.search(kpi.label) and value > 5_000_000:
-        raise LocateError(f"{kpi.label} of {value:,.0f} is not a plausible headcount")
-    return value, currency, notes, scale_from
+    # A figure is judged by its filing, never by its size: a count scaled by a reader's word alone ("in millions" that
+    # no row, column or heading states) is held as SCALE_NOT_STATED by the scale resolver, whatever it comes to.
+    return _read_raw(document, locator, kpi, default_currency)
 
 
 def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_currency: str | None

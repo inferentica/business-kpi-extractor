@@ -58,9 +58,9 @@ def test_counts_ignore_the_tables_amount_scale_but_keep_their_own():
         {"kpi": "operating.members", "table": table, "row": 2, "col": 1},
     ]})
     values, problems = read_values(document, SPEC, located, "USD")
-    read = {item.kpi.key: item.value for item in values}
-    assert "employees" not in read  # a reading that scales a headcount into the billions is refused...
-    assert any("plausible headcount" in problem for problem in problems)
+    employees = next(item for item in values if item.kpi.key == "employees")
+    # A scale only the reader gives is held for review, whatever the figure comes to: judged by the filing, not by size.
+    assert employees.status == "needs_review" and "scale not stated in the document" in employees.notes
     located.values[0].scale = 1
     values, _ = read_values(document, SPEC, located, "USD")
     read = {item.kpi.key: item.value for item in values}

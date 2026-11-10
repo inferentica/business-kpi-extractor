@@ -241,9 +241,22 @@ def check_period(located, expected: date) -> str | None:
     return None
 
 
-def looks_like_part_of_table(rows: int, total: float, rows_before: int, total_before: float | None) -> bool:
+_TOTAL_LABEL = re.compile(r"\btotal\b|^(?:net\s+)?(?:revenues?|sales)$", re.I)
+
+
+def total_label(items) -> str:
+    """The label of the row a whole-table reading took as its total (its parts' locators carry it)."""
+    return next((str(item.locator["total_row_label"]) for item in items if item.locator.get("total_row_label")), "")
+
+
+def looks_like_part_of_table(rows: int, total: float, rows_before: int, total_before: float | None,
+                             total_label: str = "") -> bool:
     """Fewer rows than the quarter compared and a total under half of its: most likely part of a table, with a subtotal
-    taken for the total (TSMC's 2nm and 3nm under "advanced technologies"). Its parts add up, so only this shows it."""
+    taken for the total (TSMC's 2nm and 3nm under "advanced technologies"). Its parts add up, so only this shows it.
+    Size only prompts the look: a total read from the row the table itself labels as its total ("Total", "Net sales")
+    is the whole table, however it compares with the quarter before."""
+    if re.search(_TOTAL_LABEL, (total_label or "").strip(" :")):
+        return False
     return bool(total_before) and rows < rows_before and total < 0.5 * total_before
 
 

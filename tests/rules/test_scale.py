@@ -72,3 +72,9 @@ def test_a_whole_table_needs_a_stated_or_quoted_scale():
 def test_a_figure_that_states_its_own_scale_says_so():
     assert number_scale("billion") == ScaleFrom(1e9, "number", "billion")
     assert ScaleFrom(1e6, "table", "($ in millions)").record() == {"factor": 1e6, "source": "table", "words": "($ in millions)"}
+
+
+def test_a_column_headed_as_a_quarter_states_its_period():
+    from kpi_extractor.rules.period import states_quarter
+    assert all(states_quarter(header) for header in ("Three Months Ended December 31, 2025", "Q4 2025", "4Q25", "13 weeks ended"))
+    assert not any(states_quarter(header) for header in ("December 31, 2025", "Twelve Months Ended", "Fiscal 2025"))
