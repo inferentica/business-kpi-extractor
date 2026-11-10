@@ -33,6 +33,7 @@ from .steps.listing_history import ListingHistory
 from .steps.kpi_list import KpiListUpkeep
 from .steps.release_flow import ReleaseFlow
 from .steps.ai_reading import AiReading
+from .steps.replay_reading import ReplayReading
 from .steps.series_identity import SeriesIdentity
 from .steps.series_checks import SeriesChecks
 from .steps.stated_figures import StatedFigures
@@ -74,7 +75,7 @@ class SymbolResult:
 
 
 class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReading, ReleaseTableReading,
-                     TaggedKpiReading, ListingHistory, KpiListUpkeep, ReleaseFlow, AiReading,
+                     TaggedKpiReading, ListingHistory, KpiListUpkeep, ReleaseFlow, ReplayReading, AiReading,
                      SeriesIdentity, SeriesChecks, StatedFigures, TraceLinks, RecordBuilding):
     """The run order, and every write of a step's rows: steps read through self.values and self.filings (read-only) and
     hand back what they want written."""

@@ -233,3 +233,55 @@ def test_a_reading_without_header_evidence_goes_back_to_the_ai():
     last = {f"{v['group_key'][4:]}.{v['kpi_key']}": {k: x for k, x in v["locator"].items() if k != "header"}
             for v in _history(first) if "quote" not in v["locator"]}
     assert replay(parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2)), last, Q2) == "column header not recorded"
+
+
+def test_a_reading_of_the_groups_code_left_is_placed_against_those_groups_alone():
+    # Code replayed the table; Flash reads only the operating group, from last quarter's sentence. The table's KPIs are
+    # not "missing now" from that reading: they were never asked of it.
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
+    operating = Spec.model_validate({"groups": SPEC.model_dump()["groups"][1:]})
+    block = next(key for key, item in second.blocks.items() if "Paid memberships" in item.text)
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "values": [
+        {"kpi": "operating.members", "block": block, "quote": "Paid memberships reached 310 million",
+         "value_text": "310 million"}]})
+    read, problems = read_values(second, operating, located, "TWD")
+    assert problems == []
+    assert _pipeline(NoAi(), _history(first))._why_not_alone(located, read, operating, Q2, second) is None
+
+
+def test_a_metric_kpi_code_cannot_find_again_is_the_only_one_the_ai_reads():
+    spec = Spec.model_validate({"groups": [*SPEC.model_dump()["groups"][:1], {
+        "key": "operating", "label": "Operating Metrics", "kind": "metric",
+        "kpis": [{"key": "members", "label": "Paid Memberships", "unit": "count"},
+                 {"key": "stores", "label": "Stores", "unit": "count"}]}]})
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300) + "<p>We ended the quarter with 812 stores.</p>",
+                           URL.format(n=1))
+    located = _first_quarter(first)
+    stores = next(key for key, item in first.blocks.items() if "812 stores" in item.text)
+    located.values.append(ai.Locator(kpi="operating.stores", block=stores, quote="We ended the quarter with 812 stores",
+                                     value_text="812"))
+    items, problems = read_values(first, spec, located, "TWD")
+    assert problems == []
+    history = [{"group_key": f"kpi_{item.group.key}", "kpi_key": item.kpi.key, "fiscal_year": "2026", "fiscal_period": "Q1",
+                "period_end": "2026-03-31", "method": "ai", "validation_status": "verified", "value": item.value,
+                "locator": item.locator, "group_label": item.group.label, "kpi_label": item.kpi.label,
+                "source_url": URL.format(n=1), "source_accession": "q1"} for item in items if not item.is_total]
+    # This quarter the stores sentence is worded anew: code reads the table and the members sentence, the AI the stores.
+    second = parse_document(report("June 30", 11, 25, 31, 42, 310) + "<p>Our store count reached 830 at quarter end.</p>",
+                            URL.format(n=2))
+    block = next(key for key, item in second.blocks.items() if "830" in item.text)
+    asked = []
+    flash = {"period_end": "2026-06-30", "values": [{"kpi": "operating.stores", "block": block,
+                                                     "quote": "Our store count reached 830", "value_text": "830"}]}
+    pipeline = _pipeline(NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash}), history)
+
+    def text(subset=None, hints=True):
+        asked.append(sorted(f"{group.key}.{kpi.key}" for group in (subset or spec).groups for kpi in group.kpis))
+        return "prompt"
+    read, _, _ = pipeline._read(text, second, spec, Q2, version=1)
+    assert asked[0] == ["operating.stores"]
+    values = {f"{item.group.key}.{item.kpi.key}": item for item in read if not item.is_total}
+    assert values["operating.members"].value == 310e6 and "replayed_from" in values["operating.members"].locator
+    assert values["operating.stores"].value == 830
+    assert pipeline.result.replay_outcomes == {"replayed": 2, "sentence not found": 1}

@@ -5,7 +5,7 @@ from pathlib import Path
 
 LIMIT = 600
 # Modules over the limit on 2026-11-08, capped at their size then.
-SHRINK_ONLY = {"documents/document.py": 630, "steps/ai_reading.py": 622, "steps/series_checks.py": 617}
+SHRINK_ONLY = {"documents/document.py": 630, "steps/ai_reading.py": 558, "steps/series_checks.py": 617}
 
 
 def test_no_module_grows_past_its_limit():

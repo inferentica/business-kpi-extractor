@@ -45,6 +45,16 @@ def _source_template(url: str) -> str:
     return re.sub(r"\d+", "", url.rsplit("/", 1)[-1].lower())
 
 
+
+def asked_of(last: dict[str, dict], spec) -> dict[str, dict]:
+    """Last quarter's locators for what a reading was asked: its groups' listed KPIs, and its whole tables' rows. A group
+    code replayed, and a KPI an older list had, were never asked of it, so they are not missing from it."""
+    groups = {group.key for group in spec.groups}
+    listed = {f"{group.key}.{kpi.key}" for group in spec.groups for kpi in group.kpis}
+    return {key: locator for key, locator in last.items()
+            if key in listed or (locator.get("whole_table") and key.split(".", 1)[0] in groups)}
+
+
 def replay(document: Document, last: dict[str, dict], expected: date) -> Located | str:
     """A reading built from last quarter's locators, or, when any of them cannot be found again, why not (counted in the
     run summary, so the reasons code most often fails on show where it should learn next)."""

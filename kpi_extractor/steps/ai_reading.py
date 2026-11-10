@@ -12,10 +12,11 @@ from ..documents.document import Document, clean
 from ..quality.checks import check_period, far_above_quarter, looks_like_part_of_table, total_label, validate_groups
 from ..readers.extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
                        read_values)
-from ..readers.replay import _same_place, _source_template, replay
-from ..readers.trace import stamp_call, trace_replay
+from ..readers.replay import _same_place, _source_template, asked_of
+from ..readers.trace import stamp_call
 from ..rules.period import states_quarter
-from .shared import (AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
+from .replay_reading import left_for_ai
+from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
@@ -64,12 +65,11 @@ class AiReading:
         self._local.replayed = False
         self._local.second_read = None
         replayed, replay_located, done = self._replay_groups(document, spec, expected, currency)
-        if done and all(group.key in done for group in spec.groups):
+        open_spec = left_for_ai(spec, done) if done else spec
+        if open_spec is None:
             self._local.replayed = True
             self.result.replayed_reads += 1
             return replayed, [], replay_located
-        open_spec = spec if not done else Spec.model_validate(
-            {"groups": [g.model_dump() for g in spec.groups if g.key not in done], "names": {}})
         read, problems, located = self._read_ai(text, document, open_spec, expected, version, currency, partial=bool(done))
         return replayed + read, problems, located
 
@@ -234,65 +234,6 @@ class AiReading:
         stamp_call(read, self._call_of(located))
         return located, read, problems
 
-    def _replay_groups(self, document: Document, spec: Spec, expected: date, currency: str | None):
-        """Each group read again by code from where it was found in the nearest quarter of the same kind of document,
-        kept only when it passes every check a Flash-only reading must (its period, its sums, no jumps, nothing found
-        before missing, every value where it was). A KPI the list has but the nearest reading did not find is looked
-        for by the AI unless that reading's AI read noted it as not reported. Returns the kept groups' values."""
-        source = _source_template(document.source_url)
-        last = self._last_locators(expected, source)
-        outcomes = self.result.replay_outcomes  # per group: replayed, or why the AI read it (the learning loop's measure)
-
-        def missed(why: str) -> None:
-            outcomes[why] = outcomes.get(why, 0) + 1
-        if not last:
-            for _group in spec.groups:
-                missed("no earlier reading of this kind of document")
-            return [], None, set()
-        history = self._ai_history(expected, source)
-        accession = next((value.get("source_accession") for key, value in history.items() if key in last), None)
-        notes = (self.filings.get(accession or "") or {}).get("notes") or []
-        reported = next((note for note in notes if note.startswith(_NOT_REPORTED)), _NOT_REPORTED)
-        not_reported = set(reported.removeprefix(_NOT_REPORTED).split(", ")) if _READ_BY_AI in notes else set()
-        # In the newest release a KPI never read anywhere is always looked for: the audit listed it from that release, so
-        # another quarter not reporting it says nothing of this one (Amazon Now's cities, listed from the Q2 2026
-        # release, were taken as absent there because Q1 lacked them). Older quarters keep the every-other-quarter rule.
-        if expected == getattr(self, "_newest_release", None):
-            ever = {f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}" for value in self.values.values()
-                    if value["method"] == "ai" and value["validation_status"] != "rejected"}
-            not_reported = {key for key in not_reported if key in ever}
-        items: list[ReadValue] = []
-        kept_located, done = None, set()
-        for group in spec.groups:
-            mine = {key: locator for key, locator in last.items() if key.split(".", 1)[0] == group.key}
-            if not mine:
-                missed("group not read in this kind of document before")
-                continue
-            whole = any(locator.get("whole_table") for locator in mine.values())
-            listed = {f"{group.key}.{kpi.key}" for kpi in group.kpis if kpi.key != group.total_kpi}
-            if not whole and (listed - mine.keys()) - not_reported:
-                missed("a listed KPI not looked for yet")  # nobody has looked for it in this kind of document
-                continue
-            located = replay(document, mine, expected)
-            if isinstance(located, str):
-                missed(located)
-                continue
-            read, problems = read_values(document, spec, located, currency)
-            read = [item for item in read if item.group.key == group.key]
-            read, problems = self._drop_wrong_columns(read, problems, document, located, expected)
-            if problems or not read or self._far_above_quarters(read, expected):
-                missed("a check failed" if problems or not read else "total far above the quarter before")
-                continue
-            if group.key not in self._confirmed_groups(located, read, spec, expected, document):
-                missed("not confirmed where it was or by the year-ago column")
-                continue
-            outcomes["replayed"] = outcomes.get("replayed", 0) + 1
-            trace_replay(read, mine, history, accession)
-            items += read
-            done.add(group.key)
-            kept_located = kept_located or located
-        return items, kept_located, done
-
     def _kind_reports_nothing(self, document: Document, expected: date, version: int | None) -> bool:
         """Whether both models already read this kind of document for this KPI list and found nothing in it (TSMC's
         earnings release once its amounts come from the quarterly report). Flash pointing at nothing again then stands;
@@ -334,9 +275,9 @@ class AiReading:
         validate_groups(trial, self._previous(expected))
         if not all(item.status == "verified" for item in trial):
             return "checks_failed"
-        if self._where_it_was(read, expected, document) or self._year_ago_confirms(read, document, expected):
+        if self._where_it_was(read, expected, document, spec) or self._year_ago_confirms(read, document, expected):
             return None
-        last = self._last_locators(expected, _source_template(document.source_url))
+        last = asked_of(self._last_locators(expected, _source_template(document.source_url)), spec)
         if not last:
             return "not_placed"  # a company's first quarters, or a new kind of document
         keys = {f"{item.group.key}.{item.kpi.key}" for item in read}
@@ -347,8 +288,8 @@ class AiReading:
         key = f"{item.group.key}.{item.kpi.key}"
         return key in last and _same_place(item.locator, last[key])
 
-    def _where_it_was(self, read: list[ReadValue], expected: date, document: Document) -> bool:
-        last = self._last_locators(expected, _source_template(document.source_url))
+    def _where_it_was(self, read: list[ReadValue], expected: date, document: Document, spec: Spec) -> bool:
+        last = asked_of(self._last_locators(expected, _source_template(document.source_url)), spec)
         if not last:
             return False  # a company's first quarters, and a new kind of document, are not placed yet
         keys = {f"{item.group.key}.{item.kpi.key}" for item in read}
