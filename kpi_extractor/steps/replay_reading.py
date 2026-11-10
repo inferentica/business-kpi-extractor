@@ -30,6 +30,18 @@ def left_for_ai(spec: Spec, done: set[str]) -> Spec | None:
     return Spec.model_validate({"groups": groups, "names": {}}) if groups else None
 
 
+
+def in_full_groups(items: list[ReadValue], spec: Spec) -> list[ReadValue]:
+    """Values read for part of a group (one metric KPI code replayed, or the ones it left to the AI) carry the KPI list's
+    own group and KPI again, as every later step expects: the release flow orders groups by their place in the list."""
+    groups = {group.key: group for group in spec.groups}
+    for item in items:
+        if (group := groups.get(item.group.key)) is not None and group is not item.group:
+            item.group = group
+            item.kpi = next((kpi for kpi in group.kpis if kpi.key == item.kpi.key), item.kpi)
+    return items
+
+
 class ReplayReading:
     def _replay_groups(self, document: Document, spec: Spec, expected: date, currency: str | None):
         """Each group (each KPI of a metric group) read again by code from where it was found in the nearest quarter of

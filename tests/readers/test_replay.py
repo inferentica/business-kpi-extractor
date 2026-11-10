@@ -284,4 +284,6 @@ def test_a_metric_kpi_code_cannot_find_again_is_the_only_one_the_ai_reads():
     values = {f"{item.group.key}.{item.kpi.key}": item for item in read if not item.is_total}
     assert values["operating.members"].value == 310e6 and "replayed_from" in values["operating.members"].locator
     assert values["operating.stores"].value == 830
+    # Both carry the list's own group, as the release flow expects when it orders groups by their place in the list.
+    assert all(spec.groups.index(item.group) >= 0 for item in read)
     assert pipeline.result.replay_outcomes == {"replayed": 2, "sentence not found": 1}

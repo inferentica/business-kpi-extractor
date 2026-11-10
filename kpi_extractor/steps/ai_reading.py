@@ -15,7 +15,7 @@ from ..readers.extract import (ReadValue, describe, explanation_supports, header
 from ..readers.replay import _same_place, _source_template, asked_of
 from ..readers.trace import stamp_call
 from ..rules.period import states_quarter
-from .replay_reading import left_for_ai
+from .replay_reading import in_full_groups, left_for_ai
 from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _same, _same_chain, _year_ago_cells)
 
@@ -69,9 +69,9 @@ class AiReading:
         if open_spec is None:
             self._local.replayed = True
             self.result.replayed_reads += 1
-            return replayed, [], replay_located
+            return in_full_groups(replayed, spec), [], replay_located
         read, problems, located = self._read_ai(text, document, open_spec, expected, version, currency, partial=bool(done))
-        return replayed + read, problems, located
+        return in_full_groups(replayed + read, spec), problems, located
 
     def _read_ai(self, text, document: Document, spec: Spec, expected: date, version: int | None, currency: str | None,
                  partial: bool = False):
