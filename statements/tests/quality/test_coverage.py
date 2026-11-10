@@ -79,3 +79,14 @@ def test_a_statement_heading_in_the_text_counts_without_tables():
     assert headed_kinds(f"compares the Group balance sheet as at 31 March 2011 with {figures}") == set()
     assert headed_kinds(f"income statement commentaries compare the three months ended 31 March 2011 {figures}") == set()
     assert headed_kinds("Balance sheet as at 31 March 2011: ratios 148% 154% 116% 120% 49% 50% 61% 62% 70%") == set()
+
+
+def test_a_year_the_company_filed_nothing_for_is_not_counted():
+    from statement_extractor.quality.coverage import release_coverage
+    # Alcon: releases to the first quarter of 2011, then nothing until its spin-off in 2019.
+    filings = [{"form": "6-K", "release_quarter": ["2011", "Q1"], "titled": [], "notes": []},
+               {"form": "20-F", "fiscal_year": "2010", "fiscal_period": "FY"},
+               {"form": "6-K", "release_quarter": ["2013", "Q1"], "titled": [], "notes": []}]
+    found = release_coverage(filings, set())
+    # 2012's four quarters are no registrant's; 2011's and 2013's first quarter count (2011 Q2-Q4 too: it filed then).
+    assert found["quarters_not_filing"] == 4
