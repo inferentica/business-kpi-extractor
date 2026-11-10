@@ -11,7 +11,7 @@ from kpi_extractor.ops.reread import picked_filings
 from kpi_extractor.readers.anchor import anchor_locator
 from kpi_extractor.readers.extract import read_values
 from kpi_extractor.readers.replay import _same_place
-from tests.readers.test_replay import NoAi, _pipeline
+from test_replay import NoAi, _pipeline
 
 URL = "https://www.sec.gov/Archives/q{n}report.htm"
 Q2 = date(2026, 6, 30)
