@@ -35,3 +35,13 @@ def test_a_uk_gaap_balance_sheet_closes_on_total_liabilities():
     assert balance_check(figures).result == "pass"
     figures[-1] = ("Total liabilities", 0, 230.0)
     assert balance_check(figures).result != "pass"  # no line equal to total assets: unproven, never served
+
+
+def test_parts_printed_below_their_total_count_once():
+    # Copel's CVM quarterly forms: each account, then the accounts it sums.
+    from statement_extractor.checks.printed import income_check
+    figures = [("Profit before taxation", 0, 126363.0), ("Provision for income tax and social contribution", 0, -54877.0),
+               ("Income tax", 0, -39517.0), ("Social contribution", 0, -15360.0), ("Deferred income tax", 0, 11733.0),
+               ("Income tax", 0, 8519.0), ("Social contribution", 0, 3214.0), ("Minority interest", 0, -4812.0),
+               ("Net income for the period", 0, 78407.0)]
+    assert income_check(figures).result == "pass"

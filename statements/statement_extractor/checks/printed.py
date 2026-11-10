@@ -85,6 +85,29 @@ def cash_check(figures) -> Check:
     return Check("cash", FAIL, f"opening {opening[1]:,.1f} + change {candidates[0]:,.1f} vs closing {closing[1]:,.1f}")
 
 
+def _without_parts(lines: list) -> list:
+    """Lines with the parts printed below their own total left out: Brazil's CVM forms print each account, then the
+    accounts it sums ("Provision for income tax and social contribution" -54,877, then "Income tax" -39,517 and "Social
+    contribution" -15,360). Parts sum to their total exactly, two or more of them, all with figures."""
+    kept, skip = [], 0
+    for index, (label, level, value) in enumerate(lines):
+        if skip:
+            skip -= 1
+            continue
+        kept.append((label, level, value))
+        if value is None:
+            continue
+        running = 0.0
+        for count, (_l, _v, part) in enumerate(lines[index + 1:index + 7], start=1):
+            if part is None:
+                break
+            running += part
+            if count >= 2 and close(running, value, 0) and (value != 0 or count == 2):
+                skip = count
+                break
+    return kept
+
+
 def income_check(figures) -> Check:
     """Net income follows from income before taxes through the lines between them, each added or taken away as the
     statement means it (a printed statement shows a tax charge as a plain figure and takes it away). Lines a subtotal
@@ -95,7 +118,7 @@ def income_check(figures) -> Check:
         return _from_a_subtotal(figures, net)
     if not pretax or not net:
         return Check("calc", NONE, "no income before taxes and net income")
-    between = figures[pretax[0] + 1:net[0]]
+    between = _without_parts(figures[pretax[0] + 1:net[0]])
     starts = subtotals(between)
     covered = {position for end, start in starts.items() for position in range(start, end)}
     # Lines under a "Total …" only: Prudential's current and deferred tax under its total tax expense, while its income
