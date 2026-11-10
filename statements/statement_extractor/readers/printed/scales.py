@@ -32,6 +32,8 @@ _SHARES_EXCEPTED = re.compile(r"\bexcept\b[^)]*?\b(?<!per )(share|shares)\b(?!\s
 _LINE_UNIT = re.compile(r"\(\s*(?:in\s+)?" + _UNIT + r"(?:\s+of\s+shares)?\s*\)|\bin\s+" + _UNIT + r"\s*\)?\s*:?$", re.I)
 
 
+# Figures in whole currency units, the currency named and no unit: "(In US dollars)", "(Expressed in Canadian dollars)".
+_UNITS_STATED = re.compile(r"\(\s*(?:in|expressed\s+in)\s+(?:U\.?\s?S\.?|US|Canadian|CDN|Cdn\.?)?\s*dollars\s*\)", re.I)
 _UNIT_CELL = re.compile(r"^" + _UNIT + r"(?:,?\s+except\b.*)?$", re.I)
 
 
@@ -74,6 +76,8 @@ def statement_scale(group: list[Table]) -> float | None:
               if (unit := _UNIT_CELL.match(cell.text.strip()))}
     if _ZEROS.search(text):
         found.add(1e3)
+    if _UNITS_STATED.search(text):
+        found.add(1.0)  # Gildan's 2003-05 statements: "(In US dollars)", every figure printed in full
     if len(found) == 2 and matches and len({word.lower() for word in _CURRENCY_WORDS.findall(raw)}) >= 2:
         return _scale(matches[0])
     return found.pop() if len(found) == 1 else None
