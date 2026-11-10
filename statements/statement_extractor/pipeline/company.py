@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import gc
 import json
+import re
 import time
 from datetime import date
 from pathlib import Path
@@ -49,6 +50,12 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
             continue
         if xbrl is None:
             found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0, summaries=summaries)
+            printed_end = _printed_year_end(notes, ref) if ref.form in ANNUAL_FORMS and _period_end(ref) is None else None
+            if printed_end and printed_end != fiscal_year_end:
+                # No period on EDGAR and its years off the company's calendar: its own year end (Gildan's 40-Fs to
+                # 2013 close in late September, before its move to calendar years).
+                fiscal_year_end = year_ends[ref.accession] = printed_end
+                found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0, summaries=summaries)
             own = [reading for reading in found if reading.own]
             record.update({"note": "no XBRL", "printed": kinds, "columns": len(found), "notes": notes,
                            "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
@@ -181,3 +188,17 @@ def _release_bases(readings) -> None:
             # Else the nearest year's: TSMC's 1997-99 quarters, before its first 20-F we hold (FY2000, ROC GAAP).
             nearest = min(annual, key=lambda year: abs(int(year) - int(reading.fiscal_year)))
             reading.basis = annual.get(reading.fiscal_year) or annual[nearest]
+
+
+_OFF_YEAR = re.compile(r"column duration_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2}) off the calendar")
+
+
+def _printed_year_end(notes: list[str], ref) -> str | None:
+    """The year end an annual report's own full-year columns print, when they fall off the company's calendar: the
+    latest such column ending within a year before the report was filed."""
+    ends = []
+    for match in _OFF_YEAR.finditer(" ".join(notes)):
+        start, end = date.fromisoformat(match.group(1)), date.fromisoformat(match.group(2))
+        if 350 <= (end - start).days + 1 <= 380 and 0 <= (ref.filed - end).days <= 366:
+            ends.append(end)
+    return f"{max(ends).month:02d}{max(ends).day:02d}" if ends else None

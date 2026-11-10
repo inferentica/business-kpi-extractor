@@ -102,6 +102,8 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             document_end = date.fromisoformat(str(raw_end)[:10]) if raw_end else None
         except ValueError:
             document_end = None
+        if document_end is not None and ref.form in ANNUAL_FORMS and not _year_end(document_end, fiscal_year_end):
+            document_end = None  # no year end: EDGAR gives Alcon's 2007 20-F 19 March 2006; its statements say which year
     attachments = list(ref.filing.attachments)
     other = another_registrant(ref, attachments) if release else None
     if other:
@@ -180,6 +182,8 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             reading.basis, reading.currency = basis, reading.currency or currency
         found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
         notes.extend(f"{document}: {note}" for note in split_titled(proved)[1])
+    if document_end is None and ref.form in ANNUAL_FORMS:
+        _own_year(found, ref.filed)
     for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
         reading.basis = reading.basis or filing_basis or default_basis(ref.form)
         reading.currency = reading.currency or filing_currency or default_currency(ref.form)
@@ -189,3 +193,27 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
     if schedules:
         kinds.append("ex27")
     return found, notes, sorted(set(kinds))
+
+
+def _own_year(found: list, filed: date) -> None:
+    """An annual report that names no period of its own (Alcon's 20-Fs of 2004-09 on EDGAR): its own year is the latest
+    year end it prints in its last year before filing."""
+    ends = [reading.period_end for reading in found if reading.fiscal_period == "FY"
+            and reading.period_end <= filed and (filed - reading.period_end).days <= 366]
+    if ends:
+        latest = max(ends)
+        for reading in found:
+            reading.own = reading.fiscal_period == "FY" and abs((reading.period_end - latest).days) <= 7
+
+
+def _year_end(day: date, fiscal_year_end: str) -> bool:
+    """Within ten days of the company's fiscal year end in some year (52/53-week years end near it)."""
+    month, last = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
+    for year in (day.year - 1, day.year, day.year + 1):
+        try:
+            end = date(year, month, min(last, 28 if month == 2 else last))
+        except ValueError:
+            continue
+        if abs((day - end).days) <= 10:
+            return True
+    return False
