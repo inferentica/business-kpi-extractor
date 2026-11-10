@@ -32,10 +32,13 @@ jobs:
               domestic = [f for f, d in zip(forms, dates) if f in ("10-K", "10-K/A") and d >= "2024-01-01"]
               if not annual or domestic:
                   continue  # a foreign filer: annual reports on 20-F or 40-F lately, none on 10-K
-              business = (data.get("addresses") or {}).get("business") or {}
+              addresses = data.get("addresses") or {}
+              business = addresses.get("business") or {}
+              mailing = addresses.get("mailing") or {}
+              place = lambda a: a.get("country") or a.get("stateOrCountryDescription") or a.get("countryCode") or a.get("stateOrCountry") or ""
               rows.append({"cik": data.get("cik"), "name": data.get("name"), "tickers": " ".join(data.get("tickers") or []),
                            "exchanges": " ".join(us), "form": annual[0].replace("/A", ""),
-                           "country": business.get("stateOrCountryDescription") or business.get("stateOrCountry") or "",
+                           "country": place(business) or place(mailing),
                            "incorporated": data.get("stateOfIncorporationDescription") or data.get("stateOfIncorporation") or "",
                            "six_k_2025": sum(1 for f, d in zip(forms, dates) if f == "6-K" and d.startswith("2025"))})
           with open("out/us_listed_foreign_filers.csv", "w", newline="") as handle:
