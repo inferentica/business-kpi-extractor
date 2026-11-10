@@ -1,0 +1,40 @@
+name: Inspect
+# Prints the tables and passages of filing documents that match a pattern, to check a figure against its filing by hand
+# (kpi_extractor/ops/inspect.py). No AI, nothing stored.
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: sec.gov document URLs, comma-separated
+        required: true
+        type: string
+      pattern:
+        description: Regular expression for the rows and passages to print (case-insensitive)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - run: uv pip install .
+      - name: Print matching tables and passages
+        # Inputs reach the command as environment variables, never as interpolated shell text.
+        env:
+          URLS: ${{ inputs.urls }}
+          PATTERN: ${{ inputs.pattern }}
+        run: python -m kpi_extractor.ops.inspect --urls "$URLS" --pattern "$PATTERN"
