@@ -90,9 +90,6 @@ jobs:
     env:
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
       STATEMENTS_ARCHIVE_CACHE: archive-cache  # archived reports fetched once, kept between runs
-      # SEC documents never change once filed: edgartools keeps each one it fetches (its HTTP cache, under this
-      # directory), and the cache is kept per company between runs, so a round fetches only what was filed since.
-      EDGAR_LOCAL_DATA_DIR: edgar-cache
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v10.2.0
@@ -104,30 +101,18 @@ jobs:
             pyproject.toml
             statements/pyproject.toml
       - run: uv pip install . ./statements
-      - id: week
-        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
         with:
           path: archive-cache
           key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
           restore-keys: statements-archive-${{ matrix.symbol }}-
-      - uses: actions/cache/restore@v4
-        with:
-          path: edgar-cache
-          key: statements-edgar-${{ matrix.symbol }}-${{ steps.week.outputs.week }}
-          restore-keys: statements-edgar-${{ matrix.symbol }}-
       - run: python -m statement_extractor read --symbol "${{ matrix.symbol }}" --since "${{ matrix.since }}" --out "out/${{ matrix.symbol }}"
       - uses: actions/cache/save@v4
         if: always()
         with:
           path: archive-cache
           key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
-      # Once a week per company: a run in the same week finds its key taken and saves nothing.
-      - uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: edgar-cache
-          key: statements-edgar-${{ matrix.symbol }}-${{ steps.week.outputs.week }}
+
       - uses: actions/upload-artifact@v6
         if: always()
         with:
