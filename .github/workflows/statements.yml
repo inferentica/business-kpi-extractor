@@ -48,8 +48,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     outputs:
-      symbols: ${{ steps.list.outputs.symbols }}
-      since: ${{ steps.list.outputs.since }}
+      matrix: ${{ steps.list.outputs.matrix }}
     steps:
       - uses: actions/checkout@v6
       - id: list
@@ -60,13 +59,23 @@ jobs:
         run: |
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
           import json, os
-          # A branch named statements/run-<set> runs statements/sets/<set>.json; any other branch runs the pilot set.
+          # A branch named statements/run-<set> runs statements/sets/<set>.json; statements/run-round runs every set
+          # at once, each company read once from the earliest date any of its sets reads it; any other branch runs the
+          # pilot set.
           branch = os.environ.get("BRANCH", "")
           name = branch.split("statements/run-", 1)[1] if branch.startswith("statements/run-") else None
-          pilot = json.load(open(f"statements/sets/{name}.json" if name else "statements/pilot.json"))
-          symbols = [s.strip().upper() for s in os.environ.get("SYMBOLS", "").split(",") if s.strip()] or pilot["symbols"]
-          print("symbols=" + json.dumps(symbols))
-          print("since=" + (os.environ.get("SINCE") or pilot["since"]))
+          if name == "round":
+              sets = [json.load(open("statements/pilot.json"))] + [
+                  json.load(open(f"statements/sets/{part}.json")) for part in ("phase1", "foreign", "sample50")]
+              since = {}
+              for one in sets:
+                  for symbol in one["symbols"]:
+                      since[symbol] = min(since.get(symbol, one["since"]), one["since"])
+          else:
+              pilot = json.load(open(f"statements/sets/{name}.json" if name else "statements/pilot.json"))
+              symbols = [s.strip().upper() for s in os.environ.get("SYMBOLS", "").split(",") if s.strip()] or pilot["symbols"]
+              since = {symbol: os.environ.get("SINCE") or pilot["since"] for symbol in symbols}
+          print("matrix=" + json.dumps([{"symbol": symbol, "since": start} for symbol, start in since.items()]))
           EOF
 
   read:
@@ -75,12 +84,15 @@ jobs:
     timeout-minutes: 240
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
       matrix:
-        symbol: ${{ fromJSON(needs.plan.outputs.symbols) }}
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
       STATEMENTS_ARCHIVE_CACHE: archive-cache  # archived reports fetched once, kept between runs
+      # SEC documents never change once filed: edgartools keeps each one it fetches (its HTTP cache, under this
+      # directory), and the cache is kept per company between runs, so a round fetches only what was filed since.
+      EDGAR_LOCAL_DATA_DIR: edgar-cache
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v10.2.0
@@ -92,17 +104,30 @@ jobs:
             pyproject.toml
             statements/pyproject.toml
       - run: uv pip install . ./statements
+      - id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
         with:
           path: archive-cache
           key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
           restore-keys: statements-archive-${{ matrix.symbol }}-
-      - run: python -m statement_extractor read --symbol "${{ matrix.symbol }}" --since "${{ needs.plan.outputs.since }}" --out "out/${{ matrix.symbol }}"
+      - uses: actions/cache/restore@v4
+        with:
+          path: edgar-cache
+          key: statements-edgar-${{ matrix.symbol }}-${{ steps.week.outputs.week }}
+          restore-keys: statements-edgar-${{ matrix.symbol }}-
+      - run: python -m statement_extractor read --symbol "${{ matrix.symbol }}" --since "${{ matrix.since }}" --out "out/${{ matrix.symbol }}"
       - uses: actions/cache/save@v4
         if: always()
         with:
           path: archive-cache
           key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
+      # Once a week per company: a run in the same week finds its key taken and saves nothing.
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: edgar-cache
+          key: statements-edgar-${{ matrix.symbol }}-${{ steps.week.outputs.week }}
       - uses: actions/upload-artifact@v6
         if: always()
         with:
