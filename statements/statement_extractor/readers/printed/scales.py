@@ -34,7 +34,8 @@ _LINE_UNIT = re.compile(r"\(\s*(?:in\s+)?" + _UNIT + r"(?:\s+of\s+shares)?\s*\)|
 
 # Figures in whole currency units, the currency named and no unit: "(In US dollars)", "(Expressed in Canadian dollars)".
 _UNITS_STATED = re.compile(r"\(\s*(?:in|expressed\s+in)\s+(?:U\.?\s?S\.?|US|Canadian|CDN|Cdn\.?)?\s*dollars\s*\)", re.I)
-_UNIT_CELL = re.compile(r"^" + _UNIT + r"(?:,?\s+except\b.*)?$", re.I)
+# James Hardie's releases: "Millions of" over each of "US Dollars | Australian Dollars", the currency row above the dates.
+_UNIT_CELL = re.compile(r"^" + _UNIT + r"(?:\s+of)?(?:,?\s+except\b.*)?$", re.I)
 
 
 def scale_text(group: list[Table]) -> str:
@@ -74,6 +75,13 @@ def statement_scale(group: list[Table]) -> float | None:
     # SHARE AMOUNTS") over their labels.
     found |= {_SCALES[unit.group(1).lower()] for cells in group[0].header for cell in cells
               if (unit := _UNIT_CELL.match(cell.text.strip()))}
+    # …or set on a row of its own above the first figures, each cell the unit alone (James Hardie's "Millions of").
+    for row in group[0].rows:
+        if row.figures:
+            break
+        units = [_UNIT_CELL.match(cell.text.strip()) for cell in row.cells if cell.text.strip()]
+        if units and all(units):
+            found |= {_SCALES[unit.group(1).lower()] for unit in units}
     if _ZEROS.search(text):
         found.add(1e3)
     if _UNITS_STATED.search(text):

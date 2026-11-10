@@ -44,8 +44,11 @@ def contradicted(kept: list[Reading]) -> list[Reading]:
         mine = figures[id(reading)]
         # A witness is a report of another season: James Hardie's 20-F and its Irish statutory accounts on 6-K a day
         # later are one report, and two of them outvoted the next year's 20-F, which reclassified a few lines.
-        before = [other for other in kept if (reading.filed - other.filed).days > _APART and _alike(other, reading)]
-        after = [other for other in kept if (other.filed - reading.filed).days > _APART and _alike(other, reading)]
+        # A report filed with the SEC is outvoted only by such reports: releases' years are unaudited, and FEMSA's 2025
+        # releases dating their first quarter as the year agreed against its 20-F.
+        peers = [other for other in kept if reading.form == "6-K" or other.form != "6-K"]
+        before = [other for other in peers if (reading.filed - other.filed).days > _APART and _alike(other, reading)]
+        after = [other for other in peers if (other.filed - reading.filed).days > _APART and _alike(other, reading)]
         if any(_agree(figures[id(early)], figures[id(late)]) and _disagree(mine, figures[id(early)])
                for early in before for late in after):
             found.append(reading)

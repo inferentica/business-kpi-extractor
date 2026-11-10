@@ -71,3 +71,13 @@ def test_a_currency_named_before_the_title_is_another_sections():
                 "adopted the Euro as their common legal currency. " + "x " * 200 +
                 "CONSOLIDATED BALANCE SHEETS RPM, Inc. and Subsidiaries (In thousands, except per share amounts)")
     assert reporting_currency(rpm, {}, "10-K") is None
+
+
+def test_a_unit_row_over_the_currency_row_is_the_scale():
+    # James Hardie's 2005 releases: "Millions of | Millions of" above "US Dollars | Australian Dollars".
+    from statement_extractor.readers.printed.tables import Cell, Row
+    rows = [Row(label="", level=0, cells=[Cell(1, 1, "Millions of"), Cell(2, 1, "Millions of")]),
+            Row(label="Cash", level=0, figures={1: 10.0, 2: 13.0})]
+    group = [Table(rows=rows, header=[[Cell(1, 1, "US Dollars"), Cell(2, 1, "Australian Dollars")]],
+                   context="Consolidated Balance Sheets (Unaudited)", index=0)]
+    assert statement_scale(group) == 1e6

@@ -65,3 +65,20 @@ def test_a_statement_in_a_currency_the_company_does_not_report_in_is_never_serve
     translated.currency = "USD"
     chosen = {item["fiscal_period"]: item for item in choose([annual, translated])}
     assert chosen["FY"]["status"] == "kept" and chosen["Q3"]["status"] != "kept"
+
+
+def test_releases_do_not_outvote_an_annual_report():
+    # FEMSA: two releases dating a first quarter as the year agree against its 20-F's year.
+    from datetime import date
+    from statement_extractor.domain.model import Reading
+    from statement_extractor.selection.witnesses import contradicted
+
+    def year(form, filed, revenue):
+        return Reading(statement="income", duration="year", fiscal_year="2025", fiscal_period="FY",
+                       period_end=date(2025, 12, 31), period_start=date(2025, 1, 1), currency="MXN",
+                       accession=f"{form}-{filed}", form=form, filed=filed, own=True, source="html", basis="IFRS",
+                       lines=[{"line": 0, "concept": "printed_total_revenues", "label": "Total revenues", "level": 0,
+                               "is_heading": False, "value": revenue}])
+    annual = year("20-F", date(2026, 4, 24), 834390.0)
+    readings = [year("6-K", date(2025, 4, 28), 195820.0), annual, year("6-K", date(2026, 4, 30), 195819.0)]
+    assert annual not in contradicted(readings)
