@@ -1,0 +1,34 @@
+# One-off probe: can a GitHub worker reach CVM's open data, and what do Copel's quarterly forms hold there?
+name: cvm-probe
+on:
+  push:
+    branches: [statements/cvm-probe]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copel's rows from CVM's ITR and DFP files
+        run: |
+          set -u
+          mkdir -p out && cd out
+          base=https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC
+          curl -sS -o itr_index.html -w "itr index %{http_code}\n" $base/ITR/DADOS/
+          curl -sS -o dfp_index.html -w "dfp index %{http_code}\n" $base/DFP/DADOS/
+          grep -o '[a-z_]*_[0-9]\{4\}\.zip' itr_index.html dfp_index.html | sort -u > files.txt || true
+          cat files.txt
+          for f in ITR/DADOS/itr_cia_aberta_2011.zip ITR/DADOS/itr_cia_aberta_2018.zip ITR/DADOS/itr_cia_aberta_2024.zip DFP/DADOS/dfp_cia_aberta_2024.zip; do
+            name=$(basename $f .zip)
+            curl -sS -o $name.zip -w "$name %{http_code} %{size_download}\n" $base/$f || continue
+            mkdir -p $name && unzip -q -o $name.zip -d $name || continue
+            ls -la $name | head -40
+            for csv in $name/*.csv; do
+              head -1 "$csv" | iconv -f latin1 -t utf-8 > "copel_$(basename $csv)"
+              iconv -f latin1 -t utf-8 "$csv" | grep -i "COMPANHIA PARANAENSE DE ENERGIA" >> "copel_$(basename $csv)" || true
+            done
+            rm -rf $name $name.zip
+          done
+          wc -l copel_* | tail -40
+      - uses: actions/upload-artifact@v6
+        with:
+          name: cvm-probe
+          path: out/
