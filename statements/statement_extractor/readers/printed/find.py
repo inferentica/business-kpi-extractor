@@ -98,8 +98,8 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         # Group AG (consolidated) versus UBS AG (consolidated)", then "Income statement" as the table's first row).
         # A parent company's columns beside the group's are no parent-only statement (side_by_side.py).
         title_text = SIDE_BY_SIDE.sub(" ", title_text)
-        if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
-                not_statement.search(_RUNNING_LINK.sub(" ", table.context[-200:])) or \
+        if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", _heading(title_text)[-260:])) or \
+                not_statement.search(_RUNNING_LINK.sub(" ", _heading(table.context[-200:]))) or \
                 len([r for r in table.rows if r.figures]) < 4:
             continue
         if any(_NOT_A_PERIOD.search(cell.text) for cells in table.header for cell in cells if cell.start > 0):
@@ -127,6 +127,12 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
                                                                    for label in labels_in_context(group)) >= 3):
             found.append((kind, group))
     return found
+
+
+def _heading(context: str) -> str:
+    """The heading lines just before a table: what follows the last sentence (Visteon's auditor's report ends "… the
+    segment disclosures as discussed in Note 22 …" above its income statement; its words are no title's)."""
+    return re.split(r"[.;]\s+(?=\S)", context)[-1]
 
 
 # The company's own profit before taxes ("INCOME BEFORE INCOME TAX"), not an item of other comprehensive income stated

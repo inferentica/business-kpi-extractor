@@ -38,7 +38,10 @@ _MONTH_YEAR = re.compile(rf"\b({_MONTH})-(\d{{2}})\b", re.I)
 _YEAR = re.compile(r"\b((?:19|20)\d{2})\b")
 
 
-_NUMBERS = {"three": 3, "six": 6, "nine": 9, "twelve": 12, "thirteen": 13, "sixteen": 16, "seventeen": 17,
+# Delta's 2007 10-Qs after fresh start: "Two Months Ended June 30, 2007 | One Month Ended April 30, 2007"; a span read
+# as none would make such a column the year to date.
+_NUMBERS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+            "eleven": 11, "twelve": 12, "thirteen": 13, "sixteen": 16, "seventeen": 17,
             "twenty-four": 24, "twenty-six": 26, "twenty-eight": 28, "thirty-six": 36, "thirty-nine": 39, "forty": 40,
             "forty-one": 41, "fifty-two": 52, "fifty-three": 53}
 
@@ -138,8 +141,11 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     day_first = _day_first(header_all)
     # One day for each column, in order, when no column prints a day of its own.
     named = [m.group(0).lower() for m in header_days]
+    # A column's own cell may hold its neighbour's day as well, where fixed-width text runs them together (Ross's
+    # "May 1, January 30, May 2" over "1999 1999 1998"); it still names its own.
+    own_named = [[m.group(0).lower() for m in _MONTH_DAY.finditer(aboves[column])] for column in columns]
     in_order_days = len(header_days) == len(columns) >= 2 and len(set(named)) == len(named) and all(
-        [m.group(0).lower() for m in _MONTH_DAY.finditer(aboves[column])] in ([], named) for column in columns)
+        not own or own == named or named[index] in own for index, own in enumerate(own_named))
     dated_in_title = {match.group(3): (match.group(1), match.group(2)) for match in _FULL_DATE.finditer(title + " " + header_all)}
     for column in columns:
         above = aboves[column]
@@ -167,6 +173,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         days = 364
         if span is not None and span.group(1):
             days = _span_days(span.group(1), span.group(2))
+            if span.group(2).lower().startswith("month") and days not in (91, 182, 273, 364):
+                continue  # one, two or four months is no quarter or year to date (Delta's fresh start in 2007)
         elif span is not None and span.group(0).lower().startswith("half"):
             days = 182  # Lloyds' "Half-year to 30 Jun 2023"
         elif span is not None and "quarter" in span.group(0).lower():

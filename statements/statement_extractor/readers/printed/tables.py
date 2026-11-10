@@ -94,7 +94,7 @@ def is_subheader(cells: list[Cell]) -> bool:
 
 COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)\s+ended\b|\bended\b|\bhalf[-\s]year\b|"
                            r"\b\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|"  # Lloyds TSB's "30 June"
-                           r"^(\s*(first|second|third|fourth)\s+quarter|\s*(three|six|nine|twelve)\s+months)\b|"
+                           r"^(\s*(first|second|third|fourth)\s+quarter|\s*(one|two|three|four|six|nine|twelve)\s+months?)\b|"  # Delta's "Two Months | One Month"
                            r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|"
                            r"\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b|"  # PepsiCo's "3/21/09"
                            r"\b\d{1,2}\.\d{1,2}\.(\d{2}|\d{4})\b|"  # UBS's "31.12.14", day first
