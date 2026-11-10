@@ -108,3 +108,12 @@ class RecordBuilding:
             "source_accession": ref.accession, "source_url": source_url or ref.source_url,
             "filed_at": ref.filed.isoformat(),
         }
+
+
+def held_for_later(value: dict, cells: list[float], checked: str) -> dict:
+    """A held figure the next year's release gives otherwise, in more than one column: held for review, never set aside.
+    Its own filing decides what it states. Goldman recast its 2022 banking lines when it formed Global Banking & Markets,
+    and each 2022 figure, as its release stated it, was set aside as contradicted (2026-11-10)."""
+    figures = ", ".join(f"{cell:,.6g}" for cell in cells[:3])
+    notes = [*(value.get("notes") or []), f"the next year's release gives {figures} for this line: restated, or misread", checked]
+    return {**value, "validation_status": "needs_review", "notes": notes}

@@ -690,13 +690,15 @@ def test_the_next_years_release_confirms_or_restates_a_flagged_value():
     assert _flagged_fixture(html, {"client": 2499.0, "gaming": 500.0})["gaming"]["validation_status"] == "needs_review"
 
 
-def test_a_flagged_value_no_column_of_the_next_years_release_shows_is_rejected():
+def test_a_flagged_value_no_column_of_the_next_years_release_shows_stays_held():
     html = """<table><tr><td></td><td>Three Months Ended June 30, 2026</td><td>Three Months Ended March 31, 2026</td>
       <td>Three Months Ended June 30, 2025</td></tr>
       <tr><td>Client</td><td>3,062</td><td>2,900</td><td>2,499</td></tr><tr><td>Gaming</td><td>779</td><td>700</td><td>1,122</td></tr></table>"""
     settled = _flagged_fixture(html, {"client": 2499.0, "gaming": 1000.0})
     assert settled["client"]["validation_status"] == "verified"
-    assert settled["gaming"]["validation_status"] == "rejected"
+    # Its own filing decides: held for review with the later figures, never set aside on another filing's word.
+    assert settled["gaming"]["validation_status"] == "needs_review"
+    assert any(note.startswith("the next year's release gives") for note in settled["gaming"]["notes"])
 
 
 def test_a_flagged_value_equal_to_an_official_figure_is_proven_only_when_precise():
@@ -2108,3 +2110,12 @@ def test_a_breakdown_its_year_ago_column_confirms_needs_no_xbrl_total():
     assert len(held) == 2 and all(v["validation_status"] == "needs_review" for v in held)
     agreed = _pipeline(FakeControl({}), [revenue, row("subs", 4708e6, True), row("ads", 778e6, True)])._anchor_ai_breakdowns()
     assert agreed == []
+
+
+def test_a_figure_the_next_years_release_gives_otherwise_is_held_not_set_aside():
+    # Goldman's 2022 Q1 Equity underwriting, $261 million as its release stated it, recast to $276 million a year later.
+    from kpi_extractor.steps.shared import held_for_later
+    row = {"kpi_key": "equity_underwriting", "value": 261e6, "validation_status": "needs_review", "notes": ["parts differ from the total by 30.6%"]}
+    held = held_for_later(row, [276e6, 183e6], "checked against b")
+    assert held["validation_status"] == "needs_review" and held["value"] == 261e6
+    assert held["notes"][1:] == ["the next year's release gives 2.76e+08, 1.83e+08 for this line: restated, or misread", "checked against b"]

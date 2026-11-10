@@ -14,7 +14,7 @@ from ..quality.checks import JUMP_NOTE, count_jump, parts_add_up, reported_match
 from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
 from ..sources.base import FilingRef
 from .shared import (AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
-                     _year_ago_cells, list_parents, value_key)
+                     _year_ago_cells, held_for_later, list_parents, value_key)
 
 MAX_YEAR_RATIO = 3.0
 # Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
@@ -31,6 +31,7 @@ _MIN_COVERAGE = 0.99
 _EXACT_NOTE = re.compile(r"^the [\w-]+'s exact (?:figure|year less its three quarters);")
 # Restatements move a figure a little (a reclassification); a jump beyond this is a different column, not a restatement.
 MAX_RESTATEMENT = 0.10
+
 
 def _period_headed(document: Document, locator: dict) -> bool:
     """Whether a value's column is headed by words naming its period ("three months ended", "Q4"), so the row's
@@ -326,8 +327,7 @@ class SeriesChecks:
                 else:
                     settle(v, f"{_RESTATED_LATER} (was {value:.15g})", value=round(cells[0], 2))
             elif named and len(cells) > 1:
-                settled[value_key(v)] = {**v, "validation_status": "rejected",
-                                         "notes": [*(v.get("notes") or []), "contradicted by the next year's release"]}
+                settled[value_key(v)] = held_for_later(v, cells, checked)
             else:
                 settled[value_key(v)] = {**v, "notes": [*(v.get("notes") or []), checked]}
         for period, items in restatements.items():
