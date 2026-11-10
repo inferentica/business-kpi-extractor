@@ -82,3 +82,9 @@ def test_sum_holds_picks_breakdowns_whose_parts_did_not_add_up():
     values = {1: held("KKR", "parts differ from the total by 21.6%"), 2: held("GS", "lines differ from Management Fees by 3%"),
               3: held("APO", "the same figure as a year earlier: check the column")}
     assert picked_filings("sum-holds", values) == {"KKR", "GS"}
+
+
+def test_failed_filings_picks_filings_that_failed_outright():
+    filings = {"KKR-Q3-2018": {"status": "failed", "attempts": 4}, "DONE": {"status": "processed"}}
+    assert picked_filings("failed-filings", {}, filings) == {"KKR-Q3-2018"}
+    assert parse_args(["--reread", "failed-filings"]).reread == "failed-filings"

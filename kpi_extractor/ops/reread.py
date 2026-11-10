@@ -55,9 +55,21 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
 }
 
 
-def picked_filings(name: str, values: dict) -> set[str]:
-    """The accessions of the filings holding figures the selector picks."""
+# Selectors that pick filings themselves: a filing that failed outright holds no figures to pick it by.
+FILING_SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
+    # KKR's Q3 2018 release failed four times on 2026-11-09 when the AI's reading outran the control plane's time limit,
+    # before Quotiva's own project allowed longer calls; past its attempts, no run reads it again unless picked.
+    "failed-filings": ("filings that failed to read and are no longer retried", lambda filing: filing.get("status") == "failed"),
+}
+
+
+def picked_filings(name: str, values: dict, filings: dict | None = None) -> set[str]:
+    """The accessions of the filings the selector picks: those holding figures it picks, or, for a filing selector, the
+    filings themselves."""
+    if name in FILING_SELECTORS:
+        picks = FILING_SELECTORS[name][1]
+        return {accession for accession, filing in (filings or {}).items() if picks(filing)}
     if name not in SELECTORS:
-        raise ValueError(f"Unknown re-read selector {name!r}; one of {', '.join(sorted(SELECTORS))}")
+        raise ValueError(f"Unknown re-read selector {name!r}; one of {', '.join(sorted({*SELECTORS, *FILING_SELECTORS}))}")
     picks = SELECTORS[name][1]
     return {value["source_accession"] for value in values.values() if value.get("source_accession") and picks(value)}

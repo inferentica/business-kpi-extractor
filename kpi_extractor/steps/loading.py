@@ -25,7 +25,7 @@ class FilingLoading:
             return False
         if getattr(self, "_reread_picked", None) is None:
             from ..ops.reread import picked_filings
-            self._reread_picked = picked_filings(name, self.values)
+            self._reread_picked = picked_filings(name, self.values, getattr(self, "filings", {}))
             getattr(self, "log", print)(f"{getattr(self, 'symbol', '')}: {len(self._reread_picked)} filings to read again ({name})")
         return accession in self._reread_picked
 
