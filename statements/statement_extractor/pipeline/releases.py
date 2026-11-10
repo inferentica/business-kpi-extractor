@@ -27,7 +27,8 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
                   "release_quarter": list(quarter[:2]) if quarter else None, "period_end": ref.period_end.isoformat()}
         try:
             with_network_retries(lambda: load_submission(ref.filing))
-            found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=ref.period_end)
+            titled: set = set()
+            found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=ref.period_end, titled=titled)
         except Exception as error:  # noqa: BLE001 - one unreadable release never stops the company
             record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"
             records.append(record)
@@ -36,7 +37,7 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
             ref.filing = None
             gc.collect()
         own = [reading for reading in found if reading.own]
-        record.update({"note": "release", "printed": kinds, "columns": len(found), "notes": notes[:10],
+        record.update({"note": "release", "printed": kinds, "titled": sorted(titled), "columns": len(found), "notes": notes[:10],
                        "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
                        **own_period(own, ref.form)})
         records.append(record)

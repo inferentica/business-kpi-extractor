@@ -17,6 +17,7 @@ from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
 from ..readers.printed.sign_index import printed_figures
 from ..readers.printed.summary import read_summaries
+from ..readers.printed.titled import split_titled
 from ..readers.slides.parse import is_slides, parse_slides
 from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
@@ -86,10 +87,12 @@ _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anythi
 
 
 def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None = None,
-                 document_end: date | None = None, summaries: list | None = None) -> tuple[list, list[str], list[str]]:
+                 document_end: date | None = None, summaries: list | None = None,
+                 titled: set | None = None) -> tuple[list, list[str], list[str]]:
     """A filing without XBRL, read from its printed documents. A release's own period is its quarter (`document_end`).
     With `signs`, every figure its tables print is also collected there by label; with `summaries`, an annual report's
-    multi-year summary figures (readers/printed/summary.py)."""
+    multi-year summary figures (readers/printed/summary.py); with `titled`, the statements it prints of its own period
+    (readers/printed/titled.py)."""
     found, notes, kinds = [], [], []
     release = ref.form == "6-K"
     if document_end is None and not release:
@@ -139,6 +142,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         except Exception as error:  # noqa: BLE001 - one unreadable document never stops the filing
             notes.append(f"{attachment.document}: unreadable ({type(error).__name__})")
             continue
+        printed_titles, document_notes = split_titled(document_notes)
+        if titled is not None:
+            titled |= printed_titles
         if signs is not None:
             parse = {"html": parse_html, "text": parse_text, "slides": parse_slides}[printed]
             for key, figures in printed_figures(parse(content)).items():
@@ -170,7 +176,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         for reading in readings:
             reading.basis, reading.currency = basis, reading.currency or currency
         found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
-        notes.extend(f"{document}: {note}" for note in proved)
+        notes.extend(f"{document}: {note}" for note in split_titled(proved)[1])
     for reading in found:  # the filing's own EX-27 schedules, an independent check on its printed figures
         reading.basis = reading.basis or filing_basis or default_basis(ref.form)
         reading.currency = reading.currency or filing_currency or default_currency(ref.form)

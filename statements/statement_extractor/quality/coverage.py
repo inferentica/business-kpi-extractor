@@ -40,16 +40,35 @@ def _derivable(year: str, number: int, kept: set, bases: dict) -> bool:
     return all(key in kept for key in keys) and bool(set.intersection(*(set(bases.get(key) or ()) for key in keys)))
 
 
+def _printed(filings) -> tuple[dict, set]:
+    """What each quarter's releases print, by title and own column date (readers/printed/titled.py), and the quarters
+    one of whose releases could not be opened: there, as in a quarter with no release on file, what it prints is
+    unknown, so every statement is counted."""
+    printed: dict[tuple, set] = {}
+    unknown = set()
+    for filing in filings:
+        if filing["form"] != "6-K" or not filing.get("release_quarter"):
+            continue
+        quarter = tuple(filing["release_quarter"])
+        if str(filing.get("note", "")).startswith("unreadable") or "titled" not in filing or any(
+                ": unreadable (" in note or "too large to read" in note for note in filing.get("notes") or []):
+            unknown.add(quarter)
+        printed.setdefault(quarter, set()).update(map(tuple, filing.get("titled") or ()))
+    return printed, unknown
+
+
 def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict | None = None) -> dict:
     """A foreign filer's quarters, from the first fiscal year a release came in to its latest release quarter: each
     quarter's income, and for the first three its balance sheet and cash flows (three months or the year to date);
-    the fourth quarter's balance sheet is the annual report's."""
+    the fourth quarter's balance sheet is the annual report's. A statement counts where a release printed it, was kept,
+    or follows from two kept periods; quarters no release printed are listed apart (`quarters_unprinted`)."""
     quarters = sorted({tuple(f["release_quarter"]) for f in filings if f["form"] == "6-K" and f.get("release_quarter")})
     if not quarters:
         return {}
     latest = quarters[-1]
+    printed, unknown = _printed(filings)
     expected = found = parent_only = derivable = 0
-    missing = []
+    missing, unprinted = [], []
     for year in range(int(quarters[0][0]), int(latest[0]) + 1):
         for number in range(1, 5):
             quarter = f"Q{number}"
@@ -59,19 +78,27 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
             if number < 4:
                 wanted.append(("balance", [(quarter, "instant")]))
                 wanted.append(("cash_flow", [(quarter, "quarter"), (quarter, "ytd")]))
+            titles = printed.get((str(year), quarter), set())
             for statement, keys in wanted:
-                expected += 1
                 served = [(statement, str(year), period, duration) for period, duration in keys]
+                shown = (str(year), quarter) in unknown or (str(year), quarter) not in printed or \
+                    (statement,) in titles or any(key in titles for key in served)
                 if any(key in kept for key in served):
+                    expected += 1
                     found += 1
                     parent_only += all(key in parent or key not in kept for key in served)
                 elif statement == "income" and number > 1 and _derivable(str(year), number, kept, bases or {}):
+                    expected += 1
                     derivable += 1
-                else:
+                elif shown:
+                    expected += 1
                     missing.append(f"{year} {quarter} {statement}")
+                else:
+                    unprinted.append(f"{year} {quarter} {statement}")
     return {"quarters_expected": expected, "quarters_kept": found, "quarters_derivable": derivable,
             "quarters_parent_only": parent_only,
-            "quarters_missing": missing[:40]}
+            "quarters_missing": missing[:40], "quarters_unprinted": len(unprinted),
+            "quarters_unprinted_list": unprinted[:120]}
 
 
 def _counts(chosen, field: str, kind=lambda value: value) -> dict:

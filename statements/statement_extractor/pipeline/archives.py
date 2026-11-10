@@ -12,6 +12,7 @@ from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period
 from ..readers.pdf.layout import pdf_text
 from ..readers.printed.summary import read_summaries
+from ..readers.printed.titled import split_titled
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.archives import archived, fetch
@@ -31,7 +32,7 @@ def read_archives(symbol: str, fiscal_year_end: str, year_offset: int, log=print
         if form == "6-K":
             quarter = label_period(Period(period_end, period_end - timedelta(days=90)), fiscal_year_end, year_offset)
             record["release_quarter"] = list(quarter[:2]) if quarter else None
-        found, notes, held = [], [], set()
+        found, notes, held, titled = [], [], set(), set()
         for item in items:
             try:
                 text = pdf_text(fetch(item))
@@ -41,6 +42,8 @@ def read_archives(symbol: str, fiscal_year_end: str, year_offset: int, log=print
             except Exception as error:  # noqa: BLE001 - one unreadable capture never stops the company
                 notes.append(f"{item.url.rsplit('/', 1)[-1]}: unreadable ({type(error).__name__}: {str(error)[:80]})")
                 continue
+            printed_titles, document_notes = split_titled(document_notes)
+            titled |= printed_titles
             basis, currency = stated_basis(text), stated_currency(text)
             if summaries is not None and form in ("20-F", "ARS"):
                 for figure in read_summaries(parse_text(text), accession=first.accession, form=form, filed=first.filed,
@@ -55,7 +58,7 @@ def read_archives(symbol: str, fiscal_year_end: str, year_offset: int, log=print
             held |= {reading.key for reading in document}
             notes.extend(f"{item.url.rsplit('/', 1)[-1]}: {note}" for note in document_notes)
         own = [reading for reading in found if reading.own]
-        record.update({"note": "archive", "printed": ["pdf"], "columns": len(found), "notes": notes[:10],
+        record.update({"note": "archive", "printed": ["pdf"], "titled": sorted(titled), "columns": len(found), "notes": notes[:10],
                        "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
                        **own_period(own, form)})
         records.append(record)
