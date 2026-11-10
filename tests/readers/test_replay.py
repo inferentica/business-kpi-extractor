@@ -327,3 +327,19 @@ def test_a_sentences_dates_and_other_figures_change_with_the_quarter():
 def test_a_value_that_repeats_in_its_sentence_is_never_replayed():
     # Which 192 was read (last quarter's column or this quarter's) is not recorded: the AI reads it again.
     assert _replayed("Equity1 189 192 192 1.6% 792 761", "192", "Equity1 189 192 201 6.3% 802 773") == "value repeats in the sentence"
+
+
+def test_a_renamed_report_is_replayed_from_the_quarter_before_under_its_old_name():
+    # TSMC's report was tsmc2025q2consolidatedfina.htm, then a2026q2consolidatedreport-.htm: the same table, a new name.
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    renamed = parse_document(report("June 30", 11, 25, 31, 42, 310), "https://www.sec.gov/Archives/a2026q2consolidatedreport-.htm")
+    control = NoAi()  # any AI call would fail: none is expected
+    pipeline = _pipeline(control, _history(first))
+    read, problems, _ = pipeline._read(lambda: "prompt", renamed, SPEC, Q2, version=1)
+    assert control.calls == [] and problems == [] and pipeline.result.replayed_reads == 1
+    # A renamed document whose table is not there goes to the AI as before.
+    flash = {"period_end": "2026-06-30", "values": []}
+    control = NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash})
+    other = parse_document("<p>Board resolutions of June 30, 2026.</p>", "https://www.sec.gov/Archives/a2026q2board.htm")
+    _pipeline(control, _history(first))._read(lambda: "prompt", other, SPEC, Q2, version=1)
+    assert ("locate", "flash") in control.calls

@@ -328,7 +328,7 @@ class AiReading:
         """A breakdown read with fewer rows than in the reference quarter and a total under half of that quarter's is
         most likely part of its table, with a subtotal taken for the total (TSMC's 2nm and 3nm under "advanced
         technologies"): its parts add up, so only the comparison shows it. Flagged whole."""
-        history = self._ai_history(expected, _source_template(document.source_url))
+        history = self._kind_history(expected, _source_template(document.source_url))
         for group in {item.group.key for item in read if item.group.kind == "revenue_breakdown"}:
             items = [item for item in read if item.group.key == group]
             total = next((item.value for item in items if item.is_total or item.kpi.key == item.group.total_kpi), None)
@@ -520,8 +520,8 @@ class AiReading:
 
     def _last_locators(self, before: date, source: str) -> dict[str, dict]:
         """Where each KPI was found the previous quarter in the same kind of document (TSMC's earnings release and its
-        financial report carry different KPIs, and are compared only with their own kind)."""
-        history = {key: value for key, value in self._ai_history(before, source).items()}
+        financial report carry different KPIs, and are compared only with their own kind; see _kind_history)."""
+        history = self._kind_history(before, source)
         if not history:
             return {}
         newest = max(value["period_end"] for value in history.values())

@@ -62,7 +62,7 @@ class ReplayReading:
         if not last:
             missed("no earlier reading of this kind of document", len(spec.groups))
             return [], None, set()
-        history = self._ai_history(expected, source)
+        history = self._kind_history(expected, source)
         accession = next((value.get("source_accession") for key, value in history.items() if key in last), None)
         not_reported = self._not_reported_before(accession, expected)
         items: list[ReadValue] = []
@@ -163,6 +163,13 @@ class ReplayReading:
                 self.result.rule_evidence.append(row)
                 outcome = f"{ANCHOR} {mode} {'agreed' if row['agreed'] else 'disagreed'}"
                 self.result.replay_outcomes[outcome] = self.result.replay_outcomes.get(outcome, 0) + 1
+
+    def _kind_history(self, before: date, source: str | None) -> dict[str, dict]:
+        """The AI's latest readings in the same kind of document. A kind is known by its file name, which issuers change
+        (TSMC's report was d…d6k, tsm-ex991_…, tsmc…consolidatdfinan, a0515, a…consolidatedreport- in turn, so replay
+        found no earlier reading for most quarters): with none under the name, the latest reading of any kind serves, and
+        replay still holds only where the same rows, column and total are found and every check passes."""
+        return self._ai_history(before, source) or (self._ai_history(before) if source is not None else {})
 
     def _not_reported_before(self, accession: str | None, expected: date) -> set[str]:
         """KPIs the nearest reading's AI looked for and did not find: not looked for again this quarter. In the newest
