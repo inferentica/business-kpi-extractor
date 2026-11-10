@@ -29,7 +29,9 @@ def cmf_facts(instance: bytes) -> list[Fact]:
         if not element.tag.startswith("{") or element.get("contextRef") not in contexts:
             continue
         namespace, name = element.tag[1:].split("}", 1)
-        if not namespace.endswith("/ifrs-full"):  # the IFRS taxonomy's own elements, not CMF's extensions
+        # The IFRS taxonomy's own elements, not CMF's extensions: "…/ifrs-full" since 2011, "…/ifrs" before (CMF's
+        # 2010-11 statements, on xbrl.iasb.org's taxonomy).
+        if not namespace.endswith(("/ifrs-full", "/ifrs")) or not ("ifrs.org" in namespace or "iasb.org" in namespace):
             continue
         try:
             value = float(element.text)

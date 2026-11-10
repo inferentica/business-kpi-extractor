@@ -79,3 +79,12 @@ def test_a_presentation_role_is_walked_in_its_order():
       <link:presentationArc xlink:from="a" xlink:to="c" order="2"/><link:presentationArc xlink:from="a" xlink:to="b" order="1"/>
       </link:presentationLink></link:linkbase>"""
     assert parse_role(role) == [("StatementAbstract", 0), ("Revenue", 1), ("ProfitLoss", 1)]
+
+
+def test_cmf_2010_statements_on_the_older_ifrs_namespace_are_read():
+    instance = b"""<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:ifrs="http://xbrl.iasb.org/taxonomy/2009-04-01/ifrs">
+      <xbrli:context id="p1"><xbrli:entity><xbrli:identifier scheme="x">93007000</xbrli:identifier></xbrli:entity>
+        <xbrli:period><xbrli:instant>2010-06-30</xbrli:instant></xbrli:period></xbrli:context>
+      <xbrli:unit id="USD"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
+      <ifrs:Assets contextRef="p1" unitRef="USD" decimals="-3">4000000000</ifrs:Assets></xbrli:xbrl>"""
+    assert cmf_facts(instance) == [Fact("Assets", None, date(2010, 6, 30), 4000000000.0, "USD", -3)]
