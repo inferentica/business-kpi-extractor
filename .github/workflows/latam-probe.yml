@@ -1,0 +1,38 @@
+# One-off probe: Chile's CMF (IFRS statements of SQM and the other US-listed Chilean filers) and Mexico's BMV, from a worker.
+name: latam-probe
+on:
+  push:
+    branches: [statements/latam-probe]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reach CMF and BMV and list statement downloads
+        shell: python
+        run: |
+          import os, re, html, urllib.request
+          agent = {"User-Agent": "TradeTracker statements (admin@inferentica.com)"}
+          os.makedirs("out", exist_ok=True)
+          def get(url, name):
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers=agent), timeout=90) as r:
+                      body = r.read(); open(f"out/{name}", "wb").write(body)
+                      print(name, r.status, len(body), r.headers.get("content-type")); return body.decode("latin-1", "replace")
+              except Exception as e:
+                  print(name, "ERROR", type(e).__name__, str(e)[:200]); return ""
+          get("https://www.bmv.com.mx/es/emisoras/informacionfinanciera/TLEVISA-5720-CGEN_CAPIT", "bmv_tlevisa.html")
+          get("https://www.cmfchile.cl/", "cmf_home.html")
+          page = get("https://www.cmfchile.cl/institucional/mercados/novedades_envio_sa_ifrs.php?mm_ifrs=09&aa_ifrs=2026", "cmf_ifrs_list.html")
+          for link in sorted(set(re.findall(r'href="([^"]+)"', page)))[:60]:
+              if "entidad" in link or "ifrs" in link.lower() or "xbrl" in link.lower(): print("  list link", html.unescape(link)[:200])
+          # SQM (RUT 93007000), Enel Chile (76536353), LATAM (89862200), Banco de Chile (97004000), CCU (90413000), Andina (91144000), Santander Chile (97036000)
+          for rut in ("93007000", "76536353"):
+              for tab in ("3", "4"):
+                  body = get(f"https://www.cmfchile.cl/institucional/mercados/entidad.php?mercado=V&rut={rut}&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania={tab}", f"cmf_{rut}_{tab}.html")
+                  for m in sorted(set(re.findall(r'(?:href|action|src)="([^"]+)"', body))):
+                      if any(w in m.lower() for w in ("ifrs", "xbrl", "zip", "estados", "fecu", "archivo", "pestania")): print("  ", rut, tab, html.unescape(m)[:220])
+                  for m in re.findall(r'<select[^>]*name="([^"]+)"', body): print("   select", m)
+      - uses: actions/upload-artifact@v6
+        with:
+          name: latam-probe
+          path: out/
