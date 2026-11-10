@@ -1,4 +1,4 @@
-"""An owner-edited KPI list (Bedrock's KPI templates): additions re-read only recent quarters."""
+"""An owner-edited KPI list (Quotiva Review): additions re-read only recent quarters."""
 from __future__ import annotations
 
 from datetime import date

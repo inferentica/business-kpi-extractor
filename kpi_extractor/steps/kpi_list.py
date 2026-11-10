@@ -159,7 +159,7 @@ class KpiListUpkeep:
         return True
 
     def _spec(self, row: dict | None, releases: list[FilingRef]) -> tuple[Spec | None, int, bool]:
-        # A list the owner edited (Bedrock's KPI templates) is kept as edited, even on a forced run.
+        # A list the owner edited (Quotiva Review) is kept as edited, even on a forced run.
         if row and (not self.force or row.get("owner_edited_at")):
             stored = Spec.model_validate({"groups": row["groups"], "names": row.get("names") or {}})
             spec, version = self._capped(stored), int(row["version"])
