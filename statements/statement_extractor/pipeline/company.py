@@ -25,6 +25,7 @@ from ..selection.summaries import choose_summaries, summary_coverage
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
 from ..sources.listing import filing_for, list_reports
 from ..sources.retry import with_network_retries
+from .prefetch import load_all
 from .printed import read_printed
 from .archives import read_archives
 from .regulators import read_regulators
@@ -38,6 +39,9 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     profile, company = company_profile(symbol)
     reports = sorted(list_reports(company, since), key=lambda ref: ref.filed, reverse=True)
     readings, filings, offset, summaries, regulator_reads = [], [], None, [], []
+    # Every report's period is read from its submission, so they are downloaded first, four at a time
+    # (pipeline/prefetch.py); each is held on its filing until read, as it was when they came one by one.
+    load_all([ref.filing for ref in reports], load_submission)
     annual_ends = [end for ref in reports if ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None]
     year_ends = {ref.accession: year_end_for(_period_end(ref), annual_ends, profile.fiscal_year_end) for ref in reports}
     for ref in reports:

@@ -15,6 +15,7 @@ from ..sources.edgar import load_submission
 from ..sources.retry import with_network_retries
 from ..sources.listing import list_releases
 from .empty_releases import names_a_statement, remember, remembered
+from .prefetch import ahead
 from .printed import read_printed
 
 
@@ -25,7 +26,8 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
     folder = os.environ.get("STATEMENTS_ARCHIVE_CACHE")
     known, empty = remembered(folder), set()
     log(f"{symbol}: {len(refs)} 6-Ks in the release window, {len(known & {ref.accession for ref in refs})} remembered empty")
-    for ref in refs:
+    # The next releases download while one is read (pipeline/prefetch.py); those remembered empty are not fetched.
+    for ref in ahead(refs, lambda ref: None if ref.accession in known else load_submission(ref.filing)):
         quarter = label_period(Period(ref.period_end, ref.period_end - timedelta(days=90)), fiscal_year_end, year_offset)
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
                   "release_quarter": list(quarter[:2]) if quarter else None, "period_end": ref.period_end.isoformat()}
