@@ -23,6 +23,7 @@ from ..selection.period_dates import align_dates
 from ..selection.signs import sign_ties
 from ..selection.summaries import choose_summaries, summary_coverage
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
+from ..sources.light import LightFiling, light_filing
 from ..sources.listing import filing_for, list_reports
 from ..sources.retry import with_network_retries
 from .printed import read_printed
@@ -44,7 +45,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         fiscal_year_end = year_ends[ref.accession]
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False}
         try:
-            xbrl = with_network_retries(lambda: (load_submission(ref.filing), ref.filing.xbrl())[1])
+            xbrl = with_network_retries(lambda: _opened(ref).xbrl())
         except Exception as error:  # noqa: BLE001 - one unreadable filing never stops the company
             record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"
             filings.append(record)
@@ -145,6 +146,7 @@ def _printed_second_look(symbol, reports, filings, readings, year_ends: dict[str
             continue
         try:
             ref.filing = filing_for(accession)
+            ref.filing = light_filing(ref.filing) or ref.filing  # only the documents read (sources/light.py)
             found, notes, kinds = read_printed(ref, year_ends[accession], year_offset,
                                                 printed_signs.setdefault(accession, {}) if accession in ties else None)
         except Exception as error:  # noqa: BLE001 - a second look that fails leaves the XBRL readings as they are
@@ -160,12 +162,23 @@ def _printed_second_look(symbol, reports, filings, readings, year_ends: dict[str
     return found_all
 
 
+def _opened(ref):
+    """The filing read from only the documents its readers open (sources/light.py), else from its whole submission."""
+    light = light_filing(ref.filing) if not isinstance(ref.filing, LightFiling) else ref.filing
+    if light is None:
+        load_submission(ref.filing)
+        return ref.filing
+    ref.filing = light
+    return light
+
+
 def _period_end(ref) -> date | None:
     """The filing's period, as SEC's index states it. A period ending within a week of the filing date is no report
     period but the index's mistake (Helix's 10-Ks of 2014 and 2015 'end' on the day they were filed, which made
     February 21 its fiscal year end and every column of 2013-15 fall off the calendar): unknown."""
     try:  # SEC can answer with an error page for a filing's header; its period is then unknown, not fatal
-        raw = getattr(ref.filing, "period_of_report", None)
+        # The filing list's report date first: asking edgartools for period_of_report downloads the whole submission.
+        raw = getattr(ref.filing, "report_date", None) or getattr(ref.filing, "period_of_report", None)
         end = date.fromisoformat(str(raw)[:10]) if raw else None
     except Exception:  # noqa: BLE001
         return None

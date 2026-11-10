@@ -7,7 +7,9 @@ from __future__ import annotations
 import re
 import time
 
-_TRANSIENT = re.compile(r"Timeout|Connect|RemoteProtocol|NetworkError|ReadError|ChunkedEncoding|IncompleteRead", re.I)
+# SEC's own refusals while busy are passing too: "Server error '503 Service Unavailable'", "429 Too Many Requests".
+_TRANSIENT = re.compile(r"Timeout|Connect|RemoteProtocol|NetworkError|ReadError|ChunkedEncoding|IncompleteRead|"
+                        r"Server error '5\d\d|\b429\b", re.I)
 _WAITS = (15, 60, 180)
 
 

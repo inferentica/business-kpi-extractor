@@ -12,6 +12,7 @@ from ..domain.calendar import quarter_end_before
 from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period
 from ..sources.edgar import load_submission
+from ..sources.light import light_filing
 from ..sources.retry import with_network_retries
 from ..sources.listing import list_releases
 from .empty_releases import names_a_statement, remember, remembered
@@ -35,7 +36,11 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
                             "notes": ["names no statement (remembered)"], "own": [], **own_period([], ref.form)})
             continue
         try:
-            with_network_retries(lambda: load_submission(ref.filing))
+            light = with_network_retries(lambda: light_filing(ref.filing))
+            if light is None:
+                with_network_retries(lambda: load_submission(ref.filing))
+            else:
+                ref.filing = light  # only the documents the readers open are fetched (sources/light.py)
             titled: set = set()
             found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=ref.period_end, titled=titled)
             if not found and not titled and not names_a_statement(ref.filing.attachments) and not any(
