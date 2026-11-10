@@ -86,9 +86,16 @@ def cmf_statements(rut: str, end: date, scope: str = "C") -> tuple[bytes | None,
     instance, filed = None, None
     for href, label in re.findall(r'href="(\.\./inc/inf_financiera/ifrs/safec_ifrs_verarchivo\.php[^"]+)"[^>]*>(.*?)</a>', page, re.S):
         if "XBRL" in label:
-            archive = zipfile.ZipFile(io.BytesIO(_open(opener, urllib.request.Request(
-                urllib.parse.urljoin(page_url, html.unescape(href)), headers=_AGENT))))
-            instance = archive.read(next(name for name in archive.namelist() if name.endswith(".xbrl")))
+            content = _open(opener, urllib.request.Request(urllib.parse.urljoin(page_url, html.unescape(href)), headers=_AGENT))
+            if content[:2] == b"PK":
+                archive = zipfile.ZipFile(io.BytesIO(content))
+                names = sorted(archive.namelist(), key=lambda name: not name.endswith(".xbrl"))  # the .xbrl, not its linkbases
+                instance = next(body for body in (archive.read(name) for name in names if name.endswith((".xbrl", ".xml")))
+                                if b"<xbrl" in body[:3000] or b":xbrl" in body[:3000])
+            elif b"<xbrl" in content[:3000] or b":xbrl" in content[:3000]:
+                instance = content  # CMF's 2010-11 statements come as the instance itself, not zipped
+            else:
+                raise ValueError(f"CMF's XBRL is neither a zip nor an instance: {content[:60]!r}")
     log = re.search(r"ventana_modal\('([^']+bitacora_ifrs\.php[^' ]+)", page)
     if instance is not None and log:
         text = _open(opener, urllib.request.Request(urllib.parse.urljoin(page_url, html.unescape(log.group(1))),
