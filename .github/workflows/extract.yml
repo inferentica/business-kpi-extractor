@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
-      BUSINESS_KPI_WORKFLOW_URL: https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow
+      BUSINESS_KPI_WORKFLOW_URL: ${{ vars.BUSINESS_KPI_WORKFLOW_URL || 'https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow' }}
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
       PYTHONUNBUFFERED: "1"
     steps:

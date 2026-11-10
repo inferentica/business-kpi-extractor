@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      BUSINESS_KPI_WORKFLOW_URL: https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow
+      BUSINESS_KPI_WORKFLOW_URL: ${{ vars.BUSINESS_KPI_WORKFLOW_URL || 'https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow' }}
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
       PYTHONUNBUFFERED: "1"
     steps:
@@ -191,7 +191,7 @@ jobs:
           KPI_EVAL_LISTS: ${{ inputs.lists || 'stored' }}
           KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
           GOLDEN: ${{ inputs.golden || 'evals/golden.json' }}
-          BUSINESS_KPI_WORKFLOW_URL: https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow
+          BUSINESS_KPI_WORKFLOW_URL: ${{ vars.BUSINESS_KPI_WORKFLOW_URL || 'https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow' }}
         # The job's own OIDC request variables let the container sign in to the control plane as this workflow.
         run: |
           mkdir -p eval-results && chmod 777 eval-results
