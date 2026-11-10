@@ -1,5 +1,6 @@
 """A foreign filer's statements as its home regulator publishes them (sources/regulators.py): CVM's quarterly and
-annual forms for Brazil's companies, OpenDART's periodic reports for Korea's. Their quarters stand above the 6-K
+annual forms for Brazil's companies, OpenDART's periodic reports for Korea's, BMV's quarterly XBRL for Mexico's and
+CMF's for Chile's (pipeline/latam.py). Their quarters stand above the 6-K
 releases that translate them, their years beside the 20-F as its witness (selection/choose.py).
 
 Each line keeps its name as filed and its code or tag, with an English name where one exists (decided 2026-11-11):
@@ -13,6 +14,7 @@ from ..domain.ifrs_labels import english_names
 from ..readers.regulators.cvm import cvm_readings
 from ..readers.regulators.dart import dart_readings
 from ..sources.regulators import DART_REPORTS, REGULATED, cvm_rows, dart_corp_code, dart_rows
+from .latam import read_bmv, read_cmf
 
 _CVM_FIRST = {"ITR": 2011, "DFP": 2010}  # the first year of each form in CVM's open data
 _DART_FIRST = 2015
@@ -28,7 +30,9 @@ def read_regulators(symbol: str, since: date, fiscal_year_end: str, year_offset:
         return [], []
     records, readings = [], []
     this_year = date.today().year
-    if regulator == "cvm":
+    if regulator in ("bmv", "cmf"):
+        records, readings = (read_bmv if regulator == "bmv" else read_cmf)(identity[0], since, fiscal_year_end, year_offset)
+    elif regulator == "cvm":
         for form, first in _CVM_FIRST.items():
             for year in range(max(first, since.year), this_year + 1):
                 record = {"regulator": "CVM", "form": form, "year": year}
@@ -63,7 +67,7 @@ def read_regulators(symbol: str, since: date, fiscal_year_end: str, year_offset:
                 readings.extend(found)
         _name_tags(readings, english_names())
     kept = sum(1 for reading in readings if reading.status == "kept")
-    log(f"{symbol}: {regulator.upper()} {len(readings)} columns from {sum(r.get('filings', 0) for r in records)} "
+    log(f"{symbol}: {regulator.upper()} {len(readings)} columns from {len({reading.accession for reading in readings})} "
         f"filings, {kept} kept, {sum(1 for r in records if 'note' in r)} years unread")
     return records, readings
 

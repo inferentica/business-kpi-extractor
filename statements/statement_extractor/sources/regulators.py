@@ -36,6 +36,13 @@ REGULATED = {
     "KEP": ("dart", ("015760",)), "KB": ("dart", ("105560",)), "SHG": ("dart", ("055550",)),
     "WF": ("dart", ("316140",)), "PKX": ("dart", ("005490",)), "SKM": ("dart", ("017670",)),
     "KT": ("dart", ("030200",)), "LPL": ("dart", ("034220",)),
+    # Mexico: each company's key at BMV. Chile: each company's RUT at CMF; its banks are left out, as Brazil's are, their
+    # statements being on the banking standard (Banco de Chile, Banco Santander Chile).
+    "TV": ("bmv", ("TLEVISA",)), "AMX": ("bmv", ("AMX",)), "CX": ("bmv", ("CEMEX",)), "KOF": ("bmv", ("KOF",)),
+    "FMX": ("bmv", ("FEMSA",)), "PAC": ("bmv", ("GAP",)), "ASR": ("bmv", ("ASUR",)), "VTMX": ("bmv", ("VESTA",)),
+    "VIST": ("bmv", ("VISTA",)), "VLRS": ("bmv", ("VOLAR",)),
+    "SQM": ("cmf", ("93007000",)), "ENIC": ("cmf", ("76536353",)), "LTM": ("cmf", ("89862200",)),
+    "CCU": ("cmf", ("90413000",)), "AKO-A": ("cmf", ("91144000",)),
 }
 
 _CVM = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC"
