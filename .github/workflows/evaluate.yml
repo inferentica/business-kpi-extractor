@@ -24,12 +24,13 @@ on:
         default: "6"
         type: string
       ai_profile:
-        description: Reasoning effort - flash-high (production), flash-max, or reasoning on every call (flash-max-all)
+        description: Reasoning effort - flash-high (production), flash-low, flash-max, or reasoning on every call (flash-max-all)
         required: true
         default: flash-high
         type: choice
         options:
           - flash-high
+          - flash-low
           - flash-max
           - flash-max-all
       golden:

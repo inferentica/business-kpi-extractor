@@ -1296,6 +1296,9 @@ def test_every_call_is_flash_and_reasoning_runs_at_the_profiles_effort(monkeypat
     assert ai_profile("flash", True) == ("flash", True, "max")
     monkeypatch.setenv("KPI_AI_PROFILE", "flash-max-all")
     assert ai_profile("flash", False) == ("flash", True, "max")
+    monkeypatch.setenv("KPI_AI_PROFILE", "flash-low")
+    assert ai_profile("flash", True) == ("flash", True, "low")
+    assert ai_profile("flash", False) == ("flash", False, None)
 
 
 def test_a_group_dropped_for_repeating_xbrl_has_its_figures_set_aside():
