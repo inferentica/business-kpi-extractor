@@ -11,6 +11,7 @@ from ..ops.control import ControlError
 from ..readers.extract import _listed_kpi
 from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
+from ..rules.classify import classify_by_rules
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
 from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds
@@ -23,6 +24,7 @@ OUTSIDE_REPORTED_PERIODS = "outside the KPI's reported periods"
 REFRESH_QUARTERS = 20
 _NOT_EARNINGS = "classified as not an earnings document"
 _CLASSIFIED_PAST_COVER = "classified past the cover 2"  # 2: covers written with &nbsp; too
+_BY_RULES = "classified by rules"
 
 def keep_current_groups(proposed: Spec, current: Spec) -> Spec:
     """A re-proposed list never silently drops a group the current list tracks (TSMC's platform and geography once
@@ -138,13 +140,21 @@ class KpiListUpkeep:
         if previous and not (own and _NOT_EARNINGS in (previous.get("notes") or [])
                              and _CLASSIFIED_PAST_COVER not in (previous.get("notes") or [])):
             return _NOT_EARNINGS not in (previous.get("notes") or [])
-        try:
-            answer = self._ask(ai.prompt(self.company, self.source.classification_excerpt(ref), ai.CLASSIFY_TASK),
-                               "classify", ai.Classification, thinking_first=False, model="flash")
-        except (AiResponseError, ControlError):
-            return False  # nothing is recorded, so the next run classifies it again
-        if answer.kind == "other":
-            self.store.record(FilingReading(ref, "skipped", notes=[_NOT_EARNINGS, *([_CLASSIFIED_PAST_COVER] if own else [])]))
+        excerpt = self.source.classification_excerpt(ref)
+        # Titles that say plainly what the filing is need no AI; the AI decides only when they say both or neither.
+        kind = classify_by_rules(excerpt)
+        if kind is None:
+            try:
+                kind = self._ask(ai.prompt(self.company, excerpt, ai.CLASSIFY_TASK),
+                                 "classify", ai.Classification, thinking_first=False, model="flash").kind
+            except (AiResponseError, ControlError):
+                return False  # nothing is recorded, so the next run classifies it again
+            by_rules = []
+        else:
+            by_rules = [_BY_RULES]
+        if kind == "other":
+            self.store.record(FilingReading(ref, "skipped", notes=[
+                _NOT_EARNINGS, *([_CLASSIFIED_PAST_COVER] if own else []), *by_rules]))
             return False
         return True
 

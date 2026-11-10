@@ -202,6 +202,19 @@ def test_furnished_filings_are_classified_once():
     assert control.calls.count(("classify", "flash")) == 1
 
 
+def test_titles_that_say_what_a_filing_is_need_no_ai(monkeypatch):
+    control = FakeControl({("classify", "flash"): {"kind": "earnings"}})
+    pipeline = _pipeline(control)
+    for accession, title, expected in (("0001-26-2", "TSMC Reports June 2026 Net Revenue", False),
+                                       ("0001-26-3", "TSMC Reports Second Quarter EPS of NT$15.36", True)):
+        ref = SimpleNamespace(confirmed=False, accession=accession, exhibits=[], form="6-K", filed=date(2026, 7, 16),
+                              role="earnings_release", source_url="https://www.sec.gov/x.htm")
+        monkeypatch.setattr(pipeline.source, "classification_excerpt",
+                            lambda ref, title=title: f"Form 6-K filed 2026-07-16\nEX-99.1 a.htm (): {title}")
+        assert pipeline._is_earnings_document(ref) is expected
+    assert ("classify", "flash") not in control.calls
+
+
 def test_large_documents_are_narrowed_to_the_sections_flash_picks():
     html = "<p>Quarter ended June 30, 2026</p>" + "".join(f"<p>Note {i}: leases and other matters.</p>" * 40 for i in range(60))
     html += "<table><tr><td>Platform</td><td>2026</td></tr><tr><td>HPC</td><td>830,369</td></tr></table>"
