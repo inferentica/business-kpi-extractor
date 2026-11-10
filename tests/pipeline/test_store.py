@@ -182,9 +182,13 @@ def test_a_new_reading_that_changes_a_verified_figure_of_its_filing_goes_to_revi
                 _row("flagged", value=1.0, status="needs_review")])
     store.write([_row("crpo", value=25_900_000_000.0), _row("same", value=5.0), _row("rounded", value=6_559.0),
                  _row("other_filing", value=4.0, accession="f2"), _row("flagged", value=2.0)])
-    held = {row["kpi_key"]: row for row in store.reread_disagreements()}
-    assert list(held) == ["crpo"]
-    assert held["crpo"]["validation_status"] == "needs_review" and held["crpo"]["value"] == 25_900_000_000.0
+    written = {row["kpi_key"]: row for row in store.reread_disagreements()}
+    assert sorted(written) == ["crpo", "rounded"]
+    held = written["crpo"]
+    assert held["validation_status"] == "needs_review" and held["value"] == 25_900_000_000.0
+    # 6,559 for 6,559.1 is the same figure rounded: the exact one is written back, verified, not held.
+    assert written["rounded"]["value"] == 6_559.1 and written["rounded"]["validation_status"] == "verified"
+    held = {"crpo": held}
     assert held["crpo"]["notes"][-1] == "a new reading of this filing differs from the figure served before: 12,800,000,000"
 
 
@@ -249,3 +253,15 @@ def test_a_series_the_filing_also_fed_keeps_its_figures_when_a_re_read_feeds_onl
         _breakdown("iphone", 61.0, group="kpi_revenue_by_product_type", locator=stated, unit="currency")]))
     assert store.values[("products", "iphone", "2026", "Q2")]["validation_status"] == "verified"
     assert store.values[("kpi_revenue_by_product_type", "iphone", "2026", "Q2")]["validation_status"] == "verified"
+
+
+def test_a_re_read_keeps_the_exact_figure_over_its_rounding():
+    # KKR's sum-holds re-read, 2026-11-10: the release's headline for the table's cell, and the other way round.
+    store = _store()
+    store.load([_row("uncalled", value=107_592_000_000.0), _row("credit", value=5.25), _row("infra", value=12.0),
+                _row("raised_q3", value=25_171_000_000.0), _row("raised_q2", value=25_000_000_000.0)])
+    store.write([_row("uncalled", value=108_000_000_000.0), _row("credit", value=5.0), _row("infra", value=11.7),
+                 _row("raised_q3", value=25_000_000_000.0), _row("raised_q2", value=25_295_000_000.0)])
+    written = {row["kpi_key"]: row["value"] for row in store.reread_disagreements()}
+    # The rounded ones go back to the exact figures served before; a more exact new reading stands unheld.
+    assert written == {"uncalled": 107_592_000_000.0, "credit": 5.25, "raised_q3": 25_171_000_000.0}

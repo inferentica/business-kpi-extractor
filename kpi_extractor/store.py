@@ -2,6 +2,8 @@
 back the rows they want written: nothing else writes values or filings to the control plane."""
 from __future__ import annotations
 
+from decimal import Decimal
+
 from dataclasses import dataclass, field
 from datetime import date
 from types import MappingProxyType
@@ -195,11 +197,15 @@ class CompanyStore:
         for key, before in self._loaded.items():
             now = self._values.get(key)
             if (now is None or before["validation_status"] != "verified" or now["validation_status"] != "verified"
-                    or before.get("owner_decision") or now.get("source_accession") != before.get("source_accession")
-                    or not _differs(now["value"], before["value"])):
+                    or before.get("owner_decision") or now.get("source_accession") != before.get("source_accession")):
                 continue
-            rows.append({**now, "validation_status": "needs_review",
-                         "notes": [*(now.get("notes") or []), f"{REREAD_NOTE} {_figure(before['value'])}"]})
+            if rounding_of(now["value"], before["value"]):
+                # The same figure rounded (the release's headline for its table's cell: KKR's uncalled commitments,
+                # 107,592 then 108,000 million): the exact one is kept.
+                rows.append(dict(before))
+            elif not rounding_of(before["value"], now["value"]) and _differs(now["value"], before["value"]):
+                rows.append({**now, "validation_status": "needs_review",
+                             "notes": [*(now.get("notes") or []), f"{REREAD_NOTE} {_figure(before['value'])}"]})
         return rows
 
     def carry(self, carried: dict) -> None:
@@ -320,6 +326,18 @@ def _keep_groups(records: list[dict], earlier: list[dict]) -> list[dict]:
         kept.append({**record, "group_key": old, "group_label": model["group_label"], "group_order": model.get("group_order"),
                      "group_kind": model["group_kind"]})
     return kept
+
+
+def _significant(value) -> int:
+    digits = Decimal(repr(float(value))).normalize().as_tuple().digits
+    return max(1, len(digits))
+
+
+def rounding_of(rough, exact) -> bool:
+    """Whether one figure is another rounded to fewer significant digits (5 for 5.25; 108,000 million for 107,592)."""
+    rough, exact = float(rough), float(exact)
+    places = _significant(rough)
+    return rough != exact and places < _significant(exact) and float(f"{exact:.{places}g}") == rough
 
 
 def _differs(value, before) -> bool:
