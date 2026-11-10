@@ -78,7 +78,14 @@ jobs:
               pilot = json.load(open(f"statements/sets/{name}.json" if name else "statements/pilot.json"))
               symbols = [s.strip().upper() for s in os.environ.get("SYMBOLS", "").split(",") if s.strip()] or pilot["symbols"]
               since = {symbol: os.environ.get("SINCE") or pilot["since"] for symbol in symbols}
-          print("matrix=" + json.dumps([{"symbol": symbol, "since": start} for symbol, start in since.items()]))
+          # The slowest companies start first (sets/durations.json, the last measured round), new ones before them: a
+          # long job started last would otherwise be the round's whole tail.
+          try:
+              minutes = json.load(open("statements/sets/durations.json"))["minutes"]
+          except (OSError, ValueError, KeyError):
+              minutes = {}
+          order = sorted(since, key=lambda symbol: -minutes.get(symbol, 99.0))
+          print("matrix=" + json.dumps([{"symbol": symbol, "since": since[symbol]} for symbol in order]))
           EOF
 
   read:

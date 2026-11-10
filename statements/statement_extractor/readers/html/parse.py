@@ -159,6 +159,18 @@ def _side_by_side(lines: list[list[Cell]]) -> int | None:
     return middle if count >= max(5, figured * 0.3) else None
 
 
+def _walk(root):
+    """Every element in document order (as root.iter() gives them), each with whether a table holds it: one pass
+    carrying the answer down, where asking each element's ancestors walked them again for every element (Vale's
+    releases spent most of their reading there)."""
+    stack = [(root, False)]
+    while stack:
+        element, in_table = stack.pop()
+        yield element, in_table
+        below = in_table or element.tag == "table"
+        stack.extend((child, below) for child in reversed(element))
+
+
 def parse_html(html: str | bytes) -> list[Table]:
     """Every table of a document with rows, its header rows and the text before it."""
     raw = html.encode("utf-8") if isinstance(html, str) else html
@@ -177,11 +189,11 @@ def parse_html(html: str | bytes) -> list[Table]:
     tree = lxml.html.fromstring(raw)
     found = []
     previous_text: list[str] = []
-    for index, element in enumerate(tree.iter()):
+    for element, in_table in _walk(tree):
         if not isinstance(element.tag, str):
             continue
         if element.tag == "table":
-            if element.getparent() is not None and any(a.tag == "table" for a in element.iterancestors()):
+            if in_table:
                 continue
             lines = [_cells(tr) for tr in element.iter("tr")]
             rows, header, seen_figures = _rows(lines)
@@ -203,8 +215,7 @@ def parse_html(html: str | bytes) -> list[Table]:
                 words = [clean(" ".join(cell.text for cell in _cells(tr))) for tr in element.iter("tr")]
                 previous_text = (previous_text + [word for word in words if word])[-40:]
         elif element.tag in ("p", "div", "font", "b", "i", "em", "strong", "u", "small", "a", "center", "h1", "h2", "h3",
-                             "h4", "span", "td") and \
-                not any(a.tag == "table" for a in element.iterancestors()):
+                             "h4", "span", "td") and not in_table:
             if element.text and element.text.strip():
                 previous_text.append(clean(element.text))
             for child in element:
