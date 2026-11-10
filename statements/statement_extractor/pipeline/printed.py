@@ -93,21 +93,22 @@ _GENERIC = {"AND", "OF", "DE", "DO", "DA", "DAS", "DOS", "THE", "HOLDINGS", "HOL
 
 
 def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
-    """The names of other companies that the readings' titles name: an acquired company's statements furnished with
-    the company's report (Gildan's 6-K of June 2011 carries Gold Toe Moretz's, "GOLD TOE MORETZ HOLDINGS CORP. AND
-    SUBSIDIARIES CONSOLIDATED BALANCE SHEETS"). A title's name is the company's own when it shares a word with the
-    company's name or a former one, or when the 6-K's cover prints it as the registrant's (Copel's Portuguese name)."""
-    names = [_words(name) - _GENERIC for name in _company_names(ref.filing)]
-    registrant = _words(cover[:cover.lower().find("indicate by check mark")] if cover else "")
-    others = []
-    for printed in {reading.titled for reading in readings if reading.titled}:
-        words = _words(printed) - _GENERIC
-        if not words or not any(names) or words <= registrant or any(words & name for name in names) or any(
-                SequenceMatcher(None, "".join(_ordered(printed)), "".join(_ordered(other))).ratio() >= 0.85
-                for other in _company_names(ref.filing)):
-            continue
-        others.append(printed)
-    return others
+    """The names of other companies that a release's statement titles name: an acquired company's statements furnished
+    with the company's report (Gildan's 6-K of June 2011 carries Gold Toe Moretz's, "GOLD TOE MORETZ HOLDINGS CORP. AND
+    SUBSIDIARIES CONSOLIDATED BALANCE SHEETS"). A name is the company's own when it shares a word with the company's
+    EDGAR name or a former one, or with the registrant's names on the 6-K's cover: FEMSA's titles print "FOMENTO
+    ECONÓMICO MEXICANO", EDGAR "MEXICAN ECONOMIC DEVELOPMENT INC". Only names of two words or more are compared; an
+    annual report, with no cover to give its own names, is never checked."""
+    if cover is None:
+        return []
+    own = set().union(*(_named(name) for name in _company_names(ref.filing)),
+                      _named(cover[:cover.lower().find("indicate by check mark")]))
+    return sorted(printed for printed in {reading.titled for reading in readings if reading.titled}
+                  if len(_named(printed)) >= 2 and not _named(printed) & own)
+
+
+def _named(name: str) -> set[str]:
+    return {word for word in _words(name) - _GENERIC if len(word) >= 3}
 
 
 def _ordered(name: str) -> list[str]:

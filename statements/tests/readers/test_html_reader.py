@@ -324,3 +324,15 @@ def test_a_statements_title_names_its_company():
     plain = "<p>CONSOLIDATED BALANCE SHEETS</p><table><tr><td></td><td>2011</td><td>2010</td></tr>" + _balance_rows() + "</table>"
     [(kind, group)] = find_statements(parse_html(plain), release=True)
     assert titled_company(kind, group[0]) is None
+
+
+def test_a_title_name_cut_off_or_after_a_page_label_is_no_name():
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements, titled_company
+    cut = "<p>" + "Q" * 600 + " ING COMPANY LIMITED AND SUBSIDIARIES</p><p>CONSOLIDATED BALANCE SHEETS</p>"
+    paged = "<p>F-6 COMPANHIA PARANAENSE DE ENERGIA COPEL AND SUBSIDIARIES</p><p>CONSOLIDATED BALANCE SHEETS</p>"
+    table = "<table><tr><td></td><td>2011</td><td>2010</td></tr>" + _balance_rows() + "</table>"
+    [(kind, group)] = find_statements(parse_html(cut + table), release=True)
+    assert titled_company(kind, group[0]) is None
+    [(kind, group)] = find_statements(parse_html(paged + table), release=True)
+    assert titled_company(kind, group[0]) == "COMPANHIA PARANAENSE DE ENERGIA COPEL"

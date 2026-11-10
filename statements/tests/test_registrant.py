@@ -63,3 +63,13 @@ def test_a_title_in_the_companys_own_name_is_its_own():
     assert _others(["BRASCAN CORPORATION"], ["BROOKFIELD Corp /ON/", "BRASCAN CORP/"]) == []  # a former name
     cover = "(Commission File No. 1-14668) COMPANHIA PARANAENSE DE ENERGIA - COPEL Energy Company of Parana Indicate by check mark"
     assert _others(["COMPANHIA PARANAENSE DE ENERGIA - COPEL"], ["ENERGY CO OF PARANA"], cover) == []  # the cover's name
+
+
+def test_a_name_in_the_companys_own_language_or_a_page_fragment_is_never_anothers():
+    cover = "Commission File Number 333-8618 FOMENTO ECONÓMICO MEXICANO, S.A.B. DE C.V. Indicate by check mark"
+    assert _others(["FOMENTO ECONÓMICO MEXICANO, S.A.B. DE C.V."], ["MEXICAN ECONOMIC DEVELOPMENT INC"], cover) == []
+    assert _others(["C.V.", "Sul", "KEPCO"], ["MEXICAN ECONOMIC DEVELOPMENT INC"], cover) == []  # under two name words
+
+
+def test_an_annual_report_is_never_checked():
+    assert _others(["GRUPO AEROPORTUARIO DEL SURESTE, S.A.B. DE C.V."], ["SOUTHEAST AIRPORT GROUP"], None) == []
