@@ -64,6 +64,8 @@ def split(line: str) -> Line | None:
             part.text, part.end = bare, part.end - (len(part.text) - len(bare))
     if not parts:
         return None
+    if len(parts) > 1 and re.fullmatch(r"\d{1,2}\)", parts[0].text):
+        parts[0].text += " "  # a wrapped label's note number closing it ("(Note" / "8)........ (2,103)"): label, no figure
     run = len(parts)
     while run > 0 and (FIGURE.match(parts[run - 1].text) or PERCENT.match(parts[run - 1].text)):
         run -= 1
