@@ -73,10 +73,10 @@ def _date(month: str, day: str, year: str) -> date | None:
     months = {name[:3]: index for index, name in enumerate(calendar.month_name) if name}
     number = months.get(month[:3].lower().capitalize()[:3]) or next(
         (index for index, name in enumerate(calendar.month_abbr) if name and name.lower() == month[:3].lower()), None)
-    try:
-        return date(int(year), number, int(day)) if number else None
-    except ValueError:
+    if not number or not 1 <= int(day) <= 31:
         return None
+    # "Three Months Ended February 29" over 1996 and 1995: the month's last day in the year that has no 29th.
+    return date(int(year), number, min(int(day), calendar.monthrange(int(year), number)[1]))
 
 
 # A quarter by name and year: TSMC's "Q3 2007", "3Q 2007", "1Q08", "Third Quarter 2007".
@@ -192,6 +192,10 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         # "December, 31" over "2011": Petrobras).
         own_days = list(_MONTH_DAY.finditer(above))
         day = own_days[-1] if own_days else title_day
+        # One cell over two columns, a day for each, as for years: "January 31, February 28," over "1996 | 1995".
+        same_days = [other for other, days_named in zip(columns, own_named) if days_named == own_named[columns.index(column)]]
+        if len(same_days) >= 2 and len(own_days) == len(same_days):
+            day = own_days[same_days.index(column)]
         if in_order_days:
             day = header_days[columns.index(column)]  # "AS AT JUNE 30, AND DECEMBER 31" over "2023 | 2022" (Brookfield)
         dotted_all = list(_DOTTED_DATE.finditer(above)) if dotted is not None else []
