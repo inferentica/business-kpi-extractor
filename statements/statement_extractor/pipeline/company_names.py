@@ -117,8 +117,14 @@ def _other_issuers(readings: list, ref, cover: str | None) -> list[str]:
     if cover is None:
         return []
     own = set().union(*(_named(name) for name in _company_names(ref.filing)), _registrant_words(cover))
+    # Another issuer opens with its legal name ("Coca-Cola FEMSA, S.A.B. de C.V."); a brand ("Volaris*", Controladora
+    # Vuela Compañía de Aviación's) or a page footer is the company's own release.
     return sorted(name for name in {reading.release_of for reading in readings if reading.release_of}
-                  if own and _named(name) and not _named(name) & own)
+                  if own and _named(name) and not _named(name) & own and _LEGAL_FORM.search(name))
+
+
+_LEGAL_FORM = re.compile(r"\b(?:S\.?\s?A\.?\s?B\.?|S\.?\s?A\.?|Inc\.?|Corp(?:oration)?\.?|Ltd\.?|Limited|plc|N\.?V\.?|AG|"
+                         r"Ltda\.?|LLC|Co\.)(?:\s+de\s+C\.?\s?V\.?)?\s*$", re.I)
 
 
 def _named(name: str) -> set[str]:

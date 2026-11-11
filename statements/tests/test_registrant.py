@@ -87,3 +87,20 @@ def test_a_listed_subsidiarys_results_are_anothers():
     brookfield = "Commission File Number 033-97038 BROOKFIELD ASSET MANAGEMENT INC. (Translation) Indicate by check mark"
     assert _others(["BRASCAN CORPORATION", "Brookfield Asset Management Inc."], ["BROOKFIELD Corp /ON/", "BRASCAN CORP/"],
                    brookfield) == []
+
+
+def test_a_release_opening_under_a_brand_is_the_companys_own():
+    # Volaris's releases open "Volaris*", its legal name Controladora Vuela Compañía de Aviación; FEMSA's 6-Ks carry
+    # Coca-Cola FEMSA's release, opening with its legal name.
+    printed._NAMES["0"] = ["Controladora Vuela Compania de Aviacion, S.A.B. de C.V."]
+
+    class Reading:
+        def __init__(self, release_of):
+            self.release_of = release_of
+
+    class Ref:
+        filing = _Filing
+
+    cover = "CONTROLADORA VUELA COMPAÑÍA DE AVIACIÓN, S.A.B. DE C.V. (Exact name of registrant as specified in its charter)"
+    readings = [Reading(name) for name in ("Volaris*", "| Page", "Coca-Cola FEMSA, S.A.B. de C.V.")]
+    assert printed._other_issuers(readings, Ref, cover) == ["Coca-Cola FEMSA, S.A.B. de C.V."]
