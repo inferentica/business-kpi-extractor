@@ -388,3 +388,17 @@ def test_a_cash_flow_continued_page_never_joins_the_income_statement():
             ("Cash and cash equivalents at end of year", "9,000", "8,000"))) + "</table>"
     readings, _ = read(first + second, "1231", None)
     assert [line["label"] for line in readings[("income", "2011")].lines][-1] == "Profit for the year"
+
+
+def test_a_title_name_after_the_title():
+    # CEMEX's 6-K: "Income Statement & Balance Sheet Information CEMEX Holdings Philippines, Inc. (Thousands of …)".
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.company_title import titled_company
+    from statement_extractor.readers.printed.find import find_statements
+    html = "<p>Financial Results Income Statement &amp; Balance Sheet Information CEMEX Holdings Philippines, Inc. " \
+           "(Thousands of Philippine Pesos)</p><table><tr><td></td><td>2011</td><td>2010</td></tr>" + "".join(
+               f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+                   ("Net sales", "1,000", "900"), ("Cost of sales", "(600)", "(550)"), ("Gross profit", "400", "350"),
+                   ("Income before income tax", "200", "150"), ("Income tax", "(50)", "(40)"), ("Net income", "150", "110"))) + "</table>"
+    [(kind, group)] = find_statements(parse_html(html), release=True)
+    assert titled_company(kind, group[0]) == "CEMEX Holdings Philippines, Inc."

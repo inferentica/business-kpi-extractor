@@ -31,7 +31,7 @@ def titled_company(kind: str, table: Table) -> str | None:
     else:
         before = re.sub(r"(?i)\b(unaudited|condensed|interim)\s*$", "", text[:title.start()].rstrip()).split()
         if not before or before[-1].upper().rstrip(",") not in _LEGAL_FORMS:
-            return None
+            return _after_title(text[title.end():])
     words: list[str] = []
     for position in range(len(before) - 1, max(-1, len(before) - 9), -1):
         word = before[position]
@@ -46,3 +46,28 @@ def titled_company(kind: str, table: Table) -> str | None:
 
 _LEGAL_FORMS = _ABBREVIATIONS | {"INC", "CORP", "CORPORATION", "LTD", "LIMITED", "PLC", "S.A", "AG", "N.V", "SA", "NV"}
 _PAGE_WORD = re.compile(r"^(F|FS|FS-R)-?\d+$|^(contents|index|statements?|page)$", re.I)
+
+
+# The name printed after the title, before its scale: CEMEX's 6-Ks furnish its listed subsidiaries' results, "Income
+# Statement & Balance Sheet Information CEMEX Holdings Philippines, Inc. (Thousands of Philippine Pesos …)", "CEMEX Latam
+# Holdings, S.A. and Subsidiaries in thousands of U.S. Dollars".
+_SCALE_START = re.compile(r"\(|\b(?:in|expressed\s+in)\s+(?:thousands|millions|billions)\b", re.I)
+_STATEMENT_WORDS = {"INFORMATION", "SHEET", "SHEETS", "STATEMENT", "STATEMENTS", "BALANCE", "INCOME", "DATA", "&", "AND",
+                    "FINANCIAL", "CONSOLIDATED", "OF", "OPERATIONS", "POSITION", "CASH", "FLOWS", "RESULTS"}
+
+
+def _after_title(text: str) -> str | None:
+    segment = text[:(_SCALE_START.search(text) or re.search(r"$", text)).start()][:120]
+    named = None
+    for named in _SUBSIDIARIES.finditer(segment):
+        pass
+    before = (segment[:named.start()] if named else segment).split()
+    if not before or not named and before[-1].upper().rstrip(",") not in _LEGAL_FORMS:
+        return None
+    words: list[str] = []
+    for word in reversed(before):
+        if not re.match(r"[A-Z]", word) or word.upper().strip(",") in _STATEMENT_WORDS or (
+                words and word.endswith(".") and word.upper() not in _ABBREVIATIONS):
+            break
+        words.insert(0, word)
+    return " ".join(words) or None

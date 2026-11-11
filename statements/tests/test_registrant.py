@@ -73,3 +73,16 @@ def test_a_name_in_the_companys_own_language_or_a_page_fragment_is_never_another
 
 def test_an_annual_report_is_never_checked():
     assert _others(["GRUPO AEROPORTUARIO DEL SURESTE, S.A.B. DE C.V."], ["SOUTHEAST AIRPORT GROUP"], None) == []
+
+
+def test_a_listed_subsidiarys_results_are_anothers():
+    # CEMEX's 6-Ks: CEMEX Holdings Philippines' and CEMEX Latam's results beside CEMEX's own.
+    cover = "Commission File Number: 001-14946 CEMEX, S.A.B. de C.V. (Exact name of Registrant) CEMEX Corp. Indicate by check mark"
+    names = ["CEMEX SAB DE CV"]
+    assert _others(["CEMEX Holdings Philippines, Inc.", "CEMEX Latam Holdings, S.A.", "CEMEX, S.A.B. de C.V."], names, cover) == [
+        "CEMEX Holdings Philippines, Inc.", "CEMEX Latam Holdings, S.A."]
+    lloyds = "Commission File number 001-15246 LLOYDS BANKING GROUP plc (Translation of registrant's name) Indicate by check mark"
+    assert _others(["Lloyds Bank plc"], ["Lloyds Banking Group plc"], lloyds) == ["Lloyds Bank plc"]
+    brookfield = "Commission File Number 033-97038 BROOKFIELD ASSET MANAGEMENT INC. (Translation) Indicate by check mark"
+    assert _others(["BRASCAN CORPORATION", "Brookfield Asset Management Inc."], ["BROOKFIELD Corp /ON/", "BRASCAN CORP/"],
+                   brookfield) == []
