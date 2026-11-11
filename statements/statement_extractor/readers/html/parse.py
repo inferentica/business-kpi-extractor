@@ -196,7 +196,7 @@ def parse_html(html: str | bytes) -> list[Table]:
     tree = lxml.html.fromstring(raw)
     found = []
     previous_text: list[str] = []
-    ticker = ""
+    ticker = issuer = ""
     for element, in_table in _walk(tree):
         if not isinstance(element.tag, str):
             continue
@@ -216,7 +216,10 @@ def parse_html(html: str | bytes) -> list[Table]:
                                                 if cell.start >= middle] for cells in lines])
                 rows += right[next((index for index, row in enumerate(right) if row.figures), len(right)):]
             context = " ".join(previous_text)[-600:]
-            found.append(Table(rows=rows, header=header, context=context, index=len(found), ticker=ticker))
+            # The document's first ticker is its own issuer's, under whatever ticker it had then (Brookfield's "BAM",
+            # Embraer's "ERJ"); a table after another one is that issuer's release.
+            found.append(Table(rows=rows, header=header, context=context, index=len(found),
+                               ticker=ticker if ticker != issuer else ""))
             if seen_figures:
                 previous_text = []
             else:
@@ -233,5 +236,6 @@ def parse_html(html: str | bytes) -> list[Table]:
                     previous_text.append(clean(child.tail))
             announced = _TICKER.findall(" ".join(previous_text[-3:]))
             ticker = announced[-1] if announced else ticker
+            issuer = issuer or (announced[0] if announced else "")
             previous_text = previous_text[-40:]
     return found
