@@ -112,15 +112,17 @@ def member_key(label: str) -> str:
     return "other" if _RESIDUAL.match(key) else key[:100]
 
 
-def remove_subtotals(members: dict[str, float], total: float | None) -> dict[str, float]:
+def remove_subtotals(members: dict[str, float], total: float | None, lines: frozenset[str] = frozenset()) -> dict[str, float]:
     """Drops members that are the sum of other members (e.g. Data Center = Hyperscale + AI Clouds + ...), keeping leaves.
 
     Parents are removed largest first, and only while the remaining members still reconcile no worse than before.
+    `lines`: members known to be lines (a KPI list names them under a parent), never dropped: among JPMorgan's dozen
+    revenue rows one or another equals a sum of others by chance (Principal transactions, 6,790, in Q1 2024).
     """
     remaining = dict(members)
     for member, value in sorted(members.items(), key=lambda item: -abs(item[1])):
         others = {key: other for key, other in remaining.items() if key != member}
-        if value <= 0 or len(others) < 2:
+        if value <= 0 or len(others) < 2 or member in lines:
             continue
         if not _is_subset_sum([other for other in others.values() if other > 0], value):
             continue
