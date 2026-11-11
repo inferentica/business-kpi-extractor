@@ -23,6 +23,9 @@ def titled_company(kind: str, table: Table) -> str | None:
         pass
     if title is None or title.start() < len(text) - 300:
         return None
+    after = _after_title(text[title.end():])
+    if after:
+        return after  # the name heading the statement itself, right after its title (CEMEX Latam's, after a "CLH" page head)
     named = None
     for named in _SUBSIDIARIES.finditer(text, 0, title.start()):
         pass
@@ -31,7 +34,7 @@ def titled_company(kind: str, table: Table) -> str | None:
     else:
         before = re.sub(r"(?i)\b(unaudited|condensed|interim)\s*$", "", text[:title.start()].rstrip()).split()
         if not before or before[-1].upper().rstrip(",") not in _LEGAL_FORMS:
-            return _after_title(text[title.end():])
+            return None
     words: list[str] = []
     for position in range(len(before) - 1, max(-1, len(before) - 9), -1):
         word = before[position]
