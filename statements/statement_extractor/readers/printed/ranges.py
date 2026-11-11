@@ -44,3 +44,4 @@ def mended_starts(periods: dict, ranged: set) -> None:
         if swapped.start < swapped.end and swapped.duration is not None and not any(
                 other.end == swapped.end and other.duration == swapped.duration for other in others):
             periods[column] = swapped
+

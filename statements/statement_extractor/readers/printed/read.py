@@ -22,7 +22,7 @@ from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
 from .company_title import titled_company
 from .currency import column_currencies, reporting_currency, translations
 from .dates import column_periods
-from .find import TITLES, find_statements, unlabelled_totals
+from .find import TITLES, find_statements, two_columns, unlabelled_totals
 from .scales import line_scale, share_scale, statement_scale, states_two
 from .side_by_side import column_scopes
 from .tables import Table, figure_columns
@@ -76,7 +76,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         if not periods:
             notes.append(f"{kind}: no dated columns")
             continue
-        dated = sorted(periods)
+        dated = sorted(set(periods) - two_columns(group[0], periods))
         by_column = column_currencies(group[0], dated)
         currency = reporting_currency(group, by_column, form)
         dropped = translations(dated, periods, by_column, currency, group)

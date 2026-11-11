@@ -267,3 +267,11 @@ def _complete(kind: str, group: list[Table]) -> bool:
     if kind == "cash_flow":
         return any(CLOSING.search(label) for label in labels) or sum(1 for label in labels if DATED_CASH.search(label)) >= 2
     return any(NET_INCOME.match(label) or PRETAX.search(label) for label in labels)
+
+def two_columns(table, periods: dict) -> set:
+    """Columns under one heading that print two figures in a row: two columns, the heading of one lost. FEMSA's FY2009
+    20-F spans "2008" over its 2009 peso column and its 2008 one, beside "2009" over the dollar translation; neither
+    the year nor which figure is the period's can be told, so neither is read."""
+    return {column for column in periods if len(column) > 1 and any(
+        sum(1 for position in column if position in row.figures) > 1 for row in table.rows)}
+

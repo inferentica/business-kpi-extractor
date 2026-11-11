@@ -138,3 +138,16 @@ def test_the_sign_beside_each_column_tells_the_translation_from_the_statement():
                                     fiscal_year_end="1231", year_offset=0)
     got = {(r.period_end.year, r.currency, r.lines[0]["value"]) for r in readings}
     assert got == {(2014, "MXN", 35_497e6), (2013, "MXN", 27_259e6)}, got
+
+
+def test_two_columns_under_one_heading_are_not_read():
+    # FEMSA's FY2009 20-F: "2009" over the dollar translation, "2008" spanning its 2009 peso column and its 2008 one.
+    from statement_extractor.domain.periods import Period
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import two_columns
+    html = "<table><tr><td></td><td colspan='2'>2009</td><td colspan='4'>2008</td></tr>" \
+           "<tr><td>Net sales</td><td>$</td><td>15,018</td><td>Ps.</td><td>196,103</td><td>Ps.</td><td>167,171</td></tr>" \
+           "<tr><td>Cost of sales</td><td></td><td>8,000</td><td></td><td>104,000</td><td></td><td>90,000</td></tr></table>"
+    [table] = parse_html(html)
+    periods = {(2,): Period(date(2009, 12, 31), date(2009, 1, 1)), (4, 6): Period(date(2008, 12, 31), date(2008, 1, 1))}
+    assert two_columns(table, periods) == {(4, 6)}
