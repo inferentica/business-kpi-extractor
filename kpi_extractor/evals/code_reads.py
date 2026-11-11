@@ -18,6 +18,10 @@ Releases are read as each one arrives (--order arrival, the default): one at a t
 the quarter just before it, as production reads a new release. --order backfill reads them as a company's first run
 does, in four chains of one fiscal quarter each, so each release replays from the same quarter a year earlier.
 
+A company with nothing stored (one never read before) is read from scratch the same way, with no AI: its KPI list is
+the AI's to write, so what code reads of it (XBRL breakdowns and tags, release tables, charts) is listed in full for a
+reading by hand against its filings (eval-results/code-reads-new.json).
+
 The latest four quarters of every company and five companies picked by hash are held out: readers are tuned on the rest
 and the held-out part confirms each change.
 
@@ -368,6 +372,45 @@ def read_company(plane: ControlPlane, symbol: str, quarters: int, held_out: bool
     }
 
 
+def read_new_company(plane: ControlPlane, symbol: str, quarters: int) -> dict:
+    """A company never read before, read from scratch by code alone: every figure the pipeline would have stored."""
+    control = CodeOnlyControl(plane)
+    started = time.perf_counter()
+    pipeline = SymbolPipeline(control, symbol, quarters, False, log=lambda line: print(line, flush=True))
+    try:
+        result = pipeline.run()
+    except Exception as error:  # noqa: BLE001
+        result = SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
+    figures = sorted((new_figure(value) for value in pipeline.store._values.values()
+                      if value.get("validation_status") != "rejected"), key=lambda row: (row["group"], row["kpi"], row["period"]))
+    return {"symbol": symbol, "figures": figures, "refused": dict(control.refused), "errors": result.errors[:5],
+            "seconds": time.perf_counter() - started}
+
+
+def new_figure(value: dict) -> dict:
+    locator = value.get("locator") or {}
+    return {"group": str(value["group_key"]), "kpi": str(value["kpi_key"]), "label": " / ".join(part for part in (value.get("group_label"), value.get("kpi_label")) if part),
+            "period": f"{value['fiscal_year']}-{value['fiscal_period']}", "end": str(value.get("period_end") or ""),
+            "value": value.get("value"), "unit": value.get("unit") or "", "method": value.get("method"),
+            "status": value.get("validation_status"), "readBy": reader(value), "source": value.get("source_url") or "",
+            "quote": str(locator.get("quote") or locator.get("label") or locator.get("concept") or "")[:300]}
+
+
+def new_text(companies: list[dict]) -> str:
+    lines = ["New companies, read by code alone (¥0)", "", "| Company | Figures | Verified | Needs review | By method | Seconds |",
+             "|---|---|---|---|---|---|"]
+    for company in companies:
+        figures = company["figures"]
+        methods = Counter(figure["method"] for figure in figures)
+        lines.append(f"| {company['symbol']} | {len(figures):,} | {sum(f['status'] == 'verified' for f in figures):,} | "
+                     f"{sum(f['status'] == 'needs_review' for f in figures):,} | "
+                     f"{', '.join(f'{name} {count:,}' for name, count in methods.most_common())} | {company['seconds']:.0f} |")
+    errors = {company["symbol"]: company["errors"] for company in companies if company["errors"]}
+    if errors:
+        lines += ["", "Errors: " + "; ".join(f"{symbol}: {found}" for symbol, found in errors.items())]
+    return "\n".join(lines)
+
+
 def summarize(companies: list[dict]) -> dict:
     rows = [row for company in companies for row in company["rows"]]
     table = defaultdict(Counter)
@@ -451,10 +494,22 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     configure_identity()
     symbols = sorted({symbol.strip().upper() for symbol in args.symbols.split(",") if symbol.strip()})
-    held = held_out_companies(symbols)
     plane = ControlPlane(os.environ["BUSINESS_KPI_WORKFLOW_URL"])
     started = plane.call("start", runId=None, triggerType="eval", symbols=symbols, quarters=args.quarters, forceRefresh=False)
     plane.run_id = started["runId"]
+    # A company with nothing stored is read from scratch (once, in the arrival pass) and listed for checking by hand.
+    fresh = [symbol for symbol in symbols if not (plane.call("symbol_state", symbol=symbol).get("values"))]
+    if fresh and args.order == "arrival":
+        with company_pool(max(1, min(args.workers, len(fresh)))) as pool:
+            new = list(pool.map(read_new_company, [plane] * len(fresh), fresh, [args.quarters] * len(fresh)))
+        Path("eval-results").mkdir(exist_ok=True)
+        Path("eval-results/code-reads-new.json").write_text(json.dumps(new, default=str, indent=1))
+        print(new_text(new))
+        if path := os.environ.get("GITHUB_STEP_SUMMARY"):
+            with open(path, "a") as out:
+                out.write(new_text(new) + "\n\n")
+    symbols = [symbol for symbol in symbols if symbol not in fresh]
+    held = held_out_companies(symbols)
     with company_pool(max(1, min(args.workers, len(symbols)))) as pool:
         companies = list(pool.map(read_company, [plane] * len(symbols), symbols, [args.quarters] * len(symbols),
                                   [symbol in held for symbol in symbols], [args.order] * len(symbols)))
