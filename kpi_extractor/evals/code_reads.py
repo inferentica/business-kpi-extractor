@@ -32,6 +32,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
+from types import MappingProxyType
 
 from ..ai import Located
 from ..ops.cli import company_pool
@@ -40,7 +41,7 @@ from ..pipeline import SymbolPipeline, SymbolResult
 from ..readers.trace import CODE_READERS
 from ..sources.sec import configure_identity
 from ..steps.replay_reading import in_full_groups, left_for_ai
-from ..steps.shared import AI_GROUP_PREFIX
+from ..steps.shared import AI_GROUP_PREFIX, value_key
 from ..store import rounding_of
 
 HELD_OUT_COMPANIES = 5
@@ -77,7 +78,9 @@ class CodeOnlyControl:
 
 
 class CodeOnlyPipeline(SymbolPipeline):
-    """The pipeline reading the company's releases again with code alone, its stored figures frozen."""
+    """The pipeline reading the company's releases again with code alone. While the releases are read the stored figures
+    are frozen, so each quarter replays only from verified places; after, the tested filings hold only what code read, and
+    the steps that fill figures by code (XBRL tags, quarter tables, quoted rows) and settle them run as in production."""
 
     def __init__(self, control: CodeOnlyControl, symbol: str, quarters: int, log=print):
         super().__init__(control, symbol, quarters, False, log=log, reread="code-only")
@@ -101,7 +104,21 @@ class CodeOnlyPipeline(SymbolPipeline):
 
     def _process_releases(self, releases, spec, version):
         self.kinds = {group.key: group.kind for group in spec.groups}
-        return super()._process_releases(releases, spec, version)
+        processed = super()._process_releases(releases, spec, version)
+        self._code_only_state()
+        return processed
+
+    def _code_only_state(self) -> None:
+        """The tested filings' release figures as code read them, in place of the stored ones (the owner's included: a
+        figure the owner decided is not one code read), and the store live again for the steps after."""
+        tested, values = self._reread_picked or set(), self.store._values
+        for key in [key for key, value in values.items() if value.get("source_accession") in tested
+                    and value.get("method") == "ai" and value.get("validation_status") != "rejected"]:
+            del values[key]
+        for rows in self.readings.values():
+            for row in rows:
+                values[value_key(row)] = MappingProxyType(row)
+        del self.store._apply  # the class's own again
 
     def _replay_part(self, document, part, locators, expected, currency):
         found = super()._replay_part(document, part, locators, expected, currency)
@@ -167,55 +184,61 @@ def _key(value: dict) -> tuple:
     return (value["group_key"], value["kpi_key"], value["fiscal_year"], value["fiscal_period"])
 
 
-def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], readings: dict[str, list[dict]],
+def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], tested: set[str], final: dict,
                   held_out: bool, misses: dict | None = None) -> list[dict]:
-    """One row per verified release figure of the tested filings, and one per figure code served beyond them."""
-    tested = set(readings)
+    """One row per verified release figure of the tested filings, scored on the company's figures as code alone left
+    them; and one per figure code serves that the store does not."""
     truth = [value for value in state_values if value.get("method") == "ai" and value.get("validation_status") == "verified"
              and value.get("source_accession") in tested]
     quarters = sorted({value["period_end"][:7] for value in truth}, reverse=True)[:HELD_OUT_QUARTERS]
-    stored = {(value.get("source_accession"), *_key(value)): value for value in state_values}
+    stored = {value_key(value): value for value in state_values}
+    kind = lambda group: "metric" if kinds.get(group, "metric") == "metric" else "breakdown"  # noqa: E731
     rows = []
     for value in truth:
-        accession = value["source_accession"]
-        mine = [row for row in readings.get(accession, []) if _key(row) == _key(value)]
-        served = [row for row in mine if row["validation_status"] == "verified"]
-        expected = float(value["value"])
-        if served:
-            found = float(served[0]["value"])
+        accession, expected = value["source_accession"], float(value["value"])
+        now = final.get(value_key(value))
+        found = float(now["value"]) if now is not None and now.get("validation_status") != "rejected" else None
+        if found is None:
+            outcome = "missed"
+        elif now["validation_status"] != "verified":
+            outcome = "held"
+        elif abs(found - expected) <= max(abs(expected) * 1e-6, 1e-9):
+            outcome = "right"
+        else:
             # A rounded copy of the figure (a headline beside its table's cell) is the filing's too, but not the same
             # figure: counted apart, never as right.
-            outcome = "right" if abs(found - expected) <= max(abs(expected) * 1e-6, 1e-9) else \
-                "rounded" if rounding_of(found, expected) or rounding_of(expected, found) else "wrong"
-        else:
-            found, outcome = (float(mine[0]["value"]) if mine else None), ("held" if mine else "missed")
+            outcome = "rounded" if rounding_of(found, expected) or rounding_of(expected, found) else "wrong"
         group = value["group_key"].removeprefix(AI_GROUP_PREFIX)
         miss = (misses or {}).get((accession, f"{group}.{value['kpi_key']}")) if outcome == "missed" else None
         rows.append({
             "why": (miss or {}).get("why") or ("not tried" if outcome == "missed" else ""), "miss": miss,
             "symbol": symbol, "accession": accession, "group": group, "kpi": value["kpi_key"],
             "label": f"{value.get('group_label')} / {value.get('kpi_label')}", "period": f"{value['fiscal_year']}-{value['fiscal_period']}",
-            "kind": "metric" if kinds.get(group, "metric") == "metric" else "breakdown", "origin": origin(value),
-            "expected": expected, "found": found, "outcome": outcome,
-            "notes": "; ".join((mine[0].get("notes") or [])[:3]) if mine and outcome != "right" else "",
+            "kind": kind(group), "origin": origin(value), "expected": expected, "found": found, "outcome": outcome,
+            "readBy": reader(now) if outcome in ("right", "rounded", "wrong") else "",
+            "notes": "; ".join((now.get("notes") or [])[:3]) if now is not None and outcome != "right" else "",
             "set": "held out" if held_out or value["period_end"][:7] in quarters else "tuning",
         })
-    for accession, read in readings.items():
-        for row in read:
-            if row["validation_status"] != "verified":
-                continue
-            before = stored.get((accession, *_key(row)))
-            if before is not None and before.get("validation_status") == "verified":
-                continue
-            group = row["group_key"].removeprefix(AI_GROUP_PREFIX)
-            rows.append({"symbol": symbol, "accession": accession, "group": group, "kpi": row["kpi_key"],
-                         "label": f"{row.get('group_label')} / {row.get('kpi_label')}",
-                         "period": f"{row['fiscal_year']}-{row['fiscal_period']}",
-                         "kind": "metric" if kinds.get(group, "metric") == "metric" else "breakdown", "origin": "",
-                         "expected": float(before["value"]) if before else None, "found": float(row["value"]),
-                         "outcome": "extra", "notes": f"stored {before['validation_status']}" if before else "not stored",
-                         "set": "held out" if held_out else "tuning"})
+    for key, row in final.items():
+        before = stored.get(key)
+        if row.get("validation_status") != "verified" or row.get("method") != "ai" or (before or {}).get("validation_status") == "verified":
+            continue
+        group = row["group_key"].removeprefix(AI_GROUP_PREFIX)
+        rows.append({"symbol": symbol, "accession": row.get("source_accession"), "group": group, "kpi": row["kpi_key"],
+                     "label": f"{row.get('group_label')} / {row.get('kpi_label')}", "period": f"{row['fiscal_year']}-{row['fiscal_period']}",
+                     "kind": kind(group), "origin": "", "expected": float(before["value"]) if before else None,
+                     "found": float(row["value"]), "outcome": "extra", "readBy": reader(row), "why": "", "miss": None,
+                     "notes": f"stored {before['validation_status']}" if before else "not stored",
+                     "set": "held out" if held_out else "tuning"})
     return rows
+
+
+def reader(value: dict) -> str:
+    """Which code read a figure this run: replay, or the code reader its locator names."""
+    locator = value.get("locator") or {}
+    if locator.get("replayed_from"):
+        return "replay"
+    return next((name for name in CODE_READERS if locator.get(name)), "rule" if locator.get("rule") else "other")
 
 
 def read_company(plane: ControlPlane, symbol: str, quarters: int, held_out: bool) -> dict:
@@ -230,7 +253,7 @@ def read_company(plane: ControlPlane, symbol: str, quarters: int, held_out: bool
     state = [dict(value) for value in pipeline.store._loaded.values()]
     kinds = pipeline.kinds
     return {
-        "symbol": symbol, "rows": score_company(symbol, state, kinds, pipeline.readings, held_out, pipeline.misses),
+        "symbol": symbol, "rows": score_company(symbol, state, kinds, set(pipeline.readings), dict(pipeline.store._values), held_out, pipeline.misses),
         "outcomes": dict(result.replay_outcomes), "left": dict(pipeline.left), "refused": dict(control.refused),
         "aiCalls": 0, "errors": result.errors[:5], "documents": len(pipeline.timings),
         "codeSeconds": pipeline.timings, "seconds": time.perf_counter() - started,
@@ -249,6 +272,7 @@ def summarize(companies: list[dict]) -> dict:
     for row in rows:
         if row["outcome"] != "extra":
             by_origin[row["origin"]][row["outcome"]] += 1
+    by_reader = Counter(row["readBy"] for row in rows if row["outcome"] == "right")
     missed_why = Counter((row["kind"], row["why"]) for row in rows if row["outcome"] == "missed")
     timings = [seconds for company in companies for seconds in company["codeSeconds"]]
     outcomes = Counter()
@@ -258,6 +282,7 @@ def summarize(companies: list[dict]) -> dict:
         "table": {f"{part}|{kind}": dict(counts) for (part, kind), counts in table.items()},
         "byOrigin": {key: dict(counts) for key, counts in by_origin.items()},
         "outcomes": dict(outcomes.most_common()),
+        "rightByReader": dict(by_reader.most_common()),
         "missedWhy": {f"{kind}|{why}": count for (kind, why), count in missed_why.most_common()},
         "byCompany": {company["symbol"]: dict(Counter(row["outcome"] for row in company["rows"])) for company in companies},
         "documents": len(timings),
@@ -291,6 +316,7 @@ def report_text(summary: dict) -> str:
     for key, counts in sorted(summary["byOrigin"].items()):
         total = sum(counts.values())
         lines.append(f"| {key} | {total:,} | {counts.get('right', 0):,} | {counts.get('wrong', 0):,} | {_coverage(counts)} |")
+    lines += ["", "Right, by the code that read it: " + ", ".join(f"{name} {count:,}" for name, count in summary.get("rightByReader", {}).items())]
     lines += ["", f"Speed: {summary['documents']:,} documents, code {summary['codeMsMedian']} ms median, "
               f"{summary['codeMsP90']} ms p90, {summary['codeSecondsTotal']} s in all",
               f"AI requests refused (none made): {summary['refused'] or 'none'}", "",

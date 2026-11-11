@@ -21,6 +21,13 @@ def trace_replay(read: list, earlier: dict[str, dict], history: dict[str, dict],
             item.locator["placed_by_call"] = placed
 
 
+def placed_elsewhere(value: dict) -> bool:
+    """A figure whose stored place holds another figure: one the owner corrected keeps the place it was misread at, and
+    one the owner entered copies another period's. Replay and the AI's hints never start from it: JPMorgan's firmwide
+    client advisors (9,107) kept the Global Private Bank row's place (3,536), which replay read again as the figure."""
+    return value.get("owner_decision") == "corrected"
+
+
 # Figures read by code from a table, a tag or another document: traced by their reader, with no AI call of their own.
 CODE_READERS = ("release_table", "quarter_table", "quoted_row", "tagged", "prospectus", "year_ago")
 
