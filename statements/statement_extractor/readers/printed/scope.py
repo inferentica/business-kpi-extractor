@@ -24,7 +24,7 @@ def statement_scope(kind: str, group: list[Table], form: str, found: list) -> st
     UBS's "(standalone)"), or when it names no scope and the document prints the same statement for the group beside
     it (TSMC's 2008 6-Ks) or titles nothing as the group's (TSMC's parent-only quarterly reports, "TAIWAN
     SEMICONDUCTOR MANUFACTURING COMPANY LTD. BALANCE SHEETS"). A statement naming no scope in a document whose results
-    are titled the group's is the group's (Azul's releases). A U.S. filer's is taken as its group's: some print a bare
+    are titled the group's is the group's, in a release printing it once (Azul's). A U.S. filer's is taken as its group's: some print a bare
     "BALANCE SHEETS" though they consolidate."""
     title = _title(group)
     own_rows = [row.label for row in group[0].rows[:4] if not row.figures]
@@ -34,6 +34,6 @@ def statement_scope(kind: str, group: list[Table], form: str, found: list) -> st
         return "parent"  # UBS's "UBS AG (standalone) financial information"
     if form.upper() not in FOREIGN_FORMS or "consolidated" in title:
         return "consolidated"
-    if any(other is not group and other_kind == kind and "consolidated" in _title(other) for other_kind, other in found):
-        return "parent"  # printed beside the group's own
+    if form.upper() != "6-K" or any(other is not group and other_kind == kind for other_kind, other in found):
+        return "parent"  # an annual report's, or one of several of its kind (UBS's quarterly reports print UBS AG's own)
     return "consolidated" if any(_GROUP_TITLE.search(_title(other)) for _kind, other in found) else "parent"
