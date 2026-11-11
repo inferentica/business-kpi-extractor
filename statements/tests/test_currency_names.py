@@ -154,3 +154,23 @@ def test_two_columns_under_one_heading_are_not_read():
     assert two_columns(table, periods) == {(4, 6)}
     [plain] = parse_html(html.split("</p>", 1)[1])
     assert two_columns(plain, periods) == set()  # one currency: no translation beside it
+
+
+def test_a_title_in_the_tables_first_rows_defines_its_signs_and_its_caption_no_heading():
+    # Coca-Cola FEMSA's FY2011 20-F: "Consolidated income statements Amounts expressed in millions of U.S. dollars ($)
+    # and in millions of Mexican pesos (Ps.), except for data per share." as the table's first rows.
+    rows = [("Net sales", "$", "8,893", "Ps.", "124,066", "Ps.", "102,988"),
+            ("Cost of goods sold", "", "4,800", "", "66,000", "", "55,000"),
+            ("Income before income taxes", "", "1,500", "", "20,000", "", "17,000"),
+            ("Income taxes", "", "500", "", "6,000", "", "5,000"),
+            ("Net income", "", "1,000", "", "14,000", "", "12,000")]
+    html = "<p>For the years ended December 31, 2011 and 2010.</p><table>" \
+           "<tr><td>Consolidated income statements</td></tr>" \
+           "<tr><td>Amounts expressed in millions of U.S. dollars ($) and in millions of Mexican pesos (Ps.), except for data per share.</td></tr>" \
+           "<tr><td></td><td></td><td>2011</td><td></td><td>2011</td><td></td><td>2010</td></tr>" + "".join(
+               "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>" for row in rows) + "</table>"
+    from statement_extractor.readers.html.read import read_document
+    readings, _notes = read_document(html, accession="x", form="20-F", filed=date(2012, 4, 26), document_end=date(2011, 12, 31),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert {(r.fiscal_year, r.currency, r.lines[0]["value"]) for r in readings if r.lines and r.lines[0]["value"]} == {
+        ("2011", "MXN", 124_066e6), ("2010", "MXN", 102_988e6)}

@@ -145,7 +145,7 @@ def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> flo
 
 # A row that only states the scale or the audit status: "Notes (in thousands, except per share data) EUR EUR".
 _CAPTION = re.compile(r"\(\s*(?:in|amounts\s+in|dollars\s+in|expressed\s+in)\s+(?:[A-Z]{2,3}\s+)?(thousands|millions|billions)\b|"
-                      r"^\(?unaudited\)?$|"
+                      r"^\(?unaudited\)?$|^amounts\s+expressed\s+in\s+(thousands|millions|billions)\b|"  # Coca-Cola FEMSA's 20-Fs
                       # A caption's second line: TSMC's "Except for Per Share Amounts and Shares Outstanding)".
                       r"^\(?\s*except\s+(for\s+)?(per\s+share|share|earnings\s+per)", re.I)
 

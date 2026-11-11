@@ -24,7 +24,9 @@ def column_currencies(table: Table, columns: list[tuple[int, ...]]) -> dict[tupl
     the title defines that sign (FEMSA's 20-Fs: "millions of U.S. dollars ($) and in millions of Mexican pesos (Ps.)",
     the translation's column first, "$ 2,407" beside "Ps. 35,497")."""
     found = {}
-    signs = _defined_signs(table.context[-400:] + " " + " ".join(cell.text for cells in table.header for cell in cells))
+    leading = " ".join(row.label for row in table.rows[:next((i for i, r in enumerate(table.rows) if r.figures), 0)][:4])
+    signs = _defined_signs(table.context[-400:] + " " + " ".join(cell.text for cells in table.header for cell in cells)
+                           + " " + leading)  # Coca-Cola FEMSA's FY2011 20-F titles its statements in their first rows
     for column in columns:
         named = currencies_named(header_text(table, column[0]) or header_text(table, column[-1]))
         # Two currencies over one column (TSMC's "3Q 2002 NTD" with a "USD" set off from the row below): neither.
