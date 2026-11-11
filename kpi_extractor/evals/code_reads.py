@@ -165,8 +165,9 @@ class CodeOnlyPipeline(SymbolPipeline):
             keys = {f"{item.group.key}.{item.kpi.key}" for item in items}
             whole = any(item.locator.get("whole_table") for item in items)
             listed = {f"{group.key}.{kpi.key}" for kpi in group.kpis}
-            if any(key.split(".", 1)[0] == group.key and key not in keys and (whole or key in listed) for key in last):
-                return "a figure read last quarter is missing now"
+            gone = [key for key in last if key.split(".", 1)[0] == group.key and key not in keys and (whole or key in listed)]
+            if gone:
+                return f"a figure read last quarter is missing now ({gone[0].split('.', 1)[1][:40]})"
             if any(item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in
                    earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
                 return "a figure repeats an earlier period's"
