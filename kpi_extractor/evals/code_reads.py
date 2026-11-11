@@ -132,11 +132,12 @@ class CodeOnlyPipeline(SymbolPipeline):
 
 
 def tested_filings(values, filings) -> set[str]:
-    """The releases holding verified figures read from them (by the AI, by replay or by a code reader)."""
+    """The filings holding verified release figures (the store keeps a release's figures as method "ai", whether the AI,
+    a replay or a code reader read them; the company state names no filing's role). Only the ones the release flow reads
+    again are scored: a prospectus's figures are read elsewhere."""
     with_figures = {value.get("source_accession") for value in values.values()
                     if value.get("method") == "ai" and value.get("validation_status") == "verified"}
-    return {accession for accession, filing in filings.items()
-            if filing.get("document_role") == "earnings_release" and filing.get("status") in _READ and accession in with_figures}
+    return {accession for accession, filing in filings.items() if filing.get("status") in _READ and accession in with_figures}
 
 
 def origin(value: dict) -> str:
