@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
-from ..documents.document import clean
+from ..documents.document import Document, clean
 from ..domain.fiscal import fiscal_label
 from ..readers.release_breakdowns import release_breakdown
 from ..readers.release_columns import amount, earlier_quarters, quarter_table_rows, release_grids, row_key, row_numbers
@@ -20,6 +20,20 @@ def _row_label(locator: dict) -> str | None:
                                          if locator.get("quote") else None)
     label = re.sub(r"(?:\s+\d{1,2})+$", "", clean(label or ""))
     return label if len(label) >= 8 else None
+
+
+def exhibit_texts(document: Document) -> list[tuple[str, str]]:
+    """Each exhibit's text with the id of its first item, whose link is the exhibit's (Document.url_of): a row found
+    in TSMC's management report links to the report, not to the earnings release that comes first in the filing."""
+    parts: dict[str, list[str]] = {}
+    for key in document.order:
+        prefix = re.match(r"([A-Z]+_)", key)
+        parts.setdefault(prefix.group(1) if prefix else "", []).append(key)
+    return [(keys[0], " ".join(item_text(document, key) for key in keys)) for keys in parts.values()]
+
+
+def item_text(document: Document, key: str) -> str:
+    return " ".join(" ".join(row) for row in document.tables[key].rows) if key in document.tables else document.blocks[key].text
 
 
 def own_label(ref: FilingRef, own: dict) -> str:
@@ -133,24 +147,23 @@ class ReleaseTableReading:
             return []
         reach = {quarter for _labels, gaps in wanted.values() for gap in gaps for quarter in own
                  if 0 <= index(quarter) - index(gap) <= 4}
-        texts: dict[str, list[str]] = {}
+        texts: dict[str, list[tuple[str, str]]] = {}
         for quarter in sorted(reach)[-40:]:
             ref = own[quarter]
             try:
                 document = self._document(ref)
             except Exception:  # noqa: BLE001 - an unreadable release gives nothing
                 continue
-            texts[ref.accession] = [" ".join(" ".join(row) for row in document.tables[key].rows) if key in document.tables
-                                    else document.blocks[key].text for key in document.order]
+            texts[ref.accession] = [(document.url_of(key), item_text(document, key)) for key in document.order]
         records = []
         for kpi, (labels, gaps) in wanted.items():
             known = {quarter: float(v["value"]) for quarter, v in held[kpi].items() if v["validation_status"] == "verified"}
-            found: dict[tuple[str, str], tuple[float, FilingRef]] = {}
+            found: dict[tuple[str, str], tuple[float, FilingRef, str]] = {}
             for _pass in range(3):  # a gap a table fills proves the next table
                 before = len(found)
                 for quarter in sorted(reach):
                     ref = own[quarter]
-                    for text in texts.get(ref.accession, []):
+                    for url, text in texts.get(ref.accession, []):
                         for label in labels:
                             for row in quarter_table_rows(text, label):
                                 figures = {(str(year), f"Q{number}"): value for (year, number), value in row.items()}
@@ -164,15 +177,15 @@ class ReleaseTableReading:
                                 scale = scales.pop()
                                 for gap in gaps & set(figures):
                                     if gap not in found or own.get(gap) is ref:
-                                        found[gap] = (figures[gap] * scale, ref)
+                                        found[gap] = (figures[gap] * scale, ref, url)
                 if len(found) == before:
                     break
             template = max((v for v in held[kpi].values() if v["validation_status"] == "verified"), key=lambda v: v["period_end"])
-            for quarter, (value, ref) in sorted(found.items()):
+            for quarter, (value, ref, url) in sorted(found.items()):
                 end = own[quarter].period_end
                 records.append({**template, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
                                 "value": value, "method": "ai", "validation_status": "verified", "reconciliation_error_pct": None,
-                                "source_accession": ref.accession, "source_url": ref.source_url, "filed_at": ref.filed.isoformat(),
+                                "source_accession": ref.accession, "source_url": url, "filed_at": ref.filed.isoformat(),
                                 "notes": [f"from the quarterly table of the release for {own_label(ref, own)}"],
                                 "locator": {"quarter_table": True, "row": labels[0]}})
         if records:
@@ -201,18 +214,17 @@ class ReleaseTableReading:
                 if v["fiscal_period"] != "FY" and v.get("period_end")}
         ends.update({quarter: own[0].period_end.isoformat() for quarter, own in refs.items()})
         records = []
-        loaded: dict[str, str] = {}
+        loaded: dict[str, list[tuple[str, str]]] = {}
 
-        def text_of(ref: FilingRef) -> str:
+        def texts_of(ref: FilingRef) -> list[tuple[str, str]]:
+            """The release's exhibits, each searched on its own and kept with its own link."""
             if ref.accession not in loaded and len(loaded) < 250:
                 try:
                     document = self._document(ref)
-                    loaded[ref.accession] = " ".join(
-                        " ".join(" ".join(row) for row in document.tables[key].rows) if key in document.tables
-                        else document.blocks[key].text for key in document.order)
+                    loaded[ref.accession] = [(document.url_of(key), text) for key, text in exhibit_texts(document)]
                 except Exception:  # noqa: BLE001 - an unreadable release gives nothing
-                    loaded[ref.accession] = ""
-            return loaded.get(ref.accession, "")
+                    loaded[ref.accession] = []
+            return loaded.get(ref.accession, [])
 
         for kpi, rows in held.items():
             readings = []
@@ -260,10 +272,10 @@ class ReleaseTableReading:
             for quarter in sorted((quarter for quarter in after if quarter in refs and quarter in known), key=index):
                 for ref in refs[quarter][:12]:
                     for label in labels:
-                        for numbers in row_numbers(text_of(ref), label):
+                        for url, numbers in ((url, numbers) for url, text in texts_of(ref) for numbers in row_numbers(text, label)):
                             if abs(numbers[0] * scale - known[quarter]) > abs(known[quarter]) * 1e-6:
                                 continue
-                            source = {"source_accession": ref.accession, "source_url": ref.source_url, "filed_at": ref.filed.isoformat()}
+                            source = {"source_accession": ref.accession, "source_url": url, "filed_at": ref.filed.isoformat()}
                             for column, lag in layout.items():
                                 earlier = label_of(index(quarter) - lag)
                                 if len(numbers) > column and earlier in gaps and earlier not in lagged:
@@ -272,14 +284,14 @@ class ReleaseTableReading:
             for quarter in gaps:
                 for ref in refs.get(quarter, [])[:12]:
                     for label in labels:
-                        for numbers in row_numbers(text_of(ref), label):
+                        for url, numbers in ((url, numbers) for url, text in texts_of(ref) for numbers in row_numbers(text, label)):
                             checks = [(numbers[column] * scale, label_of(index(quarter) - lag)) for column, lag in layout.items()
                                       if len(numbers) > column]
                             figure_of = lambda earlier: known.get(earlier, (found.get(earlier) or lagged.get(earlier) or (None,))[0])  # noqa: E731
                             proven = [(figure, earlier) for figure, earlier in checks if figure_of(earlier) is not None]
                             target = figure_of
                             if proven and all(abs(figure - target(earlier)) <= abs(target(earlier)) * 1e-6 for figure, earlier in proven):
-                                source = {"source_accession": ref.accession, "source_url": ref.source_url,
+                                source = {"source_accession": ref.accession, "source_url": url,
                                           "filed_at": ref.filed.isoformat()}
                                 found.setdefault(quarter, (numbers[0] * scale, f"the release for {quarter[1]} {quarter[0]}", source))
                                 # Its own earlier columns fill gaps behind it too (Q1 2023's report gives Q4 2022).
@@ -361,7 +373,8 @@ class ReleaseTableReading:
                                           for v in self.values.values()):
                     continue
                 records.append({**value, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
-                                "value": figure * scale, "notes": [f"an earlier column of the release for {own[1]} {own[0]}"],
+                                "value": figure * scale, "source_url": self._document(ref).url_of(grid.source),
+                                "notes": [f"an earlier column of the release for {own[1]} {own[0]}"],
                                 "locator": {"release_column": end.isoformat(), "row": label, "source": grid.source}})
         return records
 
@@ -394,17 +407,18 @@ class ReleaseTableReading:
                 if total is None:
                     continue
                 values = {member: quarters[end] * scale for member, quarters in additive.items() if end in quarters}
+                sources = {member: found[member][0].source for member in values}
                 missing = [member for member in members if member not in values]
                 tolerance = 1.5 * scale * len(members)
                 if len(missing) == 1:
                     # A renamed line (SpaceX's AI, SI by its next report): the one other row equal to the rest of revenue.
                     rest = total - sum(values.values())
-                    candidates = {label: figure for grid, label, cells, _e, _m in rows if row_key(label) not in values
+                    candidates = {label: (figure, grid.source) for grid, label, cells, _e, _m in rows if row_key(label) not in values
                                   for figure in [earlier_quarters(grid, cells, ref.period_end, True).get(end, float("nan")) * scale]
                                   if abs(figure - rest) <= tolerance}
                     if len(candidates) != 1:
                         continue
-                    values[missing[0]] = next(iter(candidates.values()))
+                    values[missing[0]], sources[missing[0]] = next(iter(candidates.values()))
                 elif missing:
                     continue
                 if abs(sum(values.values()) - total) > tolerance:
@@ -413,7 +427,8 @@ class ReleaseTableReading:
                     line = members[member]
                     records.append({**line, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
                                     "value": round(figure, 2), "method": CHART_METHOD, "source_accession": ref.accession,
-                                    "source_url": ref.source_url, "filed_at": ref.filed.isoformat(), "reconciliation_error_pct": 0,
+                                    "source_url": self._document(ref).url_of(sources[member]),
+                                    "filed_at": ref.filed.isoformat(), "reconciliation_error_pct": 0,
                                     "notes": [f"an earlier column of the release for {own[1]} {own[0]}"],
                                     "locator": {"release_table": "history", "total": total, "member": (line.get("locator") or {}).get("member")}})
         return records

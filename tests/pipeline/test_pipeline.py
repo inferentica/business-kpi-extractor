@@ -1630,6 +1630,59 @@ def test_a_metrics_gaps_come_from_rows_the_releases_repeat_in_a_learned_layout()
     assert by == {("2023", "Q1"): (3227, "r2023Q2"), ("2023", "Q4"): (2957, "r2023Q4")}
 
 
+def test_a_filled_figure_links_the_exhibit_its_row_is_in():
+    # TSMC's Q1 2023 filing: the earnings release comes first, the management report giving the row second. ASML's
+    # press release comes before the slides with the quarterly table. A filled figure links the exhibit it was read from.
+    from datetime import date as day
+
+    from kpi_extractor.documents.document import parse_document
+
+    def filing(ref, release_text, report_text):
+        document = parse_document(f"<p>{release_text}</p>", ref.source_url, prefix="A_")
+        document.extend(parse_document(f"<p>{report_text}</p>", ref.source_url.replace(".htm", "-report.htm"), prefix="B_"))
+        return document
+
+    label = 'Shipment (Kpcs, 12"-equiv. Wafer)'
+
+    def reading(year, period, end, value, quote):
+        return {"group_key": "kpi_operating", "kpi_key": "wafers", "group_kind": "metric", "fiscal_year": year, "fiscal_period": period,
+                "period_end": end, "method": "ai", "validation_status": "verified", "value": value, "unit": "count",
+                "source_accession": f"r{year}{period}", "locator": {"quote": quote, "value_text": f"{value:,}"}}
+    values = [reading("2022", "Q2", "2022-06-30", 3799, f"{label} 3,799 3,580 3,323 +6.1% +14.3%"),
+              reading("2022", "Q3", "2022-09-30", 3974, f"{label} 3,974 3,799 3,580 +4.6% +11.0%"),
+              reading("2022", "Q4", "2022-12-31", 3702, f"{label} 3,702 3,974 3,522 -6.8% +5.1%")]
+    ends = {"2022Q2": day(2022, 6, 30), "2022Q3": day(2022, 9, 30), "2022Q4": day(2022, 12, 31), "2023Q1": day(2023, 3, 31)}
+    releases = [SimpleNamespace(accession=f"r{q}", period_end=end, source_url=f"https://www.sec.gov/r{q}.htm", filed=end)
+                for q, end in ends.items()]
+    pipeline = _pipeline(None, values)
+    pipeline.profile = SimpleNamespace(name="TSMC", fiscal_year_end="1231", foreign=True)
+    pipeline.offset = 0
+    pipeline._document = lambda ref: filing(ref, "Net revenue 508.63 EPS 7.98", f"{label} 3,227 3,702 3,580 -12.8% -9.9%"
+                                            if ref.accession == "r2023Q1" else "")
+    stored = []
+    pipeline.store.write = stored.extend
+    pipeline.log = lambda *_: None
+    pipeline.store.write(pipeline._fill_quoted_rows(releases))
+    assert [(v["fiscal_period"], v["value"], v["source_url"]) for v in stored] == [
+        ("Q1", 3227, "https://www.sec.gov/r2023Q1-report.htm")]
+
+    held = {"group_key": "kpi_operating", "kpi_key": "systems", "group_kind": "metric", "fiscal_year": "2021", "fiscal_period": "Q1",
+            "period_end": "2021-03-31", "method": "ai", "validation_status": "verified", "value": 76, "unit": "count",
+            "locator": {"quote": "Lithography systems sold (units) 1 57 61 60 80 76", "value_text": "76"}}
+    ends = {"q1": day(2021, 3, 31), "q2": day(2021, 6, 30)}
+    releases = [SimpleNamespace(accession=a, period_end=end, source_url=f"https://www.sec.gov/{a}.htm", filed=end) for a, end in ends.items()]
+    pipeline = _pipeline(None, [held])
+    pipeline.profile = SimpleNamespace(name="ASML", fiscal_year_end="1231", foreign=True)
+    pipeline.offset = 0
+    pipeline._document = lambda ref: filing(ref, "ASML reports net sales of 4.0 billion", "Q1 2021 Q2 2021 Lithography systems sold "
+                                            "(units) 1 76 72" if ref.accession == "q2" else "")
+    stored = []
+    pipeline.store.write = stored.extend
+    pipeline.log = lambda *_: None
+    pipeline.store.write(pipeline._fill_quarter_tables(releases))
+    assert [(v["fiscal_period"], v["value"], v["source_url"]) for v in stored] == [("Q2", 72, "https://www.sec.gov/q2-report.htm")]
+
+
 def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
     # Visa's processed transactions: in billions as stated in text, in millions from its "(millions)" table without the
     # scale for Q2 2018 to Q3 2020; only the run's two edges jump.
