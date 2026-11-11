@@ -31,14 +31,3 @@ def column_scopes(group: list[Table], dated: list, periods: dict) -> dict | None
     if restart is None or any(ends[index] >= ends[index - 1] for index in range(restart + 1, len(ends))):
         return None
     return {column: "parent" if index < restart else "consolidated" for index, column in enumerate(dated)}
-
-
-def printed_twice(dated: list, dropped: set, periods: dict, scopes: dict) -> set:
-    """Columns whose period and scope another column of the same table also has. A statement never prints one period
-    twice (its translation is set apart before), so either may be another table's column under this one's heading:
-    Petrobras's 2005 6-K runs its annual statement's rows into the quarters' table, the years' columns under
-    "3Q-2004 | 4Q-2004 | 4Q-2003". Neither is read: the columns left out, with the translations already `dropped`."""
-    seen: dict = {}
-    for column in (column for column in dated if column not in dropped):
-        seen.setdefault((periods[column].key, scopes.get(column)), []).append(column)
-    return set(dropped) | {column for group in seen.values() if len(group) > 1 for column in group}

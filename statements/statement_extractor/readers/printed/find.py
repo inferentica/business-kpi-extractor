@@ -8,7 +8,7 @@ from dataclasses import replace
 from ...domain.printed_labels import (ASSETS, BARE_TOTAL, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES,
                                       LIABILITIES_AND_EQUITY, NET_INCOME, PRETAX, SECTIONS, EQUITY_SECTION)
 from .side_by_side import SIDE_BY_SIDE
-from .tables import Table, figure_columns
+from .tables import Table, figure_columns, number
 
 
 TITLES = (
@@ -110,14 +110,19 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             continue
         if any(_NOT_A_PERIOD.search(cell.text) for cells in table.header for cell in cells if cell.start > 0):
             continue
+        if sum(1 for row in table.rows if row.figures and number(row.label) is not None) >= 3:
+            # Its labels are figures: the table lost its label column (Petrobras's 2005 6-K runs its annual statement
+            # into the quarters' table, the first quarter's figures where the labels belong).
+            continue
         if kind == "balance" and any(_INTERIM_SPAN.search(cell.text) for cells in table.header for cell in cells):
             continue  # a balance sheet is at a date: "THREE MONTHS ENDED" over balances is an average balance table (JPM's MD&A)
         if _is_contents(table):
             continue
         group = [table]
         for later in all_tables[position + 1:position + 6]:
-            if _complete(kind, group):
-                break
+            if _complete(kind, group) and not (kind == "income" and re.search(r"\bcontinued\b", later.context[-200:], re.I)
+                                               and not any(NET_INCOME.match(label) for label in labels_in_context(group))):
+                break  # an income statement to its profit before tax goes on to its net income (Petrobras's 2005 6-K)
             if len([r for r in later.rows if r.figures]) < 2:
                 if later.rows and any(r.figures for r in later.rows):
                     break  # a small table of its own, not a spacer

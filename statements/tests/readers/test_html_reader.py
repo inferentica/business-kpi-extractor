@@ -350,3 +350,26 @@ def test_a_title_name_ending_in_its_legal_form():
            "<table><tr><td></td><td>2010</td><td>2009</td></tr>" + _balance_rows() + "</table>"
     [(kind, group)] = find_statements(parse_html(html), release=True)
     assert titled_company(kind, group[0]) == "Quattor Participações S.A."
+
+
+def test_a_table_whose_labels_are_figures_is_no_statement():
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements
+    html = "<p>Income Statement (in millions of U.S. dollars)</p><table><tr><td>3Q-2004</td><td></td><td>4Q-2004</td></tr>" + "".join(
+        f"<tr><td>{a}</td><td></td><td>{b}</td></tr>" for a, b in (("14,095", "14,722"), ("(3,149 )", "(3,349)"),
+                                                                  ("10,221", "10,701"), ("1,839", "1,707"), ("1.68", "1.56"))) + "</table>"
+    assert find_statements(parse_html(html), release=True) == []
+
+
+def test_an_income_statement_continued_to_its_net_income():
+    # Petrobras's 2005 6-K: the first page ends at "Income before income taxes …", the next, "(Continued)", at net income.
+    first = "<p>CONSOLIDATED STATEMENTS OF INCOME (in millions)</p><table><tr><td></td><td>2004</td><td>2003</td></tr>" + "".join(
+        f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+            ("Net operating revenues", "37,452", "30,797"), ("Cost of sales", "(20,303)", "(15,416)"),
+            ("Other expenses", "(7,000)", "(6,000)"), ("Income before income taxes", "10,149", "9,381"))) + "</table>"
+    second = "<p>CONSOLIDATED STATEMENTS OF INCOME (Continued) (in millions)</p><table><tr><td></td><td>2004</td><td>2003</td></tr>" + "".join(
+        f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+            ("Income tax expense", "(3,149)", "(2,800)"), ("Minority interest", "(10)", "(5)"),
+            ("Net income", "6,990", "6,576"))) + "</table>"
+    readings, _ = read(first + second, "1231", None)
+    assert readings[("income", "2004")].status == "kept"
