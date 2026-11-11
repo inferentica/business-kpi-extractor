@@ -19,7 +19,8 @@ REVENUE_CONCEPTS = (
 
 
 # A fact tagged only as "operating segments" is the consolidated total seen from the segment note, not a breakdown.
-_NEUTRAL_MEMBERS = {("ConsolidationItemsAxis", "OperatingSegmentsMember")}
+# Intel's 2022-2023 10-Qs tag their segments' revenue on the consolidated-entities axis instead (2026-11-11).
+_NEUTRAL_MEMBERS = {("ConsolidationItemsAxis", "OperatingSegmentsMember"), ("ConsolidatedEntitiesAxis", "OperatingSegmentsMember")}
 
 
 # Segments reported before intersegment sales come out (UnitedHealth's Optum sells to UnitedHealthcare) add up to

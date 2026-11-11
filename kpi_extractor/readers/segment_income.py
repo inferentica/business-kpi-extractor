@@ -23,7 +23,7 @@ INCOME_CONCEPT = "us-gaap:OperatingIncomeLoss"
 GROUP_KEY = "segment_income"
 GROUP_LABEL = "Operating Income by Segment"
 _SEGMENT_AXES = {"StatementBusinessSegmentsAxis", "SegmentsAxis"}
-_NEUTRAL = {("ConsolidationItemsAxis", "OperatingSegmentsMember")}
+_NEUTRAL = {("ConsolidationItemsAxis", "OperatingSegmentsMember"), ("ConsolidatedEntitiesAxis", "OperatingSegmentsMember")}
 # Items the consolidation axis tags between the segments and operating income, under the filing's own name when it has
 # a short one.
 _RECONCILING = {"CorporateNonSegmentMember": "Corporate", "MaterialReconcilingItemsMember": "Reconciling items",

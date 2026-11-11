@@ -161,6 +161,19 @@ def test_segments_reported_before_eliminations_add_up_with_them():
     assert {key: value for key, _label, value in group.members} == {"insurance": 70.0, "services": 50.0, "eliminations": -20.0}
 
 
+def test_operating_segments_on_the_consolidated_entities_axis_are_segments():
+    # Intel's 2022-2023 10-Qs tag each segment's revenue with ConsolidatedEntitiesAxis = OperatingSegmentsMember.
+    segment = "dim_us-gaap_StatementBusinessSegmentsAxis"
+    def tagged(value, member):
+        row = _fact("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", value, member, axis=segment)
+        row["dim_srt_ConsolidatedEntitiesAxis"] = "us-gaap:OperatingSegmentsMember"
+        return row
+    facts = pd.DataFrame([_fact("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", 100.0),
+                          tagged(60.0, "intc:ClientComputingGroupMember"), tagged(40.0, "intc:DatacenterAndAIMember")])
+    group = extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups[0]
+    assert {key: value for key, _label, value in group.members} == {"clientcomputinggroup": 60.0, "datacenterandai": 40.0}
+
+
 def test_the_corporate_member_stays_corporate_whatever_its_label_says():
     # Coca-Cola's 2025 10-K tags Corporate as CorporateNonSegmentMember with a label naming reconciling items; its
     # table says "Corporate", the line its quarters tagged CorporateMember.
