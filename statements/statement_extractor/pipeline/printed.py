@@ -92,26 +92,34 @@ def another_registrant(ref, attachments) -> str | None:
 _GENERIC = {"AND", "OF", "DE", "DO", "DA", "DAS", "DOS", "THE", "HOLDINGS", "HOLDING", "GROUP", "INCORPORATED"}
 
 
+# A listed subsidiary is named for its parent and its market: CEMEX's 6-Ks carry CEMEX Holdings Philippines', CEMEX
+# Latam's and CEMEX España's results beside CEMEX's own.
+_REGIONS = {"PHILIPPINES", "LATAM", "ESPANA", "SPAIN", "LATIN", "AMERICA", "AMERICAS", "EUROPE", "ASIA", "MEXICO",
+            "COLOMBIA", "CHILE", "PERU", "BRASIL", "BRAZIL", "ARGENTINA", "CANADA", "USA", "PANAMA", "EGYPT", "INDIA"}
+
+
 def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
     """The names of other companies that a release's statement titles name: an acquired company's statements furnished
     with the company's report (Gildan's 6-K of June 2011 carries Gold Toe Moretz's, "GOLD TOE MORETZ HOLDINGS CORP. AND
-    SUBSIDIARIES CONSOLIDATED BALANCE SHEETS"), or a listed subsidiary's (CEMEX's 6-Ks carry CEMEX Holdings
-    Philippines' and CEMEX Latam's results). A name is the company's own when each of its words is a word of the
-    company's EDGAR name, a former one or the registrant's names on the 6-K's cover (FEMSA's titles print "FOMENTO
-    ECONÓMICO MEXICANO", EDGAR "MEXICAN ECONOMIC DEVELOPMENT INC"), one letter lost in decoding allowed. Only names of
-    two words or more are compared; an annual report, with no cover to give its own names, is never checked."""
+    SUBSIDIARIES CONSOLIDATED BALANCE SHEETS"), or a listed subsidiary's, its parent's name and a market's. A name is
+    the company's own when it shares a word with the company's EDGAR name or a former one, or with the registrant's names
+    on the 6-K's cover (FEMSA's titles print "FOMENTO ECONÓMICO MEXICANO", EDGAR "MEXICAN ECONOMIC DEVELOPMENT INC").
+    Only names of two words or more are compared; an annual report, with no cover to give its own names, is never
+    checked."""
     if cover is None:
         return []
     own = set().union(*(_named(name) for name in _company_names(ref.filing)),
                       _named(cover[:cover.lower().find("indicate by check mark")]))
     if not own:
         return []
-
-    def known(word: str) -> bool:
-        return word in own or any(SequenceMatcher(None, word, other).ratio() >= 0.85 for other in own)
-
-    return sorted(printed for printed in {reading.titled for reading in readings if reading.titled}
-                  if len(_named(printed)) >= 2 and not all(known(word) for word in _named(printed)))
+    others = []
+    for printed in {reading.titled for reading in readings if reading.titled}:
+        words = _named(printed)
+        if len(words) >= 2 and (not words & own and not any(
+                SequenceMatcher(None, word, other).ratio() >= 0.85 for word in words for other in own)
+                or words & own and (words - own) & _REGIONS):
+            others.append(printed)
+    return sorted(others)
 
 
 def _named(name: str) -> set[str]:

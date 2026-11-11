@@ -66,8 +66,9 @@ def _after_title(text: str) -> str | None:
         return None
     words: list[str] = []
     for word in reversed(before):
-        if not re.match(r"[A-Z]", word) or word.upper().strip(",") in _STATEMENT_WORDS or (
-                words and word.endswith(".") and word.upper() not in _ABBREVIATIONS):
-            break
+        if word.upper().strip(",") in _STATEMENT_WORDS:
+            return " ".join(words) or None  # the name follows the title's words directly
+        if not re.match(r"[A-Z]", word) or words and word.endswith(".") and word.upper() not in _ABBREVIATIONS:
+            return None  # other words between the title and the name: no name of the title's
         words.insert(0, word)
-    return " ".join(words) or None
+    return None

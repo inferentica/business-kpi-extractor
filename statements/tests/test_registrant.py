@@ -81,8 +81,9 @@ def test_a_listed_subsidiarys_results_are_anothers():
     names = ["CEMEX SAB DE CV"]
     assert _others(["CEMEX Holdings Philippines, Inc.", "CEMEX Latam Holdings, S.A.", "CEMEX, S.A.B. de C.V."], names, cover) == [
         "CEMEX Holdings Philippines, Inc.", "CEMEX Latam Holdings, S.A."]
-    lloyds = "Commission File number 001-15246 LLOYDS BANKING GROUP plc (Translation of registrant's name) Indicate by check mark"
-    assert _others(["Lloyds Bank plc"], ["Lloyds Banking Group plc"], lloyds) == ["Lloyds Bank plc"]
+    ultrapar = "Commission File Number 001-14950 ULTRAPAR HOLDINGS INC. (Translation of Registrant's Name) Indicate by check mark"
+    assert _others(["Ultrapar Participações S.A.", "Chief Executive Officer ULTRAPAR HOLDINGS INC."], ["ULTRAPAR HOLDINGS INC"],
+                   ultrapar) == []  # its Portuguese name, and a signature's words before its name
     brookfield = "Commission File Number 033-97038 BROOKFIELD ASSET MANAGEMENT INC. (Translation) Indicate by check mark"
     assert _others(["BRASCAN CORPORATION", "Brookfield Asset Management Inc."], ["BROOKFIELD Corp /ON/", "BRASCAN CORP/"],
                    brookfield) == []
