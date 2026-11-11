@@ -431,3 +431,25 @@ def test_a_quarters_place_is_replayed_though_the_years_figure_shares_its_day():
     read, _problems, _ = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
     assert {item.kpi.key: item.value for item in read if not item.is_total}["members"] == 310_000_000
     assert "last reading was the year's" not in pipeline.result.replay_outcomes
+
+
+def _members(count: str, scale_words: str) -> str:
+    return f"""<p>People served by our businesses{scale_words}</p>
+<table><tr><td></td><td>June 30, 2026</td><td>March 31, 2026</td></tr>
+<tr><td>Medicare Advantage</td><td>{count}</td><td>7,800</td></tr></table>"""
+
+
+def test_a_replayed_count_keeps_the_scale_words_its_reading_quoted_while_the_filing_states_them():
+    # UnitedHealth: members in thousands, stated beside the table, not in it; replay dropped the quoted words, so every
+    # replayed count was held for an unstated scale.
+    spec = Spec.model_validate({"groups": [{"key": "people", "label": "People Served", "kind": "metric", "kpis": [
+        {"key": "ma", "label": "Medicare Advantage Members", "unit": "count"}]}]})
+    last = {"people.ma": {"table": "T0", "row": 1, "col": 1, "row_label": "Medicare Advantage", "header": "@ # #",
+                          "scale": 1000, "scale_text": "(in thousands)"}}
+    stated = parse_document(_members("7,900", " (in thousands)"), URL.format(n=2))
+    values, problems = read_values(stated, spec, replay(stated, last, date(2026, 6, 30), 2), "USD")
+    assert [(item.value, item.status) for item in values] == [(7_900_000, "verified")]
+    # The words gone from the filing: the scale is not stated, and the figure is held, as before.
+    unstated = parse_document(_members("7,900", ""), URL.format(n=2))
+    values, _problems = read_values(unstated, spec, replay(unstated, last, date(2026, 6, 30), 2), "USD")
+    assert [item.status for item in values] == ["needs_review"]

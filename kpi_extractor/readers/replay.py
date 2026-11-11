@@ -123,7 +123,9 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
     if len(matches) > 1 and matches[0][0] != locator.get("table"):
         return "row in several tables"  # and none of them is last quarter's
     table_id, row = matches[0]
-    return Locator(kpi=key, table=table_id, row=row, col=col, scale=locator.get("scale"))
+    # The scale words last quarter's reading quoted ("(in thousands)") go with the place: the scale check still holds the
+    # figure unless the words are in this filing beside its table (UnitedHealth's members were held for an unstated scale).
+    return Locator(kpi=key, table=table_id, row=row, col=col, scale=locator.get("scale"), scale_text=locator.get("scale_text"))
 
 
 def _replay_table(document: Document, group: str, parts: list[dict], quarter: int | None = None) -> TableLocator | str:
@@ -153,7 +155,7 @@ def _replay_table(document: Document, group: str, parts: list[dict], quarter: in
             misses.append("column header changed" if "header" in first else "column header not recorded")
             continue
         return TableLocator(group=group, table=table.id, col=col, first_row=first_row, last_row=last_row,
-                            total_row=total_row, scale=first.get("scale"))
+                            total_row=total_row, scale=first.get("scale"), scale_text=first.get("scale_text"))
     return misses[0] if misses else "table rows not found"
 
 
