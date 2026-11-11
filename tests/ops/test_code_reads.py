@@ -1,4 +1,5 @@
 from kpi_extractor.evals.code_reads import CodeOnlyControl, held_out_companies, origin, score_company, summarize, report_text
+from kpi_extractor.steps.shared import value_key
 
 
 def _value(kpi, value, status="verified", accession="a1", period=("2026", "Q2"), locator=None, method="ai"):
@@ -10,18 +11,20 @@ def _value(kpi, value, status="verified", accession="a1", period=("2026", "Q2"),
 def test_each_verified_release_figure_is_scored_against_code_reading_of_its_filing():
     state = [_value("dau", 3.6), _value("mau", 4.1), _value("arpu", 12.0), _value("paid", 7.0), _value("cities", 10.0),
              _value("orders", 5.0, status="needs_review")]
-    readings = {"a1": [_value("dau", 3.6), _value("mau", 4.2), _value("arpu", 12.0, status="needs_review"),
-                       _value("cities", 10.04), _value("orders", 5.0)]}
-    rows = score_company("META", state, {"users": "metric"}, readings, held_out=False)
+    read = [_value("dau", 3.6, locator={"replayed_from": "a0"}), _value("mau", 4.2), _value("arpu", 12.0, status="needs_review"),
+            _value("cities", 10.04), _value("orders", 5.0, locator={"quarter_table": True})]
+    rows = score_company("META", state, {"users": "metric"}, {"a1"}, {value_key(row): row for row in read}, held_out=False)
     outcomes = {row["kpi"]: row["outcome"] for row in rows}
     assert outcomes == {"dau": "right", "mau": "wrong", "arpu": "held", "paid": "missed", "cities": "rounded", "orders": "extra"}
     assert {row["kind"] for row in rows} == {"metric"}
+    assert {row["kpi"]: row["readBy"] for row in rows if row["readBy"]} == {"dau": "replay", "mau": "other", "cities": "other",
+                                                                            "orders": "quarter_table"}
 
 
 def test_the_latest_four_quarters_and_hashed_companies_are_held_out():
     periods = [("2025", "Q1"), ("2025", "Q2"), ("2025", "Q3"), ("2025", "Q4"), ("2026", "Q1")]
     state = [{**_value("dau", 1.0, period=period), "period_end": f"{period[0]}-{3 * int(period[1][1]):02d}-28"} for period in periods]
-    rows = score_company("META", state, {}, {"a1": []}, held_out=False)
+    rows = score_company("META", state, {}, {"a1"}, {}, held_out=False)
     assert sorted((row["period"], row["set"]) for row in rows)[0] == ("2025-Q1", "tuning")
     assert sum(row["set"] == "held out" for row in rows) == 4
     assert held_out_companies(["A", "B", "C", "D", "E", "F", "G"]) == held_out_companies(["G", "F", "E", "D", "C", "B", "A"])
@@ -47,7 +50,7 @@ def test_ai_requests_are_refused_and_writes_kept_local():
 
 
 def test_report_shows_coverage_speed_and_buckets():
-    rows = score_company("META", [_value("dau", 3.6), _value("mau", 4.1)], {}, {"a1": [_value("dau", 3.6)]}, held_out=True)
+    rows = score_company("META", [_value("dau", 3.6), _value("mau", 4.1)], {}, {"a1"}, {value_key(_value("dau", 3.6)): _value("dau", 3.6)}, held_out=True)
     summary = summarize([{"symbol": "META", "rows": rows, "outcomes": {"row label not found": 1}, "left": {}, "refused": {},
                           "errors": [], "codeSeconds": [0.01, 0.03], "seconds": 2.0}])
     text = report_text(summary)
@@ -102,3 +105,16 @@ def test_what_code_cannot_read_is_left_unread_and_no_later_quarter_lends_its_pla
     second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
     read, _problems, _located = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
     assert read == [] and pipeline.result.replay_outcomes == {"no earlier reading of this kind of document": 2}
+
+
+def test_after_the_releases_the_tested_filings_hold_only_what_code_read_and_the_store_is_live_again():
+    stored = [_value("dau", 3.6), _value("mau", 4.1), _value("paid", 7.0, accession="other")]
+    pipeline = _code_only(stored)
+    pipeline.store.load(stored, [])
+    pipeline.store._apply = lambda values: None  # frozen while the releases are read
+    pipeline._reread_picked = {"a1"}
+    pipeline.readings = {"a1": [_value("dau", 3.6, locator={"replayed_from": "a0"})]}
+    pipeline._code_only_state()
+    assert {key[1] for key in pipeline.store._values} == {"dau", "paid"}  # mau was the AI's, so it is gone
+    pipeline.store._apply([_value("mau", 4.1, locator={"quarter_table": True})])  # a fill step's write lands
+    assert pipeline.store._values[value_key(_value("mau", 4.1))]["locator"] == {"quarter_table": True}
