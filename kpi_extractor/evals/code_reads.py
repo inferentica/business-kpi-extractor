@@ -44,7 +44,7 @@ from ..sources.sec import configure_identity
 from ..quality.checks import check_period, validate_groups
 from ..readers.extract import _row_label, read_values
 from ..xbrl import member_key
-from ..readers.replay import _source_template
+from ..readers.replay import _source_template, row_gone
 from ..steps.replay_reading import in_full_groups, left_for_ai
 from ..steps.shared import AI_GROUP_PREFIX, _days, _same, value_key
 from ..store import rounding_of
@@ -165,7 +165,8 @@ class CodeOnlyPipeline(SymbolPipeline):
             keys = {f"{item.group.key}.{item.kpi.key}" for item in items}
             whole = any(item.locator.get("whole_table") for item in items)
             listed = {f"{group.key}.{kpi.key}" for kpi in group.kpis}
-            gone = [key for key in last if key.split(".", 1)[0] == group.key and key not in keys and (whole or key in listed)]
+            gone = [key for key in last if key.split(".", 1)[0] == group.key and key not in keys and (whole or key in listed)
+                    and not row_gone(document, last[key])]
             if gone:
                 return f"a figure read last quarter is missing now ({gone[0].split('.', 1)[1][:40]})"
             if any(item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in
