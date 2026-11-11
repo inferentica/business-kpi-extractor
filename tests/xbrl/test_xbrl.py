@@ -161,6 +161,22 @@ def test_segments_reported_before_eliminations_add_up_with_them():
     assert {key: value for key, _label, value in group.members} == {"insurance": 70.0, "services": 50.0, "eliminations": -20.0}
 
 
+def test_the_corporate_member_stays_corporate_whatever_its_label_says():
+    # Coca-Cola's 2025 10-K tags Corporate as CorporateNonSegmentMember with a label naming reconciling items; its
+    # table says "Corporate", the line its quarters tagged CorporateMember.
+    segment = "dim_us-gaap_StatementBusinessSegmentsAxis"
+    facts = pd.DataFrame([
+        _fact("us-gaap:Revenues", 100.0),
+        _fact("us-gaap:Revenues", 60.0, "x:EmeaMember", axis=segment, consolidation="us-gaap:OperatingSegmentsMember"),
+        _fact("us-gaap:Revenues", 45.0, "x:NorthAmericaMember", axis=segment, consolidation="us-gaap:OperatingSegmentsMember"),
+        _fact("us-gaap:Revenues", 1.0, None, axis=segment, consolidation="us-gaap:CorporateNonSegmentMember"),
+        _fact("us-gaap:Revenues", -6.0, None, axis=segment, consolidation="us-gaap:IntersegmentEliminationMember"),
+    ])
+    names = {"us-gaap:CorporateNonSegmentMember": "Corporate and Segment Reconciling Items"}
+    group = extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q", label=names.get).groups[0]
+    assert {key for key, _label, _value in group.members} == {"emea", "northamerica", "corporate", "eliminations"}
+
+
 def test_revenue_outside_every_split_is_kept_as_one_row_when_two_splits_agree():
     contract = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
     segment, region = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_StatementGeographicalAxis"
