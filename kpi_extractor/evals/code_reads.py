@@ -42,7 +42,8 @@ from ..pipeline import SymbolPipeline, SymbolResult
 from ..readers.trace import CODE_READERS
 from ..sources.sec import configure_identity
 from ..quality.checks import check_period, validate_groups
-from ..readers.extract import read_values
+from ..readers.extract import _row_label, read_values
+from ..xbrl import member_key
 from ..readers.replay import _source_template
 from ..steps.replay_reading import in_full_groups, left_for_ai
 from ..steps.shared import AI_GROUP_PREFIX, _days, _same, value_key
@@ -130,8 +131,11 @@ class CodeOnlyPipeline(SymbolPipeline):
         found = super()._replay_part(document, part, locators, expected, currency)
         if isinstance(found, str):
             accession = getattr(self._local, "accession", None)
+            lacking = _closest_table(document, locators) if found == "table rows not found" else None
             for key, locator in locators.items():
                 place = {name: locator.get(name) for name in ("row_label", "quote", "table", "header") if locator.get(name)}
+                if lacking:
+                    place["closest"] = lacking
                 self.misses[(accession, key)] = {"why": found, "place": place, "document": document.source_url.rsplit("/", 1)[-1]}
         return found
 
@@ -231,6 +235,21 @@ class CodeOnlyPipeline(SymbolPipeline):
             for group in open_spec.groups:
                 self.left[group.key] += len(group.kpis)
         return in_full_groups(replayed, spec), [], located or Located()
+
+
+def _closest_table(document, locators: dict[str, dict]) -> dict:
+    """For a whole table replay found nowhere: the table holding most of last quarter's rows, and the rows it lacks."""
+    wanted = {member_key(locator["row_label"]): locator["row_label"] for locator in locators.values() if locator.get("row_label")}
+    total = next((locator.get("total_row_label") for locator in locators.values() if locator.get("total_row_label")), None)
+    best = None
+    for table in document.tables.values():
+        labels = {member_key(_row_label(row, 1)) for row in table.rows}
+        lacking = [label for key, label in wanted.items() if key not in labels]
+        if total and member_key(total) not in labels:
+            lacking.append(f"total: {total}")
+        if best is None or len(lacking) < len(best[1]):
+            best = (table.id, lacking)
+    return {"table": best[0], "lacks": best[1][:6]} if best else {}
 
 
 def tested_filings(values, filings) -> set[str]:
