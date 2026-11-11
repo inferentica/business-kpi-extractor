@@ -96,3 +96,18 @@ def test_a_currency_in_the_tables_own_headings_is_its_currency():
     from statement_extractor.readers.printed.find import find_statements
     [(_kind, group)] = find_statements(parse_html(html), release=True)
     assert reporting_currency(group, {}, "6-K") == "USD"
+
+
+def test_a_statements_columns_share_its_one_dollar_sign():
+    # Brookfield's Q2 2001 release: 2000 decided by the 2002 report alone (CAD); 2001 also by 2003's in US dollars.
+    found = [reading("40-F", "FY", "CAD", "2002"), reading("40-F", "FY", "USD", "2003"),
+             reading("6-K", "Q2", BARE_DOLLARS, "2001"), reading("6-K", "Q2", BARE_DOLLARS, "2000")]
+    _bare_currencies(found)
+    assert [r.currency for r in found[2:]] == ["CAD", "CAD"]
+    alone = [reading("40-F", "FY", "CAD", "2002"), reading("40-F", "FY", "USD", "2003"), reading("6-K", "Q1", BARE_DOLLARS, "2001")]
+    _bare_currencies(alone)
+    assert alone[2].currency is None  # nothing in its own statement decides it
+
+
+def test_brookfields_canadian_dollar_mark():
+    assert currencies_named("MILLIONS, EXCEPT PER SHARE AMOUNTS (CDN.$)") == ["CAD"]

@@ -87,7 +87,7 @@ _CURRENCIES = (
     ("TWD", r"NT\$|\bNTD\b|New\s+Taiwan\s+dollars?|New\s+Taiwan\b"),
     # Embraer's "in millions of U.S.dollars": no space after the stop.
     ("USD", r"US\$|U\.S\.\$|\bUSDm?\b|U\.\s?S\.\s*dollars?|United\s+States\s+dollars?|US\s+dollars?"),
-    ("CAD", r"C\$|CDN\$|\bCAD\b|Canadian\s+dollars?"),
+    ("CAD", r"C\$|CDN\.?\$|\bCAD\b|Canadian\s+dollars?"),  # Brookfield's 2001 releases: "(CDN.$)"
     ("HKD", r"HK\$|\bHKD\b|Hong\s+Kong\s+dollars?"),
     ("EUR", r"€|\bEURm?\b|\beuros?\b"),
     ("NLG", r"\bNLG\b|\bguilders?\b|\bNfl\.?"),

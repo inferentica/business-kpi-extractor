@@ -10,6 +10,7 @@ import gc
 import json
 import re
 import time
+from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
@@ -213,10 +214,21 @@ def _bare_currencies(readings) -> None:
     (Alcon's "($ millions)" in US dollars, Scotiabank's in Canadian dollars, GAP's "thousands of pesos" in Mexican
     pesos); a year whose annual reports give no single one of that kind leaves it without."""
     by_year = _reporting_currencies(readings)
-    for reading in readings:
-        if reading.currency in (BARE_DOLLARS, BARE_PESOS):
-            kinds = [currency for currency in by_year.get(reading.fiscal_year, set()) if same_kind(reading.currency, currency)]
-            reading.currency = kinds[0] if len(kinds) == 1 else None
+    marked = [(reading, reading.currency) for reading in readings if reading.currency in (BARE_DOLLARS, BARE_PESOS)]
+    for reading, marker in marked:
+        kinds = [currency for currency in by_year.get(reading.fiscal_year, set()) if same_kind(marker, currency)]
+        reading.currency = kinds[0] if len(kinds) == 1 else None
+    # A statement's columns share its one "$": Brookfield's Q2 2001 release prints 2001 beside 2000, and 2000 is in
+    # Canadian dollars (its 2002 annual report, the one presenting it), so 2001 is too, though 2003's report in US
+    # dollars leaves the year itself undecided.
+    decided: dict[tuple, set] = defaultdict(set)
+    for reading, marker in marked:
+        if reading.currency:
+            decided[(reading.accession, reading.statement, marker)].add(reading.currency)
+    for reading, marker in marked:
+        found = decided.get((reading.accession, reading.statement, marker), set())
+        if reading.currency is None and len(found) == 1:
+            reading.currency = next(iter(found))
 
 
 def _release_bases(readings) -> None:
