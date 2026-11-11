@@ -71,13 +71,31 @@ FILING_SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
 }
 
 
+def _reports_without_segments(values: dict) -> set[str]:
+    """Periodic reports holding segment operating income from XBRL but no revenue by segment: their split went unread
+    (Intel's 2022-2023 10-Qs, tagged on the consolidated-entities axis, before the reader took that axis as neutral)."""
+    groups: dict[str, set] = {}
+    for value in values.values():
+        if value.get("method") == "xbrl" and value.get("source_accession"):
+            groups.setdefault(value["source_accession"], set()).add(value.get("group_key"))
+    return {accession for accession, keys in groups.items() if "segment_income" in keys and "segments" not in keys}
+
+
+# Selectors that pick filings by what all their figures together lack.
+SET_SELECTORS: dict[str, tuple[str, Callable[[dict], set[str]]]] = {
+    "reports-without-segments": ("periodic reports with segment income from XBRL but no revenue by segment", _reports_without_segments),
+}
+
+
 def picked_filings(name: str, values: dict, filings: dict | None = None) -> set[str]:
     """The accessions of the filings the selector picks: those holding figures it picks, or, for a filing selector, the
     filings themselves."""
+    if name in SET_SELECTORS:
+        return SET_SELECTORS[name][1](values)
     if name in FILING_SELECTORS:
         picks = FILING_SELECTORS[name][1]
         return {accession for accession, filing in (filings or {}).items() if picks(filing)}
     if name not in SELECTORS:
-        raise ValueError(f"Unknown re-read selector {name!r}; one of {', '.join(sorted({*SELECTORS, *FILING_SELECTORS}))}")
+        raise ValueError(f"Unknown re-read selector {name!r}; one of {', '.join(sorted({*SELECTORS, *FILING_SELECTORS, *SET_SELECTORS}))}")
     picks = SELECTORS[name][1]
     return {value["source_accession"] for value in values.values() if value.get("source_accession") and picks(value)}

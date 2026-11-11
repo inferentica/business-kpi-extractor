@@ -18,7 +18,7 @@ from .memory import MemoryWatch, peak_gb
 from .offpeak import seconds_until_offpeak
 from ..pipeline import SymbolPipeline, SymbolResult
 from ..sources.sec import _temporary, configure_identity
-from .reread import FILING_SELECTORS, SELECTORS
+from .reread import FILING_SELECTORS, SELECTORS, SET_SELECTORS
 
 _SYMBOL = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
@@ -31,7 +31,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--force", action="store_true", help="Re-read filings and re-propose KPI lists")
     parser.add_argument("--retrace", action="store_true",
                         help="Re-read only filings holding AI figures read before calls were traced; lists stay as they are")
-    parser.add_argument("--reread", default="", choices=["", *sorted({*SELECTORS, *FILING_SELECTORS})],
+    parser.add_argument("--reread", default="", choices=["", *sorted({*SELECTORS, *FILING_SELECTORS, *SET_SELECTORS})],
                         help="Re-read only the filings a selector picks (ops/reread.py); lists stay as they are")
     parser.add_argument("--trigger", default="manual", choices=["scheduled", "manual", "watchlist_add", "backfill"])
     # Companies mostly wait on the AI, but a re-read of every report parses ten years of XBRL at up to 2 GB a company:

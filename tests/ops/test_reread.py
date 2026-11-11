@@ -95,3 +95,14 @@ def test_place_holds_picks_figures_held_for_a_place_their_row_never_named():
               2: held("SUMS", "parts differ from the total by 4%"),
               3: held("DONE", "the row and its headings name no: EMEA", owner_decision="rejected")}
     assert picked_filings("place-holds", values) == {"KO"}
+
+
+def test_reports_with_segment_income_but_no_segment_revenue_are_picked():
+    from kpi_extractor.ops.reread import picked_filings
+    values = {
+        1: {"source_accession": "a", "method": "xbrl", "group_key": "segment_income"},
+        2: {"source_accession": "b", "method": "xbrl", "group_key": "segment_income"},
+        3: {"source_accession": "b", "method": "xbrl", "group_key": "segments"},
+        4: {"source_accession": "c", "method": "ai", "group_key": "segment_income"},
+    }
+    assert picked_filings("reports-without-segments", values) == {"a"}
