@@ -51,6 +51,25 @@ def inspect(accession: str) -> None:
     except Exception as error:  # noqa: BLE001 - printed, not raised
         own = f"error: {error}"
     print(f"-- own segment revenue measure: {own}")
+    _segment_facts(facts, breakdowns.period_end)
+
+
+def _segment_facts(facts, period_end) -> None:
+    """The period's facts on any segment axis, by concept: how the filing tags its segments."""
+    axes = [column for column in facts.columns if column.startswith("dim_") and "egment" in column]
+    if not axes:
+        print("-- no segment axis in the facts")
+        return
+    end = str(period_end)
+    rows = facts[(facts["period_end"].astype(str).str[:10] == end) & facts[axes].notna().any(axis=1)]
+    dims = [column for column in facts.columns if column.startswith("dim_")]
+    print(f"-- facts on segment axes ending {end}: {len(rows)}")
+    for concept, group in list(rows.groupby("concept"))[:25]:
+        print(f"   {concept} ({len(group)})")
+        for _index, row in group.head(12).iterrows():
+            tags = ", ".join(f"{column[4:]}={row[column]}" for column in dims if isinstance(row[column], str))
+            start = str(row.get("period_start") or "")[:10]
+            print(f"      {start}..{end} {row.get('numeric_value')}  {tags}")
 
 
 def main(argv: list[str] | None = None) -> int:
