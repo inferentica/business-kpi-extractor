@@ -167,3 +167,56 @@ def quarter_sections(document: Document, labels: list[str], end: date) -> Docume
             keep.append(key)
     return Document(document.source_url, {key: document.tables[key] for key in keep if key in document.tables},
                     {key: document.blocks[key] for key in keep if key in document.blocks}, keep)
+
+
+_SEGMENT_HEADING = re.compile(r"([A-Z][A-Za-z0-9&,.'\- ]{0,40}):\s*$")
+_SEGMENT_INCOME = re.compile(r"^segment (?:income|loss|income \(loss\)|\(loss\) income) from operations\b", re.I)
+_ROW_SCALE = {"millions": 1e6, "thousands": 1e3, "billions": 1e9}
+
+
+@dataclass
+class SegmentIncome:
+    values: dict[str, float]  # line key → the segment's income (loss) from operations, in full amounts
+    tables: dict[str, str]  # line key → the table it was read from
+    names: dict[str, str]  # line key → the prospectus's name for the segment
+
+
+def prospectus_segment_income(document: Document, members: dict[str, str],
+                              renamed: dict[str, str] | None = None) -> dict[Period, SegmentIncome]:
+    """Each segment's income (loss) from operations for every period the prospectus's per-segment tables give, when
+    every segment of `members` (key → label) is found for it. SpaceX's prospectus gives one small table per segment
+    under its name ("Space:", "Connectivity:", "AI:"), each with a "Segment income (loss) from operations" row.
+    `renamed`: a prospectus name (line key) → today's key, from the revenue tables; one segment left unnamed is the
+    one table left."""
+    wanted = {key: {key, line_key(label)} for key, label in members.items()}
+    names_to = {name: member for name, member in (renamed or {}).items() if member in members}
+    read: dict[str, tuple[str, dict[Period, float]]] = {}  # the prospectus's segment name → (table, figures)
+    for table in document.tables.values():
+        heading = _SEGMENT_HEADING.search((table.context or "").strip())
+        columns = period_columns(table) if heading else {}
+        if not columns:
+            continue
+        row = next((row for row in table.rows if row and _SEGMENT_INCOME.match(_label(row[0]))), None)
+        if row is None:
+            continue
+        unit = next((scale for word, scale in _ROW_SCALE.items() if f"in {word}" in (row[0] or "").lower()), None)
+        scale = unit or table.declared_scale() or document.default_scale()
+        figures = {period: amount * scale for col, period in columns.items() if (amount := _amount(row, col)) is not None}
+        if scale and figures:
+            read.setdefault(heading.group(1).strip(), (table.id, figures))
+    matched: dict[str, str] = {}  # member → the prospectus's name
+    for name in read:
+        key = line_key(name)
+        member = names_to.get(key) or next((m for m, keys in wanted.items() if key in keys and m not in matched), None)
+        if member and member not in matched:
+            matched[member] = name
+    unmatched = [member for member in members if member not in matched]
+    left = [name for name in read if name not in matched.values()]
+    if len(unmatched) == 1 and len(left) == 1:
+        matched[unmatched[0]] = left[0]
+    if set(matched) != set(members):
+        return {}
+    periods = set.intersection(*(set(read[name][1]) for name in matched.values()))
+    return {period: SegmentIncome({member: read[name][1][period] for member, name in matched.items()},
+                                  {member: read[name][0] for member, name in matched.items()}, dict(matched))
+            for period in periods}

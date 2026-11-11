@@ -98,3 +98,61 @@ def test_a_quarters_reading_gets_the_passages_naming_a_kpi_and_that_quarter():
               "B3": TextBlock("B3", "As of March 31, 2026, we had 9,600 satellites in orbit.")}
     sections = quarter_sections(Document("x", {}, blocks, ["B1", "B2", "B3"]), ["Starlink Subscribers"], date(2026, 3, 31))
     assert sections.order == ["B2"]
+
+
+def _segment_table(table_id: str, heading: str, label: str, figures: list[str]) -> Table:
+    return Table(table_id, f"Segment Operating and Financial Data (unaudited) {heading}", [
+        ["", "Three Months Ended March 31,", "", "", "Year Ended December 31,", "", ""],
+        ["", "2026", "2025", "", "2025", "2024", "2023"],
+        ["Launches (number) ..........", "40", "38", "", "170", "138", "98"],
+        [f"{label} (in millions) ..........", *figures[:2], "", *figures[2:]],
+    ])
+
+
+# SpaceX's prospectus: one table per segment under its name, its AI segment SI by the second 10-Q.
+SEGMENT_TABLES = {
+    "T16": _segment_table("T16", "Space:", "Segment income (loss) from operations", ["$(662)", "$(70)", "$(657)", "$21", "$(1)"]),
+    "T17": _segment_table("T17", "Space: Connectivity:", "Segment income from operations", ["$1,188", "$1,033", "$4,423", "$2,006", "$469"]),
+    "T18": _segment_table("T18", "Connectivity: AI:", "Segment loss from operations", ["$(2,469)", "$(936)", "$(6,355)", "$(1,561)", "$(3,973)"]),
+}
+
+
+def test_each_segments_income_is_read_from_its_own_table_under_its_name():
+    from kpi_extractor.readers.prospectus import prospectus_segment_income
+    document = Document("x", SEGMENT_TABLES, {}, list(SEGMENT_TABLES))
+    found = prospectus_segment_income(document, SEGMENTS, {"ai": "si"})
+    assert found[Period(date(2026, 3, 31), False)].values == {"space": -662e6, "connectivity": 1_188e6, "si": -2_469e6}
+    assert found[Period(date(2023, 12, 31), True)].values == {"space": -1e6, "connectivity": 469e6, "si": -3_973e6}
+    assert found[Period(date(2026, 3, 31), False)].names["si"] == "AI"
+    # Without the revenue tables' rename, the one segment left is the one table left.
+    assert prospectus_segment_income(document, SEGMENTS)[Period(date(2025, 3, 31), False)].values["si"] == -936e6
+    # A segment the prospectus does not give: no period is read.
+    two = Document("x", {key: SEGMENT_TABLES[key] for key in ("T16", "T17")}, {}, ["T16", "T17"])
+    assert prospectus_segment_income(two, SEGMENTS) == {}
+
+
+def test_the_prospectus_gives_segment_income_and_joins_the_renamed_segments_quarters():
+    from kpi_extractor.pipeline import SymbolPipeline
+    from kpi_extractor.sources.base import FilingRef
+
+    def row(key, label, year, quarter, value, end):
+        return {"group_key": "segment_income", "group_label": "Operating Income by Segment", "group_kind": "revenue_breakdown",
+                "group_order": 50, "kpi_key": key, "kpi_label": label, "kpi_order": 0, "fiscal_year": year, "fiscal_period": quarter,
+                "period_end": end, "method": "xbrl", "validation_status": "verified", "value": value, "notes": [], "currency": "USD",
+                "locator": {"member": f"spcx:{label}Member"}}
+    pipeline = SymbolPipeline(None, "SPCX", quarters=8, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(fiscal_year_end="1231")
+    pipeline.offset = 0
+    stored_rows = [row("space", "Space", "2026", "Q3", -7e6, "2026-09-30"), row("connectivity", "Connectivity", "2026", "Q3", 2_367e6, "2026-09-30"),
+                   row("si", "SI", "2026", "Q3", 431e6, "2026-09-30"), row("ai", "AI", "2026", "Q2", -1_257e6, "2026-06-30")]
+    pipeline.values = {(v["group_key"], v["kpi_key"], v["fiscal_year"], v["fiscal_period"]): v for v in stored_rows}
+    ref = FilingRef("0001628280-26-042639", "424B4", date(2026, 6, 12), "earnings_release", "https://www.sec.gov/x.htm")
+    renamed = {("segments", "ai"): "si"}
+    records = pipeline._prospectus_segment_income(Document("x", SEGMENT_TABLES, {}, list(SEGMENT_TABLES)), ref, renamed)
+    by = {(r["kpi_key"], r["fiscal_year"], r["fiscal_period"]): r["value"] for r in records}
+    assert by[("si", "2026", "Q1")] == -2_469e6 and by[("space", "2025", "FY")] == -657e6 and len(records) == 15
+    assert renamed[("segment_income", "ai")] == "si"
+    stored = []
+    pipeline.store.write = stored.extend
+    pipeline.store.write(pipeline._join_prospectus_names({("segment_income", "ai"): "si"}))
+    assert [(v["kpi_key"], v["fiscal_period"], v["validation_status"]) for v in stored] == [("si", "Q2", "verified"), ("ai", "Q2", "rejected")]

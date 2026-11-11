@@ -6,14 +6,14 @@ from datetime import date
 
 from ..ai import Spec
 from ..domain.fiscal import fiscal_label
-from ..readers.prospectus import interim_quarters, prospectus_breakdowns, quarter_sections
+from ..readers.prospectus import interim_quarters, prospectus_breakdowns, prospectus_segment_income, quarter_sections
 from ..readers.release_breakdowns import line_key
 from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from ..store import FilingReading
 from .shared import AI_GROUP_PREFIX, _DONE
 
-_PROSPECTUS_READER = "prospectus reader 1"
+_PROSPECTUS_READER = "prospectus reader 2"  # 2: segment income too
 
 
 class ListingHistory:
@@ -113,11 +113,46 @@ class ListingHistory:
                             period_end=period.end, locator={"total": found.total, "member": (template.get("locator") or {}).get("member"),
                                                             "prospectus": True, "table": found.table, "row": found.rows.get(member)},
                         ))
+            records += self._prospectus_segment_income(document, ref, renamed)
             return FilingReading(ref, "processed" if records else "skipped", records=records,
                                  notes=[_PROSPECTUS_READER, f"{len(records)} breakdown figures from the IPO prospectus"]), renamed
         except Exception as error:  # noqa: BLE001 - the history is extra
             self.log(f"{self.symbol}: prospectus breakdowns not read ({type(error).__name__}: {error})"[:300])
             return None, {}
+
+    def _prospectus_segment_income(self, document, ref: FilingRef, renamed: dict[tuple[str, str], str]) -> list[dict]:
+        """Each segment's income from operations for the periods the prospectus's per-segment tables give (SpaceX's Q1s
+        and full years), for periods the company never reported; its name for a renamed segment joins the series."""
+        rows = [value for value in self.values.values() if value["method"] == "xbrl" and value["validation_status"] == "verified"
+                and value["group_key"] == INCOME_GROUP and value["fiscal_period"] != "FY"]
+        if not rows:
+            return []
+        latest = max((value["fiscal_year"], value["fiscal_period"]) for value in rows)
+        lines = {value["kpi_key"]: value for value in rows if (value["fiscal_year"], value["fiscal_period"]) == latest}
+        names = {name: member for (_group, name), member in renamed.items()}
+        records = []
+        for period, found in prospectus_segment_income(document, {key: line["kpi_label"] for key, line in lines.items()}, names).items():
+            for member, name in found.names.items():
+                if line_key(name) not in (member, line_key(lines[member]["kpi_label"])):
+                    renamed[(INCOME_GROUP, line_key(name))] = member
+            try:
+                quarter = fiscal_label(period.end, self.profile.fiscal_year_end, annual=period.annual, year_offset=self.offset)
+            except Exception:  # noqa: BLE001 - a period off the company's calendar
+                continue
+            if self._held(INCOME_GROUP, quarter):
+                continue
+            for member, value in found.values.items():
+                template = lines[member]
+                records.append(self._record(
+                    group_key=INCOME_GROUP, group_label=template["group_label"], group_kind=template["group_kind"],
+                    group_order=template["group_order"], kpi_key=member, kpi_label=template["kpi_label"],
+                    kpi_order=template["kpi_order"], unit="currency", value=value, currency=template.get("currency"),
+                    method="xbrl", validation_status="verified", reconciliation_error_pct=None,
+                    notes=["from the IPO prospectus"], ref=ref, fiscal_year=quarter[0], fiscal_period=quarter[1],
+                    period_end=period.end, locator={"member": (template.get("locator") or {}).get("member"), "prospectus": True,
+                                                    "table": found.tables[member], "row_label": found.names[member]},
+                ))
+        return records
 
     def _join_prospectus_names(self, renamed: dict[tuple[str, str], str]) -> list[dict]:
         """A line renamed after listing is one series under today's name: the prospectus's row the line was matched to
