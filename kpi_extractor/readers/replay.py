@@ -12,6 +12,7 @@ from ..documents.document import Document, Table, clean, parse_number
 from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from .anchor import anchor_words
 from .extract import _row_label, column_header
+from .quoted_rows import replay_row_line
 from ..rules.period import DEEP_HEADER_ROWS
 from ..xbrl import member_key
 
@@ -135,10 +136,19 @@ def row_gone(document: Document, locator: dict) -> bool:
     label = clean(locator.get("row_label") or "")
     if not label:
         return False
-    key = member_key(label)
-    if any(member_key(cell) == key for table in document.tables.values() for row in table.rows for cell in row[:3]):
-        return False
-    return not any(label.lower() in block.text.lower() for block in document.blocks.values())
+    keys, text = _labels_of(document)
+    return member_key(label) not in keys and label.lower() not in text
+
+
+def _labels_of(document: Document) -> tuple[set[str], str]:
+    """Every row label of the document and all its passages' text, worked out once for it (TSMC's reports hold some
+    hundred tables: scanning them for each row took a document's replay from 120 ms to 300 ms at the 90th percentile)."""
+    cached = getattr(document, "_labels_cache", None)
+    if cached is None:
+        keys = {member_key(cell) for table in document.tables.values() for row in table.rows for cell in row[:3] if cell}
+        cached = (keys, "\n".join(block.text.lower() for block in document.blocks.values()))
+        object.__setattr__(document, "_labels_cache", cached)
+    return cached
 
 
 def missing_since(last: dict[str, dict], keys: set[str], group: str, whole: bool, listed: set[str], document: Document) -> bool:
@@ -218,8 +228,10 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:
         found = [(block.id, match) for block in document.blocks.values() for match in compiled.finditer(block.text)]
         if found:
             break
-    if len(found) != 1:  # gone, or more than one sentence of that shape (this year's and last year's)
-        return "sentence found more than once" if found else "sentence not found"
+    if not found:
+        return replay_row_line(document, key, locator)  # a table row quoted as a line, whose signs or marks changed
+    if len(found) != 1:  # more than one sentence of that shape (this year's and last year's)
+        return "sentence found more than once"
     block_id, match = found[0]
     new_value = prefix + match.group(value_group) + suffix
     if new_value not in match.group(0):
