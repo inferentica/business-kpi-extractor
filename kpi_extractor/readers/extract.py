@@ -27,7 +27,7 @@ from ..rules.period import (  # noqa: F401 - re-exported for callers of extract
     _CHANGE_KPI, _FOURTH_QUARTER, _FULL_DATE, _LONG_SPAN_KPI, _LONGER, _MONTH_NAME,
     _MONTH_SPAN, _MONTHS, _NAMES_QUARTER, _NUMERIC_DATE, _ORDINAL, _OTHER_PERIOD,
     _QUARTER, _stands_at_period_end, _STOCK_KPI, _YEAR, _YEAR_ROW, _YTD_TITLE,
-    column_dates, column_duration_problem, column_header, header_contradicts)
+    column_dates, column_duration_problem, column_header, header_contradicts, quarter_for_trailing_kpi)
 from ..rules.identity import (  # noqa: F401 - re-exported for callers of extract
     _combined_line, _FOOTNOTE, _identity, _label_words, _listed_kpi, _NOT_THE_PLACE,
     _PLACE, _place_not_named, _places, _plain_label, _row_label, _row_named_twice,
@@ -215,6 +215,8 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
     if not re.search(r"[.!?]$", quote.strip()) and (span := _YTD_TITLE.search(heading)) and not _LONG_SPAN_KPI.search(kpi.label) \
             and not _NAMES_QUARTER.search(heading) and not _stands_at_period_end(kpi):
         raise LocateError(f"the heading after the quote gives the figures {span.group(0).lower()!r}, not the quarter's")
+    if problem := quarter_for_trailing_kpi(before[-160:], kpi.label):
+        raise LocateError(problem)
     if other := net_gross_mismatch(before[-80:], kpi.label):
         raise LocateError(f"the quote gives the {other} figure, not {kpi.label!r}")
     if value > 0 and (kpi.unit == "percent" or (kpi.unit == "count" and _CHANGE_KPI.search(kpi.label))) \

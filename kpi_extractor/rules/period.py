@@ -67,6 +67,23 @@ _LONG_SPAN_KPI = re.compile(r"year[- ]to[- ]date|\bYTD\b|cumulative|all[- ]time|
 _NAMES_QUARTER = re.compile(r"\b(?:first|second|third|fourth)\s+quarter\b|\bquarter\s+(?:ended|of)\b|\bthree months\b|\b[1-4]Q\b|\bQ[1-4]\b", re.I)
 
 
+# A KPI over the twelve months to the quarter's end (KKR's "Private Equity Portfolio (LTM Gross Return)"), and the words
+# that give a twelve-month figure: the year ended at a fourth quarter is its last twelve months.
+_TRAILING_KPI = re.compile(r"\bLTM\b|\bTTM\b|\btrailing\b|\btwelve[- ]months?\b|\b12[- ]months?\b", re.I)
+_TWELVE_MONTHS = re.compile(r"\bLTM\b|\bTTM\b|\btrailing\b|twelve[- ]months?|\b12[- ]months?|\byears? ended\b|\bfor the (?:full )?year\b"
+                            r"|\b(?:during|over|in) the (?:full )?year\b|\bfull[- ]year\b|\byear[- ]over[- ]year\b|\bannual", re.I)
+
+
+def quarter_for_trailing_kpi(before: str, kpi_label: str) -> str | None:
+    """Why a quote's figure is not a twelve-month KPI's: the words before it name the quarter and no twelve months.
+    KKR's "For the quarter ended December 31, 2016, KKR's private equity portfolio appreciated 3.4%" is the quarter's
+    return; its LTM return is the year's 11.9%, in the sentence before."""
+    sentence = re.split(r"(?<=[.!?])\s+(?=[A-Z])", before)[-1]  # the year's figure in the sentence before is another's
+    if _TRAILING_KPI.search(kpi_label) and _NAMES_QUARTER.search(sentence) and not _TWELVE_MONTHS.search(sentence):
+        return f"the quote gives the quarter's figure, not {kpi_label!r}"
+    return None
+
+
 # A KPI that is a level at period end (a stock), not a flow over it: a year-to-date change can lead to its level.
 _STOCK_KPI = re.compile(r"backlog|obligations?|\bRPO\b|\bcRPO\b|customers?|subscribers?|members?|users?|base\b|balances?|assets|"
                         r"\bAU[MSA]\b|in force|count\b|sites|rigs|fleet|stores|locations|employees|headcount|deposits|loans|capacity|"

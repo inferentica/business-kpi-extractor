@@ -920,3 +920,26 @@ def test_a_table_repeated_whole_or_with_its_own_period_is_no_twin():
                                          "<td>Year Ended</td><td>Concentrate Sales1</td><td>Price/Mix</td><td>Unit Case Volume</td>"),
                            "https://example.com/y.htm")
     assert earlier_twin(dated, list(dated.tables)[1]) is None
+
+
+def test_a_quote_naming_only_the_quarter_is_not_a_twelve_month_kpis_figure():
+    # KKR's 2016 Q4 release: the year's return is the LTM return at a fourth quarter; the quarter's 3.4% is not.
+    text = ("For the year ended December 31, 2016, KKR's private equity portfolio appreciated 11.9%. "
+            "For the quarter ended December 31, 2016, KKR's private equity portfolio appreciated 3.4%.")
+    label = "Traditional Private Equity Portfolio (LTM Gross Return)"
+    assert _read_quote(text, label, "percent", "For the year ended December 31, 2016, KKR's private equity portfolio "
+                                               "appreciated 11.9%", "11.9%") == 11.9
+    document = parse_document(f"<p>{text}</p>", "https://example.com/ex99.htm")
+    block = next(iter(document.blocks))
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric",
+                                             "kpis": [{"key": "k", "label": label, "unit": "percent"}]}]})
+    located = Located.model_validate({"period_end": "2016-12-31", "values": [{"kpi": "ops.k", "block": block, "value_text": "3.4%",
+        "quote": text}]})
+    values, problems = read_values(document, spec, located, "USD")
+    assert values == [] and "the quarter's figure" in problems[0]
+    # A sentence giving both spans keeps its twelve-month figure: "For the quarter and last twelve months ended June 30".
+    both = "For the quarter and last twelve months ended June 30, 2016, KKR's private equity portfolio appreciated 4.5% and 6.0%, respectively."
+    assert _read_quote(both, label, "percent", both, "6.0%") == 6.0
+    # A quarter's own KPI is untouched.
+    assert _read_quote(text, "Private Equity Portfolio Quarterly Return", "percent",
+                       "For the quarter ended December 31, 2016, KKR's private equity portfolio appreciated 3.4%", "3.4%") == 3.4
