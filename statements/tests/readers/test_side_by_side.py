@@ -54,4 +54,16 @@ def test_the_reports_name_is_no_side_by_side_heading():
         .replace("(In thousands of reais)", "(In thousands of reais) See the individual and consolidated quarterly information")
     readings, _notes = read_document(one, accession="x", form="6-K", filed=date(2023, 7, 31),
                                      document_end=date(2023, 6, 30), fiscal_year_end="1231", year_offset=0)
-    assert {r.scope for r in readings if r.statement == "balance"} == {"consolidated"}
+    # No "parent" scope from the report's name; the same dates printed twice with no scope headings over them are
+    # neither read (readers/printed/side_by_side.py's printed_twice), so the parent's columns are never served as the group's.
+    assert "parent" not in {r.scope for r in readings} and not [r for r in readings if r.statement == "balance"]
+
+
+def test_one_period_printed_twice_is_neither_read():
+    # Petrobras's 2005 6-K: the annual statement's rows run into the quarters' table, under "3Q-2004 | 4Q-2004 | 4Q-2003".
+    from statement_extractor.domain.periods import Period
+    from statement_extractor.readers.printed.side_by_side import printed_twice
+    quarter = Period(date(2004, 12, 31), date(2004, 10, 2))
+    periods = {(2,): quarter, (3,): quarter, (5,): Period(date(2003, 12, 31), date(2003, 10, 2))}
+    assert printed_twice([(2,), (3,), (5,)], set(), periods, {}) == {(2,), (3,)}
+    assert printed_twice([(2,), (3,)], set(), periods, {(2,): "parent", (3,): "consolidated"}) == set()

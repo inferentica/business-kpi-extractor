@@ -24,7 +24,7 @@ from .currency import column_currencies, reporting_currency, translations
 from .dates import column_periods
 from .find import TITLES, find_statements, unlabelled_totals
 from .scales import line_scale, share_scale, statement_scale, states_two
-from .side_by_side import column_scopes
+from .side_by_side import column_scopes, printed_twice
 from .tables import Table, figure_columns
 from .titled import titled_notes
 
@@ -83,11 +83,11 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         if dropped:
             notes.append(f"{kind}: {len(dropped)} convenience translation column(s) left out")
         read_periods.setdefault(seen, set()).update(period.key for period in periods.values())
-        kept = [index for index, column in enumerate(dated) if column not in dropped]
         scopes = column_scopes(group, dated, periods)
         if scopes is None:
             notes.append(f"{kind}: parent and group columns side by side, not told apart")
             continue
+        kept = [index for index, column in enumerate(dated) if column not in printed_twice(dated, dropped, periods, scopes)]
         layout = [(group[0], dated)]
         for table in group[1:]:
             own = column_periods(kind, [table], fiscal_year_end, document_end)
