@@ -943,3 +943,24 @@ def test_a_quote_naming_only_the_quarter_is_not_a_twelve_month_kpis_figure():
     # A quarter's own KPI is untouched.
     assert _read_quote(text, "Private Equity Portfolio Quarterly Return", "percent",
                        "For the quarter ended December 31, 2016, KKR's private equity portfolio appreciated 3.4%", "3.4%") == 3.4
+
+
+META_Q4_2023 = """
+<ul><li>Ad impressions and price per ad &#8211; In the fourth quarter of 2023, ad impressions delivered across our Family of
+Apps increased by 21% year-over-year and the average price per ad increased by 2% year-over-year. For the full year 2023,
+ad impressions increased by 28% year-over-year and the average price per ad decreased by 9% year-over-year.</li></ul>
+"""
+
+
+def test_a_quote_whose_sentence_opens_with_another_period_is_not_the_quarters():
+    # Meta Q4 2023: a quote of the full-year sentence's second half read the year's -9% as the quarter's +2%.
+    document = parse_document(META_Q4_2023, "https://example.com/ex99.htm")
+    spec = _metric_spec(("price", "Average Price per Ad Year over Year Growth", "percent"))
+    def read(quote, value):
+        located = Located.model_validate({"period_end": "2023-12-31", "values": [
+            {"kpi": "operating.price", "block": _block(document, quote), "quote": quote, "value_text": value}]})
+        return read_values(document, spec, located, "USD")
+    values, problems = read("the average price per ad decreased by 9% year-over-year", "9%")
+    assert values == [] and "'for the full year', not the quarter's" in problems[0]
+    values, problems = read("the average price per ad increased by 2% year-over-year", "2%")
+    assert problems == [] and [item.value for item in values] == [2]

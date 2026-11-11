@@ -343,3 +343,16 @@ def test_a_renamed_report_is_replayed_from_the_quarter_before_under_its_old_name
     other = parse_document("<p>Board resolutions of June 30, 2026.</p>", "https://www.sec.gov/Archives/a2026q2board.htm")
     _pipeline(control, _history(first))._read(lambda: "prompt", other, SPEC, Q2, version=1)
     assert ("locate", "flash") in control.calls
+
+
+def test_a_quote_replayed_into_a_full_year_sentence_is_not_the_quarters():
+    # Meta Q4 2023: last quarter's "the average price per ad decreased by 6%" matched only the full year's sentence (its
+    # quarter rose), which replay served as the quarter's -9%.
+    from tests.readers.test_extract import META_Q4_2023
+    document = parse_document(META_Q4_2023, "https://www.sec.gov/Archives/meta-12312023xexhibit991.htm")
+    spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric", "kpis": [
+        {"key": "price", "label": "Average Price per Ad Year over Year Growth", "unit": "percent"}]}]})
+    last = {"operating.price": {"block": "A_P2", "quote": "the average price per ad decreased by 6% year-over-year", "value_text": "6%"}}
+    located = replay(document, last, date(2023, 12, 31), 4)
+    values, problems = read_values(document, spec, located, "USD") if not isinstance(located, str) else ([], [located])
+    assert values == [] and problems

@@ -23,7 +23,7 @@ from ..rules.wording import (  # noqa: F401 - re-exported for callers of extract
 from ..rules.currency import (  # noqa: F401 - re-exported for callers of extract
     _column_currency, _currency, _CURRENCY_MARKERS)
 from ..rules.period import (  # noqa: F401 - re-exported for callers of extract
-    year_ago_record, year_ago_value,
+    other_period_problem, year_ago_record, year_ago_value,
     _CHANGE_KPI, _FOURTH_QUARTER, _FULL_DATE, _LONG_SPAN_KPI, _LONGER, _MONTH_NAME,
     _MONTH_SPAN, _MONTHS, _NAMES_QUARTER, _NUMERIC_DATE, _ORDINAL, _OTHER_PERIOD,
     _QUARTER, _stands_at_period_end, _STOCK_KPI, _YEAR, _YEAR_ROW, _YTD_TITLE,
@@ -196,17 +196,8 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
     before = quote[:quote.find(value_text)]
     if forward_looking(before):
         raise LocateError("the quote is a forecast or guidance, not the reported figure")
-    # "YTD 2025, the company was awarded 14 new contract commitments" is the year to date, not the quarter's count,
-    # unless the KPI itself is defined over the longer span (Tesla's cumulative deliveries, PGIM's trailing flows).
-    # A quote that names the quarter ("In the second quarter of fiscal 2026, 2,148 units booked") is the quarter's figure.
-    if (span := _OTHER_PERIOD.search(before[-120:])) and not _LONG_SPAN_KPI.search(kpi.label) \
-            and not _NAMES_QUARTER.search(before[-160:]):
-        # GE Vernova's "backlog increased $6.5 billion year-to-date, to approximately $26 billion" states a change over
-        # the year and then the level at quarter end: the level of a stock measure is the quarter's figure.
-        between = before[-120:][span.end():]
-        level = re.search(r"\b(?:to|reached|reaching|stood at|stands at|as of|at the end|ended the quarter with|now)\b", between)
-        if not (level and _STOCK_KPI.search(kpi.label)):
-            raise LocateError(f"the quote gives the figure {span.group(0).lower()!r}, not the quarter's")
+    if problem := other_period_problem(block.text, quote, before, kpi.label):
+        raise LocateError(problem)
     # A slide's title can follow its figures: Borr's "22 New Commitments $625M Added Backlog Revenue ... 4,820+ Backlog
     # Days 2025 YTD Contracting Statistics" gives the year to date, though no word before the figures says so.
     # A quote that ends its sentence, and a next bullet or sentence ("Through the first six months of 2025, ..."), is no
