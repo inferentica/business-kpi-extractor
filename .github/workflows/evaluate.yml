@@ -14,8 +14,9 @@ on:
           - prompts
           - trial
           - classify
+          - code-reads
       symbols:
-        description: For a trial - comma-separated tickers to read as new companies (nothing is stored)
+        description: For a trial - comma-separated tickers to read as new companies (nothing is stored); for code-reads, the companies whose releases code reads again with no AI
         required: false
         type: string
       quarters:
@@ -116,8 +117,15 @@ jobs:
           cache-dependency-glob: pyproject.toml
       - run: uv pip install .
       - name: Wait for DeepSeek off-peak prices
-        if: github.event_name != 'workflow_dispatch' || inputs.offpeak  # a push or the schedule waits too (an unset input equals false)
+        # a push or the schedule waits too (an unset input equals false); code reads make no AI call, so never wait
+        if: (github.event_name != 'workflow_dispatch' || inputs.offpeak) && inputs.suite != 'code-reads'
         run: python -m kpi_extractor.ops.offpeak
+      - name: Read releases with code alone (no AI)
+        if: inputs.suite == 'code-reads'
+        env:
+          SYMBOLS: ${{ inputs.symbols }}
+          QUARTERS: ${{ inputs.quarters || '12' }}
+        run: python -m kpi_extractor.evals.code_reads --symbols "$SYMBOLS" --quarters "$QUARTERS"
       - name: Score the Classify rules (no AI)
         if: inputs.suite == 'classify'
         run: python -m kpi_extractor.evals.classify_eval
@@ -144,7 +152,7 @@ jobs:
           if [ -n "$LISTS_FROM" ]; then LISTS="--lists-from $(find lists-from -name trial.json | head -1)"; fi
           python -m kpi_extractor.evals.trial --symbols "$SYMBOLS" --quarters "$QUARTERS" $LISTS
       - name: Score against the golden set
-        if: inputs.suite != 'prompts' && inputs.suite != 'trial' && inputs.suite != 'classify'
+        if: inputs.suite != 'prompts' && inputs.suite != 'trial' && inputs.suite != 'classify' && inputs.suite != 'code-reads'
         env:
           QUARTERS: ${{ inputs.quarters || '6' }}
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}
