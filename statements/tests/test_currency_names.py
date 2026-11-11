@@ -145,9 +145,12 @@ def test_two_columns_under_one_heading_are_not_read():
     from statement_extractor.domain.periods import Period
     from statement_extractor.readers.html.parse import parse_html
     from statement_extractor.readers.printed.find import two_columns
-    html = "<table><tr><td></td><td colspan='2'>2009</td><td colspan='4'>2008</td></tr>" \
+    html = "<p>Amounts expressed in millions of U.S. dollars ($) and in millions of Mexican pesos (Ps.)</p>" \
+           "<table><tr><td></td><td colspan='2'>2009</td><td colspan='4'>2008</td></tr>" \
            "<tr><td>Net sales</td><td>$</td><td>15,018</td><td>Ps.</td><td>196,103</td><td>Ps.</td><td>167,171</td></tr>" \
            "<tr><td>Cost of sales</td><td></td><td>8,000</td><td></td><td>104,000</td><td></td><td>90,000</td></tr></table>"
     [table] = parse_html(html)
     periods = {(2,): Period(date(2009, 12, 31), date(2009, 1, 1)), (4, 6): Period(date(2008, 12, 31), date(2008, 1, 1))}
     assert two_columns(table, periods) == {(4, 6)}
+    [plain] = parse_html(html.split("</p>", 1)[1])
+    assert two_columns(plain, periods) == set()  # one currency: no translation beside it
