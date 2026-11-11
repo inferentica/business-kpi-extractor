@@ -93,7 +93,9 @@ def test_what_code_cannot_read_is_left_unread_and_no_later_quarter_lends_its_pla
     pipeline = _code_only(_history(first))
     read, _problems, _located = pipeline._read(lambda: "prompt", six, SPEC, Q2, version=1)
     assert {item.kpi.key for item in read} == {"members"} and pipeline.left == {"technology": 1}
-    assert {key: miss["why"] for (_accession, key), miss in pipeline.misses.items()} == {"technology.n3": "column header changed"}
+    # A whole table's miss is each of its rows' (the table was read whole last quarter).
+    assert {miss["why"] for miss in pipeline.misses.values()} == {"column header changed"}
+    assert "technology.n3" in {key for _accession, key in pipeline.misses}
     assert pipeline.control.refused == {}
     later = [{**value, "period_end": "2026-09-30", "fiscal_period": "Q3"} for value in _history(first)]
     pipeline = _code_only(later)
