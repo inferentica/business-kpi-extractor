@@ -9,6 +9,7 @@ from ..sources.archive import filing_folder
 from ..quality.checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
 from ..documents.document import Document, clean, parse_number
 from ..readers.extract import column_header
+from ..readers.quoted_rows import row_line_others
 from ..sources.base import FilingRef
 
 AI_GROUP_PREFIX = "kpi_"
@@ -51,6 +52,9 @@ def _year_ago_cells(document: Document, locator: dict, value: float) -> list[flo
     """The other cells of a value's row in columns headed for the same length of period ("three months ended"), in the
     value's own units: the year-ago figure (and the quarter before, where a release shows it)."""
     table = document.tables.get(str(locator.get("table")))
+    if table is None and locator.get("quote") and (parsed := parse_number(locator.get("value_text") or "")) and parsed.value:
+        # A table row quoted as a line of text: its other figures (the year-ago one among them, where it shows one).
+        return [other * value / parsed.value for other in row_line_others(locator["quote"], locator["value_text"])]
     if table is None or locator.get("row") is None or locator.get("col") is None:
         return []
     row, col = int(locator["row"]), int(locator["col"])
