@@ -34,6 +34,6 @@ def statement_scope(kind: str, group: list[Table], form: str, found: list) -> st
         return "parent"  # UBS's "UBS AG (standalone) financial information"
     if form.upper() not in FOREIGN_FORMS or "consolidated" in title:
         return "consolidated"
-    if form.upper() != "6-K" or any(other is not group and other_kind == kind for other_kind, other in found):
+    if form.upper() != "6-K" or any(other[0] is not group[0] and other_kind == kind for other_kind, other in found):
         return "parent"  # an annual report's, or one of several of its kind (UBS's quarterly reports print UBS AG's own)
     return "consolidated" if any(_GROUP_TITLE.search(_title(other)) for _kind, other in found) else "parent"
