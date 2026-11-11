@@ -17,7 +17,7 @@ from ..readers.trace import placed_elsewhere, stamp_call
 from ..rules.period import states_quarter
 from .replay_reading import in_full_groups, left_for_ai
 from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
-                     _same, _same_chain, _year_ago_cells)
+                     _later_place, _same, _same_chain, _year_ago_cells)
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
 MAX_DOCUMENT_CHARS = 120_000
@@ -509,7 +509,7 @@ class AiReading:
                 continue
             key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
             if value["period_end"] < cutoff:
-                if value["period_end"] > latest.get(key, {}).get("period_end", ""):
+                if _later_place(value, latest.get(key)):
                     latest[key] = value
             elif value["period_end"] < later.get(key, {}).get("period_end", "9999"):
                 later[key] = value
