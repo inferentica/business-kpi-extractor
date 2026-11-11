@@ -428,3 +428,19 @@ def test_a_notes_statement_of_discontinued_operations_is_no_statement():
             "discontinued operations mainly: a) the Concrete Pipe Business for the period ended January 31, 2017</p>"
             "<table><tr><td>INCOME STATEMENT</td><td>2017</td><td>2016</td></tr>" + rows + "</table>")
     assert find_statements(parse_html(html), release=True) == []
+
+
+def test_an_underlying_basis_income_statement_is_no_statement():
+    # Lloyds' quarterly releases: "UNDERLYING BASIS CONSOLIDATED INCOME STATEMENT" and "INCOME STATEMENT - UNDERLYING
+    # BASIS" beside the "STATUTORY CONSOLIDATED INCOME STATEMENT", the company's own measures, not its statement.
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements
+    rows = "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+        ("Net interest income", "2,906", "2,829"), ("Other income", "1,477", "1,592"), ("Total income", "4,383", "4,421"),
+        ("Operating costs", "(1,987)", "(2,020)"), ("Impairment", "(126)", "(186)"), ("Profit before tax", "2,270", "2,215"),
+        ("Taxation", "(500)", "(480)"), ("Profit for the period", "1,770", "1,735")))
+    table = "<table><tr><td></td><td>2016</td><td>2015</td></tr>" + rows + "</table>"
+    for title, found in (("UNDERLYING BASIS CONSOLIDATED INCOME STATEMENT", 0), ("INCOME STATEMENT - UNDERLYING BASIS", 0),
+                         ("STATUTORY CONSOLIDATED INCOME STATEMENT (UNAUDITED)", 1)):
+        html = f"<p>Profit on an underlying basis was up. {title}</p>" + table
+        assert len(find_statements(parse_html(html), release=True)) == found

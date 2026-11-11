@@ -39,6 +39,9 @@ _NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bcomparison\b.{0,120}?\bve
 # statement of operations of CEMEX discontinued operations mainly: a) the Concrete Pipe Business …".
 _DISCONTINUED = re.compile(r"\b(?:statements?\s+of\s+(?:operations|income)|income\s+statements?)\s+of\s+(?:[\w-]+\s+){0,3}"
                            r"discontinued\s+operations\b", re.I)
+# Results restated by the company's own measures beside its statutory statements (Lloyds: "UNDERLYING BASIS CONSOLIDATED
+# INCOME STATEMENT", "INCOME STATEMENT - UNDERLYING BASIS"): only the statutory statement is the company's own.
+_UNDERLYING = re.compile(r"\bunderlying\s+basis\b", re.I)
 
 
 # "quarterly" names quarterly-data tables, not the report's own running header (Tennant's "Quarterly Report – Form 10-Q"
@@ -113,7 +116,8 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         title_text = SIDE_BY_SIDE.sub(" ", title_text)
         if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
                 not_statement.search(_RUNNING_LINK.sub(" ", _heading(table.context[-200:]))) or \
-                _DISCONTINUED.search(table.context[-600:]) or len([r for r in table.rows if r.figures]) < 4:
+                _DISCONTINUED.search(table.context[-600:]) or _UNDERLYING.search(
+                    _heading(table.context[-200:]) + " " + " ".join(cell.text for cells in table.header[:2] for cell in cells)) or len([r for r in table.rows if r.figures]) < 4:
             continue
         if any(_NOT_A_PERIOD.search(cell.text) for cells in table.header for cell in cells if cell.start > 0):
             continue
