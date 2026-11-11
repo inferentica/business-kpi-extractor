@@ -24,11 +24,10 @@ from .currency import column_currencies, reporting_currency, translations
 from .dates import column_periods
 from .find import TITLES, find_statements, two_columns, unlabelled_totals
 from .scales import line_scale, share_scale, statement_scale, states_two
+from .scope import statement_scope
 from .side_by_side import column_scopes
 from .tables import Table, figure_columns
 from .titled import titled_notes
-
-_FOREIGN_FORMS = ("20-F", "40-F", "6-K")
 
 
 def _concept(label: str, kind: str) -> str:
@@ -52,13 +51,13 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     notes: list[str] = []
     found = find_statements(all_tables, release=form == "6-K")
     # A statement printed more than once: the fullest table, the group's before the parent's alone (TSMC's 2008 6-Ks).
-    found.sort(key=lambda item: (_scope(item[1], form) != "consolidated",
+    found.sort(key=lambda item: (statement_scope(item[0], item[1], form, found) != "consolidated",
                                  -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
     read_periods: dict[tuple, set] = {}  # by kind and scope: Copel prints the parent's quarter, then the group's
     for kind, group in found:
         periods = column_periods(kind, group, fiscal_year_end, document_end)
         notes.extend(titled_notes(kind, periods, document_end, fiscal_year_end, year_offset))
-        seen = (kind, _scope(group, form))
+        seen = (kind, statement_scope(kind, group, form, found))
         if seen in read_periods:
             # A statement printed again gives only the periods it prints of its own: Chase's 1995 10-Qs print the three
             # months and the six months as two income statements; TSMC's releases print the quarters and the year.
@@ -108,27 +107,11 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             if reading is None:
                 continue
             reading.accession, reading.form, reading.filed, reading.currency = accession, form, filed, currency
-            reading.scope, reading.titled = scopes.get(dated[index]) or _scope(group, form), titled_company(kind, group[0])
+            reading.scope = scopes.get(dated[index]) or statement_scope(kind, group, form, found)
+            reading.titled = titled_company(kind, group[0])
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes
-
-
-def _scope(group: list[Table], form: str) -> str:
-    """A foreign filer's statement is the company's alone when its title does not say consolidated ("TAIWAN
-    SEMICONDUCTOR MANUFACTURING COMPANY LTD. BALANCE SHEETS", "UNCONSOLIDATED BALANCE SHEET"). A U.S. filer's is
-    taken as its group's: some print a bare "BALANCE SHEETS" though they consolidate."""
-    leading = " ".join(row.label for row in group[0].rows[:4] if not row.figures)  # a title in the table's own rows
-    title = (group[0].context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in group[0].header)
-             + " " + leading).lower()
-    own_rows = [row.label for row in group[0].rows[:4] if not row.figures]
-    if re.search(r"\b(unconsolidated|non-consolidated|parent\s+company\s+only)\b", title) or \
-            any(re.search(r"\bparent\s+company$", label, re.I) for label in own_rows) or \
-            re.search(r"\bstandalone\b", title[-160:]):
-        return "parent"  # UBS's "UBS AG (standalone) financial information"
-    if form.upper() in _FOREIGN_FORMS and "consolidated" not in title:
-        return "parent"
-    return "consolidated"
 
 
 def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> float | None:

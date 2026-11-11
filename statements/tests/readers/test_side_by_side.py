@@ -55,3 +55,21 @@ def test_the_reports_name_is_no_side_by_side_heading():
     readings, _notes = read_document(one, accession="x", form="6-K", filed=date(2023, 7, 31),
                                      document_end=date(2023, 6, 30), fiscal_year_end="1231", year_offset=0)
     assert {r.scope for r in readings if r.statement == "balance"} == {"consolidated"}
+
+
+def test_a_release_titling_its_results_the_groups_scopes_its_untitled_statements():
+    # Azul's releases: "Consolidated Financial Results … the following income statement", then "Cash Flow Statement – IFRS".
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements
+    from statement_extractor.readers.printed.scope import statement_scope
+    rows = "".join(row(label, "100", "90") for label in ("Cash flows from operating activities", "Net cash from operating activities",
+                                                          "Net cash used in investing activities", "Net cash used in financing activities",
+                                                          "Cash at the beginning of the period", "Cash at the end of the period"))
+    page = ("<p>Consolidated Financial Results The following income statement should be read with the comments</p>"
+            "<table><tr><td></td><td>3Q24</td><td>3Q23</td></tr>" + row("Net income", "5", "4") + "</table>"
+            "<p>Third Quarter Results 2024 Cash Flow Statement – IFRS</p><table><tr><td></td><td>3Q24</td><td>3Q23</td></tr>" + rows + "</table>")
+    tables = parse_html(page)
+    found = [("income", [tables[0]]), ("cash_flow", [tables[1]])]
+    assert statement_scope("cash_flow", [tables[1]], "6-K", found) == "consolidated"
+    alone = [("cash_flow", [tables[1]])]
+    assert statement_scope("cash_flow", [tables[1]], "6-K", alone) == "parent"  # nothing titled the group's
