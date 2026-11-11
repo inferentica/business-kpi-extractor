@@ -1,0 +1,35 @@
+name: XBRL Inspect
+# Prints what the XBRL reader makes of filings: the breakdowns kept, those not reconciled, and the company's own segment
+# revenue measure (kpi_extractor/ops/xbrl_inspect.py). No AI, nothing stored.
+on:
+  workflow_dispatch:
+    inputs:
+      accessions:
+        description: Accession numbers, comma-separated
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - run: uv pip install .
+      - name: Print the XBRL reader's breakdowns
+        # Inputs reach the command as environment variables, never as interpolated shell text.
+        env:
+          ACCESSIONS: ${{ inputs.accessions }}
+        run: python -m kpi_extractor.ops.xbrl_inspect --accessions "$ACCESSIONS"
