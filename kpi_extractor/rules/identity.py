@@ -31,6 +31,10 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
         # Not after a joining word: "Markets & Securities Services" is a combined line, not Securities Services.
         matches = [kpi for kpi in listed if len(_identity(kpi.label)) >= 8 and wanted.endswith(_identity(kpi.label))
                    and not re.search(r"(?:&|\band|\+|,|/)\s*$", label[:len(label) - len(_tail(label, kpi.label))], re.I)]
+    if not matches:
+        # A row naming only the side its sign falls on ("Investment securities losses", JPMorgan's quarters with a loss)
+        # is the listed line that names both ("Investment Securities Gains/(Losses)").
+        matches = [kpi for kpi in listed if wanted in {_identity(side) for side in _one_sided(kpi.label)}]
     if not matches and (bare := _SPACED_FOOTNOTE.sub("", label)) != label:
         # A footnote mark set apart from the label ("Net system sales 3", ASML's 2017 releases) when the label without
         # it is a listed KPI: never a name's own number ("Tier 1"), which would have no listed KPI to match.
@@ -39,6 +43,15 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
 
 
 _SPACED_FOOTNOTE = re.compile(r"\s+\d{1,2}$")
+_TWO_SIDED = re.compile(r"\b(gains?|income|profits?|earnings)\s*(?:/|\band\b|\bor\b)?\s*\(?\s*(loss(?:es)?)\s*\)?", re.I)
+
+
+def _one_sided(label: str) -> set[str]:
+    """A label naming both sides of a figure ("Gains/(Losses)", "Income (Loss)") as each side alone."""
+    found = _TWO_SIDED.search(label)
+    if not found:
+        return set()
+    return {f"{label[:found.start()]}{side}{label[found.end():]}" for side in (found.group(1), found.group(2))}
 
 
 _TOTAL_LABEL = re.compile(r"\s*total\b", re.I)
