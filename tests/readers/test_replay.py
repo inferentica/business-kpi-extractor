@@ -356,3 +356,31 @@ def test_a_quote_replayed_into_a_full_year_sentence_is_not_the_quarters():
     located = replay(document, last, date(2023, 12, 31), 4)
     values, problems = read_values(document, spec, located, "USD") if not isinstance(located, str) else ([], [located])
     assert values == [] and problems
+
+
+def _jpm(newest: str, older: str, advisory: str) -> str:
+    return f"""<table>
+<tr><td>JPMORGAN CHASE &amp; CO.</td></tr><tr><td>COMMERCIAL &amp; INVESTMENT BANK</td></tr>
+<tr><td>FINANCIAL HIGHLIGHTS, CONTINUED</td></tr><tr><td>(in millions, except where otherwise noted)</td></tr>
+<tr><td></td><td>QUARTERLY TRENDS</td><td></td><td>SIX MONTHS ENDED JUNE 30,</td></tr>
+<tr><td></td><td></td><td>{newest} Change</td><td></td></tr>
+<tr><td></td><td>{newest}</td><td>{older}</td><td>2024</td></tr>
+<tr><td>BUSINESS METRICS</td><td></td><td></td><td></td></tr>
+<tr><td>Advisory</td><td>{advisory}</td><td>$598</td><td>$1,383</td></tr>
+</table>"""
+
+
+def test_a_table_whose_date_row_sits_below_its_title_rows_is_replayed_as_the_newest_quarter():
+    # JPMorgan's supplement opens each table with four title rows: the "2Q24 1Q24" row was past the six rows the period
+    # checks read, so no table of it was replayed (631 figures to the AI).
+    spec = Spec.model_validate({"groups": [{"key": "fees", "label": "Investment Banking Fees", "kind": "metric", "kpis": [
+        {"key": "advisory", "label": "Advisory", "unit": "currency"}]}]})
+    url = "https://www.sec.gov/Archives/a{n}q24erfex992supplement.htm"
+    second = parse_document(_jpm("2Q24", "1Q24", "$785"), url.format(n=2))
+    last = {"fees.advisory": {"table": "T0", "row": 8, "col": 1, "row_label": "Advisory", "header": "quarterly trends"}}
+    located = replay(second, last, date(2024, 6, 30), 2)
+    values, problems = read_values(second, spec, located, "USD")
+    assert problems == [] and [item.value for item in values] == [785_000_000]
+    # A column that names another quarter is never read as this one, however deep its name sits.
+    stale = parse_document(_jpm("1Q24", "4Q23", "$598"), url.format(n=2))
+    assert replay(stale, last, date(2024, 6, 30), 2) == "column header changed"
