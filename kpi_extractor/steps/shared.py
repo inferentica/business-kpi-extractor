@@ -117,3 +117,15 @@ def held_for_later(value: dict, cells: list[float], checked: str) -> dict:
     figures = ", ".join(f"{cell:,.6g}" for cell in cells[:3])
     notes = [*(value.get("notes") or []), f"the next year's release gives {figures} for this line: restated, or misread", checked]
     return {**value, "validation_status": "needs_review", "notes": notes}
+
+
+# A reading's other figures in its own units: put back on its series' scale with it, or its year-ago cell (kept as what
+# the release reported for the year before) stays a thousandfold off (Morgan Stanley's 2016 Q3 AUM, $417 million).
+_SCALED_FIGURES = ("year_ago_value", "ytd", "ytd_total")
+
+
+def _rescaled(locator: dict | None, factor: float) -> dict | None:
+    if not locator:
+        return locator
+    return {**locator, **{key: round(float(locator[key]) * factor, 6) for key in _SCALED_FIGURES
+                          if isinstance(locator.get(key), (int, float))}}

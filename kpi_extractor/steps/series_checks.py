@@ -13,7 +13,7 @@ from ..documents.document import Document, parse_number
 from ..quality.checks import JUMP_NOTE, count_jump, parts_add_up, reported_matches
 from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
 from ..sources.base import FilingRef
-from .shared import (AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
+from .shared import (_rescaled, AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
                      _year_ago_cells, held_for_later, list_parents, value_key)
 
 MAX_YEAR_RATIO = 3.0
@@ -471,7 +471,7 @@ class SeriesChecks:
                     continue
                 factor = 10 ** (3 * (main - at))
                 notes = [note for note in v.get("notes") or [] if not _is_jump(note) and note != "confirmed by review"]
-                records.append({**v, "value": round(float(v["value"]) * factor, 6),
+                records.append({**v, "value": round(float(v["value"]) * factor, 6), "locator": _rescaled(v.get("locator"), factor),
                                 "validation_status": "verified" if not notes else v["validation_status"],
                                 "notes": [*notes, f"read without its table's scale: {factor:g}× to match the series"]})
         if records:

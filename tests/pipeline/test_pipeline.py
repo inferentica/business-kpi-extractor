@@ -1699,6 +1699,10 @@ def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
                                                                      ("2018", "Q4"): 32763e6, ("2019", "Q1"): 37400e6}
     assert fixed[("2019", "Q1")]["validation_status"] == "verified"
     assert fixed[("2018", "Q2")]["validation_status"] == "verified"
+    # The reading's year-ago cell moves with it (Morgan Stanley's 2017 Q3 AUM gave 2016 Q3 as $417 million, not billion).
+    with_year_ago = [*values[:3], {**values[3], "locator": {"year_ago_value": 28_000, "ytd": 90_000, "scale": 1e6}}, *values[4:]]
+    moved = {(v["fiscal_year"], v["fiscal_period"]): v for v in _pipeline(None, with_year_ago)._scale_runs()}
+    assert moved[("2018", "Q3")]["locator"] == {"year_ago_value": 28_000e6, "ytd": 90_000e6, "scale": 1e6}
     # A series that only grows has no run; an owner's figure is never changed.
     assert _pipeline(None, [row("2018", "Q1", 10), row("2018", "Q2", 25), row("2018", "Q3", 60)])._scale_runs() == []
     kept = _pipeline(None, [*values[:2], {**values[2], "owner_decision": "corrected"}, *values[5:]])._scale_runs()
