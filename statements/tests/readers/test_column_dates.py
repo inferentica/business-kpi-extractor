@@ -210,3 +210,21 @@ def test_each_columns_own_month_range_and_named_quarters():
         ("2019", "Q2", "quarter"), ("2019", "Q2", "ytd"), ("2020", "Q2", "quarter"), ("2020", "Q2", "ytd")]
     assert _income("<td>2020</td><td>2019</td><td>2Q-2020</td><td>1Q-2020</td>", "<tr><td>Jan-Jun</td></tr>") == [
         ("2019", "Q2", "ytd"), ("2020", "Q1", "quarter"), ("2020", "Q2", "quarter"), ("2020", "Q2", "ytd")]
+
+
+def test_a_columns_own_month_over_another_date_the_title_gives_its_year():
+    # FEMSA's FY2012 20-F: "As of December 31, 2012, 2011 and as of January 1, 2011", columns "December 2012 | December
+    # 2011 | January 1, 2011".
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    rows = [("Cash and cash equivalents", "36,521", "25,841", "26,705"), ("Total current assets", "100", "90", "80"),
+            ("Total assets", "300", "280", "260"), ("Total liabilities", "120", "110", "100"), ("Total equity", "180", "170", "160"),
+            ("Total liabilities and equity", "300", "280", "260")]
+    html = "<p>Consolidated Statements of Financial Position As of December 31, 2012, 2011 and as of January 1, 2011 " \
+           "Amounts expressed in millions of Mexican pesos</p><table><tr><td></td><td>December 2012</td><td>December 2011</td>" \
+           "<td>January 1, 2011</td></tr>" + "".join(
+               "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>" for row in rows) + "</table>"
+    readings, _notes = read_document(html, accession="x", form="20-F", filed=day(2013, 4, 15), document_end=day(2012, 12, 31),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert {(r.period_end, r.lines[0]["value"]) for r in readings} == {
+        (day(2012, 12, 31), 36_521e6), (day(2011, 12, 31), 25_841e6), (day(2011, 1, 1), 26_705e6)}

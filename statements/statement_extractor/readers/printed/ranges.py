@@ -45,3 +45,12 @@ def mended_starts(periods: dict, ranged: set) -> None:
                 other.end == swapped.end and other.duration == swapped.duration for other in others):
             periods[column] = swapped
 
+
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+
+def own_month(above: str) -> int | None:
+    """The month a column's own header names before its year ("December 2011"), if it names one."""
+    match = re.search(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?:19|20)\d{2}\b", above, re.I)
+    return _MONTHS.index(match.group(1).lower()) + 1 if match else None
+

@@ -10,12 +10,11 @@ from datetime import date, timedelta
 from ...domain.periods import Period
 from .find import TITLE_PATTERNS
 from ...domain.basis import currencies_named
-from .ranges import dotted_date as _dotted, mended_starts, numeric_date as _numeric
+from .ranges import dotted_date as _dotted, mended_starts, numeric_date as _numeric, own_month
 from .tables import YEAR_ONLY, Table, figure_columns, header_text
 
 
 _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
-
 
 _MONTH_DAY = re.compile(rf"\b({_MONTH}),?\s+(\d{{1,2}})\b", re.I)  # Petrobras: "December, 31"
 _DAY_MONTH_YEAR = re.compile(rf"\b(\d{{1,2}})\s+({_MONTH})\s+((?:19|20)\d{{2}})\d?\b", re.I)
@@ -241,7 +240,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                 end = date(year_of + (2000 if year_of < 50 else 1900) if year_of < 100 else year_of, month, day_of)
             except ValueError:
                 end = None
-        elif day is not None and not _MONTH_DAY.search(above) and year in dated_in_title:
+        elif day is not None and not _MONTH_DAY.search(above) and year in dated_in_title and own_month(above) in (
+                None, _date(dated_in_title[year][0], "1", year).month):  # FEMSA: "December 2011" under "… January 1, 2011"
             end = _date(*dated_in_title[year], year)  # "June 29, 2014 and June 30, 2013": each year's own date (ASML)
         elif day is not None:
             end = _date(day.group(1), day.group(2), year)
