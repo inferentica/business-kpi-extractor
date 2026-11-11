@@ -13,7 +13,7 @@ from datetime import date
 from ..domain.ifrs_labels import english_names
 from ..readers.regulators.cvm import cvm_readings
 from ..readers.regulators.dart import dart_readings
-from ..sources.regulators import DART_REPORTS, REGULATED, cvm_rows, dart_corp_code, dart_rows
+from ..sources.regulators import DART_REPORTS, KEPT_SERVED, REGULATED, cvm_rows, dart_corp_code, dart_rows
 from .latam import read_bmv, read_cmf
 
 _CVM_FIRST = {"ITR": 2011, "DFP": 2010}  # the first year of each form in CVM's open data
@@ -30,6 +30,7 @@ def read_regulators(symbol: str, since: date, fiscal_year_end: str, year_offset:
         return [], []
     records, readings = [], []
     this_year = date.today().year
+    served_before = len(KEPT_SERVED)
     if regulator in ("bmv", "cmf"):
         records, readings = (read_bmv if regulator == "bmv" else read_cmf)(identity[0], since, fiscal_year_end, year_offset)
     elif regulator == "cvm":
@@ -66,9 +67,13 @@ def read_regulators(symbol: str, since: date, fiscal_year_end: str, year_offset:
                 records.append(record)
                 readings.extend(found)
         _name_tags(readings, english_names())
+    if len(KEPT_SERVED) > served_before:  # the regulator could not be reached: its last copies read instead
+        records.append({"regulator": regulator.upper(), "note": "unreachable, kept copies read",
+                        "kept_copies": KEPT_SERVED[served_before:]})
+        log(f"{symbol}: {regulator.upper()} unreachable, {len(KEPT_SERVED) - served_before} kept copies read")
     kept = sum(1 for reading in readings if reading.status == "kept")
     log(f"{symbol}: {regulator.upper()} {len(readings)} columns from {len({reading.accession for reading in readings})} "
-        f"filings, {kept} kept, {sum(1 for r in records if 'note' in r)} years unread")
+        f"filings, {kept} kept, {sum(1 for r in records if 'note' in r and 'kept_copies' not in r)} years unread")
     return records, readings
 
 

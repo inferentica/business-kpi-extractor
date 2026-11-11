@@ -402,3 +402,15 @@ def test_a_title_name_after_the_title():
                    ("Income before income tax", "200", "150"), ("Income tax", "(50)", "(40)"), ("Net income", "150", "110"))) + "</table>"
     [(kind, group)] = find_statements(parse_html(html), release=True)
     assert titled_company(kind, group[0]) == "CEMEX Holdings Philippines, Inc."
+
+
+def test_a_title_in_another_companys_possessive_names_it():
+    # James Hardie's 6-K of September 2004: an inquiry's report quotes "a summary of Amaca’s Income Statements".
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.company_title import titled_company
+    from statement_extractor.readers.printed.find import find_statements
+    table = "<table><tr><td></td><td>2004</td><td>2003</td></tr>" + _balance_rows() + "</table>"
+    for prose, name in (("They may be seen in the following summary of Amaca&#8217;s Balance Sheets as at June 2004:", "Amaca’s"),
+                        ("The Company&#8217;s consolidated balance sheets", None)):
+        [(kind, group)] = find_statements(parse_html(f"<p>{prose}</p>" + table), release=True)
+        assert titled_company(kind, group[0]) == name

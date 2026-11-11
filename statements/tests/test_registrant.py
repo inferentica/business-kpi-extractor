@@ -119,3 +119,9 @@ def test_a_translation_printed_as_na_is_no_name():
     cover = ("Commission File Number 001-14878 GERDAU S.A. (Exact Name of Registrant as Specified in its Charter) "
              "N/A (Translation of Registrant&rsquo;s Name into English) Av. Doutora Ruth Cardoso")
     assert _other(cover, ["GERDAU S.A."]) is None
+
+
+def test_one_name_in_the_possessive_is_compared():
+    cover = "Commission File Number 1-15240 James Hardie Industries N.V. (Translation of registrant's name) Indicate by check mark"
+    assert _others(["Amaca’s"], ["JAMES HARDIE INDUSTRIES NV"], cover) == ["Amaca’s"]
+    assert _others(["James Hardie’s", "Hardie’s"], ["JAMES HARDIE INDUSTRIES NV"], cover) == []

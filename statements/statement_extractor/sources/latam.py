@@ -18,7 +18,7 @@ import urllib.request
 import zipfile
 from datetime import date, datetime
 
-from .regulators import _cache, _fresh, _get
+from .regulators import DOWN, KEPT_SERVED, _cache, _fresh, _get
 
 _BMV = "https://www.bmv.com.mx"
 _CMF = "https://www.cmfchile.cl/institucional/mercados/"
@@ -35,10 +35,17 @@ def bmv_packages(key: str) -> list[dict]:
     if kept is not None and kept.exists() and time.time() - kept.stat().st_mtime < 86400:
         page = kept.read_text(encoding="utf-8")
     else:
-        page = _get(f"{_BMV}/es/emisoras/archivos-estadar-xbrl").decode("utf-8", "replace")
-        if kept is not None:
-            kept.parent.mkdir(parents=True, exist_ok=True)
-            kept.write_text(page, encoding="utf-8")
+        try:
+            page = _get(f"{_BMV}/es/emisoras/archivos-estadar-xbrl").decode("utf-8", "replace")
+        except OSError:
+            if kept is None or not kept.exists():
+                raise
+            KEPT_SERVED.append(kept.name)  # BMV unreachable: the last listing kept, not none
+            page = kept.read_text(encoding="utf-8")
+        else:
+            if kept is not None:
+                kept.parent.mkdir(parents=True, exist_ok=True)
+                kept.write_text(page, encoding="utf-8")
     found = []
     for row in _ROW.findall(html.unescape(page)):
         cells = [re.sub(r"<[^>]+>", " ", cell).strip() for cell in re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)]
@@ -75,9 +82,29 @@ def cmf_statements(rut: str, end: date, scope: str = "C") -> tuple[bytes | None,
     stem = f"cmf_{rut}_{end:%Y%m}_{scope}"
     kept = cache / f"{stem}.json" if cache else None
     if kept is not None and kept.exists() and not _fresh(end.year):
-        meta = json.loads(kept.read_text())
-        body = (cache / f"{stem}.xbrl").read_bytes() if meta.get("filed") else None
-        return body, date.fromisoformat(meta["filed"]) if meta.get("filed") else None
+        return _kept_cmf(cache, stem)
+    try:
+        instance, filed = _cmf_fetch(rut, end, scope)
+    except OSError:
+        if kept is None or not kept.exists():
+            raise
+        KEPT_SERVED.append(kept.name)  # CMF unreachable: the last copy kept, not none
+        return _kept_cmf(cache, stem)
+    if kept is not None:
+        kept.parent.mkdir(parents=True, exist_ok=True)
+        kept.write_text(json.dumps({"filed": filed.isoformat() if filed else None}))
+        if instance is not None:
+            (cache / f"{stem}.xbrl").write_bytes(instance)
+    return instance, filed
+
+
+def _kept_cmf(cache, stem: str) -> tuple[bytes | None, date | None]:
+    meta = json.loads((cache / f"{stem}.json").read_text())
+    body = (cache / f"{stem}.xbrl").read_bytes() if meta.get("filed") else None
+    return body, date.fromisoformat(meta["filed"]) if meta.get("filed") else None
+
+
+def _cmf_fetch(rut: str, end: date, scope: str) -> tuple[bytes | None, date | None]:
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     page_url = (f"{_CMF}entidad.php?mercado=V&rut={rut}&grupo=&tipoentidad=RVEMI&row=&vig=VI&control=svs&pestania=3")
     query = urllib.parse.urlencode({"forma": "P", "mm": f"{end.month:02d}", "aa": str(end.year), "tipo": scope,
@@ -106,15 +133,11 @@ def cmf_statements(rut: str, end: date, scope: str = "C") -> tuple[bytes | None,
         filed = max(stamps).date() if stamps else None
     if filed is None:
         instance = None  # a filing whose submission time CMF does not log is not read: its date would be a guess
-    if kept is not None:
-        kept.parent.mkdir(parents=True, exist_ok=True)
-        kept.write_text(json.dumps({"filed": filed.isoformat() if filed else None}))
-        if instance is not None:
-            (cache / f"{stem}.xbrl").write_bytes(instance)
     return instance, filed
 
 
 def _open(opener, request, tries: int = 4) -> bytes:
+    tries = 1 if "cmfchile.cl" in DOWN else tries
     for attempt in range(tries):
         try:
             time.sleep(1.0)  # one request a second: CMF is a public service, not a bulk endpoint
@@ -122,6 +145,7 @@ def _open(opener, request, tries: int = 4) -> bytes:
                 return response.read()
         except OSError:
             if attempt == tries - 1:
+                DOWN.add("cmfchile.cl")
                 raise
             time.sleep(10 * (attempt + 1))
     raise RuntimeError("unreachable")

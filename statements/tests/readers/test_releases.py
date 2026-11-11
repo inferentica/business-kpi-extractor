@@ -228,3 +228,15 @@ def test_another_issuers_release_in_the_6k_is_named():
            "<table><tr><td>b</td><td>2</td></tr></table>"
     assert [table.release_of for table in parse_html(html)] == ["Fomento Económico Mexicano, S.A.B. de C.V.",
                                                                  "Coca-Cola FEMSA, S.A.B. de C.V."]
+
+
+def test_an_opening_around_a_nested_element_is_read_in_order():
+    # FEMSA's 6-K of July 2020: the dateline is a paragraph's tail after a nested span, ahead of the ticker's span;
+    # reading a tail before its element's children put "(… NYSE: KOF)" first and missed the opening (round 61).
+    from statement_extractor.readers.html.parse import parse_html
+    html = "<p>Monterrey, Mexico, July 24, 2020 &mdash; Fomento Econ&oacute;mico Mexicano, S.A.B. de C.V. (NYSE: FMX) announced</p>" \
+           "<table><tr><td>a</td><td>1</td></tr></table>" \
+           "<div><p><span><b>Coca-Cola FEMSA Announces Results</b></span>Mexico City, July 22, 2020, Coca-Cola FEMSA, " \
+           "S.A.B. de C.V. <span>(BMV: KOF UBL, NYSE: KOF)</span> announced</p></div><table><tr><td>b</td><td>2</td></tr></table>"
+    assert [table.release_of for table in parse_html(html)] == ["Fomento Económico Mexicano, S.A.B. de C.V.",
+                                                                 "Coca-Cola FEMSA, S.A.B. de C.V."]

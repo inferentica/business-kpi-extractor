@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import calendar
 import re
-from collections import Counter
 from datetime import date, timedelta
 
 from ...domain.periods import Period
 from .find import TITLE_PATTERNS
-from ...domain.basis import currencies_named
-from .ranges import dotted_date as _dotted, mended_starts, numeric_date as _numeric, own_month
-from .tables import YEAR_ONLY, Table, figure_columns, header_text
+from .ranges import dates_in_order, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric, own_month
+from .tables import Table, figure_columns, header_text
 
 
 _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
@@ -45,8 +43,9 @@ _NUMBERS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "sev
             "forty-one": 41, "fifty-two": 52, "fifty-three": 53}
 
 
-# A span in words or digits, in months or weeks: "Nine Months Ended", "12 Weeks Ended" (Costco, PepsiCo), "36 Weeks".
-_SPAN = re.compile(rf"\b({'|'.join(sorted(_NUMBERS, key=len, reverse=True))}|\d{{1,2}})[-\s]+(months?|weeks?)\b|"
+# A span in words or digits, in months or weeks: "Nine Months Ended", "12 Weeks Ended" (Costco, PepsiCo), "36 Weeks",
+# TSMC's "Six MTHS 2001".
+_SPAN = re.compile(rf"\b({'|'.join(sorted(_NUMBERS, key=len, reverse=True))}|\d{{1,2}})[-\s]+(months?|mths?|weeks?)\b|"
                    r"\b(?:fiscal\s+)?years?\s+ended\b|\bhalf[-\s]year\b|\b(?:quarter)\s+ended\b|\b(?:first|second|third|fourth)\s+quarter\b", re.I)
 
 
@@ -64,7 +63,7 @@ _MONTH_RANGE = re.compile(rf"\b({_MONTH})\s*(?:-|–|—|to|through)\s*({_MONTH}
 
 def _standard(span) -> bool:
     """A span a statement period can have: a quarter, half, nine months or year in months, or any count of weeks."""
-    return not (span.group(1) and span.group(2).lower().startswith("month")
+    return not (span.group(1) and span.group(2).lower().startswith(("month", "mth"))
                 and _span_days(span.group(1), span.group(2)) not in (91, 182, 273, 364))
 
 
@@ -85,8 +84,8 @@ def _date(month: str, day: str, year: str) -> date | None:
     return date(int(year), number, min(int(day), calendar.monthrange(int(year), number)[1]))
 
 
-# A quarter by name and year: TSMC's "Q3 2007", "3Q 2007", "1Q08", "Third Quarter 2007".
-_QUARTER_NAME = re.compile(r"\b(?:Q([1-4])|([1-4])Q|(first|second|third|fourth)\s+quarter)(?:\s+of)?\s*[,'\-/]?\s*((?:19|20)\d{2}|\d{2})\b", re.I)  # Petrobras: "3Q-2016"
+# A quarter by name and year: TSMC's "Q3 2007", "3Q 2007", "1Q08", "Third Quarter 2007", Petrobras's "3Q-2016", Copel's "2nd Q 2003".
+_QUARTER_NAME = re.compile(r"\b(?:Q([1-4])|([1-4])(?:(?:st|nd|rd|th)\s*(?:Q\b|quarter)|Q)|(first|second|third|fourth)\s+quarter)(?:\s+of)?\s*[,'\-/]?\s*((?:19|20)\d{2}|\d{2})\b", re.I)
 _ORDINAL = {"first": 1, "second": 2, "third": 3, "fourth": 4}
 
 
@@ -105,31 +104,6 @@ def _named_quarter(text: str, fiscal_year_end: str) -> date | None:
     return date(end_year, end_month, last if day >= 28 else min(day, last))
 
 
-def years_in_order(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[int, ...], str]:
-    """Each column's year taken in order from a row of bare years, when that row prints one year for each column in
-    the reporting currency: TSMC's FY2002 20-F prints "2000 | 2001 | 2002" a cell left of its figures, so "2001" sits
-    right over 2000's. A translation column takes the year of the column before it."""
-    row = next((cells for cells in reversed(table.header)
-                if len(years := [cell for cell in cells if YEAR_ONLY.match(cell.text)]) >= 2
-                and all(YEAR_ONLY.match(cell.text) or re.fullmatch(r"notes?", cell.text, re.I) for cell in cells if cell.text)), None)
-    if row is None:
-        return {}
-    years = [cell.text for cell in row if YEAR_ONLY.match(cell.text)]
-    named = {column: currencies_named(header_text(table, column[0])) for column in columns}
-    counts = Counter(codes[-1] for codes in named.values() if codes)
-    reporting = counts.most_common(1)[0][0] if counts else None
-    own = [column for column in columns if not (named[column] and named[column][-1] != reporting)]
-    if len(own) != len(years) or len(own) == len(columns) and len(row) == len(columns):
-        return {}
-    found, year = {}, None
-    for column in columns:
-        if column in own:
-            year = years[own.index(column)]
-        if year is not None:
-            found[column] = year
-    return found
-
-
 def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                    document_end: date | None = None) -> dict[tuple[int, ...], Period]:
     """Each figure column's period, from the header above it and the statement's title. A column printed with a year
@@ -140,17 +114,23 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     context = month_first(first.context[-300:])
     # The header's own date first, else one printed after the statement's title ("… years ended December 31, 2007"):
     # a page names other dates before the title (TSMC's auditors' report, dated April 15, 2011).
-    titled = [match.end() for pattern in TITLE_PATTERNS for match in pattern.finditer(context)]
-    title = context[max(titled):] if titled else ""
+    titled = [(match.end(), match.start()) for pattern in TITLE_PATTERNS for match in pattern.finditer(context)]
+    title = context[max(titled)[0]:] if titled else ""
+    heading = re.split(r"\.\s+(?=[A-Z])", context[:max(titled)[1]])[-1] if titled else ""  # a period stated before the
+    if not _MONTH_DAY.search(title) and re.search(rf"\b(?:ended|ending|as\s+(?:of|at))\s+(?:{_MONTH})", heading, re.I):
+        title = heading + " " + title  # title (KEPCO's "For the six-month periods ended June 30, 2004 and 2005 (In millions
+        # of Won) Consolidated Statements of Income"), never a page's date ("… Reports 2Q20 Results July 22, 2020")
     in_title = list(_MONTH_DAY.finditer(title))
     title_day = _MONTH_DAY.search(header_all) or (in_title[-1] if in_title else None)
     periods: dict[tuple[int, ...], Period] = {}
     columns = figure_columns(first)
-    in_order = years_in_order(first, columns)
-    aboves = {column: month_first(header_text(first, column[0]) or header_text(first, column[-1])) for column in columns}
+    in_order, ordered = years_in_order(first, columns), dates_in_order(first, columns)
+    aboves = {column: ordered.get(column) or month_first(header_text(first, column[0]) or header_text(first, column[-1])) for column in columns}
     # The header's span, never a span no statement period has (Morgan Stanley's "2010 | 2009 | Fiscal 2008 | One Month
     # Ended December 31, 2008": the month is its last column's alone).
-    title_span = next((match for match in _SPAN.finditer(header_all) if _standard(match)), None) or _SPAN.search(title)
+    # Else the rows over the figures: Coca-Cola FEMSA's "For the Third Quarter of:" over "2020 | 2019" (round 61).
+    over = " ".join(row.label for row in first.rows[:next((i for i, r in enumerate(first.rows) if r.figures), 0)][:6])
+    title_span = next((match for match in _SPAN.finditer(header_all) if _standard(match)), None) or _SPAN.search(title) or _SPAN.search(over)
     header_days = list(_MONTH_DAY.finditer(header_all))
     day_first = _day_first(header_all)
     # One day for each column, in order, when no column prints a day of its own.
@@ -162,6 +142,10 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         not own or own == named or named[index] in own for index, own in enumerate(own_named))
     dated_in_title = {match.group(3): (match.group(1), match.group(2)) for match in _FULL_DATE.finditer(title + " " + header_all)}
     ranged: set = set()
+    # Bare years as the release's own year to date only where they are its year and the one before: "2007 | 2008 |
+    # 2009" in CSN's 6-K of December 2010 are years (round 61).
+    printed_years = sorted(set(_YEAR.findall(header_all)))
+    releases_years = document_end is not None and len(printed_years) <= 2 and printed_years[-1:] == [str(document_end.year)]
     leading = " ".join(row.label for row in first.rows[:next((i for i, r in enumerate(first.rows) if r.figures), 0)][:3])
     months = _MONTH_RANGE.search(header_all) or _MONTH_RANGE.search(leading)
     for column in columns:
@@ -254,7 +238,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                                    if _date(match.group(1), "1", year).month == month), None)
                 end = date(int(year), month, titled_day or calendar.monthrange(int(year), month)[1])
         elif document_end is not None and (days < 350 and kind != "balance" or kind == "balance" and int(year) == document_end.year
-                                           or kind != "balance" and span is None and not _near_year_end(document_end, fiscal_year_end)):
+                                           or kind != "balance" and span is None and releases_years and not _near_year_end(document_end, fiscal_year_end)):
             end = date(int(year), document_end.month, min(document_end.day, calendar.monthrange(int(year), document_end.month)[1]))
         else:
             month, day_of = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])

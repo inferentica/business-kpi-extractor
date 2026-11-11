@@ -179,18 +179,33 @@ def _openings(root) -> list[tuple[int, str]]:
     """Each release opening's place in document order (root.iter()'s) and its issuer's name: every piece of text is
     read, a table cell's too (Coca-Cola FEMSA's release in FEMSA's 6-K)."""
     found, window = [], []
-    for order, element in enumerate(root.iter()):
-        if not isinstance(element.tag, str):
-            continue
-        for piece in (element.text, element.tail):
-            if piece and piece.strip():
-                window = (window + [clean(piece)])[-8:]
-                announced = [match.group("name").strip(" ,:—–-") for match in _OPENING.finditer(" ".join(window))]
-                announced = [name for name in announced if not _PROSE.search(name)]
-                if announced:
-                    found.append((order, announced[-1]))
-                    window = []
+    for order, piece in _texts(root):
+        if piece and piece.strip():
+            window = (window + [clean(piece)])[-8:]
+            announced = [match.group("name").strip(" ,:—–-") for match in _OPENING.finditer(" ".join(window))]
+            announced = [name for name in announced if not _PROSE.search(name)]
+            if announced:
+                found.append((order, announced[-1]))
+                window = []
     return found
+
+
+def _texts(root):
+    """Each piece of text in reading order, with its place in root.iter()'s order: an element's text, its children's,
+    then its tail. Taking a tail before the children read "(BMV: KOF UBL, NYSE: KOF)" ahead of the "Mexico City, July
+    22, 2020, Coca-Cola FEMSA, S.A.B. de C.V." it follows (FEMSA's 6-K of July 2020)."""
+    index = {element: order for order, element in enumerate(root.iter())}
+    stack, last = [(root, False)], 0
+    while stack:
+        element, closing = stack.pop()
+        if closing:
+            yield last, element.tail
+            continue
+        last = index[element]
+        stack.append((element, True))
+        if isinstance(element.tag, str):
+            yield last, element.text
+        stack.extend((child, False) for child in reversed(element))
 
 
 def _walk(root):

@@ -10,8 +10,9 @@ from .tables import Table
 
 # The two headings side by side, the parent's first: as the table's own row ("Parent Company Consolidated"), or in
 # the header above the columns.
-# Not the report's name ("the individual and consolidated quarterly information").
-SIDE_BY_SIDE = re.compile(r"\b(parent\s+company|individual)\s+consolidated\b", re.I)
+# Not the report's name ("the individual and consolidated quarterly information"). Ultrapar's 2010 6-Ks print "Parent |
+# Consolidated".
+SIDE_BY_SIDE = re.compile(r"\b(parent(?:\s+company)?|individual)\s+consolidated\b", re.I)
 
 
 def _side_by_side(group: list[Table]) -> bool:

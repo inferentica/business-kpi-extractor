@@ -250,3 +250,75 @@ def test_a_releases_year_only_columns_are_its_year_to_date():
     readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2010, 5, 6), document_end=day(2010, 3, 31),
                                      fiscal_year_end="1231", year_offset=0)
     assert {(r.period_start, r.period_end) for r in readings} == {(day(2010, 1, 1), day(2010, 3, 31)), (day(2009, 1, 1), day(2009, 3, 31))}
+
+
+def test_ordinal_quarters_are_their_quarters():
+    # Copel's Q1 2004 release: "2nd Q 2003 | 3rd Q 2003 | 4th Q 2003 | 03/31/2004 | 03/31/2003"; the first column was
+    # read as a bare year and dated to the release's quarter (round 61).
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    heads = ["2nd Q 2003", "3rd Q 2003", "4th Q 2003", "03/31/2004", "03/31/2003"]
+    rows = [("Operating revenues", "1000", "1100", "1200", "1300", "900"), ("Operating expenses", "(800)", "(850)", "(900)", "(950)", "(700)"),
+            ("Operating income", "200", "250", "300", "350", "200"), ("Income tax", "(50)", "(60)", "(70)", "(80)", "(40)"),
+            ("Net income", "150", "190", "230", "270", "160")]
+    html = ("<p>Quarterly Income Statement (amounts expressed in thousands of Brazilian Reais)</p><table><tr><td>INCOME STATEMENT</td>"
+            + "".join(f"<td>{head}</td>" for head in heads) + "</tr>"
+            + "".join("<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>" for row in rows) + "</table>")
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2004, 5, 17), document_end=day(2004, 3, 31),
+                                     fiscal_year_end="1231", year_offset=0)
+    ends = {r.period_end: r.period_start for r in readings}
+    assert ends[day(2003, 6, 30)] is not None and ends[day(2003, 6, 30)].month == 4
+    assert ends[day(2003, 3, 31)] == day(2003, 1, 1)
+    assert sorted(ends) == [day(2003, 3, 31), day(2003, 6, 30), day(2003, 9, 30), day(2003, 12, 31), day(2004, 3, 31)]
+
+
+def test_a_period_printed_before_the_title_dates_its_columns():
+    # KEPCO's 6-K of October 2005: "For the six-month periods ended June 30, 2004 and 2005 (In millions of Won and in
+    # thousands of U.S. dollars) Consolidated Statements of Income" over "2004 | 2005"; nothing after the title.
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    rows = [("Operating revenues", "11,374", "12,039"), ("Operating expenses", "(9,000)", "(9,500)"), ("Operating income", "2,374", "2,539"),
+            ("Income taxes", "(500)", "(600)"), ("Net income", "1,874", "1,939")]
+    html = ("<p>See accompanying notes to consolidated financial statements.</p><p>Korea Electric Power Corporation and "
+            "Subsidiaries</p><p>For the six-month periods ended June 30, 2004 and 2005</p><p>(In millions of Won and in "
+            "thousands of U.S. dollars, except earnings per share)</p><p>Consolidated Statements of Income</p>"
+            "<table><tr><td></td><td>2004</td><td>2005</td></tr>"
+            + "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in rows) + "</table>")
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2005, 10, 26), document_end=day(2005, 9, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert sorted(r.period_end for r in readings) == [day(2004, 6, 30), day(2005, 6, 30)]
+
+
+def test_a_quarter_named_over_the_figures_is_the_quarter():
+    # Coca-Cola FEMSA's Q3 2020 release: "For the Third Quarter of:" in a row over "2020 | 2019"; dated the year to
+    # date by the year-only rule (round 61).
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    rows = [("Net revenues", "47,294", "45,248"), ("Cost of goods sold", "(25,000)", "(24,000)"), ("Gross profit", "22,294", "21,248"),
+            ("Income taxes", "(2,000)", "(1,900)"), ("Net income", "4,000", "3,800")]
+    html = ("<table><tr><td>CONSOLIDATED INCOME STATEMENT</td></tr><tr><td>Millions of Pesos</td></tr>"
+            "<tr><td>For the Third Quarter of:</td></tr><tr><td></td><td>2020</td><td>2019</td></tr>"
+            + "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in rows) + "</table>")
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2020, 10, 26), document_end=day(2020, 9, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert {(r.fiscal_year, r.fiscal_period, r.duration) for r in readings} == {("2020", "Q3", "quarter"), ("2019", "Q3", "quarter")}
+
+
+def test_three_bare_years_in_a_release_are_years():
+    # CSN's 6-K of December 2010 (its reference form): "2007 | 2008 | 2009", no span; the year-only rule dated them
+    # to the nine months to September (round 61).
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    rows = [("Net revenue", "11,440", "14,002", "10,978"), ("Cost of products sold", "(6,000)", "(7,023)", "(6,500)"),
+            ("Gross profit", "5,440", "6,979", "4,478"), ("Income taxes", "(900)", "(1,000)", "(800)"), ("Net income", "2,000", "2,500", "2,600")]
+    html = ("<p>Consolidated Statement of Income (R$ thousands)</p><table><tr><td></td><td>2007</td><td>2008</td><td>2009</td></tr>"
+            + "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td><td>{c}</td></tr>" for label, a, b, c in rows) + "</table>")
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2010, 12, 28), document_end=day(2010, 9, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert {(r.fiscal_year, r.fiscal_period) for r in readings} == {("2007", "FY"), ("2008", "FY"), ("2009", "FY")}
+
+
+def test_months_abbreviated_are_a_span():
+    from statement_extractor.readers.printed.dates import _SPAN, _span_days
+    match = _SPAN.search("Six MTHS 2001")
+    assert match and _span_days(match.group(1), match.group(2)) == 182

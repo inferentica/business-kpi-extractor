@@ -99,7 +99,7 @@ def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
     SUBSIDIARIES CONSOLIDATED BALANCE SHEETS"), or a listed subsidiary's, its parent's name and a market's. A name is
     the company's own when it shares a word with the company's EDGAR name or a former one, or with the registrant's names
     on the 6-K's cover (FEMSA's titles print "FOMENTO ECONÓMICO MEXICANO", EDGAR "MEXICAN ECONOMIC DEVELOPMENT INC").
-    Only names of two words or more are compared; an annual report, with no cover to give its own names, is never
+    Only names of two words or more are compared, or one in the possessive ("Amaca’s Income Statements"); an annual report, with no cover to give its own names, is never
     checked."""
     if cover is None:
         return []
@@ -108,8 +108,8 @@ def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
         return []
     others = []
     for printed in {reading.titled for reading in readings if reading.titled}:
-        words = _named(printed)
-        if len(words) >= 2 and (not words & own and not any(
+        words = _named(printed.removesuffix("’s"))
+        if (len(words) >= 2 or printed.endswith("’s") and words) and (not words & own and not any(
                 SequenceMatcher(None, word, other).ratio() >= 0.85 for word in words for other in own)
                 or words & own and (words - own) & _REGIONS):
             others.append(printed)

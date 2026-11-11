@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from datetime import date
 
 from ...domain.periods import Period
+from ...domain.basis import currencies_named
+from .tables import YEAR_ONLY, Table, header_text
 
 
 def _year(year: int) -> int:
@@ -54,3 +57,45 @@ def own_month(above: str) -> int | None:
     match = re.search(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?:19|20)\d{2}\b", above, re.I)
     return _MONTHS.index(match.group(1).lower()) + 1 if match else None
 
+
+
+_FULL_NUMERIC = re.compile(r"\d{1,2}/\d{1,2}/(?:\d{2}|\d{4})")
+
+
+def dates_in_order(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[int, ...], str]:
+    """Each column's date taken in order from a header row of dates alone, one for each column, where the row's cells
+    sit left of the figures: Ultrapar's 2010 6-Ks print "06/30/2010 | 06/30/2009 | 06/30/2010 | 06/30/2009" over its
+    parent's and consolidated columns a cell to the left, so each column read its left neighbour's date (round 61)."""
+    for cells in reversed(table.header):
+        texts = [cell.text.strip() for cell in cells if cell.text.strip()]
+        if len(texts) == len(columns) >= 2 and all(_FULL_NUMERIC.fullmatch(text) for text in texts):
+            above = [_FULL_NUMERIC.findall(header_text(table, column[0]) or header_text(table, column[-1])) for column in columns]
+            if any(texts[index] not in found for index, found in enumerate(above)):
+                return dict(zip(columns, texts))
+            return {}
+    return {}
+
+
+def years_in_order(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[int, ...], str]:
+    """Each column's year taken in order from a row of bare years, when that row prints one year for each column in
+    the reporting currency: TSMC's FY2002 20-F prints "2000 | 2001 | 2002" a cell left of its figures, so "2001" sits
+    right over 2000's. A translation column takes the year of the column before it."""
+    row = next((cells for cells in reversed(table.header)
+                if len(years := [cell for cell in cells if YEAR_ONLY.match(cell.text)]) >= 2
+                and all(YEAR_ONLY.match(cell.text) or re.fullmatch(r"notes?", cell.text, re.I) for cell in cells if cell.text)), None)
+    if row is None:
+        return {}
+    years = [cell.text for cell in row if YEAR_ONLY.match(cell.text)]
+    named = {column: currencies_named(header_text(table, column[0])) for column in columns}
+    counts = Counter(codes[-1] for codes in named.values() if codes)
+    reporting = counts.most_common(1)[0][0] if counts else None
+    own = [column for column in columns if not (named[column] and named[column][-1] != reporting)]
+    if len(own) != len(years) or len(own) == len(columns) and len(row) == len(columns):
+        return {}
+    found, year = {}, None
+    for column in columns:
+        if column in own:
+            year = years[own.index(column)]
+        if year is not None:
+            found[column] = year
+    return found

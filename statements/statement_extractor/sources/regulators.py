@@ -5,7 +5,9 @@ from 2016). These are the companies' own filings to their regulators, never thei
 
 Both are read on the runners: CVM's site refuses some networks outright, and OpenDART needs the DART_API_KEY secret.
 Every file and answer is kept in the run's cache (STATEMENTS_ARCHIVE_CACHE) so a period already filed is not fetched
-again; the current and previous year are fetched each run, as a late filing or an amendment lands there."""
+again; the current and previous year are fetched each run, as a late filing or an amendment lands there, and the kept
+copy is served when the regulator cannot be reached (round 61: OpenDART timed out for Shinhan's 2025-26 reports, and
+other filings took their periods)."""
 from __future__ import annotations
 
 import csv
@@ -58,6 +60,12 @@ def _cache() -> Path | None:
     return Path(folder, "regulators") if folder else None
 
 
+# Hosts that failed every try this run: asked once per request after that, not four times over eight minutes.
+DOWN: set[str] = set()
+# The kept copies served because their regulator could not be reached this run.
+KEPT_SERVED: list[str] = []
+
+
 def _fresh(year: int) -> bool:
     """Whether a year's data may still change: this year's and last year's filings are still arriving."""
     return year >= date.today().year - 1
@@ -65,15 +73,36 @@ def _fresh(year: int) -> bool:
 
 def _get(url: str, tries: int = 4) -> bytes:
     request = urllib.request.Request(url, headers={"User-Agent": _AGENT})
+    host = urllib.parse.urlsplit(url).netloc
+    tries = 1 if host in DOWN else tries
     for attempt in range(tries):
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 return response.read()
         except OSError:
             if attempt == tries - 1:
+                DOWN.add(host)
                 raise
             time.sleep(10 * (attempt + 1))
     raise RuntimeError("unreachable")
+
+
+def kept_or_fetched(kept: Path | None, fresh: bool, fetch):
+    """A kept copy where its data can no longer change; else fetch() again, kept for the next run, and the kept copy
+    served when the regulator cannot be reached, so a passing outage leaves no year unread."""
+    if kept is not None and kept.exists() and not fresh:
+        return json.loads(kept.read_text())
+    try:
+        found = fetch()
+    except OSError:
+        if kept is None or not kept.exists():
+            raise
+        KEPT_SERVED.append(kept.name)
+        return json.loads(kept.read_text())
+    if kept is not None:
+        kept.parent.mkdir(parents=True, exist_ok=True)
+        kept.write_text(json.dumps(found, ensure_ascii=False))
+    return found
 
 
 def cvm_rows(form: str, year: int, cnpjs: tuple[str, ...]) -> dict[str, list[dict]]:
@@ -81,8 +110,10 @@ def cvm_rows(form: str, year: int, cnpjs: tuple[str, ...]) -> dict[str, list[dic
     and version) and each statement part's rows, consolidated ("_con") and the parent's ("_ind")."""
     cache = _cache()
     kept = cache / f"cvm_{form}_{year}_{'_'.join(c[:10].replace('.', '') for c in cnpjs)}.json" if cache else None
-    if kept is not None and kept.exists() and not _fresh(year):
-        return json.loads(kept.read_text())
+    return kept_or_fetched(kept, _fresh(year), lambda: _cvm_fetch(form, year, cnpjs))
+
+
+def _cvm_fetch(form: str, year: int, cnpjs: tuple[str, ...]) -> dict[str, list[dict]]:
     name = f"{form.lower()}_cia_aberta_{year}"
     archive = zipfile.ZipFile(io.BytesIO(_get(f"{_CVM}/{form}/DADOS/{name}.zip")))
     wanted = {"index": f"{name}.csv"} | {f"{part}_{scope}": f"{name.replace('_cia_aberta', '_cia_aberta_' + part + '_' + scope)}.csv"
@@ -94,9 +125,6 @@ def cvm_rows(form: str, year: int, cnpjs: tuple[str, ...]) -> dict[str, list[dic
             continue
         text = archive.read(member).decode("latin-1")
         found[key] = [row for row in csv.DictReader(io.StringIO(text), delimiter=";") if row.get("CNPJ_CIA") in cnpjs]
-    if kept is not None:
-        kept.parent.mkdir(parents=True, exist_ok=True)
-        kept.write_text(json.dumps(found, ensure_ascii=False))
     return found
 
 
@@ -105,8 +133,10 @@ def dart_rows(corp_code: str, year: int, report: str, scope: str = "CFS") -> lis
     company alone ("OFS"). Empty where the report is not filed (status 013)."""
     cache = _cache()
     kept = cache / f"dart_{corp_code}_{year}_{report}_{scope}.json" if cache else None
-    if kept is not None and kept.exists() and not _fresh(year):
-        return json.loads(kept.read_text())
+    return kept_or_fetched(kept, _fresh(year), lambda: _dart_fetch(corp_code, year, report, scope))
+
+
+def _dart_fetch(corp_code: str, year: int, report: str, scope: str) -> list[dict]:
     key = os.environ.get("DART_API_KEY")
     if not key:
         raise RuntimeError("DART_API_KEY is not set")
@@ -115,11 +145,7 @@ def dart_rows(corp_code: str, year: int, report: str, scope: str = "CFS") -> lis
     answer = json.loads(_get(f"{_DART}/fnlttSinglAcntAll.json?{query}"))
     if answer.get("status") not in ("000", "013"):
         raise RuntimeError(f"OpenDART {answer.get('status')}: {answer.get('message')}")
-    rows = answer.get("list") or []
-    if kept is not None:
-        kept.parent.mkdir(parents=True, exist_ok=True)
-        kept.write_text(json.dumps(rows, ensure_ascii=False))
-    return rows
+    return answer.get("list") or []
 
 
 def dart_corp_code(stock_code: str) -> str:

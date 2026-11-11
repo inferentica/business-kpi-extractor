@@ -23,6 +23,9 @@ def titled_company(kind: str, table: Table) -> str | None:
         pass
     if title is None or title.start() < len(text) - 300:
         return None
+    possessive = _POSSESSIVE.search(text[:title.start()])
+    if possessive and not set(possessive.group(1).upper().split()) <= _OWN_WORDS:
+        return possessive.group(1) + "’s"  # a report's prose quoting a company's statements ("Amaca’s Income Statements")
     after = _after_title(text[title.end():])
     if after:
         return after  # the name heading the statement itself, right after its title (CEMEX Latam's, after a "CLH" page head)
@@ -47,6 +50,11 @@ def titled_company(kind: str, table: Table) -> str | None:
     return " ".join(words) or None
 
 
+# "summary of Amaca’s Income Statements for the period to June 2004" (James Hardie's 6-K of September 2004 furnishes
+# an inquiry's report on its former subsidiaries): a name in the possessive right before the title.
+_POSSESSIVE = re.compile(r"\b([A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*){0,4})['’]s\s+(?:(?:summari[sz]ed|consolidated|condensed|"
+                         r"interim|unaudited)\s+)*$")
+_OWN_WORDS = {"THE", "COMPANY", "COMPANY'S", "GROUP", "CORPORATION", "REGISTRANT", "ISSUER", "BANK", "PARENT", "OUR"}
 _LEGAL_FORMS = _ABBREVIATIONS | {"INC", "CORP", "CORPORATION", "LTD", "LIMITED", "PLC", "S.A", "AG", "N.V", "SA", "NV"}
 _PAGE_WORD = re.compile(r"^(F|FS|FS-R)-?\d+$|^(contents|index|statements?|page)$", re.I)
 

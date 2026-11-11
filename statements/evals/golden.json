@@ -20463,12 +20463,12 @@
    "fiscal_period": "Q2",
    "duration": "ytd",
    "label": "^Cash\\ and\\ Cash\\ Equivalents\\ at\\ End\\ of\\ Period$",
-   "value": 48198000000.0,
+   "value": 49611000000.0,
    "scale": 1000000,
-   "source_accession": "archive:TSM:6-K:2000-06-30",
+   "source_accession": "archive:TSM:6-K:2001-06-30",
    "era": "archive",
    "checked": "read by hand",
-   "note": "hand check TSM-archive-14, 2026-11-09: the filing's own printed row"
+   "note": "hand check TSM-archive-14, 2026-11-09 (own filing, pre-merger 48,198); 2026-11-11: the newest filing presenting it, the Q2 2001 report (2q01_cf.pdf, Six MTHS 2000), prints 49,611 after the merger, as the 2000 report's post-merger column does"
   },
   {
    "symbol": "TSM",

@@ -73,3 +73,23 @@ def test_a_release_titling_its_results_the_groups_scopes_its_untitled_statements
     assert statement_scope("cash_flow", [tables[1]], "6-K", found) == "consolidated"
     alone = [("cash_flow", [tables[1]])]
     assert statement_scope("cash_flow", [tables[1]], "6-K", alone) == "parent"  # nothing titled the group's
+
+
+def test_dates_left_of_their_columns_are_taken_in_order():
+    # Ultrapar's Q2 2010 6-K: "Parent | Consolidated" over "06/30/2010 | 06/30/2009 | 06/30/2010 | 06/30/2009", the
+    # dates a cell left of their figures past a note column; each column read its left neighbour's date (round 61).
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    rows = [("Net revenue from sales and services", "0", "0", "20,318", "16,033"), ("Cost of products sold", "0", "0", "(18,770)", "(14,812)"),
+            ("Gross profit", "0", "0", "1,548", "1,221"), ("Income before taxes", "330", "180", "480", "260"),
+            ("Net income for the period", "336", "184", "336", "184")]
+    head = "<tr><td></td><td></td><td colspan='4'>Parent</td><td colspan='4'>Consolidated</td></tr>"
+    dates = "<tr><td></td>" + "".join(f"<td colspan='2'>{text}</td>" for text in ("06/30/2010", "06/30/2009", "06/30/2010", "06/30/2009")) + "</tr>"
+    body = "".join(f"<tr><td>{label}</td><td>3.a)</td>" + "".join(f"<td></td><td>{figure}</td>" for figure in figures) + "</tr>"
+                   for label, *figures in rows)
+    html = ("<p>Ultrapar Participações S.A. and Subsidiaries Income statements For the six-month periods ended June 30, 2010 "
+            "and 2009 (In thousands of Reais)</p><table>" + head + dates + body + "</table>")
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2010, 8, 12), document_end=day(2010, 6, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    found = {(r.period_end.year, r.scope): next(line["value"] for line in r.lines if line["value"] is not None) for r in readings}
+    assert found == {(2010, "parent"): 0.0, (2009, "parent"): 0.0, (2010, "consolidated"): 20318000.0, (2009, "consolidated"): 16033000.0}
