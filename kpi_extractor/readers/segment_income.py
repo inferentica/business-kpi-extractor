@@ -9,6 +9,8 @@ and development, general and administrative, and stock-based compensation); only
 
 from __future__ import annotations
 
+from collections import Counter
+
 import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -167,7 +169,14 @@ def _rows(frame: pd.DataFrame, label: Callable[[str], str | None], labels: dict[
         # Palantir's 10-Ks call Government "Government Operating Segment", its 10-Qs "Government": one segment.
         return re.sub(r"\s+operating segment$", "", own, flags=re.I) if own else humanize(member)
 
-    rows = [(member_key(name(member)), name(member), member, value)
+    names = {member: name(member) for member in segments}
+    # Two segments under one name would be stored as one: a member whose label repeats another's takes its own element's
+    # name (Brookfield's 2026 Q3 10-Q labels its Energy segment's member "Infrastructure").
+    shared = Counter(member_key(named) for named in names.values())
+    for member, named in names.items():
+        if shared[member_key(named)] > 1 and member_key(humanize(member)) != member_key(named):
+            names[member] = humanize(member)
+    rows = [(member_key(names[member]), names[member], member, value)
             for member, value in sorted(segments.items(), key=lambda item: -item[1])]
     items = [(member_key(name(member)), name(member), member, value) for member, value in reconciling.items()]
     # A tagged item stands only when it closes the gap to operating income: Nvidia tags its corporate item with the

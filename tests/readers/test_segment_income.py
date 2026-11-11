@@ -105,6 +105,21 @@ def test_a_companys_own_segment_measures_stand_in_for_operating_income():
     assert segment_revenue(alphabet, date(2026, 9, 30), False) is None
 
 
+def test_two_segments_one_label_keep_their_own_names():
+    # Brookfield's 2026 Q3 10-Q labels its Energy segment's member "Infrastructure"; its table says Energy (179).
+    from kpi_extractor.readers.segment_income import segment_revenue
+    start, end = "2026-07-01", "2026-09-30"
+    members = ("bam:CreditSegmentMember", "bam:RealEstateSegmentMember", "bam:InfrastructureMember", "bam:EnergySegmentMember",
+               "bam:PrivateEquityMember")
+    rows = [{**fact(value, start, end, member, "us-gaap:OperatingSegmentsMember"), "concept": "bam:SegmentRevenue"}
+            for member, value in zip(members, (562e6, 283e6, 268e6, 179e6, 170e6))]
+    labels = {"bam:InfrastructureMember": "Infrastructure", "bam:EnergySegmentMember": "Infrastructure",
+              "bam:CreditSegmentMember": "Credit", "bam:RealEstateSegmentMember": "Real estate", "bam:PrivateEquityMember": "Private equity"}
+    revenue = segment_revenue(pd.DataFrame(rows), date(2026, 9, 30), False, labels.get)
+    assert {key: value for key, _name, _member, value in revenue.current.rows} == {
+        "credit": 562e6, "realestate": 283e6, "infrastructure": 268e6, "energy": 179e6, "privateequity": 170e6}
+
+
 def test_a_companys_own_measure_without_its_total_is_its_segments_added_up():
     # Brookfield's Q1 2026 10-Q tags each segment's earnings for the quarter, but not their sum.
     start, end = "2026-01-01", "2026-03-31"
