@@ -384,3 +384,17 @@ def test_a_table_whose_date_row_sits_below_its_title_rows_is_replayed_as_the_new
     # A column that names another quarter is never read as this one, however deep its name sits.
     stale = parse_document(_jpm("1Q24", "4Q23", "$598"), url.format(n=2))
     assert replay(stale, last, date(2024, 6, 30), 2) == "column header changed"
+
+
+def test_a_figure_the_owner_corrected_never_lends_its_place():
+    # JPMorgan: the owner corrected firmwide client advisors to 9,107, but the figure kept the place it was misread at
+    # (the Global Private Bank row, 3,536), and replay read that row again as next quarter's figure.
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
+    history = [{**value, "owner_decision": "corrected", "value": 999} if value["kpi_key"] == "members" else value
+               for value in _history(first)]
+    pipeline = _pipeline(NoAi({("locate", "flash"): {"period_end": "2026-06-30", "values": []},
+                               ("locate", "reasoning"): {"period_end": "2026-06-30", "values": []}}), history)
+    read, _problems, _ = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
+    assert "members" not in {item.kpi.key for item in read}
+    assert pipeline.result.replay_outcomes.get("group not read in this kind of document before") == 1

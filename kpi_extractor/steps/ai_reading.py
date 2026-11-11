@@ -13,7 +13,7 @@ from ..quality.checks import check_period, far_above_quarter, looks_like_part_of
 from ..readers.extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
                        read_values)
 from ..readers.replay import _same_place, _source_template, asked_of
-from ..readers.trace import stamp_call
+from ..readers.trace import placed_elsewhere, stamp_call
 from ..rules.period import states_quarter
 from .replay_reading import in_full_groups, left_for_ai
 from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
@@ -493,13 +493,13 @@ class AiReading:
     def _ai_history(self, before: date, source: str | None = None) -> dict[str, dict]:
         """The latest AI value of each KPI before a date (optionally only from one kind of document); when none is
         before it (an older quarter read after newer ones), the nearest reading after it, which plays the same part:
-        where each KPI was found in the nearest quarter."""
+        where each KPI was found in the nearest quarter. A figure whose place holds another figure never serves."""
         latest: dict[str, dict] = {}
         later: dict[str, dict] = {}
         cutoff = before.isoformat()
         chained = getattr(self._local, "chained", False)
         for value in list(self.values.values()):
-            if value["method"] != "ai" or abs(_days(value["period_end"], cutoff)) <= 20:
+            if value["method"] != "ai" or placed_elsewhere(value) or abs(_days(value["period_end"], cutoff)) <= 20:
                 continue
             if chained and (value["period_end"] > cutoff or not _same_chain(value["period_end"], before)):
                 continue  # in a chain: only its own earlier quarters, which are always read first
