@@ -40,6 +40,7 @@ from ..ops.control import ControlPlane
 from ..pipeline import SymbolPipeline, SymbolResult
 from ..readers.trace import CODE_READERS
 from ..sources.sec import configure_identity
+from ..readers.replay import _source_template
 from ..steps.replay_reading import in_full_groups, left_for_ai
 from ..steps.shared import AI_GROUP_PREFIX, value_key
 from ..store import rounding_of
@@ -129,6 +130,26 @@ class CodeOnlyPipeline(SymbolPipeline):
                 self.misses[(accession, key)] = {"why": found, "place": place, "document": document.source_url.rsplit("/", 1)[-1]}
         return found
 
+    def _untried(self, document, spec, expected, done: set[str]) -> None:
+        """Why each KPI replay never tried was left: the group-level reasons the replay counts but does not name."""
+        accession = getattr(self._local, "accession", None)
+        last = self._last_locators(expected, _source_template(document.source_url))
+        tried = {key.split(".", 1)[0] for known, key in self.misses if known == accession}  # a table's miss is its group's
+        for group in spec.groups:
+            for kpi in group.kpis:
+                key = f"{group.key}.{kpi.key}"
+                if key in done or group.key in done or (accession, key) in self.misses or (group.kind != "metric" and group.key in tried):
+                    continue
+                if not last:
+                    why = "no earlier reading of this kind of document"
+                elif not any(known.split(".", 1)[0] == group.key for known in last):
+                    why = "group not read in this kind of document before"
+                elif key not in last:
+                    why = "this KPI not read in this kind of document before"
+                else:
+                    why = "group held back: a listed KPI not looked for yet"
+                self.misses[(accession, key)] = {"why": why, "place": {}, "document": document.source_url.rsplit("/", 1)[-1]}
+
     def _reread_due(self, accession: str) -> bool:
         if self._reread_picked is None:
             self._reread_picked = tested_filings(self.values, self.filings)
@@ -150,6 +171,7 @@ class CodeOnlyPipeline(SymbolPipeline):
         replayed, located, done = self._replay_groups(document, spec, expected, currency)
         self.timings.append(time.perf_counter() - started)
         open_spec = left_for_ai(spec, done) if done else spec
+        self._untried(document, spec, expected, done)
         if open_spec is None:
             self._local.replayed = True
             self.result.replayed_reads += 1
@@ -211,7 +233,7 @@ def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], 
         group = value["group_key"].removeprefix(AI_GROUP_PREFIX)
         miss = (misses or {}).get((accession, f"{group}.{value['kpi_key']}")) if outcome == "missed" else None
         rows.append({
-            "why": (miss or {}).get("why") or ("not tried" if outcome == "missed" else ""), "miss": miss,
+            "why": (miss or {}).get("why") or ("document not read by code" if outcome == "missed" else ""), "miss": miss,
             "symbol": symbol, "accession": accession, "group": group, "kpi": value["kpi_key"],
             "label": f"{value.get('group_label')} / {value.get('kpi_label')}", "period": f"{value['fiscal_year']}-{value['fiscal_period']}",
             "kind": kind(group), "origin": origin(value), "expected": expected, "found": found, "outcome": outcome,

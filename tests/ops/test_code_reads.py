@@ -105,6 +105,7 @@ def test_what_code_cannot_read_is_left_unread_and_no_later_quarter_lends_its_pla
     second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
     read, _problems, _located = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
     assert read == [] and pipeline.result.replay_outcomes == {"no earlier reading of this kind of document": 2}
+    assert {miss["why"] for miss in pipeline.misses.values()} == {"no earlier reading of this kind of document"}
 
 
 def test_after_the_releases_the_tested_filings_hold_only_what_code_read_and_the_store_is_live_again():
