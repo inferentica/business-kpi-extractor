@@ -279,7 +279,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
         checks.insert(0, income_check(figures))
     return Reading(statement=kind, duration=duration, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
                    period_end=period.end, period_start=period.start, currency=None, accession="", form="", filed=date.min,
-                   own=False, source="html", lines=lines, checks=checks, ticker=layout[0][0].ticker)
+                   own=False, source="html", lines=lines, checks=checks, release_of=layout[0][0].release_of)
 
 
 def _printed_unit(values: list[float]) -> float:

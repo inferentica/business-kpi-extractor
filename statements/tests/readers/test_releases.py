@@ -219,15 +219,12 @@ def test_a_hidden_sizing_row_is_no_line():
     assert [row.label for row in table.rows] == ["Net income"]
 
 
-def test_another_issuers_release_in_the_6k_is_left_out():
-    # FEMSA's 6-Ks carry Coca-Cola FEMSA's release, opening "(BMV: KOFL, NYSE: KOF)".
-    from statement_extractor.pipeline.releases import _same_ticker
+def test_another_issuers_release_in_the_6k_is_named():
+    # FEMSA's 6-Ks carry Coca-Cola FEMSA's release after FEMSA's own; FEMSA's text names The Coca-Cola Company in passing.
     from statement_extractor.readers.html.parse import parse_html
-    html = "<p>Monterrey, Mexico, October 28, 2019 — FEMSA (NYSE: FMX; BMV: FEMSAUBD) announced. FEMSA and The " \
-           "Coca-Cola Company (NYSE: KO) signed with Coca-Cola FEMSA (NYSE: KOF)</p><table><tr><td>a</td><td>1</td></tr></table>" \
-           "<p>Mexico City, October 25, 2019, Coca-Cola FEMSA, S.A.B. de C.V. (BMV: KOFL, NYSE: KOF) announced</p>" \
+    html = "<p>Monterrey, Mexico, October 28, 2019 &mdash; Fomento Econ&oacute;mico Mexicano, S.A.B. de C.V. (&ldquo;FEMSA&rdquo;) (NYSE: FMX; " \
+           "BMV: FEMSAUBD) announced. FEMSA and The Coca-Cola Company (NYSE: KO) signed</p><table><tr><td>a</td><td>1</td></tr></table>" \
+           "<p>Mexico City April 29, 2015, Coca-Cola FEMSA, S.A.B. de C.V. (BMV: KOFL, NYSE: KOF) announced</p>" \
            "<table><tr><td>b</td><td>2</td></tr></table>"
-    assert [table.ticker for table in parse_html(html)] == ["", "KOF"]
-    own = "<p>São Paulo, April 26, 2010 - Embraer (NYSE: ERJ) announced</p><table><tr><td>a</td><td>1</td></tr></table>"
-    assert [table.ticker for table in parse_html(own)] == [""]  # the document's own issuer, under its ticker then
-    assert _same_ticker("FMX", "FMX") and not _same_ticker("KOF", "FMX") and _same_ticker("AKO.A", "AKO-A")
+    assert [table.release_of for table in parse_html(html)] == ["Fomento Económico Mexicano, S.A.B. de C.V.",
+                                                                 "Coca-Cola FEMSA, S.A.B. de C.V."]

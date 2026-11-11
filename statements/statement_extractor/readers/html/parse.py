@@ -160,18 +160,22 @@ def _side_by_side(lines: list[list[Cell]]) -> int | None:
     return middle if count >= max(5, figured * 0.3) else None
 
 
-# A release opens with its issuer and tickers, "Coca-Cola FEMSA, S.A.B. de C.V. (BMV: KOFL, NYSE: KOF)": FEMSA's 6-Ks
-# carry Coca-Cola FEMSA's release after FEMSA's own.
-# Only a release's opening counts, its dateline just before the issuer: FEMSA's own text names "The Coca-Cola Company
-# (NYSE: KO)" and Coca-Cola FEMSA's tickers among its holdings.
-_TICKER = re.compile(r"\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?"
-                     r"\s+(?:19|20)\d{2}\b.{0,160}?\bNYSE\s*:\s*([A-Z][A-Z.]{0,6})\b", re.I | re.S)
+# A release opens with its dateline, issuer and tickers: "Mexico City April 29, 2015, Coca-Cola FEMSA, S.A.B. de C.V.
+# (BMV: KOFL, NYSE: KOF)", in FEMSA's 6-Ks after FEMSA's own release. Its issuer's name is kept for the pipeline
+# (pipeline/printed.py) to tell another issuer's release from the company's own under an old ticker (Brookfield's
+# "BAM", Embraer's "ERJ"). A name in passing ("The Coca-Cola Company (NYSE: KO)") has no dateline before it.
+_OPENING = re.compile(r"\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?"
+                      r"\s+(?:19|20)\d{2}\b\)?[\s,:—–-]*(?P<name>(?:(?!\b(?:19|20)\d{2}\b)[^()]){3,120}?)\s*(?:\([^()]*\)\s*)?"
+                      r"\([^()]*\bNYSE\s*:\s*[A-Z][A-Z.]{0,6}\b", re.I | re.S)
+# A sentence, not a name: "FEMSA announced that subsidiaries of FEMSA have signed …". A name's lower-case words are
+# its connectors ("Coca-Cola FEMSA, S.A.B. de C.V.").
+_PROSE = re.compile(r"\b(?!(?:de|del|la|las|los|y|e|and|of|the|du|des|et)\b)[a-z]{3,}\b")
 _HIDDEN = re.compile(r"visibility\s*:\s*hidden|display\s*:\s*none", re.I)
 
 
 def _openings(root) -> list[tuple[int, str]]:
-    """Each release opening's place in document order (root.iter()'s) and NYSE ticker: every piece of text is read, a table
-    cell's too (Coca-Cola FEMSA's release in FEMSA's 6-K)."""
+    """Each release opening's place in document order (root.iter()'s) and its issuer's name: every piece of text is
+    read, a table cell's too (Coca-Cola FEMSA's release in FEMSA's 6-K)."""
     found, window = [], []
     for order, element in enumerate(root.iter()):
         if not isinstance(element.tag, str):
@@ -179,9 +183,10 @@ def _openings(root) -> list[tuple[int, str]]:
         for piece in (element.text, element.tail):
             if piece and piece.strip():
                 window = (window + [clean(piece)])[-8:]
-                announced = _TICKER.findall(" ".join(window))
+                announced = [match.group("name").strip(" ,:—–-") for match in _OPENING.finditer(" ".join(window))]
+                announced = [name for name in announced if not _PROSE.search(name)]
                 if announced:
-                    found.append((order, announced[-1].upper()))
+                    found.append((order, announced[-1]))
                     window = []
     return found
 
@@ -217,7 +222,6 @@ def parse_html(html: str | bytes) -> list[Table]:
     found = []
     previous_text: list[str] = []
     openings = _openings(tree)
-    issuer = openings[0][1] if openings else ""
     order = {element: index for index, element in enumerate(tree.iter())} if openings else {}
     for element, in_table in _walk(tree):
         if not isinstance(element.tag, str):
@@ -238,11 +242,8 @@ def parse_html(html: str | bytes) -> list[Table]:
                                                 if cell.start >= middle] for cells in lines])
                 rows += right[next((index for index, row in enumerate(right) if row.figures), len(right)):]
             context = " ".join(previous_text)[-600:]
-            # The document's first ticker is its own issuer's, under whatever ticker it had then (Brookfield's "BAM",
-            # Embraer's "ERJ"); a table after another one is that issuer's release.
-            ticker = next((name for place, name in reversed(openings) if place <= order.get(element, -1)), "")
-            found.append(Table(rows=rows, header=header, context=context, index=len(found),
-                               ticker=ticker if ticker != issuer else ""))
+            release_of = next((name for place, name in reversed(openings) if place <= order.get(element, -1)), "")
+            found.append(Table(rows=rows, header=header, context=context, index=len(found), release_of=release_of))
             if seen_figures:
                 previous_text = []
             else:

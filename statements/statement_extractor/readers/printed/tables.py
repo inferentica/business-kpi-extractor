@@ -52,7 +52,7 @@ class Table:
     index: int  # the table's place in the document
     header_text: str = ""  # a text table's header lines as printed, before their words are given to columns
     dollars: bool = False  # a text table's lines print "$" before figures (the parser keeps figures, not the sign)
-    ticker: str = ""  # another issuer's NYSE ticker the document announced before the table (its release's), else ""
+    release_of: str = ""  # the issuer whose release opening (dateline, name, NYSE ticker) last came before the table
 
 
 # An account code before a label in Brazil's CVM forms: "3.09 Profit before taxation", "1.01.01 Cash and cash equivalents".

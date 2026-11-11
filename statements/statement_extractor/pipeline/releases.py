@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import gc
 import os
-import re
 import time
 from datetime import date, timedelta
 
@@ -61,11 +60,6 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
                        "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
                        **own_period(own, ref.form)})
         records.append(record)
-        theirs = [reading for reading in found if reading.ticker and not _same_ticker(reading.ticker, symbol)]
-        if theirs:
-            # Another issuer's release furnished in the company's 6-K (FEMSA's carry Coca-Cola FEMSA's): its statements.
-            record["notes"] = (record.get("notes") or []) + [f"another issuer's release left out ({theirs[0].ticker})"]
-            found = [reading for reading in found if reading not in theirs]
         readings.extend(found)
         if found:
             log(f"{symbol}: 6-K {ref.filed} release {len(found)} columns, own "
@@ -73,9 +67,3 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
     remember(folder, empty)
     return records, readings
 
-
-def _same_ticker(announced: str, symbol: str) -> bool:
-    """A release's NYSE ticker is the company's: "AKO.A" or "AKO" for AKO-A."""
-    plain = re.sub(r"[^A-Z]", "", announced.upper())
-    own = re.sub(r"[^A-Z]", "", symbol.upper())
-    return bool(plain) and (plain.startswith(own) or own.startswith(plain))

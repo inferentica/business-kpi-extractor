@@ -3,11 +3,6 @@ periodic report, the furnished exhibits (EX-99) for a results release, in HTML (
 (about 1993-2000). Each document's basis is the one it states; its EX-27 schedules check what it prints."""
 from __future__ import annotations
 
-import html
-import re
-import unicodedata
-from difflib import SequenceMatcher
-
 from datetime import date
 
 from ..checks.schedules import parse_schedule, schedule_check
@@ -25,110 +20,11 @@ from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.documents import PRINTED_DOCUMENTS, release_documents
+from .company_names import _NAMES, _cover_text, _other_companies, _other_issuers, another_registrant  # noqa: F401
 from .unstated_scale import with_proven_scale
 
 _ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
-_REGISTRANT = re.compile(r"\(\s*(?:Translation\s+of\s+registrant|Exact\s+name\s+of\s+registrant)", re.I)
-_BEFORE_NAME = re.compile(r".*(?:\d{1,3}-\d{4,6}|\b(?:19|20)\d{2}\b|\b1934\b|\bForm\s+6-K\b)\s*:?", re.I | re.S)
-_SUFFIXES = {"THE", "PLC", "INC", "CORP", "CORPORATION", "LTD", "LIMITED", "CO", "COMPANY", "SA", "AG", "NV", "LLC", "ON"}
-_NAMES: dict[str, list[str]] = {}
 
-
-def _words(name: str) -> set[str]:
-    plain = unicodedata.normalize("NFKD", html.unescape(name)).encode("ascii", "ignore").decode()  # "PETRÓLEO"
-    return {word for word in re.sub(r"[^A-Z0-9]+", " ", plain.upper()).split() if word not in _SUFFIXES}
-
-
-def _company_names(filing) -> list[str]:
-    """The company's name and its former names, as EDGAR records them."""
-    cik = str(getattr(filing, "cik", "") or "")
-    if cik not in _NAMES:
-        names = [str(getattr(filing, "company", "") or "")]
-        try:
-            from edgar import Company
-            names += [item["name"] for item in (Company(int(cik)).data.former_names or [])]
-        except Exception:  # noqa: BLE001 - without former names, the current one is compared
-            pass
-        _NAMES[cik] = [name for name in names if name]
-    return _NAMES[cik]
-
-
-def _cover_text(attachments) -> str | None:
-    """A 6-K cover's first words as plain text."""
-    cover = next((item for item in attachments if str(item.document_type or "").upper().startswith("6-K")), None)
-    if cover is None:
-        return None
-    content = cover.content
-    if isinstance(content, bytes):
-        try:
-            content = content.decode("utf-8")
-        except UnicodeDecodeError:
-            content = content.decode("latin-1")  # Petrobras's covers
-    text = re.sub(r"<[^>]+>|&nbsp;", " ", html.unescape(str(content or "")) if "&" in str(content or "")[:30_000] else str(content or ""))
-    return re.sub(r"\s+", " ", text[:30_000])
-
-
-def another_registrant(ref, attachments) -> str | None:
-    """The registrant a 6-K's cover names, when it is neither the company nor a name the company once had."""
-    text = _cover_text(attachments)
-    if text is None:
-        return None
-    match = _REGISTRANT.search(text)
-    if match is None:
-        return None
-    printed = _BEFORE_NAME.sub("", text[max(0, match.start() - 150):match.start()]).strip(" :.,")
-    words = _words(printed)
-    names = [_words(name) for name in _company_names(ref.filing)]
-    if not words or not names or any(words <= name or name <= words or "".join(sorted(words)) == "".join(sorted(name))
-                                     or any(SequenceMatcher(None, "".join(_ordered(printed)), "".join(_ordered(other))).ratio() >= 0.85
-                                            for other in _company_names(ref.filing))  # "PETR?LEO": one letter lost
-                                     for name in names if name):
-        return None
-    # Only a name of the company's own family: a subsidiary shares its brand (Lloyds Bank plc beside Lloyds Banking
-    # Group); a name sharing nothing is the company's in another language (Copel's "Energy Company of Paraná").
-    return printed[:80] if any(words & name for name in names) else None
-
-
-_GENERIC = {"AND", "OF", "DE", "DO", "DA", "DAS", "DOS", "THE", "HOLDINGS", "HOLDING", "GROUP", "INCORPORATED"}
-
-
-# A listed subsidiary is named for its parent and its market: CEMEX's 6-Ks carry CEMEX Holdings Philippines', CEMEX
-# Latam's and CEMEX España's results beside CEMEX's own.
-_REGIONS = {"PHILIPPINES", "LATAM", "ESPANA", "SPAIN", "LATIN", "AMERICA", "AMERICAS", "EUROPE", "ASIA", "MEXICO",
-            "COLOMBIA", "CHILE", "PERU", "BRASIL", "BRAZIL", "ARGENTINA", "CANADA", "USA", "PANAMA", "EGYPT", "INDIA"}
-
-
-def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
-    """The names of other companies that a release's statement titles name: an acquired company's statements furnished
-    with the company's report (Gildan's 6-K of June 2011 carries Gold Toe Moretz's, "GOLD TOE MORETZ HOLDINGS CORP. AND
-    SUBSIDIARIES CONSOLIDATED BALANCE SHEETS"), or a listed subsidiary's, its parent's name and a market's. A name is
-    the company's own when it shares a word with the company's EDGAR name or a former one, or with the registrant's names
-    on the 6-K's cover (FEMSA's titles print "FOMENTO ECONÓMICO MEXICANO", EDGAR "MEXICAN ECONOMIC DEVELOPMENT INC").
-    Only names of two words or more are compared; an annual report, with no cover to give its own names, is never
-    checked."""
-    if cover is None:
-        return []
-    own = set().union(*(_named(name) for name in _company_names(ref.filing)),
-                      _named(cover[:cover.lower().find("indicate by check mark")]))
-    if not own:
-        return []
-    others = []
-    for printed in {reading.titled for reading in readings if reading.titled}:
-        words = _named(printed)
-        if len(words) >= 2 and (not words & own and not any(
-                SequenceMatcher(None, word, other).ratio() >= 0.85 for word in words for other in own)
-                or words & own and (words - own) & _REGIONS):
-            others.append(printed)
-    return sorted(others)
-
-
-def _named(name: str) -> set[str]:
-    return {word for word in _words(name) - _GENERIC if len(word) >= 3}
-
-
-def _ordered(name: str) -> list[str]:
-    plain = unicodedata.normalize("NFKD", html.unescape(name)).encode("ascii", "ignore").decode()
-    return [word for word in re.sub(r"[^A-Z0-9]+", " ", plain.upper()).split() if word not in _SUFFIXES]
 _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anything far larger is no statement
 
 
@@ -197,6 +93,11 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         if others:
             readings = [reading for reading in readings if reading.titled not in others]
             document_notes.append(f"another company's statements left out ({'; '.join(sorted(others))[:120]})")
+        issuers = _other_issuers(readings, ref, cover)
+        if issuers:
+            # Another issuer's release furnished in the company's 6-K (FEMSA's carry Coca-Cola FEMSA's): its statements.
+            readings = [reading for reading in readings if reading.release_of not in issuers]
+            document_notes.append(f"another issuer's release left out ({'; '.join(issuers)[:120]})")
         printed_titles, document_notes = split_titled(document_notes)
         if titled is not None:
             titled |= printed_titles | {(kind,) for kind in headed_kinds(content)}
