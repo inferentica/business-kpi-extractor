@@ -22,6 +22,7 @@ and the held-out part confirms each change.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -30,7 +31,7 @@ import sys
 import threading
 import time
 from collections import Counter, defaultdict
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from types import MappingProxyType
 
@@ -40,10 +41,14 @@ from ..ops.control import ControlPlane
 from ..pipeline import SymbolPipeline, SymbolResult
 from ..readers.trace import CODE_READERS
 from ..sources.sec import configure_identity
+from ..quality.checks import check_period, validate_groups
+from ..readers.extract import read_values
 from ..readers.replay import _source_template
 from ..steps.replay_reading import in_full_groups, left_for_ai
-from ..steps.shared import AI_GROUP_PREFIX, value_key
+from ..steps.shared import AI_GROUP_PREFIX, _days, _same, value_key
 from ..store import rounding_of
+
+UNCONFIRMED = "not confirmed where it was or by the year-ago column"
 
 HELD_OUT_COMPANIES = 5
 HELD_OUT_QUARTERS = 4
@@ -130,6 +135,52 @@ class CodeOnlyPipeline(SymbolPipeline):
                 self.misses[(accession, key)] = {"why": found, "place": place, "document": document.source_url.rsplit("/", 1)[-1]}
         return found
 
+    def _checked(self, document, part, located, expected, currency, mark=None):
+        found = super()._checked(document, part, located, expected, currency, mark)
+        if found == UNCONFIRMED:
+            started = time.perf_counter()  # a diagnosis, not reading: kept out of code's time
+            keys = {group.key for group in part.groups}
+            read = [item for item in read_values(document, part, located, currency)[0] if item.group.key in keys]
+            found = f"not confirmed: {self._unconfirmed_why(located, read, part, expected, document)}"
+            self._local.diagnosis = getattr(self._local, "diagnosis", 0.0) + time.perf_counter() - started
+        return found
+
+    def _unconfirmed_why(self, located, read, part, expected, document) -> str:
+        """Which of the confirmation's conditions (AiReading._confirmed_groups) a code reading failed."""
+        if check_period(located, expected) or located.annual or self._reports_full_year(read, expected):
+            return "the reading's period is in doubt"
+        earlier = self._earlier_values(expected)
+        last = self._last_locators(expected, _source_template(document.source_url))
+        target = (expected - timedelta(days=365)).isoformat()
+        stored = {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
+                  for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
+                  and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
+        for group in part.groups:
+            items = [item for item in read if item.group.key == group.key]
+            parts = [item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]
+            keys = {f"{item.group.key}.{item.kpi.key}" for item in items}
+            whole = any(item.locator.get("whole_table") for item in items)
+            listed = {f"{group.key}.{kpi.key}" for kpi in group.kpis}
+            if any(key.split(".", 1)[0] == group.key and key not in keys and (whole or key in listed) for key in last):
+                return "a figure read last quarter is missing now"
+            if any(item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in
+                   earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
+                return "a figure repeats an earlier period's"
+            trial = copy.deepcopy(items)
+            validate_groups(trial, self._previous(expected))
+            held = next((item for item in trial if item.status != "verified"), None)
+            if held is not None:
+                return f"a check holds it ({(held.notes or ['unstated'])[-1][:60]})"
+            for item in parts:
+                if self._same_place_as_last(item, expected, document):
+                    continue
+                before = stored.get(f"{group.key}.{item.kpi.key}")
+                if before is None:
+                    return "moved, and no year-ago figure is stored"
+                if not self._year_ago_cell_matches(item, document, before):
+                    return "moved, and its year-ago column differs from the stored figure"
+        return "other"
+
     def _untried(self, document, spec, expected, done: set[str]) -> None:
         """Why each KPI replay never tried was left: the group-level reasons the replay counts but does not name."""
         accession = getattr(self._local, "accession", None)
@@ -165,11 +216,12 @@ class CodeOnlyPipeline(SymbolPipeline):
     def _read(self, text, document, spec, expected, version=None):
         """Code first, as AiReading._read, with what is left for the AI left unread."""
         currency = self._default_currency() or document.declared_currency() or document.marked_currency()
+        self._local.diagnosis = 0.0
         self._local.replayed = False
         self._local.second_read = None
         started = time.perf_counter()
         replayed, located, done = self._replay_groups(document, spec, expected, currency)
-        self.timings.append(time.perf_counter() - started)
+        self.timings.append(time.perf_counter() - started - self._local.diagnosis)
         open_spec = left_for_ai(spec, done) if done else spec
         self._untried(document, spec, expected, done)
         if open_spec is None:
