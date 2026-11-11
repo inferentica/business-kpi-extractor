@@ -163,3 +163,30 @@ def test_a_range_start_set_day_first_among_month_first_ones():
     assert sorted((p.start, p.end) for p in periods.values()) == [
         (date(2003, 1, 1), date(2003, 6, 30)), (date(2003, 4, 1), date(2003, 6, 30)),
         (date(2004, 1, 1), date(2004, 6, 30)), (date(2004, 4, 1), date(2004, 6, 30))]
+
+
+def test_months_from_and_to_over_years_give_the_span():
+    # CEMEX's Q3 2026 report: "2026 | 2025" over the columns, "January - September" as the table's first row.
+    from datetime import date as day
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.html.read import read_document
+    html = "<p>STATEMENT OF OPERATIONS In thousands of U.S. dollars</p><table><tr><td>STATEMENT OF OPERATIONS</td><td>2026</td><td>2025</td></tr>" \
+           "<tr><td>January - September</td></tr>" + "".join(
+               f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+                   ("Sales", "13,202", "11,952"), ("Cost of sales", "(8,636)", "(7,900)"), ("Gross profit", "4,566", "4,052"),
+                   ("Earnings before income tax", "1,300", "1,100"), ("Income tax", "(300)", "(250)"), ("Net income", "1,000", "850"))) + "</table>"
+    assert parse_html(html)
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2026, 10, 26), document_end=day(2026, 9, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert {(r.period_start, r.period_end) for r in readings} == {(day(2026, 1, 1), day(2026, 9, 30)), (day(2025, 1, 1), day(2025, 9, 30))}
+
+
+def test_a_column_ending_after_its_filing_is_left_out():
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    html = "<p>CONSOLIDATED STATEMENTS OF INCOME (in millions)</p><table><tr><td></td><td>2026</td><td>2025</td></tr>" + "".join(
+        f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+            ("Sales", "100", "90"), ("Income before income taxes", "20", "18"), ("Income taxes", "5", "4"), ("Net income", "15", "14")))
+    readings, notes = read_document(html + "</table>", accession="x", form="6-K", filed=day(2026, 10, 26), document_end=None,
+                                    fiscal_year_end="1231", year_offset=0)
+    assert {r.period_end.year for r in readings} == {2025} and any("ends after the filing" in note for note in notes)

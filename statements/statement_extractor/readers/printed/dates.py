@@ -60,6 +60,11 @@ _DOTTED_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b")  # day fir
 _LISTED = re.compile(r"^[\s,]*((19|20)\d{2})?[\s,]*$")  # between days listed one per column: commas, a year at most
 
 
+# Months from and to, over columns that print only their years: CEMEX's "January - September" as the first row under
+# "2026 | 2025", its "Jan - Sep" in another table.
+_MONTH_RANGE = re.compile(rf"\b({_MONTH})\s*(?:-|–|—|to|through)\s*({_MONTH})(?![\w.])", re.I)
+
+
 def _standard(span) -> bool:
     """A span a statement period can have: a quarter, half, nine months or year in months, or any count of weeks."""
     return not (span.group(1) and span.group(2).lower().startswith("month")
@@ -160,6 +165,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         not own or own == named or named[index] in own for index, own in enumerate(own_named))
     dated_in_title = {match.group(3): (match.group(1), match.group(2)) for match in _FULL_DATE.finditer(title + " " + header_all)}
     ranged: set = set()
+    leading = " ".join(row.label for row in first.rows[:next((i for i, r in enumerate(first.rows) if r.figures), 0)][:3])
+    months = _MONTH_RANGE.search(header_all) or _MONTH_RANGE.search(leading)
     for column in columns:
         above = aboves[column]
         numeric = _NUMERIC_DATE.search(above)
@@ -168,6 +175,12 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         sharing = [other for other in columns if aboves[other] == above]
         if column not in in_order and len(sharing) >= 2 and len(years) == len(sharing):
             years = [years[sharing.index(column)]]  # one header cell over two columns, a year for each (TIM's 6-Ks)
+        if months and kind != "balance" and years and not numeric and not dotted and not _MONTH_DAY.search(above):
+            year = int(years[-1])
+            opened, closed = _date(months.group(1), "1", str(year)), _date(months.group(2), "1", str(year))
+            if opened is not None and closed is not None and opened <= closed:
+                periods[column] = Period(date(year, closed.month, calendar.monthrange(year, closed.month)[1]), opened)
+                continue
         short = _MONTH_YEAR.search(above)
         if short and not years and not numeric:
             # TSMC's 1998-99 balance sheets: "Sep-99 | Jun-99", the month's last day.

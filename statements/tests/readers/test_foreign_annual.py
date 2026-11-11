@@ -35,7 +35,7 @@ BALANCE = TITLE + "<table>" + \
 
 
 def read(html, form="20-F", end=date(2003, 12, 31)):
-    readings, notes = read_document(html, accession="a", form=form, filed=date(2004, 5, 28), document_end=end,
+    readings, notes = read_document(html, accession="a", form=form, filed=date(2030, 1, 1), document_end=end,
                                     fiscal_year_end="1231", year_offset=0)
     return readings, notes
 

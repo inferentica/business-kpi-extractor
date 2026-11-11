@@ -135,41 +135,6 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
     return found
 
 
-# "GOLD TOE MORETZ HOLDINGS CORP. AND SUBSIDIARIES CONSOLIDATED BALANCE SHEETS": the company a statement's title names.
-_SUBSIDIARIES = re.compile(r"\band\s+(?:its\s+)?(?:consolidated\s+)?subsidiar(?:y|ies)\b", re.I)
-_ABBREVIATIONS = {"INC.", "CORP.", "CO.", "LTD.", "S.A.", "N.V.", "L.P.", "PLC.", "B.V.", "AG.", "S.A.B."}
-
-
-def titled_company(kind: str, table: Table) -> str | None:
-    """The company named just before a statement's title, as "<name> and subsidiaries"; None where the title names
-    none that way, or the name is cut off or runs into a page's other words."""
-    text = table.context[-600:]
-    title = None
-    for title in dict(TITLES)[kind].finditer(text):
-        pass
-    if title is None or title.start() < len(text) - 300:
-        return None
-    named = None
-    for named in _SUBSIDIARIES.finditer(text, 0, title.start()):
-        pass
-    if named is None or title.start() - named.end() > 80:
-        return None
-    before = text[:named.start()].split()
-    words: list[str] = []
-    for position in range(len(before) - 1, max(-1, len(before) - 9), -1):
-        word = before[position]
-        if not re.match(r"[A-Z&]", word) or _PAGE_WORD.match(word) or re.search(r"['’]s$", word, re.I) or \
-                (words and word.endswith(".") and word.upper() not in _ABBREVIATIONS):
-            break  # a page number or label, a lower-case word or a sentence's end: the text before the name
-        if position == 0 and len(table.context) >= 600:
-            return None  # the name runs back to where the parser's 600 characters before the table begin: cut off
-        words.insert(0, word)
-    return " ".join(words) or None
-
-
-_PAGE_WORD = re.compile(r"^(F|FS|FS-R)-?\d+$|^(contents|index|statements?|page)$", re.I)
-
-
 def _heading(context: str) -> str:
     """The words before a table that describe it. Where the lines just above it are a statement's own title, the
     sentences before that title are other text (Visteon's auditor's report ends "… the segment disclosures as discussed

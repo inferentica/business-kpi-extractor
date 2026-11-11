@@ -49,7 +49,7 @@ CASH = """<p>CONSOLIDATED STATEMENTS OF CASH FLOWS</p>
 
 
 def read(html, fiscal_year_end, end):
-    readings, notes = read_document(html, accession="a", form="10-K", filed=date(2007, 11, 15), document_end=end,
+    readings, notes = read_document(html, accession="a", form="10-K", filed=date(2030, 1, 1), document_end=end,
                                     fiscal_year_end=fiscal_year_end, year_offset=0)
     return {(r.statement, r.fiscal_year): r for r in readings}, notes
 
@@ -315,7 +315,8 @@ def test_a_reconciliation_titled_in_the_tables_first_rows_is_no_statement():
 
 def test_a_statements_title_names_its_company():
     from statement_extractor.readers.html.parse import parse_html
-    from statement_extractor.readers.printed.find import find_statements, titled_company
+    from statement_extractor.readers.printed.company_title import titled_company
+    from statement_extractor.readers.printed.find import find_statements
     html = """<p>See Notes to Consolidated Financial Statements.</p><p>2</p>
 <p>GOLD TOE MORETZ HOLDINGS CORP. AND SUBSIDIARIES</p><p>UNAUDITED CONDENSED INTERIM CONSOLIDATED BALANCE SHEETS</p>
 <p>(Dollars In Thousands)</p><table><tr><td></td><td>2011</td><td>2010</td></tr>""" + _balance_rows() + "</table>"
@@ -328,7 +329,8 @@ def test_a_statements_title_names_its_company():
 
 def test_a_title_name_cut_off_or_after_a_page_label_is_no_name():
     from statement_extractor.readers.html.parse import parse_html
-    from statement_extractor.readers.printed.find import find_statements, titled_company
+    from statement_extractor.readers.printed.company_title import titled_company
+    from statement_extractor.readers.printed.find import find_statements
     cut = "<p>" + "Q" * 600 + " ING COMPANY LIMITED AND SUBSIDIARIES</p><p>CONSOLIDATED BALANCE SHEETS</p>"
     paged = "<p>F-6 COMPANHIA PARANAENSE DE ENERGIA COPEL AND SUBSIDIARIES</p><p>CONSOLIDATED BALANCE SHEETS</p>"
     table = "<table><tr><td></td><td>2011</td><td>2010</td></tr>" + _balance_rows() + "</table>"
@@ -336,3 +338,15 @@ def test_a_title_name_cut_off_or_after_a_page_label_is_no_name():
     assert titled_company(kind, group[0]) is None
     [(kind, group)] = find_statements(parse_html(paged + table), release=True)
     assert titled_company(kind, group[0]) == "COMPANHIA PARANAENSE DE ENERGIA COPEL"
+
+
+def test_a_title_name_ending_in_its_legal_form():
+    # Braskem's 6-K of June 2011: Quattor's interim statements, "F-1 Quattor Participações S.A. Consolidated Balance Sheets".
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.company_title import titled_company
+    from statement_extractor.readers.printed.find import find_statements
+    html = "<p>Notes to the consolidated financial statements F-6</p><p>F-1</p><p>Quattor Participa&ccedil;&otilde;es S.A.</p>" \
+           "<p>Consolidated Balance Sheets</p><p>In thousands of reais</p>" \
+           "<table><tr><td></td><td>2010</td><td>2009</td></tr>" + _balance_rows() + "</table>"
+    [(kind, group)] = find_statements(parse_html(html), release=True)
+    assert titled_company(kind, group[0]) == "Quattor Participações S.A."

@@ -200,10 +200,12 @@ def test_a_release_without_ex99_reads_its_numbered_exhibits():
             self.document_type = kind
 
     cover, report, contract = Item("6-K"), Item("EX-1"), Item("EX-10.1")
-    assert release_documents([cover, report, contract]) == [report]
+    assert release_documents([cover, report, contract]) == [cover, report]
     release = Item("EX-99.1")
     assert release_documents([cover, report, release]) == [release]
     assert release_documents([cover, contract]) == [cover]
+    letter = Item("EX-15.1")  # Petrobras: the interim report in the 6-K itself, an auditor's letter beside it
+    assert release_documents([cover, letter]) == [cover, letter]
 
 
 def test_a_hidden_sizing_row_is_no_line():

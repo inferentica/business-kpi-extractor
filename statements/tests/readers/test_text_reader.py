@@ -77,7 +77,7 @@ SCHEDULE = """<TABLE> <S> <C>
 
 
 def read(text, fiscal_year_end, end, form="10-Q"):
-    readings, notes = read_document(text, accession="a", form=form, filed=date(1995, 5, 15), document_end=end,
+    readings, notes = read_document(text, accession="a", form=form, filed=date(2030, 1, 1), document_end=end,
                                     fiscal_year_end=fiscal_year_end, year_offset=0)
     return {(r.statement, r.fiscal_year, r.fiscal_period, r.duration): r for r in readings}, notes
 

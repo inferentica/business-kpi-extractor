@@ -7,8 +7,7 @@ page break continues in the next table. Each figure column takes its period from
 span ("Three Months Ended"). Each line keeps its printed label, its indentation and its figure as printed.
 
 It is kept only when its arithmetic holds on the printed figures (brackets for negatives):
-- assets equal liabilities and equity;
-- opening cash plus the change (or the three sections) equals closing cash;
+- assets equal liabilities and equity; opening cash plus the change (or the three sections) equals closing cash;
 - each printed total equals the lines above it, and net income follows from income before taxes.
 """
 from __future__ import annotations
@@ -20,10 +19,11 @@ from ...checks.printed import balance_check, cash_check, income_check, total_che
 from ...domain.model import Reading
 from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
+from .company_title import titled_company
 from .currency import column_currencies, reporting_currency, translations
 from .dates import column_periods
+from .find import TITLES, find_statements, unlabelled_totals
 from .scales import line_scale, share_scale, statement_scale, states_two
-from .find import TITLES, find_statements, titled_company, unlabelled_totals
 from .side_by_side import column_scopes
 from .tables import Table, figure_columns
 from .titled import titled_notes
@@ -98,8 +98,8 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             layout.append((table, columns))
         for index in kept:
             labelled = label_period(period := periods[dated[index]], fiscal_year_end, year_offset)
-            if labelled is None:
-                notes.append(f"{kind}: column {period.key} off the calendar")
+            if labelled is None or filed != date.min and period.end > filed:  # a column ending after its filing is misdated
+                notes.append(f"{kind}: column {period.key} {'off the calendar' if labelled is None else 'ends after the filing'}")
                 continue
             # Every dated column stays in `columns`, translations too, so a figure off its place is never taken for the
             # column beside it.
