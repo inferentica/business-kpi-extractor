@@ -81,3 +81,19 @@ def test_a_unit_row_over_the_currency_row_is_the_scale():
     group = [Table(rows=rows, header=[[Cell(1, 1, "US Dollars"), Cell(2, 1, "Australian Dollars")]],
                    context="Consolidated Balance Sheets (Unaudited)", index=0)]
     assert statement_scale(group) == 1e6
+
+
+def test_millions_of_mexican_pesos_and_a_peso_sign_after_the_label():
+    # Televisa's releases: "(Millions of Mexican Pesos)", each total's label ending "Ps." before its figure.
+    from datetime import date
+    from statement_extractor.readers.html.read import read_document
+    html = "<p>GRUPO TELEVISA, S.A.B. CONDENSED CONSOLIDATED STATEMENTS OF INCOME FOR THE THREE MONTHS ENDED JUNE 30, " \
+           "2013 AND 2012 (Millions of Mexican Pesos)</p><table><tr><td></td><td>2013</td><td>2012</td></tr>" + "".join(
+               f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+                   ("Net sales Ps.", "18,065.0", "17,000.0"), ("Cost of sales", "9,429.9", "9,000.0"),
+                   ("Income before income taxes", "3,320.3", "3,000.0"), ("Income taxes", "1,108.5", "1,000.0"),
+                   ("Net income Ps.", "2,211.8", "2,000.0"))) + "</table>"
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=date(2013, 7, 12), document_end=date(2013, 6, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert {(r.status, r.currency, r.lines[0]["label"], r.lines[0]["value"]) for r in readings if r.period_end.year == 2013} == {
+        ("kept", "MXN", "Net sales", 18_065e6)}

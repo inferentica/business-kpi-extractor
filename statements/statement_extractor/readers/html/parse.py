@@ -79,7 +79,8 @@ def _row(cells: list[Cell]) -> Row | None:
     if code:  # a CVM account code: its depth is the line's level ("3.10" over "3.10.01")
         label, level = label[code.end():], (level or 0) + 20 * code.group(0).count(".")
     label = re.sub(r"\s+\d{1,2}(\s*,\s*\d{1,2})+$|\s+\d{1,2},$", "", label)  # "NET SALES 2, 26" in one cell
-    label = re.sub(r"\s+(?:￦|₩|R\$|US\$|NT\$|\$|£|€|¥)$", "", label)  # KEPCO's "Profit for the period ￦" before its figure
+    # KEPCO's "Profit for the period ￦" before its figure, Televisa's "Net income Ps."
+    label = re.sub(r"\s+(?:￦|₩|R\$|US\$|NT\$|Ch\$|Ps\.?|\$|£|€|¥)$", "", label)
     if not label and not figures:
         return None
     return Row(label=label, level=level if level is not None else 0, figures=figures, cells=cells, code=account)
