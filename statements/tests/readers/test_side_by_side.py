@@ -93,3 +93,10 @@ def test_dates_left_of_their_columns_are_taken_in_order():
                                      fiscal_year_end="1231", year_offset=0)
     found = {(r.period_end.year, r.scope): next(line["value"] for line in r.lines if line["value"] is not None) for r in readings}
     assert found == {(2010, "parent"): 0.0, (2009, "parent"): 0.0, (2010, "consolidated"): 20318000.0, (2009, "consolidated"): 16033000.0}
+
+
+def test_dated_ranges_over_their_own_columns_are_kept():
+    # Copel's ITRs: "01/07/2009 | 01/01/2009 …" over "to 30/09/2009 …" sit over their own columns; the in-order
+    # rule read "01/07/2009" as "01/07/20", saw no match and re-dated them (round 62).
+    from statement_extractor.readers.printed.ranges import _FULL_NUMERIC
+    assert _FULL_NUMERIC.findall("01/07/2009 to 30/09/2009") == ["01/07/2009", "30/09/2009"]

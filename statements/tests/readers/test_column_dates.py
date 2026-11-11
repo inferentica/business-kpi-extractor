@@ -322,3 +322,30 @@ def test_months_abbreviated_are_a_span():
     from statement_extractor.readers.printed.dates import _SPAN, _span_days
     match = _SPAN.search("Six MTHS 2001")
     assert match and _span_days(match.group(1), match.group(2)) == 182
+
+
+def test_an_ordinal_quarter_with_a_dot_is_its_quarter():
+    # Copel's Q3 2004 release: "4th Q.2003 | 1st Q.2004 | … | 09/30/2004 | 09/30/2003"; "4th Q.2003" was read as the
+    # 2003 year to date (round 62).
+    from statement_extractor.readers.printed.dates import _named_quarter
+    from datetime import date as day
+    assert _named_quarter("4th Q.2003", "1231") == day(2003, 12, 31)
+
+
+def test_spans_printed_over_each_column_date_each():
+    # Lloyds' Q3 2017 release: "Nine | Nine | Three | Three" over "months …" over "ended 30 Sept" over "2017 | 2016 |
+    # Change | 2017 | 2016 | Change" (round 62 read all four as three months).
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    rows = [("Net interest income", "9,117", "8,630", "6", "3,192", "2,848", "12"), ("Other income", "4,776", "4,520", "6", "1,428", "1,427", "0"),
+            ("Total income", "13,893", "13,150", "6", "4,620", "4,275", "8"), ("Operating costs", "(6,000)", "(6,100)", "2", "(2,000)", "(2,050)", "2"),
+            ("Profit before tax", "6,000", "5,000", "20", "2,000", "1,700", "18")]
+    cell = lambda texts: "<tr><td></td>" + "".join(f"<td>{text}</td>" for text in texts) + "</tr>"
+    html = ("<p>CONSOLIDATED INCOME STATEMENT</p><table>" + cell(["Nine", "Nine", "", "Three", "Three", ""])
+            + cell(["months", "months", "", "months", "months", ""]) + cell(["ended 30 Sept"] * 2 + [""] + ["ended 30 Sept"] * 2 + [""])
+            + cell(["2017", "2016", "Change", "2017", "2016", "Change"]) + cell(["£ million", "£ million", "%", "£ million", "£ million", "%"])
+            + "".join("<tr><td>" + label + "</td>" + "".join(f"<td>{f}</td>" for f in figures) + "</tr>" for label, *figures in rows) + "</table>")
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2017, 10, 25), document_end=day(2017, 9, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    found = {(r.fiscal_year, r.duration): next(l["value"] for l in r.lines if l["value"]) for r in readings}
+    assert found == {("2017", "ytd"): 9117e6, ("2016", "ytd"): 8630e6, ("2017", "quarter"): 3192e6, ("2016", "quarter"): 2848e6}

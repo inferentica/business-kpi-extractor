@@ -59,7 +59,7 @@ def own_month(above: str) -> int | None:
 
 
 
-_FULL_NUMERIC = re.compile(r"\d{1,2}/\d{1,2}/(?:\d{2}|\d{4})")
+_FULL_NUMERIC = re.compile(r"\b\d{1,2}/\d{1,2}/(?:\d{4}|\d{2})\b")
 
 
 def dates_in_order(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[int, ...], str]:
@@ -99,3 +99,16 @@ def years_in_order(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[i
         if year is not None:
             found[column] = year
     return found
+
+
+def spans_over(table: Table, columns: list[tuple[int, ...]], span) -> dict[tuple[int, ...], str]:
+    """Each column's span printed in the rows over the figures, a cell over each column: Lloyds' quarterly releases
+    print "Nine | Nine | Three | Three" over "months | months | months | months" over "ended 30 Sept" (round 62)."""
+    found: dict[tuple[int, ...], list[str]] = {column: [] for column in columns}
+    for row in table.rows[:next((index for index, row in enumerate(table.rows) if row.figures), 0)][:6]:
+        over = {column: cell.text for column in columns for cell in row.cells[1:]
+                if cell.text.strip() and cell.start <= column[0] < cell.start + cell.span}
+        if len(over) >= 2:
+            for column, text in over.items():
+                found[column].append(text)
+    return {column: " ".join(texts) for column, texts in found.items() if texts and span.search(" ".join(texts))}
