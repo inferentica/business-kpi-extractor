@@ -136,3 +136,12 @@ def test_releases_are_read_one_at_a_time_as_they_arrive_or_all_together_as_a_bac
     pipeline.order = "backfill"
     pipeline._process_releases(refs, SPEC, 1)
     assert calls == [refs]  # the pipeline's own chains, one per fiscal quarter
+
+
+def test_a_new_company_lists_every_figure_code_read_for_checking_by_hand():
+    from kpi_extractor.evals.code_reads import new_figure, new_text
+    figure = new_figure({**_value("dau", 3.6, locator={"quarter_table": True, "quote": "DAP 3.6"}), "group_label": "Users",
+                         "kpi_label": "Daily active people", "validation_status": "verified", "method": "release_table"})
+    assert figure["label"] == "Users / Daily active people" and figure["readBy"] == "quarter_table" and figure["quote"] == "DAP 3.6"
+    text = new_text([{"symbol": "ORCL", "figures": [figure], "refused": {}, "errors": [], "seconds": 40.2}])
+    assert "| ORCL | 1 | 1 | 0 | release_table 1 | 40 |" in text
