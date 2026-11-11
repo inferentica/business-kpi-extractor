@@ -110,7 +110,7 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             continue
         if any(_NOT_A_PERIOD.search(cell.text) for cells in table.header for cell in cells if cell.start > 0):
             continue
-        if sum(1 for row in table.rows if row.figures and number(row.label) is not None) >= 3:
+        if sum(1 for row in table.rows if row.figures and number(row.label)) >= 3:  # not a scale's "( 000)" (Ross)
             # Its labels are figures: the table lost its label column (Petrobras's 2005 6-K runs its annual statement
             # into the quarters' table, the first quarter's figures where the labels belong).
             continue
