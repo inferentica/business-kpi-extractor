@@ -56,7 +56,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         set_aside = contradicted(kept)
         aside = {id(reading) for reading in set_aside}
         eligible = [reading for reading in kept if id(reading) not in aside] or kept
-        winner = max(eligible, key=lambda item: (item.scope == "consolidated", _rank(item),
+        winner = max(eligible, key=lambda item: (item.scope == "consolidated", _rank(item), not _coded(item),
                                              item.form != "6-K" or annual is None or item.basis == annual, item.filed,
                                              item.own, item.source == "xbrl")) if eligible else None
         record = {
@@ -139,6 +139,12 @@ def _reporting_currencies(readings: list[Reading]) -> dict[str, set[str]]:
         if year not in own:
             years[str(year)].add(nearest)
     return years
+
+
+def _coded(reading: Reading) -> bool:
+    """Read from Mexico's coded template (readers/printed/mexico_coded.py): its labels are machine translations
+    ("NET INCOME" over the revenue), so a release's own presentation of the period is served before it."""
+    return bool(reading.lines) and reading.lines[0]["concept"].startswith("bmv_")
 
 
 def _reporting_currency(readings: list[Reading]) -> str | None:

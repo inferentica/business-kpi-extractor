@@ -26,6 +26,8 @@ def settle_signs(winner: Reading, kept: list[Reading], printed: dict[str, list[f
         return winner
     if len(kept) < 3:
         return winner
+    # Mexico's coded template prints costs as positive amounts, its own convention: it never votes on a sign.
+    kept = [reading for reading in kept if reading is winner or not (reading.lines and reading.lines[0]["concept"].startswith("bmv_"))]
     others = [line_keys(reading.lines) for reading in kept if reading is not winner]
     # A filer can retag a line between filings (JPM's credit losses moved to "…AvailableforsaleSecurities"); the
     # printed label still names it.

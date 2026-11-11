@@ -164,3 +164,14 @@ def test_a_rejected_reading_never_states_the_reporting_currency():
     good = reading("fy15", date(2016, 4, 30), 2.0, own=True)
     good.fiscal_year, good.currency = "2015", "MXN"
     assert _reporting_currencies([bad, good])["2009"] == {"MXN"}
+
+
+def test_a_release_is_served_before_mexicos_coded_template_of_the_same_period():
+    # Televisa: its press release ("Net sales") and, days later, the coded template ("40010000 NET INCOME" for revenue).
+    release = reading("press", date(2013, 7, 9), 16_983.8e6, own=True)
+    coded = reading("coded", date(2013, 7, 12), 16_983_775e3, own=True)
+    coded.lines[0]["concept"] = "bmv_Revenue"
+    [chosen] = choose([release, coded])
+    assert chosen["source_accession"] == "press"
+    [alone] = choose([coded])
+    assert alone["source_accession"] == "coded"  # where nothing else prints the statement
