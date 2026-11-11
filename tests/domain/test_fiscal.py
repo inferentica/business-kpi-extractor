@@ -110,3 +110,15 @@ def test_a_filing_days_after_a_quarter_closes_reports_that_quarter():
     assert release_period(day(2025, 10, 22), "1231") == day(2025, 9, 30)   # an ordinary results release
     assert release_period(day(2025, 12, 10), "1231") == day(2025, 9, 30)   # late in the window, still the quarter before
     assert release_period(day(2025, 7, 2), "0630") == day(2025, 6, 30)     # a June year end the same way
+
+
+def test_one_mistagged_report_does_not_rename_every_fiscal_year():
+    from kpi_extractor.domain.fiscal import offset_lead
+    # Oracle (year ends May 31): its 10-Q for August 31, 2026 names fiscal 2026; its 10-K and Q3 10-Q the year they close.
+    samples = [(date(2026, 8, 31), "2026", False), (date(2026, 5, 31), "2026", True), (date(2026, 2, 28), "2026", False)]
+    assert learn_year_offset(samples[:1], "0531") == -1
+    assert offset_lead(samples[:2], "0531") == 1  # not yet settled: one more report is read
+    assert learn_year_offset(samples, "0531") == 0 and offset_lead(samples, "0531") == 2
+    assert fiscal_label(date(2026, 8, 31), "0531", year_offset=0) == ("2027", "Q1")
+    # A tie goes to the newest report.
+    assert learn_year_offset([(date(2026, 7, 26), "2027", False), (date(2026, 4, 26), "2026", False)], "0125") == 0

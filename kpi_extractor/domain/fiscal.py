@@ -92,13 +92,29 @@ def _own_end(nominal: date, own_ends) -> date:
     return min(projected, key=lambda end: abs(end - nominal)) if projected else nominal
 
 
-def learn_year_offset(samples: list[tuple[date, str, bool]], fiscal_year_end: str) -> int:
-    """The company's fiscal-year naming offset from (period end, reported fiscal year, annual) samples."""
+def _offset_votes(samples: list[tuple[date, str, bool]], fiscal_year_end: str) -> dict[int, int]:
     votes: dict[int, int] = {}
-    for period_end, reported_year, _annual in samples:
+    for period_end, reported_year, annual in samples:
         if not reported_year or not reported_year.isdigit():
             continue
         offset = int(reported_year) - fiscal_year_end_for(period_end, fiscal_year_end).year
         if offset in (-1, 0, 1):
-            votes[offset] = votes.get(offset, 0) + 1
-    return max(votes, key=votes.get) if votes else 0
+            votes[offset] = votes.get(offset, 0) + (2 if annual else 1)  # a year's report names the year it closes
+    return votes
+
+
+def learn_year_offset(samples: list[tuple[date, str, bool]], fiscal_year_end: str) -> int:
+    """The company's fiscal-year naming offset from (period end, reported fiscal year, annual) samples: the offset most
+    of them give, an annual report's sample counting twice; on a tie, the newest sample's (samples come newest first)."""
+    votes = _offset_votes(samples, fiscal_year_end)
+    if not votes:
+        return 0
+    best = max(votes.values())
+    order = [int(year) - fiscal_year_end_for(end, fiscal_year_end).year for end, year, _a in samples if year and year.isdigit()]
+    return next(offset for offset in order if votes.get(offset) == best)
+
+
+def offset_lead(samples: list[tuple[date, str, bool]], fiscal_year_end: str) -> int:
+    """How many votes the leading offset has over the next."""
+    counts = sorted(_offset_votes(samples, fiscal_year_end).values(), reverse=True) + [0, 0]
+    return counts[0] - counts[1]
