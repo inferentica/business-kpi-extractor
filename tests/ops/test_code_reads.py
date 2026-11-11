@@ -119,3 +119,20 @@ def test_after_the_releases_the_tested_filings_hold_only_what_code_read_and_the_
     assert {key[1] for key in pipeline.store._values} == {"dau", "paid"}  # mau was the AI's, so it is gone
     pipeline.store._apply([_value("mau", 4.1, locator={"quarter_table": True})])  # a fill step's write lands
     assert pipeline.store._values[value_key(_value("mau", 4.1))]["locator"] == {"quarter_table": True}
+
+
+def test_releases_are_read_one_at_a_time_as_they_arrive_or_all_together_as_a_backfill(monkeypatch):
+    from datetime import date
+
+    from kpi_extractor.pipeline import SymbolPipeline
+    calls = []
+    monkeypatch.setattr(SymbolPipeline, "_process_releases", lambda self, refs, spec, version: calls.append(refs) or refs)
+    refs = [SimpleNamespace(accession=name, period_end=date(2025, month, 28)) for name, month in (("q3", 9), ("q1", 3), ("q2", 6))]
+    pipeline = _code_only([])
+    pipeline._code_only_state = lambda: None
+    assert [ref.accession for ref in pipeline._process_releases(refs, SPEC, 1)] == ["q1", "q2", "q3"]
+    assert [[ref.accession for ref in batch] for batch in calls] == [["q1"], ["q2"], ["q3"]]  # the quarter before is read first
+    calls.clear()
+    pipeline.order = "backfill"
+    pipeline._process_releases(refs, SPEC, 1)
+    assert calls == [refs]  # the pipeline's own chains, one per fiscal quarter

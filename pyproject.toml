@@ -23,6 +23,7 @@ business-kpi-evaluate = "kpi_extractor.evals.evaluate:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # tests import shared fixtures from other test modules (tests.readers.test_replay)
 addopts = "-q"
 
 [tool.setuptools.packages.find]

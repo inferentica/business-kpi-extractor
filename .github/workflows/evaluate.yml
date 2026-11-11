@@ -125,7 +125,12 @@ jobs:
         env:
           SYMBOLS: ${{ inputs.symbols }}
           QUARTERS: ${{ inputs.quarters || '12' }}
-        run: python -m kpi_extractor.evals.code_reads --symbols "$SYMBOLS" --quarters "$QUARTERS"
+        # Each release as it arrives (from the quarter before it), then as a backfill (from the quarter a year earlier).
+        run: |
+          status=0
+          python -m kpi_extractor.evals.code_reads --symbols "$SYMBOLS" --quarters "$QUARTERS" --order arrival || status=1
+          python -m kpi_extractor.evals.code_reads --symbols "$SYMBOLS" --quarters "$QUARTERS" --order backfill || status=1
+          exit $status
       - name: Score the Classify rules (no AI)
         if: inputs.suite == 'classify'
         run: python -m kpi_extractor.evals.classify_eval
