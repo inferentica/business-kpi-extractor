@@ -467,3 +467,18 @@ def test_a_tag_whose_unit_is_not_the_kpis_is_never_learned_and_what_it_filled_is
     pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
     assert [(v["fiscal_period"], v["validation_status"]) for v in stored] == [("Q2", "rejected")]
     assert stored[0]["notes"][0].startswith("withdrawn: its report tag (RevenueRemainingPerformanceObligation)")
+
+
+def test_a_valuation_models_input_is_never_a_kpis_figure():
+    # KKR tags the weighted-average EV/EBITDA exit multiple behind its Level 3 fair values (11.0, then 11.7). It equalled
+    # the release's "infrastructure portfolio appreciated 11%" twice, so it was learned as that return.
+    multiple = {"concept": "kkr:EquityMethodInvestmentsOtherMeasurementInput", "numeric_value": 11.7, "period_type": "instant",
+                "period_instant": "2025-06-30", "period_start": None, "period_end": None, "unit_ref": "pure",
+                "dim_us-gaap_MeasurementInputTypeAxis": "kkr:MeasurementInputEnterpriseValueEBITDAExitMultipleMember",
+                "dim_srt_RangeAxis": "srt:WeightedAverageMember"}
+    tagged_input = {**multiple, "concept": "us-gaap:FairValueMeasurementInput", "dim_us-gaap_MeasurementInputTypeAxis": None,
+                    "dim_srt_RangeAxis": None}
+    kept = {**multiple, "concept": "us-gaap:Revenues", "numeric_value": 9.0, "dim_us-gaap_MeasurementInputTypeAxis": None,
+            "dim_srt_RangeAxis": None}
+    found = quarter_facts(pd.DataFrame([multiple, tagged_input, kept]), date(2025, 6, 30))
+    assert found == {Tag("us-gaap:Revenues", (), True): 9.0}

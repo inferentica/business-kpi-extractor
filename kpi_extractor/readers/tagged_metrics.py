@@ -43,6 +43,8 @@ def quarter_facts(facts: pd.DataFrame, period_end: date, days: tuple[int, int] =
                 or not days[0] <= (period_end - starts[index]).days <= days[1]:
             continue
         every = [(column, str(fact[column])) for column in dimension_columns if pd.notna(fact[column])]
+        if _VALUATION_INPUT.search(str(fact["concept"])) or any(_VALUATION_INPUT.search(column) for column, _member in every):
+            continue
         # A timing member (the date a backlog is expected from) changes every quarter and names no part: it is left
         # out of the tag, which an untimed figure of the same concept takes first.
         dimensions = tuple(sorted(item for item in every if not _TIMING.search(item[0])))
@@ -122,6 +124,10 @@ def learn_tags(readings: dict[tuple[str, str], float], facts: dict[tuple[str, st
 
 
 _TIMING = re.compile(r"Timing|StartDate|ExpectedTiming", re.I)
+# A valuation model's input (a discount rate, an exit multiple behind Level 3 fair values) is an assumption, never a
+# figure the company reports: KKR's weighted-average EV/EBITDA exit multiple, 11.0 twice like the release's "11%", was
+# learned as its infrastructure portfolio's return.
+_VALUATION_INPUT = re.compile(r"MeasurementInput")
 _DATE_LIKE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
