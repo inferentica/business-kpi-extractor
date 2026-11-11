@@ -38,8 +38,7 @@ _MONTH_YEAR = re.compile(rf"\b({_MONTH})(?:-|\s*['’])(\d{{2}})\b", re.I)  # "S
 _YEAR = re.compile(r"\b((?:19|20)\d{2})\b")
 
 
-# Delta's 2007 10-Qs after fresh start: "Two Months Ended June 30, 2007 | One Month Ended April 30, 2007"; a span read
-# as none would make such a column the year to date.
+# Delta's 2007 10-Qs after fresh start ("Two Months Ended … | One Month Ended …"): read as none, a year to date.
 _NUMBERS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
             "eleven": 11, "twelve": 12, "thirteen": 13, "sixteen": 16, "seventeen": 17,
             "twenty-four": 24, "twenty-six": 26, "twenty-eight": 28, "thirty-six": 36, "thirty-nine": 39, "forty": 40,
@@ -254,7 +253,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                 titled_day = next((int(match.group(2)) for match in [*_MONTH_DAY.finditer(header_all), *in_title]
                                    if _date(match.group(1), "1", year).month == month), None)
                 end = date(int(year), month, titled_day or calendar.monthrange(int(year), month)[1])
-        elif document_end is not None and (days < 350 and kind != "balance" or kind == "balance" and int(year) == document_end.year):
+        elif document_end is not None and (days < 350 and kind != "balance" or kind == "balance" and int(year) == document_end.year
+                                           or kind != "balance" and span is None and not _near_year_end(document_end, fiscal_year_end)):
             end = date(int(year), document_end.month, min(document_end.day, calendar.monthrange(int(year), document_end.month)[1]))
         else:
             month, day_of = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])

@@ -236,3 +236,17 @@ def test_a_month_with_a_two_digit_year_after_an_apostrophe():
     from statement_extractor.readers.printed.dates import _MONTH_YEAR
     assert _MONTH_YEAR.search("Dec '09").groups() == ("Dec", "09") and _MONTH_YEAR.search("Sep-99")
     assert day(2009, 12, 31)
+
+
+def test_a_releases_year_only_columns_are_its_year_to_date():
+    # Ultrapar's Q1 2010 release: a cash flow statement over "2010 | 2009", no span printed.
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    rows = [("Net cash provided by operating activities", "100", "90"), ("Net cash used in investing activities", "(40)", "(30)"),
+            ("Net cash used in financing activities", "(20)", "(10)"), ("Cash at the beginning of the period", "500", "400"),
+            ("Cash at the end of the period", "540", "450")]
+    html = "<p>ULTRAPAR CONSOLIDATED CASH FLOW STATEMENT In millions of Reais</p><table><tr><td></td><td>2010</td><td>2009</td></tr>" + "".join(
+        f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in rows) + "</table>"
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2010, 5, 6), document_end=day(2010, 3, 31),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert {(r.period_start, r.period_end) for r in readings} == {(day(2010, 1, 1), day(2010, 3, 31)), (day(2009, 1, 1), day(2009, 3, 31))}
