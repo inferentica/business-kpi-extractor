@@ -58,7 +58,8 @@ def _segment_facts(facts, period_end) -> None:
     """The period's facts on any segment axis, by concept: how the filing tags its segments."""
     axes = [column for column in facts.columns if column.startswith("dim_") and "egment" in column]
     if not axes:
-        print("-- no segment axis in the facts")
+        counts = {column[4:]: int(facts[column].notna().sum()) for column in facts.columns if column.startswith("dim_")}
+        print(f"-- no segment axis in the facts; axes used: {dict(sorted(counts.items(), key=lambda item: -item[1])[:15])}")
         return
     end = str(period_end)
     rows = facts[(facts["period_end"].astype(str).str[:10] == end) & facts[axes].notna().any(axis=1)]
