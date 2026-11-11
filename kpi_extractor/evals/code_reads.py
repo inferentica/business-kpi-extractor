@@ -216,6 +216,10 @@ def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], 
             "label": f"{value.get('group_label')} / {value.get('kpi_label')}", "period": f"{value['fiscal_year']}-{value['fiscal_period']}",
             "kind": kind(group), "origin": origin(value), "expected": expected, "found": found, "outcome": outcome,
             "readBy": reader(now) if outcome in ("right", "rounded", "wrong") else "",
+            # Where code read a figure that is not right: its filing and place, so a wrong one is found at once.
+            "foundAt": {"accession": now.get("source_accession"), "document": str(now.get("source_url") or "").rsplit("/", 1)[-1],
+                        **{name: (now.get("locator") or {}).get(name) for name in ("table", "row", "col", "row_label", "quote", "replayed_from")
+                           if (now.get("locator") or {}).get(name) is not None}} if now is not None and outcome != "right" else None,
             "notes": "; ".join((now.get("notes") or [])[:3]) if now is not None and outcome != "right" else "",
             "set": "held out" if held_out or value["period_end"][:7] in quarters else "tuning",
         })

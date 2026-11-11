@@ -74,10 +74,16 @@ class ReplayReading:
                 continue
             listed = {f"{group.key}.{kpi.key}" for kpi in group.kpis if kpi.key != group.total_kpi}
             unlooked = (listed - mine.keys()) - not_reported  # nobody has looked for it in this kind of document yet
+            # A place last read as the year's figure holds a year, and a replay states no period of its own: TSMC's 2023
+            # wafer shipments (12,002,177, its annual statements' row) were replayed as Q4's. The AI reads the period.
+            yearly = {key for key in mine if (history.get(key) or {}).get("fiscal_period") == "FY"}
+            missed("last reading was the year's", len(yearly))
+            if yearly and not kpi_by_kpi(group):
+                continue
             if kpi_by_kpi(group):
                 parts = [({key: locator}, Spec.model_validate({"groups": [{**group.model_dump(), "kpis": [
                     kpi.model_dump() for kpi in group.kpis if f"{group.key}.{kpi.key}" == key]}]}), key)
-                    for key, locator in mine.items() if key in listed]
+                    for key, locator in mine.items() if key in listed and key not in yearly]
                 missed("a listed KPI not looked for yet", len(unlooked))
             elif unlooked and not any(locator.get("whole_table") for locator in mine.values()):
                 missed("a listed KPI not looked for yet")

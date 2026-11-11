@@ -398,3 +398,17 @@ def test_a_figure_the_owner_corrected_never_lends_its_place():
     read, _problems, _ = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
     assert "members" not in {item.kpi.key for item in read}
     assert pipeline.result.replay_outcomes.get("group not read in this kind of document before") == 1
+
+
+def test_a_place_last_read_as_the_years_figure_is_never_replayed_as_a_quarter():
+    # TSMC: its FY 2022 statements' "Wafer | Shipments (Piece)" row was replayed into the 2023 statements, and the year's
+    # 12,002,177 wafers were taken for the fourth quarter's.
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
+    history = [{**value, "fiscal_period": "FY"} if value["kpi_key"] == "members" else value for value in _history(first)]
+    flash = {"period_end": "2026-06-30", "values": []}
+    pipeline = _pipeline(NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash}), history)
+    read, _problems, _ = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
+    assert "members" not in {item.kpi.key for item in read}
+    assert pipeline.result.replay_outcomes["last reading was the year's"] == 1
+    assert {item.kpi.key for item in read if not item.is_total} >= {"n3"}  # the quarter's table still replays
