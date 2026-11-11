@@ -189,3 +189,29 @@ def test_a_title_in_the_tables_own_rows_says_consolidated():
     readings, _ = read_text(ASML_Q1_2003, accession="r", form="6-K", filed=date(2003, 4, 16),
                             document_end=date(2003, 3, 31), fiscal_year_end="1231", year_offset=0)
     assert readings and all(r.scope == "consolidated" for r in readings)
+
+
+def test_a_release_without_ex99_reads_its_numbered_exhibits():
+    # Brookfield's 6-K of 24 March 2011: its annual report filed as EX-1.
+    from statement_extractor.sources.documents import release_documents
+
+    class Item:
+        def __init__(self, kind):
+            self.document_type = kind
+
+    cover, report, contract = Item("6-K"), Item("EX-1"), Item("EX-10.1")
+    assert release_documents([cover, report, contract]) == [report]
+    release = Item("EX-99.1")
+    assert release_documents([cover, report, release]) == [release]
+    assert release_documents([cover, contract]) == [cover]
+
+
+def test_a_hidden_sizing_row_is_no_line():
+    # Brookfield's 2011 annual report: a row styled visibility:hidden holding "00000000" atop each statement.
+    from statement_extractor.readers.html.parse import parse_html
+    html = """<table><tr style="visibility:hidden; line-height:0pt"><td></td><td>00000000</td><td>00000000</td></tr>
+<tr><td>YEARS ENDED DECEMBER 31 (MILLIONS)</td><td>2011</td><td>2010</td></tr>
+<tr><td>Net income</td><td>3,674</td><td>3,195</td></tr></table>"""
+    [table] = parse_html(html)
+    assert [cell.text for cells in table.header for cell in cells][-2:] == ["2011", "2010"]
+    assert [row.label for row in table.rows] == ["Net income"]

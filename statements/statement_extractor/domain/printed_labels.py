@@ -90,6 +90,8 @@ NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+pr
                         # IFRS: TIM's "Net profit for the period", Petrobras's "Net income for the period"
                         r"^net\s+(income|profit|earnings|loss)(\s*/\s*\(loss\)|\s+\(loss\))?\s+for\s+the\s+(period|year|quarter)$|^net\s+\((loss|income)\)\s+(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
+                        # Canadian GAAP from 2007, no other comprehensive income: Gildan's "Net earnings and comprehensive income".
+                        r"^net\s+(income|earnings)(\s+\(loss\))?\s+and\s+comprehensive\s+(income|earnings)(\s+\(loss\))?$|"
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
                          r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"

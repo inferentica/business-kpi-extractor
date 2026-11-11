@@ -159,6 +159,9 @@ def _side_by_side(lines: list[list[Cell]]) -> int | None:
     return middle if count >= max(5, figured * 0.3) else None
 
 
+_HIDDEN = re.compile(r"visibility\s*:\s*hidden|display\s*:\s*none", re.I)
+
+
 def _walk(root):
     """Every element in document order (as root.iter() gives them), each with whether a table holds it: one pass
     carrying the answer down, where asking each element's ancestors walked them again for every element (Vale's
@@ -195,7 +198,9 @@ def parse_html(html: str | bytes) -> list[Table]:
         if element.tag == "table":
             if in_table:
                 continue
-            lines = [_cells(tr) for tr in element.iter("tr")]
+            # A row styled invisible sizes the columns and is never seen (Brookfield's 2011 annual report: a hidden first
+            # row of "00000000" atop each statement, which read as figures and left the years below as a line).
+            lines = [_cells(tr) for tr in element.iter("tr") if not _HIDDEN.search(tr.get("style") or "")]
             rows, header, seen_figures = _rows(lines)
             middle = _side_by_side(lines)
             if middle is not None:

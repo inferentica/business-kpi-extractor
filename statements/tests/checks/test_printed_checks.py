@@ -100,3 +100,20 @@ def test_cash_moved_into_assets_held_for_sale_adjusts_the_change():
                     ("Foreign currency revaluation", 252), ("Cash and cash equivalents Balance, beginning of period", 15_051),
                     ("Cash and cash equivalents Balance, end of period", 16_242), ("Net change in cash classified within assets held for sale", 71))
     assert cash_check(figures).result == "pass"
+
+
+def test_the_exchange_effect_after_the_sections_not_an_adjustment_of_the_same_words():
+    # Gildan's fiscal 2001: opening cash at the top, unlabelled section totals, "Foreign exchange loss (gain)" among the
+    # operating adjustments, the effect of exchange rates on cash after the sections, and cash of nil at the end.
+    from statement_extractor.checks.printed import cash_check
+    figures = lines(("Cash and cash equivalents, beginning of year", 33_492_381), ("Net earnings", 815_958),
+                    ("Foreign exchange loss (gain)", -416_640), ("Net cash from operating activities", -12_343_056),
+                    ("Net cash from financing activities", 28_290_168), ("Net cash from investing activities", -49_282_740),
+                    ("Effect of exchange rate changes on cash and cash equivalents", -156_753),
+                    ("Cash and cash equivalents, end of year", 0))
+    assert cash_check(figures).result == "pass"
+
+
+def test_net_earnings_and_comprehensive_income_is_net_income():
+    from statement_extractor.domain.printed_labels import NET_INCOME
+    assert NET_INCOME.search("Net earnings and comprehensive income")  # Gildan's fiscal 2007, Canadian GAAP

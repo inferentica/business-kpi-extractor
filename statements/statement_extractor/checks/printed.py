@@ -71,12 +71,19 @@ def cash_check(figures) -> Check:
     if first_change is not None and first_change < opening[0]:
         effects += [value for label, _level, value in figures[first_change + 1:opening[0]]
                     if value is not None and not (EXCHANGE.search(label) or EFFECT.match(label) or CHANGE.search(label))]
-    sections = [value for label, _level, value in figures if SECTIONS.search(label) and re.search(r"^net|^cash|^total", label, re.I)]
+    placed = [(index, value) for index, (label, _level, value) in enumerate(figures)
+              if SECTIONS.search(label) and re.search(r"^net|^cash|^total", label, re.I)]
+    sections = [value for _index, value in placed]
     candidates = list(changes)
     candidates += [change + effect for change in changes for effect in effects]
     candidates += [change + sum(effects) for change in changes if len(effects) > 1]
     if len(sections) >= 3:
         candidates += [sum(sections[:3]), sum(sections[:3]) + sum(effects[:1])]
+        # The effect of exchange rates on cash printed after the sections, not an operating adjustment of the same
+        # words before them (Gildan's 2001 "Foreign exchange loss (gain)" among its adjustments to net earnings).
+        after = [value for index, (label, _level, value) in enumerate(figures) if index > placed[2][0] and value is not None
+                 and (EXCHANGE.search(label) or EFFECT.match(label))]
+        candidates += [sum(sections[:3]) + sum(after)]
     for change in candidates:
         if close(opening[1] + change, closing[1], 3):
             return Check("cash", PASS)
