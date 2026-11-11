@@ -54,6 +54,18 @@ _CHANGE_KPI = re.compile(r"\bnet\s+(?:additions?|adds|change|gains?|increase)\b|
 _OTHER_PERIOD = re.compile(r"\bfirst (?:six|nine) months\b|\b(?:six|nine|twelve) months ended\b|\bfor the (?:full )?(?:fiscal )?year\b"
                            r"|\bfull[- ]year\b|\bfiscal (?:year )?\d{4}\b|\byear[- ]to[- ]date\b|\bYTD\b|\bfirst half\b|\bH1\b", re.I)
 
+_SENTENCE_END = re.compile(r"(?<=[.!?;])\s+(?=[A-Z\u2022(])|\u2022|\s[\u2013\u2014-]\s")
+
+
+def sentence_opening(text: str, quote: str) -> str:
+    """The words of the quote's sentence before the quote: "" when the quote begins its sentence, or is not found. Meta's
+    Q4 2023 release opens "For the full year 2023, ad impressions increased by 28% ... and the average price per ad
+    decreased by 9%": a quote of its second half alone read the year's -9% as the quarter's +2%."""
+    at = text.find(quote)
+    if at <= 0:
+        return ""
+    return _SENTENCE_END.split(text[:at])[-1].strip()
+
 
 # A slide title naming the year to date ("2025 YTD Contracting Statistics").
 _YTD_TITLE = re.compile(r"(?:\b20\d{2}\s+)?\bYTD\b|\b[Yy]ear[- ]to[- ][Dd]ate\b")
@@ -219,3 +231,21 @@ def states_quarter(header: str) -> bool:
     """Whether a column header itself says its figures are a quarter's ("Three Months Ended", "Q4 2025", "4Q25"):
     the filing's own word on the period, which a total far above the quarter before cannot outweigh."""
     return bool(_STATES_QUARTER.search(header or ""))
+
+
+def other_period_problem(text: str, quote: str, before: str, kpi_label: str) -> str | None:
+    """Why a quoted figure is not the quarter's, when the words before it give another period. "YTD 2025, the company was
+    awarded 14 new contract commitments" is the year to date, not the quarter's count, unless the KPI itself is defined
+    over the longer span (Tesla's cumulative deliveries, PGIM's trailing flows). A quote that names the quarter ("In the
+    second quarter of fiscal 2026, 2,148 units booked") is the quarter's figure. The period may open the quote's
+    sentence before the quote itself (sentence_opening)."""
+    context = f"{sentence_opening(text, quote)} {before}"
+    if (span := _OTHER_PERIOD.search(context[-120:])) and not _LONG_SPAN_KPI.search(kpi_label) \
+            and not _NAMES_QUARTER.search(context[-160:]):
+        # GE Vernova's "backlog increased $6.5 billion year-to-date, to approximately $26 billion" states a change over
+        # the year and then the level at quarter end: the level of a stock measure is the quarter's figure.
+        between = context[-120:][span.end():]
+        level = re.search(r"\b(?:to|reached|reaching|stood at|stands at|as of|at the end|ended the quarter with|now)\b", between)
+        if not (level and _STOCK_KPI.search(kpi_label)):
+            return f"the quote gives the figure {span.group(0).lower()!r}, not the quarter's"
+    return None
