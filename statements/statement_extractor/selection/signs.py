@@ -45,7 +45,7 @@ def settle_signs(winner: Reading, kept: list[Reading], printed: dict[str, list[f
                 value = keyed.get(key)
                 if value is None:
                     value = by_label.get(line["label"].lower())
-                if value is not None and abs(abs(value) - abs(line["value"])) < 0.5:
+                if value is not None and _same(value, line["value"]):
                     values.append(value)
             opposite = sum(1 for value in values if (value < 0) != (line["value"] < 0))
             if opposite > len(values) - opposite + 1:  # most presentations, the newest's included, print the other sign
@@ -108,6 +108,12 @@ def sign_ties(readings: list[Reading]) -> set[str]:
 
 
 _SCALES = (1.0, 1e3, 1e6, 1e9)
+
+
+def _same(shown: float, value: float) -> bool:
+    """One amount in either sign, for the vote among presentations: to half a unit, and a per-share figure to its
+    printed places (Volaris's 2017 earnings per share of 0.275 is not the loss of 0.588 its earlier 20-Fs print)."""
+    return abs(abs(shown) - abs(value)) <= (0.5 if abs(value) >= 10 else 0.0006)
 
 
 def _disputed(winner: Reading, others: list[Reading]) -> set[str]:

@@ -145,3 +145,12 @@ def test_among_releases_the_annual_reports_basis_wins():
     again.basis, again.form = "IFRS", "6-K"
     chosen = {item["fiscal_period"]: item for item in choose([annual, first, again])}
     assert chosen["Q2"]["source_accession"] == "q2" and chosen["Q2"]["other_bases"][0]["basis"] == "IFRS"
+
+
+def test_a_per_share_figure_is_matched_to_its_printed_places_in_the_vote():
+    # Volaris's FY2020 20-F prints 2017 earnings per share of 0.275; its earlier 20-Fs' (0.588) and (0.644) are other
+    # amounts, not the same one in the other sign.
+    year = [reading("fy18", date(2018, 4, 30), -0.588, own=True), reading("fy19", date(2019, 4, 30), -0.644, own=False),
+            reading("fy20", date(2020, 6, 30), 0.275, own=False)]
+    [chosen] = choose(year)
+    assert chosen["source_accession"] == "fy20" and chosen["lines"][0]["value"] == 0.275
