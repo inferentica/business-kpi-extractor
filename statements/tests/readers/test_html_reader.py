@@ -414,3 +414,17 @@ def test_a_title_in_another_companys_possessive_names_it():
                         ("The Company&#8217;s consolidated balance sheets", None)):
         [(kind, group)] = find_statements(parse_html(f"<p>{prose}</p>" + table), release=True)
         assert titled_company(kind, group[0]) == name
+
+
+def test_a_notes_statement_of_discontinued_operations_is_no_statement():
+    # CEMEX's 6-K of October 2017: a note's "condensed combined information of the statement of operations of CEMEX
+    # discontinued operations", headed "INCOME STATEMENT | Jan-Sep | Third Quarter" (round 63 served its quarter).
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements
+    rows = "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+        ("Sales", "1,549", "6,819"), ("Cost of sales and operating expenses", "(1,531)", "(6,509)"), ("Other expenses, net", "14", "(1)"),
+        ("Financial expense", "(5)", "(9)"), ("Income tax", "(2)", "(30)"), ("Net income", "25", "270")))
+    html = ("<p>The following table presents condensed combined information of the statement of operations of CEMEX "
+            "discontinued operations mainly: a) the Concrete Pipe Business for the period ended January 31, 2017</p>"
+            "<table><tr><td>INCOME STATEMENT</td><td>2017</td><td>2016</td></tr>" + rows + "</table>")
+    assert find_statements(parse_html(html), release=True) == []

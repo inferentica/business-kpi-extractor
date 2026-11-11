@@ -35,6 +35,12 @@ _NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bcomparison\b.{0,120}?\bve
                             r"reconciliation\s+of|amounts\s+determined\s+under|(under|to|with)\s+u\.?\s?s\.?\s+gaap", re.I)
 
 
+# A note's statement of discontinued operations: CEMEX's 6-K of October 2017, "condensed combined information of the
+# statement of operations of CEMEX discontinued operations mainly: a) the Concrete Pipe Business …".
+_DISCONTINUED = re.compile(r"\b(?:statements?\s+of\s+(?:operations|income)|income\s+statements?)\s+of\s+(?:[\w-]+\s+){0,3}"
+                           r"discontinued\s+operations\b", re.I)
+
+
 # "quarterly" names quarterly-data tables, not the report's own running header (Tennant's "Quarterly Report – Form 10-Q"
 # atop every page).
 _NOT_IN_RELEASE = re.compile(_NOT_STATEMENT.pattern.replace("summary|", "").replace("|quarterly(?!\\s+report)|", "|"), re.I)
@@ -107,7 +113,7 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         title_text = SIDE_BY_SIDE.sub(" ", title_text)
         if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
                 not_statement.search(_RUNNING_LINK.sub(" ", _heading(table.context[-200:]))) or \
-                len([r for r in table.rows if r.figures]) < 4:
+                _DISCONTINUED.search(table.context[-600:]) or len([r for r in table.rows if r.figures]) < 4:
             continue
         if any(_NOT_A_PERIOD.search(cell.text) for cells in table.header for cell in cells if cell.start > 0):
             continue
