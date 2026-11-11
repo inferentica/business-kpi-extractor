@@ -6,9 +6,9 @@ page break continues in the next table. Each figure column takes its period from
 ("September 29, 2007"), or the year under a date in the title ("Three fiscal years ended September 29, 2007"), and its
 span ("Three Months Ended"). Each line keeps its printed label, its indentation and its figure as printed.
 
-It is kept only when its arithmetic holds on the printed figures (brackets for negatives):
-- assets equal liabilities and equity; opening cash plus the change (or the three sections) equals closing cash;
-- each printed total equals the lines above it, and net income follows from income before taxes.
+It is kept only when its arithmetic holds on the printed figures (brackets for negatives): assets equal liabilities and
+equity; opening cash plus the change (or the three sections) equals closing cash; each printed total equals the lines
+above it; net income follows from income before taxes.
 """
 from __future__ import annotations
 
@@ -279,7 +279,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
         checks.insert(0, income_check(figures))
     return Reading(statement=kind, duration=duration, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
                    period_end=period.end, period_start=period.start, currency=None, accession="", form="", filed=date.min,
-                   own=False, source="html", lines=lines, checks=checks)
+                   own=False, source="html", lines=lines, checks=checks, ticker=layout[0][0].ticker)
 
 
 def _printed_unit(values: list[float]) -> float:

@@ -20,13 +20,46 @@ _DOLLAR_CELL = re.compile(r"^\s*\$\s*(?:[\d(.]|$)")
 
 
 def column_currencies(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[int, ...], str | None]:
-    """Each column's currency as its header names it, if it does."""
+    """Each column's currency as its header names it, if it does; else as the sign printed beside its figures, where
+    the title defines that sign (FEMSA's 20-Fs: "millions of U.S. dollars ($) and in millions of Mexican pesos (Ps.)",
+    the translation's column first, "$ 2,407" beside "Ps. 35,497")."""
     found = {}
+    signs = _defined_signs(table.context[-400:] + " " + " ".join(cell.text for cells in table.header for cell in cells))
     for column in columns:
         named = currencies_named(header_text(table, column[0]) or header_text(table, column[-1]))
         # Two currencies over one column (TSMC's "3Q 2002 NTD" with a "USD" set off from the row below): neither.
-        found[column] = named[0] if len(named) == 1 else None
+        found[column] = named[0] if len(named) == 1 else signs.get(_sign_beside(table, column)) if signs else None
     return found
+
+
+_DEFINED = re.compile(r"((?:u\.?\s?s\.?|united\s+states)\s+dollars?|mexican\s+pesos?|chilean\s+pesos?|(?:brazilian\s+)?reais)"
+                      r"\s*\((\$|ps\.?|ch\$|r\$|us\$)\)", re.I)
+
+
+def _defined_signs(text: str) -> dict[str, str]:
+    """The signs a title defines for its currencies: "U.S. dollars ($)", "Mexican pesos (Ps.)"."""
+    signs = {}
+    for match in _DEFINED.finditer(text):
+        named = currencies_named(match.group(1))
+        if named:
+            signs[match.group(2).lower().rstrip(".")] = named[0]
+    return signs if len(set(signs.values())) >= 2 else {}
+
+
+def _sign_beside(table: Table, column: tuple[int, ...]) -> str | None:
+    """The currency sign printed in the cell just before a column's figures, in the statement's first figure rows."""
+    for row in [row for row in table.rows if row.figures][:12]:
+        own = next((cell for cell in row.cells if cell.start == column[0]), None)
+        inside = _SIGN_IN_CELL.match(own.text) if own is not None else None
+        if inside:
+            return inside.group(1).lower().rstrip(".")  # "Ps. 35,497"
+        before = [cell for cell in row.cells if cell.start < column[0] and column[0] - cell.start <= 2 and cell.text.strip()]
+        if before and not row.figures.get(before[-1].start):
+            return before[-1].text.strip().lower().rstrip(".")
+    return None
+
+
+_SIGN_IN_CELL = re.compile(r"^\(?\s*(ps\.?|us\$|ch\$|r\$|\$)\s*[\d(]", re.I)
 
 
 def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | None:

@@ -160,6 +160,9 @@ def _side_by_side(lines: list[list[Cell]]) -> int | None:
     return middle if count >= max(5, figured * 0.3) else None
 
 
+# A release opens with its issuer and tickers, "Coca-Cola FEMSA, S.A.B. de C.V. (BMV: KOFL, NYSE: KOF)": FEMSA's 6-Ks
+# carry Coca-Cola FEMSA's release after FEMSA's own.
+_TICKER = re.compile(r"\bNYSE\s*:\s*([A-Z][A-Z.]{0,6})\b")
 _HIDDEN = re.compile(r"visibility\s*:\s*hidden|display\s*:\s*none", re.I)
 
 
@@ -193,6 +196,7 @@ def parse_html(html: str | bytes) -> list[Table]:
     tree = lxml.html.fromstring(raw)
     found = []
     previous_text: list[str] = []
+    ticker = ""
     for element, in_table in _walk(tree):
         if not isinstance(element.tag, str):
             continue
@@ -212,7 +216,7 @@ def parse_html(html: str | bytes) -> list[Table]:
                                                 if cell.start >= middle] for cells in lines])
                 rows += right[next((index for index, row in enumerate(right) if row.figures), len(right)):]
             context = " ".join(previous_text)[-600:]
-            found.append(Table(rows=rows, header=header, context=context, index=len(found)))
+            found.append(Table(rows=rows, header=header, context=context, index=len(found), ticker=ticker))
             if seen_figures:
                 previous_text = []
             else:
@@ -227,5 +231,7 @@ def parse_html(html: str | bytes) -> list[Table]:
             for child in element:
                 if child.tail and child.tail.strip():
                     previous_text.append(clean(child.tail))
+            announced = _TICKER.findall(" ".join(previous_text[-3:]))
+            ticker = announced[-1] if announced else ticker
             previous_text = previous_text[-40:]
     return found

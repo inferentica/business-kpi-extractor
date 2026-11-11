@@ -52,6 +52,7 @@ class Table:
     index: int  # the table's place in the document
     header_text: str = ""  # a text table's header lines as printed, before their words are given to columns
     dollars: bool = False  # a text table's lines print "$" before figures (the parser keeps figures, not the sign)
+    ticker: str = ""  # the last NYSE ticker the document's text announced before the table (a release's issuer)
 
 
 # An account code before a label in Brazil's CVM forms: "3.09 Profit before taxation", "1.01.01 Cash and cash equivalents".
@@ -68,6 +69,7 @@ def number(text: str) -> float | None:
     if re.fullmatch(r"\(\s*\$\s*000'?s?\s*\)|\$\s*000'?s?|\d{1,2}\.\d{1,2}\.(\d{2}|\d{4})", text.strip()):
         return None  # a scale, or a date written day first (UBS's "31.12.14")
     text = text.replace("$", "").strip()
+    text = re.sub(r"^(\(?)\s*Ps\.?\s*(?=[\d.(\-−–])", r"\1", text)  # a peso sign in the figure's cell: FEMSA's "Ps. 35,497"
     if _DASH.match(text):
         return 0.0
     match = _NUMBER.match(text)

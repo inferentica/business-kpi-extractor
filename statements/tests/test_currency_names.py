@@ -120,3 +120,21 @@ def test_a_currency_in_the_tables_first_row_beats_the_commentary_above_its_title
            "<table><tr><td></td><td>2016</td><td>2015</td></tr><tr><td>R$ million</td></tr>" + "".join(
                f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in ROWS) + "</table>"
     assert _currencies(html) == {"BRL"}
+
+
+def test_the_sign_beside_each_column_tells_the_translation_from_the_statement():
+    # FEMSA's 20-Fs: "Amounts expressed in millions of U.S. dollars ($) and in millions of Mexican pesos (Ps.)", the
+    # translation's column first, "$ 2,407" beside "Ps. 35,497".
+    rows = [("Cash and cash equivalents", "$", "2,407", "Ps. 35,497", "Ps. 27,259"),
+            ("Total current assets", "", "5,370", "79,112", "70,000"), ("Total assets", "", "15,000", "220,000", "200,000"),
+            ("Total liabilities", "", "6,000", "88,000", "80,000"), ("Total equity", "", "9,000", "132,000", "120,000"),
+            ("Total liabilities and equity", "", "15,000", "220,000", "200,000")]
+    html = "<p>Consolidated Statements of Financial Position As of December 31, 2014 and 2013. Amounts expressed in millions " \
+           "of U.S. dollars ($) and in millions of Mexican pesos (Ps.)</p><table><tr><td></td><td></td><td>December 2014 (*)</td>" \
+           "<td>December 2014</td><td>December 2013</td></tr>" + "".join(
+               "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>" for row in rows) + "</table>"
+    from statement_extractor.readers.html.read import read_document
+    readings, notes = read_document(html, accession="x", form="20-F", filed=date(2015, 4, 15), document_end=date(2014, 12, 31),
+                                    fiscal_year_end="1231", year_offset=0)
+    got = {(r.period_end.year, r.currency, r.lines[0]["value"]) for r in readings}
+    assert got == {(2014, "MXN", 35_497e6), (2013, "MXN", 27_259e6)}, got

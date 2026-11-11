@@ -46,6 +46,7 @@ class Reading:
     lines: list[dict] = field(default_factory=list)  # line, concept, label, level, is_heading, value
     checks: list[Check] = field(default_factory=list)
     titled: str | None = None  # the company a printed statement's title names ("… and subsidiaries"), for the pipeline
+    ticker: str = ""  # the NYSE ticker a release announced before the statement (pipeline/releases.py)
 
     @property
     def key(self) -> tuple[str, str, str, str]:
@@ -73,7 +74,7 @@ class Reading:
         data["period_start"] = self.period_start.isoformat() if self.period_start else None
         data["filed"] = self.filed.isoformat()
         data["status"] = self.status
-        data.pop("titled")
+        data.pop("titled"), data.pop("ticker")
         if not with_lines:
             data.pop("lines")
             data["line_count"] = len(self.lines)

@@ -217,3 +217,13 @@ def test_a_hidden_sizing_row_is_no_line():
     [table] = parse_html(html)
     assert [cell.text for cells in table.header for cell in cells][-2:] == ["2011", "2010"]
     assert [row.label for row in table.rows] == ["Net income"]
+
+
+def test_another_issuers_release_in_the_6k_is_left_out():
+    # FEMSA's 6-Ks carry Coca-Cola FEMSA's release, opening "(BMV: KOFL, NYSE: KOF)".
+    from statement_extractor.pipeline.releases import _same_ticker
+    from statement_extractor.readers.html.parse import parse_html
+    html = "<p>FEMSA (NYSE: FMX; BMV: FEMSAUBD) announced</p><table><tr><td>a</td><td>1</td></tr></table>" \
+           "<p>Coca-Cola FEMSA, S.A.B. de C.V. (BMV: KOFL, NYSE: KOF) announced</p><table><tr><td>b</td><td>2</td></tr></table>"
+    assert [table.ticker for table in parse_html(html)] == ["FMX", "KOF"]
+    assert _same_ticker("FMX", "FMX") and not _same_ticker("KOF", "FMX") and _same_ticker("AKO.A", "AKO-A")
