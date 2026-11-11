@@ -412,3 +412,22 @@ def test_a_place_last_read_as_the_years_figure_is_never_replayed_as_a_quarter():
     assert "members" not in {item.kpi.key for item in read}
     assert pipeline.result.replay_outcomes["last reading was the year's"] == 1
     assert {item.kpi.key for item in read if not item.is_total} >= {"n3"}  # the quarter's table still replays
+
+
+def test_a_filing_giving_a_kpis_quarter_and_year_on_one_day_lends_the_quarters_place():
+    from kpi_extractor.steps.shared import _later_place
+    quarter = {"period_end": "2025-12-31", "fiscal_period": "Q4"}
+    year = {"period_end": "2025-12-31", "fiscal_period": "FY"}
+    assert _later_place(quarter, year) and not _later_place(year, quarter)
+    assert _later_place({"period_end": "2026-03-31", "fiscal_period": "Q1"}, quarter) and _later_place(year, None)
+
+
+def test_a_quarters_place_is_replayed_though_the_years_figure_shares_its_day():
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
+    history = _history(first)
+    year = [{**value, "fiscal_period": "FY", "locator": {"derived": True}} for value in history if value["kpi_key"] == "members"]
+    pipeline = _pipeline(NoAi(), year + history)  # the year's figure first, as a store may hold it
+    read, _problems, _ = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
+    assert {item.kpi.key: item.value for item in read if not item.is_total}["members"] == 310_000_000
+    assert "last reading was the year's" not in pipeline.result.replay_outcomes

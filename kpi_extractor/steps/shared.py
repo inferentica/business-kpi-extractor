@@ -26,6 +26,15 @@ def value_key(value: dict) -> tuple[str, str, str, str]:
     return value["group_key"], value["kpi_key"], value["fiscal_year"], value["fiscal_period"]
 
 
+def _later_place(value: dict, known: dict | None) -> bool:
+    """Whether a reading is a later place for its KPI than the one known: the later period, and on the same day the
+    quarter's figure before the year's (a Q4 filing gives both; replay never starts from a year's place, so a year
+    winning the tie lost TSMC's and ASML's Q4 places)."""
+    if known is None:
+        return True
+    return (value["period_end"], value.get("fiscal_period") != "FY") > (known["period_end"], known.get("fiscal_period") != "FY")
+
+
 def only_adds(before: Spec, after: Spec) -> bool:
     """Whether a new list keeps every KPI of the old one as it was, adding only."""
     kept = {(group.key, group.kind, kpi.key, kpi.unit) for group in after.groups for kpi in group.kpis}
