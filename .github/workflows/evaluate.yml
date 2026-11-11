@@ -24,7 +24,7 @@ on:
         default: "6"
         type: string
       ai_profile:
-        description: Reasoning effort - flash-high (production), flash-low, flash-max, or reasoning on every call (flash-max-all)
+        description: Reasoning effort - flash-high (production), flash-low, flash-max, reasoning on every call (flash-max-all), Qianwen for every call (qwen), or DeepSeek's first reading with Qianwen's reasoning calls (mixed)
         required: true
         default: flash-high
         type: choice
@@ -33,6 +33,8 @@ on:
           - flash-low
           - flash-max
           - flash-max-all
+          - qwen
+          - mixed
       golden:
         description: Values to score against; its companies are the ones read
         required: true

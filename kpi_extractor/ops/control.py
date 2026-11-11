@@ -66,11 +66,13 @@ class ControlPlane:
     def ai(self, symbol: str, purpose: str, system: str, user: str, thinking: bool, model: str = "flash",
            prompt_version: str | None = None) -> str:
         model, thinking, effort = ai_profile(model, thinking)
+        provider = ai_provider(thinking)
         # The reply streams keep-alive spaces before its JSON, so a long reasoning call outlasts the gateway's idle
         # limit; a failure after the first byte arrives as {"error": ...} and is retried once.
         for attempt in (1, 2):
             response = self.call("ai", timeout=390, attempts=2, symbol=symbol, purpose=purpose, model=model,
                                  system=system, user=user, thinking=thinking, **({"effort": effort} if effort else {}),
+                                 **({"provider": provider} if provider != "deepseek" else {}),
                                  **({"promptVersion": prompt_version} if prompt_version else {}))
             if not response.get("error"):
                 return Reply(str(response.get("content") or ""), response.get("callId"))
@@ -112,8 +114,18 @@ class ControlPlane:
 # reading, reviews and naming with it. "flash-high" (DeepSeek's default effort) matched the former Pro reader on the
 # golden set at half the cost (2026-10-26); "flash-max" reasons longer, "flash-max-all" reasons on every call;
 # "flash-low" reasons less (DeepSeek offers low, high and max), tried for cost: reasoning tokens are most of a second read's.
-AI_PROFILES = ("flash-high", "flash-low", "flash-max", "flash-max-all")
+# "qwen" sends every call to Qianwen (qwen3.8-flash) instead; "mixed" keeps DeepSeek's first reading and sends every
+# reasoning call (the second reading, reviews, naming) to Qianwen, an independent second model (the 2026-11-11 test).
+AI_PROFILES = ("flash-high", "flash-low", "flash-max", "flash-max-all", "qwen", "mixed")
 _EFFORT = {"flash-max": "max", "flash-low": "low"}
+
+
+def ai_provider(thinking: bool) -> str:
+    """Which model answers a call under the configured profile: DeepSeek, or Qianwen under "qwen" and "mixed"."""
+    profile = os.environ.get("KPI_AI_PROFILE", "flash-high")
+    if profile == "qwen" or (profile == "mixed" and thinking):
+        return "qwen"
+    return "deepseek"
 
 
 def ai_profile(model: str, thinking: bool) -> tuple[str, bool, str | None]:

@@ -2176,3 +2176,13 @@ def test_a_figure_the_next_years_release_gives_otherwise_is_held_not_set_aside()
     held = held_for_later(row, [276e6, 183e6], "checked against b")
     assert held["validation_status"] == "needs_review" and held["value"] == 261e6
     assert held["notes"][1:] == ["the next year's release gives 2.76e+08, 1.83e+08 for this line: restated, or misread", "checked against b"]
+
+
+def test_qwen_profiles_choose_the_model_per_call(monkeypatch):
+    from kpi_extractor.ops.control import ai_provider
+    monkeypatch.setenv("KPI_AI_PROFILE", "flash-high")
+    assert (ai_provider(False), ai_provider(True)) == ("deepseek", "deepseek")
+    monkeypatch.setenv("KPI_AI_PROFILE", "qwen")
+    assert (ai_provider(False), ai_provider(True)) == ("qwen", "qwen")
+    monkeypatch.setenv("KPI_AI_PROFILE", "mixed")  # DeepSeek reads first; Qianwen reads again and reviews
+    assert (ai_provider(False), ai_provider(True)) == ("deepseek", "qwen")
