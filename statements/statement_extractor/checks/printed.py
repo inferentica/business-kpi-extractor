@@ -196,11 +196,22 @@ def _chain(start: float, end: float, values: list[float]) -> bool:
 
 
 def total_check(printed) -> Check:
+    """Each printed total against the lines above it (_totals); where one fails, again with a line's parts printed
+    under it at its own level set aside (Volaris's "Passenger revenues" over "Fare revenues" and "Other passenger
+    revenues"), taken only when every total then holds."""
+    check = _totals(printed)
+    if check.result == FAIL:
+        again = _totals(_without_parts(printed, same_level=True))
+        if again.result == PASS:
+            return again
+    return check
+
+
+def _totals(printed) -> Check:
     """Each printed "Total …" equals lines just above it, read upward: an earlier subtotal counts as one line for the
     lines it sums, together with the headings over them ("Total assets" = total current assets + the lines after it),
     and a line headed "Less" is taken away, in brackets or not (Costco's accumulated depreciation). A total with fewer than two lines above it is not tested."""
     verified, failures = 0, []
-    printed = _without_parts(printed, same_level=True)  # a line's parts printed under it, at its level (Volaris)
     starts = subtotals(printed)
     assets = [value for label, _level, value in printed if value is not None and ASSETS.match(label)]
     equity_section = any(EQUITY_SECTION.search(label) for label, _level, _value in printed)

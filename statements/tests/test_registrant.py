@@ -112,3 +112,10 @@ def test_each_name_on_the_cover_is_compared():
     cover = ("Commission File Number: 1-16269 AM&Eacute;RICA M&Oacute;VIL, S.A.B. DE C.V. (Exact Name of the Registrant as "
              "Specified in the Charter) America Mobile (Translation of Registrant&rsquo;s Name into English) Lago Alberto 366")
     assert _other(cover, ["America Movil SAB de CV"]) is None
+
+
+def test_a_translation_printed_as_na_is_no_name():
+    # Gerdau's covers: "GERDAU S.A. (Exact Name of Registrant as Specified in its Charter) N/A (Translation of Registrant's Name)".
+    cover = ("Commission File Number 001-14878 GERDAU S.A. (Exact Name of Registrant as Specified in its Charter) "
+             "N/A (Translation of Registrant&rsquo;s Name into English) Av. Doutora Ruth Cardoso")
+    assert _other(cover, ["GERDAU S.A."]) is None

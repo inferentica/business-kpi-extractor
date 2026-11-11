@@ -71,7 +71,9 @@ def another_registrant(ref, attachments) -> str | None:
         # Móvil's translation "America Mobile" is no EDGAR name, its "AMÉRICA MÓVIL, S.A.B. DE C.V." is).
         printed = _BEFORE_NAME.sub("", text[max(0, match.start() - 150):match.start()]).split(")")[-1].strip(" :.,")
         words = _words(printed)
-        if not words or not names or any(words <= name or name <= words or "".join(sorted(words)) == "".join(sorted(name))
+        if not any(len(word) >= 3 for word in words):
+            continue  # no name: Gerdau's cover prints "N/A" for its translation
+        if not names or any(words <= name or name <= words or "".join(sorted(words)) == "".join(sorted(name))
                                          or any(SequenceMatcher(None, "".join(_ordered(printed)), "".join(_ordered(other))).ratio() >= 0.85
                                                 for other in _company_names(ref.filing))  # "PETR?LEO": one letter lost
                                          for name in names if name):
