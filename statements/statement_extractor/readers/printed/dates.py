@@ -32,7 +32,7 @@ def month_first(text: str) -> str:
 
 
 _FULL_DATE = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}}),?\s+((?:19|20)\d{{2}})\b", re.I)
-_MONTH_YEAR = re.compile(rf"\b({_MONTH})-(\d{{2}})\b", re.I)
+_MONTH_YEAR = re.compile(rf"\b({_MONTH})(?:-|\s*['’])(\d{{2}})\b", re.I)  # "Sep-99"; América Móvil's "Dec '09"
 
 
 _YEAR = re.compile(r"\b((?:19|20)\d{2})\b")

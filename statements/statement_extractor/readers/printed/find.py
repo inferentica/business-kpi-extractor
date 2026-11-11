@@ -25,7 +25,7 @@ TITLES = (
 
 # Tables that carry a statement's name but are not the company's own statement.
 _NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bcomparison\b.{0,120}?\bversus\b|quarterly(?!\s+report)|condensed\s+consolidating|consolidating|parent\s+company|registrant|"
-                            r"guarantor|pro\s+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
+                            r"guarantor|pro[\s-]+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
                             r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b|"
                             # Chase's 1998 reconciliation of reported results to an operating basis, headed "INCOME STATEMENT".

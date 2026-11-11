@@ -228,3 +228,11 @@ def test_a_columns_own_month_over_another_date_the_title_gives_its_year():
                                      fiscal_year_end="1231", year_offset=0)
     assert {(r.period_end, r.lines[0]["value"]) for r in readings} == {
         (day(2012, 12, 31), 36_521e6), (day(2011, 12, 31), 25_841e6), (day(2011, 1, 1), 26_705e6)}
+
+
+def test_a_month_with_a_two_digit_year_after_an_apostrophe():
+    # América Móvil's releases: "Dec '09 | Dec '08" over their balance sheets.
+    from datetime import date as day
+    from statement_extractor.readers.printed.dates import _MONTH_YEAR
+    assert _MONTH_YEAR.search("Dec '09").groups() == ("Dec", "09") and _MONTH_YEAR.search("Sep-99")
+    assert day(2009, 12, 31)

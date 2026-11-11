@@ -11,6 +11,7 @@ from ..domain.basis import (BARE_DOLLARS, BARE_PESOS, default_basis, default_cur
 from ..domain.calendar import ANNUAL_FORMS
 from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
+from ..readers.printed.mexico_coded import MARKER as MEXICO_MARKER, coded_readings
 from ..readers.printed.sign_index import printed_figures
 from ..readers.printed.summary import read_summaries
 from ..readers.positioned.layout import is_positioned, positioned_text
@@ -89,6 +90,11 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         except Exception as error:  # noqa: BLE001 - one unreadable document never stops the filing
             notes.append(f"{attachment.document}: unreadable ({type(error).__name__})")
             continue
+        if printed == "html" and MEXICO_MARKER in content[:3_000_000].upper():
+            # Mexico's coded template furnished in a 6-K (readers/printed/mexico_coded.py): read by its account codes.
+            readings = readings + coded_readings(parse_html(content), accession=ref.accession, form=ref.form,
+                                                 filed=ref.filed, document_end=document_end,
+                                                 fiscal_year_end=fiscal_year_end, year_offset=year_offset)
         others = _other_companies(readings, ref, cover)
         if others:
             readings = [reading for reading in readings if reading.titled not in others]
