@@ -92,7 +92,12 @@ def cash_check(figures) -> Check:
     return Check("cash", FAIL, f"opening {opening[1]:,.1f} + change {candidates[0]:,.1f} vs closing {closing[1]:,.1f}")
 
 
-def _without_parts(lines: list) -> list:
+# Lines that are never a total's parts: Volaris's "Passenger revenues" over "Fare revenues" and "Other passenger
+# revenues" prints them at one level; a gross profit or a net figure after a revenue line is never its part.
+_NO_PART = re.compile(r"^(total|gross|net|operating\s+(income|profit|loss))\b", re.I)
+
+
+def _without_parts(lines: list, same_level: bool = False) -> list:
     """Lines with the parts printed below their own total left out: Brazil's CVM forms print each account, then the
     accounts it sums ("Provision for income tax and social contribution" -54,877, then "Income tax" -39,517 and "Social
     contribution" -15,360). Parts sum to their total exactly, two or more of them, all with figures."""
@@ -105,11 +110,12 @@ def _without_parts(lines: list) -> list:
         if value is None:
             continue
         running = 0.0
-        for count, (_l, part_level, part) in enumerate(lines[index + 1:index + 7], start=1):
-            if part is None or part_level <= level:
+        for count, (part_label, part_level, part) in enumerate(lines[index + 1:index + 7], start=1):
+            if part is None or part_level < level or part_level == level and not same_level or \
+                    same_level and (_NO_PART.match(part_label) or _NO_PART.match(label) or not value):
                 break  # parts sit below their total, a level deeper (the CVM forms' account codes)
             running += part
-            if count >= 2 and close(running, value, 0) and (value != 0 or count == 2):
+            if count >= 2 and close(running, value, 0 if not same_level else count) and (value != 0 or count == 2):
                 skip = count
                 break
     return kept
@@ -194,6 +200,7 @@ def total_check(printed) -> Check:
     lines it sums, together with the headings over them ("Total assets" = total current assets + the lines after it),
     and a line headed "Less" is taken away, in brackets or not (Costco's accumulated depreciation). A total with fewer than two lines above it is not tested."""
     verified, failures = 0, []
+    printed = _without_parts(printed, same_level=True)  # a line's parts printed under it, at its level (Volaris)
     starts = subtotals(printed)
     assets = [value for label, _level, value in printed if value is not None and ASSETS.match(label)]
     equity_section = any(EQUITY_SECTION.search(label) for label, _level, _value in printed)

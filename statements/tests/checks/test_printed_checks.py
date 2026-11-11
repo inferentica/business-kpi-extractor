@@ -117,3 +117,16 @@ def test_the_exchange_effect_after_the_sections_not_an_adjustment_of_the_same_wo
 def test_net_earnings_and_comprehensive_income_is_net_income():
     from statement_extractor.domain.printed_labels import NET_INCOME
     assert NET_INCOME.search("Net earnings and comprehensive income")  # Gildan's fiscal 2007, Canadian GAAP
+
+
+def test_a_lines_parts_printed_under_it_at_its_level():
+    # Volaris's 2018 releases: "Passenger revenues" over "Fare revenues" and "Other passenger revenues", all one level.
+    from statement_extractor.checks.printed import total_check
+    printed = [("Passenger revenues", 0, 5929), ("Fare revenues", 0, 4137), ("Other passenger revenues", 0, 1792),
+               ("Non-passenger revenues", 0, 301), ("Cargo", 0, 53), ("Other non-passenger revenues", 0, 249),
+               ("Total operating revenues", 0, 6230)]
+    assert total_check(printed).result == "pass"
+    # A revenue line never takes the gross profit after it as a part.
+    from statement_extractor.checks.printed import _without_parts
+    lines = [("Revenue", 0, 100), ("Cost of sales", 0, 60), ("Gross profit", 0, 40)]
+    assert _without_parts(lines, same_level=True) == lines

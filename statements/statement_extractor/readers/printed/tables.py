@@ -81,6 +81,8 @@ def number(text: str) -> float | None:
 
 
 YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
+# A quarter's name over a column: América Móvil's "3Q10 | 3Q09".
+QUARTER_CELL = re.compile(r"^\s*(?:[1-4]Q|Q[1-4])\s*['’]?\s*(?:19|20)?\d{2}\s*$", re.I)
 
 
 # Words a header row prints over each column rather than a period: TSMC's management reports print "USD | NTD | % |
@@ -158,8 +160,9 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
     lowest = next((cells for cells in reversed(table.header) if [cell for cell in cells if cell.start > 0]), None)
     money = [cell for cell in lowest or [] if cell.start > 0]
     bottom = (lowest if money and (all(currencies_named(cell.text) for cell in money) or is_subheader(lowest))
-              else None) or next((cells for cells in reversed(table.header) if any(YEAR_ONLY.match(cell.text) or COLUMN_TITLE.search(cell.text)
-                                                                                  for cell in cells[1:] or cells)), [])
+              else None) or next((cells for cells in reversed(table.header) if any(
+                  YEAR_ONLY.match(cell.text) or COLUMN_TITLE.search(cell.text) or QUARTER_CELL.match(cell.text)
+                  for cell in cells[1:] or cells)), [])
 
     def under(position: int):
         return next(((cell.start, cell.end) for cell in bottom if cell.start <= position < cell.end and cell.text), None)

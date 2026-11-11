@@ -120,9 +120,11 @@ def _reporting_currencies(readings: list[Reading]) -> dict[str, set[str]]:
     # Each year's own annual report states its currency (most of its statements), and a report up to two years later
     # may restate it in its own; a translation column read in an annual report (KEPCO's US$) is neither.
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    # A rejected reading is a misread, never the company's statement of its currency (Volaris's 2013-14 20-Fs, read
+    # from the dollar translation column, rejected).
     for reading in readings:
         if reading.own and reading.form != "6-K" and reading.fiscal_period == "FY" and reading.currency and \
-                reading.source not in REGULATORS and len(reading.currency) == 3:
+                reading.source not in REGULATORS and len(reading.currency) == 3 and reading.status != "rejected":
             counts[reading.fiscal_year][reading.currency] += 1
     own = {int(year): max(by, key=by.get) for year, by in counts.items()}
     if not own:
@@ -144,6 +146,6 @@ def _reporting_currency(readings: list[Reading]) -> str | None:
     counts: dict[str, int] = defaultdict(int)
     for reading in readings:
         if reading.own and reading.fiscal_period == "FY" and reading.form != "6-K" and reading.currency and \
-                reading.source not in REGULATORS and len(reading.currency) == 3:
+                reading.source not in REGULATORS and len(reading.currency) == 3 and reading.status != "rejected":
             counts[reading.currency] += 1
     return max(counts, key=counts.get) if counts else None

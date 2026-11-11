@@ -8,7 +8,8 @@ import re
 import unicodedata
 from difflib import SequenceMatcher
 
-_REGISTRANT = re.compile(r"\(\s*(?:Translation\s+of\s+registrant|Exact\s+name\s+of\s+registrant)", re.I)
+# "(Exact Name of the Registrant as Specified in the Charter)" on América Móvil's covers.
+_REGISTRANT = re.compile(r"\(\s*(?:Translation\s+of\s+(?:the\s+)?registrant|Exact\s+name\s+of\s+(?:the\s+)?registrant)", re.I)
 _BEFORE_NAME = re.compile(r".*(?:\d{1,3}-\d{4,6}|\b(?:19|20)\d{2}\b|\b1934\b|\bForm\s+6-K\b)\s*:?", re.I | re.S)
 _SUFFIXES = {"THE", "PLC", "INC", "CORP", "CORPORATION", "LTD", "LIMITED", "CO", "COMPANY", "SA", "AG", "NV", "LLC", "ON"}
 _NAMES: dict[str, list[str]] = {}
@@ -63,20 +64,22 @@ def another_registrant(ref, attachments) -> str | None:
     text = _cover_text(attachments)
     if text is None:
         return None
-    match = _REGISTRANT.search(text)
-    if match is None:
-        return None
-    printed = _BEFORE_NAME.sub("", text[max(0, match.start() - 150):match.start()]).strip(" :.,")
-    words = _words(printed)
     names = [_words(name) for name in _company_names(ref.filing)]
-    if not words or not names or any(words <= name or name <= words or "".join(sorted(words)) == "".join(sorted(name))
-                                     or any(SequenceMatcher(None, "".join(_ordered(printed)), "".join(_ordered(other))).ratio() >= 0.85
-                                            for other in _company_names(ref.filing))  # "PETR?LEO": one letter lost
-                                     for name in names if name):
-        return None
+    found = []
+    for match in _REGISTRANT.finditer(text):
+        # Each name the cover prints, its exact one and its translation: either may be the company's own (América
+        # Móvil's translation "America Mobile" is no EDGAR name, its "AMÉRICA MÓVIL, S.A.B. DE C.V." is).
+        printed = _BEFORE_NAME.sub("", text[max(0, match.start() - 150):match.start()]).split(")")[-1].strip(" :.,")
+        words = _words(printed)
+        if not words or not names or any(words <= name or name <= words or "".join(sorted(words)) == "".join(sorted(name))
+                                         or any(SequenceMatcher(None, "".join(_ordered(printed)), "".join(_ordered(other))).ratio() >= 0.85
+                                                for other in _company_names(ref.filing))  # "PETR?LEO": one letter lost
+                                         for name in names if name):
+            return None
+        found.append((printed, words))
     # Only a name of the company's own family: a subsidiary shares its brand (Lloyds Bank plc beside Lloyds Banking
     # Group); a name sharing nothing is the company's in another language (Copel's "Energy Company of Paraná").
-    return printed[:80] if any(words & name for name in names) else None
+    return next((printed[:80] for printed, words in found if any(words & name for name in names)), None)
 
 
 _GENERIC = {"AND", "OF", "DE", "DO", "DA", "DAS", "DOS", "THE", "HOLDINGS", "HOLDING", "GROUP", "INCORPORATED"}

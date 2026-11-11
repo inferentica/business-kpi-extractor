@@ -104,3 +104,11 @@ def test_a_release_opening_under_a_brand_is_the_companys_own():
     cover = "CONTROLADORA VUELA COMPAÑÍA DE AVIACIÓN, S.A.B. DE C.V. (Exact name of registrant as specified in its charter)"
     readings = [Reading(name) for name in ("Volaris*", "| Page", "Coca-Cola FEMSA, S.A.B. de C.V.")]
     assert printed._other_issuers(readings, Ref, cover) == ["Coca-Cola FEMSA, S.A.B. de C.V."]
+
+
+def test_each_name_on_the_cover_is_compared():
+    # América Móvil: "AMÉRICA MÓVIL, S.A.B. DE C.V. (Exact Name of the Registrant as Specified in the Charter) America
+    # Mobile (Translation of Registrant's Name into English)".
+    cover = ("Commission File Number: 1-16269 AM&Eacute;RICA M&Oacute;VIL, S.A.B. DE C.V. (Exact Name of the Registrant as "
+             "Specified in the Charter) America Mobile (Translation of Registrant&rsquo;s Name into English) Lago Alberto 366")
+    assert _other(cover, ["America Movil SAB de CV"]) is None

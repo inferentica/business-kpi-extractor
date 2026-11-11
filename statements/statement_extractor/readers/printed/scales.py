@@ -18,7 +18,7 @@ _DOLLAR_UNIT = re.compile(r"(?:(?:US|C|CDN|NT|HK)?\$|£|€|¥)\s*" + _UNIT + r"
                           # UBS's "CHF million", "USD million": a currency code before the unit
                           r"\b(?:CHF|USD|EUR|GBP|JPY|CNY|RMB|KRW|BRL|CAD|AUD|HKD|TWD|NTD|INR|MXN|SEK|NOK|DKK)\s+" + _UNIT + r"\b|"
                           # James Hardie's "(Millions of US dollars)"
-                          r"\b" + _UNIT + r"\s+of\s+(?:[A-Z.]+\s+|new\s+taiwan\s+|hong\s+kong\s+)?(?:dollars|euros?|pounds|yen|won|reais|francs|yuan|renminbi|pesos|rupees|soles)\b|"  # Televisa's "(Millions of Mexican Pesos)"
+                          r"\b" + _UNIT + r"\s+of\s+(?:[A-Z.]+\s+|new\s+taiwan\s+|hong\s+kong\s+)?(?:dollars|euros?|pounds|yen|won|reais|francs|yuan|renminbi|pesos|rupees|soles|MxP)\b|"  # Televisa's "(Millions of Mexican Pesos)"
                           r"\(\s*" + _UNIT + r"\s*(?:,\s*except\b[^)]*)?\)", re.I)  # Brookfield's "(MILLIONS)"
 # Thousands written as zeros: Ross's "($000, except stores and per share data, unaudited)", Icahn's "(In $000s, except
 # unit amounts)" and "(In 000s ...)", "($000's)", "(000 omitted)".

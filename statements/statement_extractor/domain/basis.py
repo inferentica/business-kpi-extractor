@@ -100,7 +100,7 @@ _CURRENCIES = (
     ("CHF", r"\bCHF\b|\bSwiss\s+francs?\b"),
     # The other home currencies of US-listed foreign filers (Televisa's "In thousands of Mexican pesos", Enel Chile's
     # "In thousands of Chilean pesos", Andina's "ThCh$").
-    ("MXN", r"\bMXN\b|\bMexican\s+pesos?\b|\bMx\$"),
+    ("MXN", r"\bMXN\b|\bMexican\s+pesos?\b|\bMx\$|\bMxP\b"),  # América Móvil's releases: "Millions of MxP"
     ("CLP", r"\bCLP\b|\bChilean\s+pesos?\b|\bThCh\$|\bCh\$"),
     ("ARS", r"\bARS\b|\bArgentine\s+pesos?\b"),
     ("COP", r"\bCOP\b|\bColombian\s+pesos?\b"),

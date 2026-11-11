@@ -154,3 +154,13 @@ def test_a_per_share_figure_is_matched_to_its_printed_places_in_the_vote():
             reading("fy20", date(2020, 6, 30), 0.275, own=False)]
     [chosen] = choose(year)
     assert chosen["source_accession"] == "fy20" and chosen["lines"][0]["value"] == 0.275
+
+
+def test_a_rejected_reading_never_states_the_reporting_currency():
+    # Volaris's 2014 20-F read from its dollar column, rejected; its peso quarters stand.
+    from statement_extractor.selection.choose import _reporting_currencies
+    bad = reading("fy14", date(2015, 4, 30), 1.0, own=True, result="fail")
+    bad.currency = "USD"
+    good = reading("fy15", date(2016, 4, 30), 2.0, own=True)
+    good.fiscal_year, good.currency = "2015", "MXN"
+    assert _reporting_currencies([bad, good])["2009"] == {"MXN"}

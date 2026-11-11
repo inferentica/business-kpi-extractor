@@ -9,7 +9,8 @@ import re
 import lxml.html
 
 from ...domain.basis import currencies_named, is_currency_word
-from ..printed.tables import ACCOUNT_CODE, COLUMN_TITLE, is_subheader, NOTE_MARK, Cell, Row, Table, clean, is_header_figures, number
+from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_header_figures,
+                              is_subheader, number)
 
 
 def _text(element) -> str:
@@ -123,7 +124,8 @@ def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
             rows.append(row)
         elif not seen_figures:
             texts = " ".join(cell.text for cell in cells)
-            if COLUMN_TITLE.search(texts):
+            quarters = [cell.text for cell in cells if cell.text.strip()][1 if cells and cells[0].text.strip() else 0:]
+            if COLUMN_TITLE.search(texts) or len(quarters) >= 2 and all(QUARTER_CELL.match(text) for text in quarters):
                 header.append([cell for cell in cells if cell.text])
             elif row.label:
                 rows.append(Row(label=row.label, level=row.level, cells=cells))
