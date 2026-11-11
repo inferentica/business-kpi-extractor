@@ -6,12 +6,13 @@ from concurrent.futures import Future
 from datetime import date
 
 from ..documents.document import Document, parse_document
-from ..domain.fiscal import learn_year_offset
+from ..domain.fiscal import learn_year_offset, offset_lead
 from ..readers.trace import untraced
 from ..sources.base import FilingRef
 from .shared import _DONE, _MAX_ATTEMPTS, _XBRL_READER, _folder
 
 _XBRL_KEPT = 6
+_OFFSET_REPORTS = 6  # the most reports the fiscal-year vote reads
 
 
 class FilingLoading:
@@ -68,21 +69,25 @@ class FilingLoading:
         return self._exhibits[exhibit.url]
 
     def _year_offset(self, reports: list[FilingRef]) -> int:
-        for ref in reversed(reports):
+        """The company's fiscal-year naming, voted by its newest reports until one offset leads by two votes (a report's
+        own fiscal year, an annual report's counting twice). One report can be mistagged: Oracle's 10-Q for the quarter
+        ended August 31, 2026 names fiscal 2026, its 10-K and earlier 10-Qs the year each closes, so every period was
+        named a year early."""
+        samples: list[tuple[date, str, bool]] = []
+        for ref in list(reversed(reports))[:_OFFSET_REPORTS]:
             try:
                 xbrl = self._xbrl(ref)
             except Exception:  # noqa: BLE001 - an unreadable report just cannot vote
                 continue
-            if xbrl is None:
-                continue
-            entity = xbrl.entity_info or {}
+            entity = (xbrl.entity_info or {}) if xbrl is not None else {}
             period_end = entity.get("document_period_end_date")
-            if period_end and entity.get("fiscal_year"):
-                return learn_year_offset(
-                    [(date.fromisoformat(str(period_end)[:10]), str(entity["fiscal_year"]), False)],
-                    self.profile.fiscal_year_end,
-                )
-        return 0
+            if not (period_end and entity.get("fiscal_year")):
+                continue
+            samples.append((date.fromisoformat(str(period_end)[:10]), str(entity["fiscal_year"]),
+                            str(entity.get("fiscal_period") or "").upper() == "FY"))
+            if offset_lead(samples, self.profile.fiscal_year_end) >= 2:
+                break
+        return learn_year_offset(samples, self.profile.fiscal_year_end)
 
     def _document(self, *refs: FilingRef) -> Document:
         """The exhibits of one or more filings as one document; each exhibit's ids carry their own letter prefix."""
