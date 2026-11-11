@@ -85,6 +85,8 @@ class CodeOnlyPipeline(SymbolPipeline):
         self.timings: list[float] = []
         self.left: Counter = Counter()  # group (or metric KPI) keys left for the AI
         self.kinds: dict[str, str] = {}
+        # Why each figure code tried was not read, with the place it was looked for: (accession, "group.kpi") -> both.
+        self.misses: dict[tuple[str, str], dict] = {}
         self._reread_picked = None
         # Frozen: a reading is recorded, never applied, so later quarters replay only from verified stored places.
         self.store._apply = lambda values: None
@@ -100,6 +102,15 @@ class CodeOnlyPipeline(SymbolPipeline):
     def _process_releases(self, releases, spec, version):
         self.kinds = {group.key: group.kind for group in spec.groups}
         return super()._process_releases(releases, spec, version)
+
+    def _replay_part(self, document, part, locators, expected, currency):
+        found = super()._replay_part(document, part, locators, expected, currency)
+        if isinstance(found, str):
+            accession = getattr(self._local, "accession", None)
+            for key, locator in locators.items():
+                place = {name: locator.get(name) for name in ("row_label", "quote", "table", "header") if locator.get(name)}
+                self.misses[(accession, key)] = {"why": found, "place": place, "document": document.source_url.rsplit("/", 1)[-1]}
+        return found
 
     def _reread_due(self, accession: str) -> bool:
         if self._reread_picked is None:
@@ -157,7 +168,7 @@ def _key(value: dict) -> tuple:
 
 
 def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], readings: dict[str, list[dict]],
-                  held_out: bool) -> list[dict]:
+                  held_out: bool, misses: dict | None = None) -> list[dict]:
     """One row per verified release figure of the tested filings, and one per figure code served beyond them."""
     tested = set(readings)
     truth = [value for value in state_values if value.get("method") == "ai" and value.get("validation_status") == "verified"
@@ -179,7 +190,9 @@ def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], 
         else:
             found, outcome = (float(mine[0]["value"]) if mine else None), ("held" if mine else "missed")
         group = value["group_key"].removeprefix(AI_GROUP_PREFIX)
+        miss = (misses or {}).get((accession, f"{group}.{value['kpi_key']}")) if outcome == "missed" else None
         rows.append({
+            "why": (miss or {}).get("why") or ("not tried" if outcome == "missed" else ""), "miss": miss,
             "symbol": symbol, "accession": accession, "group": group, "kpi": value["kpi_key"],
             "label": f"{value.get('group_label')} / {value.get('kpi_label')}", "period": f"{value['fiscal_year']}-{value['fiscal_period']}",
             "kind": "metric" if kinds.get(group, "metric") == "metric" else "breakdown", "origin": origin(value),
@@ -217,7 +230,7 @@ def read_company(plane: ControlPlane, symbol: str, quarters: int, held_out: bool
     state = [dict(value) for value in pipeline.store._loaded.values()]
     kinds = pipeline.kinds
     return {
-        "symbol": symbol, "rows": score_company(symbol, state, kinds, pipeline.readings, held_out),
+        "symbol": symbol, "rows": score_company(symbol, state, kinds, pipeline.readings, held_out, pipeline.misses),
         "outcomes": dict(result.replay_outcomes), "left": dict(pipeline.left), "refused": dict(control.refused),
         "aiCalls": 0, "errors": result.errors[:5], "documents": len(pipeline.timings),
         "codeSeconds": pipeline.timings, "seconds": time.perf_counter() - started,
@@ -236,6 +249,7 @@ def summarize(companies: list[dict]) -> dict:
     for row in rows:
         if row["outcome"] != "extra":
             by_origin[row["origin"]][row["outcome"]] += 1
+    missed_why = Counter((row["kind"], row["why"]) for row in rows if row["outcome"] == "missed")
     timings = [seconds for company in companies for seconds in company["codeSeconds"]]
     outcomes = Counter()
     for company in companies:
@@ -244,6 +258,7 @@ def summarize(companies: list[dict]) -> dict:
         "table": {f"{part}|{kind}": dict(counts) for (part, kind), counts in table.items()},
         "byOrigin": {key: dict(counts) for key, counts in by_origin.items()},
         "outcomes": dict(outcomes.most_common()),
+        "missedWhy": {f"{kind}|{why}": count for (kind, why), count in missed_why.most_common()},
         "byCompany": {company["symbol"]: dict(Counter(row["outcome"] for row in company["rows"])) for company in companies},
         "documents": len(timings),
         "codeMsMedian": round(statistics.median(timings) * 1000, 1) if timings else None,
@@ -281,6 +296,8 @@ def report_text(summary: dict) -> str:
               f"AI requests refused (none made): {summary['refused'] or 'none'}", "",
               "| Replay outcome | Count |", "|---|---|"]
     lines += [f"| {why} | {count:,} |" for why, count in summary["outcomes"].items()]
+    lines += ["", "| Missed figures, by why | Kind | Figures |", "|---|---|---|"]
+    lines += [f"| {key.split('|', 1)[1]} | {key.split('|', 1)[0]} | {count:,} |" for key, count in summary.get("missedWhy", {}).items()]
     lines += ["", "| Company | Right | Wrong | Held | Missed | Extra |", "|---|---|---|---|---|---|"]
     for symbol, counts in sorted(summary["byCompany"].items()):
         lines.append(f"| {symbol} | {counts.get('right', 0)} | {counts.get('wrong', 0)} | {counts.get('held', 0)} | "
