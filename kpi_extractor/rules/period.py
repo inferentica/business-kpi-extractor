@@ -113,10 +113,15 @@ _MONTH_NAME = r"(january|february|march|april|may|june|july|august|september|oct
 _MONTH_SPAN = re.compile(rf"\b{_MONTH_NAME}\s*(?:to|through|thru|-|–|—)\s*{_MONTH_NAME}(?![\w])")
 
 
-def column_header(table: Table, first_data_row: int, col: int) -> str:
+# The header rows a recorded header reads (stored readings compare with it as it was), and the deeper reach of the
+# period checks: JPMorgan's supplement tables open with four title rows, so their "2Q24 1Q24 ..." row is the seventh.
+HEADER_ROWS, DEEP_HEADER_ROWS = 6, 12
+
+
+def column_header(table: Table, first_data_row: int, col: int, rows: int = HEADER_ROWS) -> str:
     """The words heading a column ("Three Months Ended @ #") with dates and numbers blanked, so a quarter's column and a
     six-month or prior-year column never pass for one another when a reading is replayed."""
-    cells = [cell for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row) and re.search(r"[A-Za-z]", cell := _heading(row, col))]
+    cells = [cell for row in table.rows[:max(first_data_row, 1)][:rows] if col < len(row) and re.search(r"[A-Za-z]", cell := _heading(row, col))]
     text = clean(" ".join(cells)).lower()
     # A span of months names its length: Philips' "January to June" is a half-year, "April to June" a quarter.
     text = _MONTH_SPAN.sub(lambda m: f"<{(_MONTHS[m.group(2)[:3]] - _MONTHS[m.group(1)[:3]]) % 12 + 1} months>", text)

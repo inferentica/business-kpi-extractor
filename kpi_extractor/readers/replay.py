@@ -12,6 +12,7 @@ from ..documents.document import Document, Table, clean, parse_number
 from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from .anchor import anchor_words
 from .extract import _row_label, column_header
+from ..rules.period import DEEP_HEADER_ROWS
 from ..xbrl import member_key
 
 _MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
@@ -224,11 +225,10 @@ def _same_header(table: Table, first_data_row: int, col: int, locator: dict, qua
     # A reading stored before headers were recorded carries no evidence of its column: the AI reads it once more.
     if "header" not in locator:
         return False
-    now = column_header(table, first_data_row, col)
-    named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(now)}
+    named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(column_header(table, first_data_row, col, DEEP_HEADER_ROWS))}
     if named and quarter and named != {quarter}:
         return False
-    return comparable_header(now) == comparable_header(locator["header"])
+    return comparable_header(column_header(table, first_data_row, col)) == comparable_header(locator["header"])
 
 
 _QUARTERS = {"first": 1, "second": 2, "third": 3, "fourth": 4}
@@ -260,7 +260,7 @@ def current_column(table: Table, first_data_row: int, col: int) -> bool:
                 found.add(int(four) if four else 2000 + int(short or apostrophe))
         return found
 
-    header_rows = table.rows[:max(first_data_row, 1)][:6]
+    header_rows = table.rows[:max(first_data_row, 1)][:DEEP_HEADER_ROWS]
     column = years([row[col] for row in header_rows if col < len(row)])
     every = years([cell for row in header_rows for cell in row[1:]])
     if not every:
