@@ -7,7 +7,7 @@ from kpi_extractor.ai import Spec
 from kpi_extractor.documents.document import parse_document
 from kpi_extractor.readers.extract import read_values
 from kpi_extractor.pipeline import SymbolPipeline
-from kpi_extractor.readers.replay import replay, reported_period
+from kpi_extractor.readers.replay import replay, reported_period, row_gone
 
 URL = "https://www.sec.gov/Archives/q{n}report.htm"
 
@@ -453,3 +453,28 @@ def test_a_replayed_count_keeps_the_scale_words_its_reading_quoted_while_the_fil
     unstated = parse_document(_members("7,900", ""), URL.format(n=2))
     values, _problems = read_values(unstated, spec, replay(unstated, last, date(2026, 6, 30), 2), "USD")
     assert [item.status for item in values] == ["needs_review"]
+
+
+def test_a_row_the_filing_no_longer_has_is_left_out_and_the_rest_replay():
+    # TSMC dropped its 10-nanometer row in 2024: every later report was sent to the AI for a row that no longer exists.
+    ten = "<tr><td>10-nanometer</td><td>7</td><td>1</td></tr>"
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300, ten), URL.format(n=1))
+    second = parse_document(report("June 30", 11, 25, 31, 42, 310), URL.format(n=2))
+    table = next(iter(first.tables))
+    located = ai.Located.model_validate({"period_end": "2026-03-31", "tables": [
+        {"group": "technology", "table": table, "col": 1, "first_row": 2, "last_row": 6, "total_row": 7}]})
+    items, problems = read_values(first, SPEC, located, "TWD")
+    assert problems == [] and "r10nanometer" in {item.kpi.key for item in items}
+    history = [{"group_key": f"kpi_{item.group.key}", "kpi_key": item.kpi.key, "fiscal_year": "2026", "fiscal_period": "Q1",
+                "period_end": "2026-03-31", "method": "ai", "validation_status": "verified", "value": item.value,
+                "locator": item.locator, "group_label": item.group.label, "kpi_label": item.kpi.label,
+                "source_url": URL.format(n=1), "source_accession": "q1"} for item in items if not item.is_total]
+    flash = {"period_end": "2026-06-30", "values": []}
+    pipeline = _pipeline(NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash}), history)
+    read, problems, _ = pipeline._read(lambda: "prompt", second, SPEC, Q2, version=1)
+    assert pipeline.result.replay_outcomes.get("replayed") == 1, pipeline.result.replay_outcomes
+    assert {item.kpi.key: item.value for item in read if not item.is_total}["r2nanometer"] == 11_000
+    # Carried to another table of the filing, the row is not gone: a table read in part is never taken for a whole one.
+    carried = report("June 30", 11, 25, 31, 42, 310) + "<table><tr><td>10-nanometer</td><td>7</td></tr></table>"
+    assert not row_gone(parse_document(carried, URL.format(n=2)), {"row_label": "10-nanometer"})
+    assert row_gone(second, {"row_label": "10-nanometer"})

@@ -128,13 +128,37 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
     return Locator(kpi=key, table=table_id, row=row, col=col, scale=locator.get("scale"), scale_text=locator.get("scale_text"))
 
 
+def row_gone(document: Document, locator: dict) -> bool:
+    """Whether a row last quarter's reading had is in no table or passage of this filing: a line the company stopped
+    reporting. A row carried onto the next page is still in the filing, so a table read only in part is never taken
+    for a complete one."""
+    label = clean(locator.get("row_label") or "")
+    if not label:
+        return False
+    key = member_key(label)
+    if any(member_key(cell) == key for table in document.tables.values() for row in table.rows for cell in row[:3]):
+        return False
+    return not any(label.lower() in block.text.lower() for block in document.blocks.values())
+
+
+def missing_since(last: dict[str, dict], keys: set[str], group: str, whole: bool, listed: set[str], document: Document) -> bool:
+    """Whether a reading of a group lacks a figure the reference quarter had (a key the current list no longer has,
+    from a reading under an older list, is not missing: it is not asked for; nor is a row the filing no longer has)."""
+    return any(key.split(".", 1)[0] == group and key not in keys and (whole or key in listed) and not row_gone(document, locator)
+               for key, locator in last.items())
+
+
 def _replay_table(document: Document, group: str, parts: list[dict], quarter: int | None = None) -> TableLocator | str:
     first = parts[0]
     col = first.get("col")
     if col is None or "total_row_label" not in first:
         return "total row not recorded"  # read before replays recorded it
     misses = []  # why each table that has the rows does not give them, last quarter's first
-    wanted = {member_key(part["row_label"]) for part in parts}
+    # A row the filing no longer has anywhere is gone, not unread (TSMC dropped its 10-nanometer row in 2024): the rest
+    # are replayed, and still stand only where they add up to the total.
+    wanted = {member_key(part["row_label"]) for part in parts if not row_gone(document, part)}
+    if len(wanted) < 2:
+        return "table rows not found"
     total_label = first["total_row_label"]
     for table in _tables_by_preference(document, first.get("table")):
         rows: dict[str, int] = {}
