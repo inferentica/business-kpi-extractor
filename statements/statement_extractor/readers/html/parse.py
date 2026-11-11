@@ -162,8 +162,28 @@ def _side_by_side(lines: list[list[Cell]]) -> int | None:
 
 # A release opens with its issuer and tickers, "Coca-Cola FEMSA, S.A.B. de C.V. (BMV: KOFL, NYSE: KOF)": FEMSA's 6-Ks
 # carry Coca-Cola FEMSA's release after FEMSA's own.
-_TICKER = re.compile(r"\bNYSE\s*:\s*([A-Z][A-Z.]{0,6})\b")
+# Only a release's opening counts, its dateline just before the issuer: FEMSA's own text names "The Coca-Cola Company
+# (NYSE: KO)" and Coca-Cola FEMSA's tickers among its holdings.
+_TICKER = re.compile(r"\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?"
+                     r"\s+(?:19|20)\d{2}\b.{0,160}?\bNYSE\s*:\s*([A-Z][A-Z.]{0,6})\b", re.I | re.S)
 _HIDDEN = re.compile(r"visibility\s*:\s*hidden|display\s*:\s*none", re.I)
+
+
+def _openings(root) -> list[tuple[int, str]]:
+    """Each release opening's place in document order (root.iter()'s) and NYSE ticker: every piece of text is read, a table
+    cell's too (Coca-Cola FEMSA's release in FEMSA's 6-K)."""
+    found, window = [], []
+    for order, element in enumerate(root.iter()):
+        if not isinstance(element.tag, str):
+            continue
+        for piece in (element.text, element.tail):
+            if piece and piece.strip():
+                window = (window + [clean(piece)])[-8:]
+                announced = _TICKER.findall(" ".join(window))
+                if announced:
+                    found.append((order, announced[-1].upper()))
+                    window = []
+    return found
 
 
 def _walk(root):
@@ -196,7 +216,9 @@ def parse_html(html: str | bytes) -> list[Table]:
     tree = lxml.html.fromstring(raw)
     found = []
     previous_text: list[str] = []
-    ticker = issuer = ""
+    openings = _openings(tree)
+    issuer = openings[0][1] if openings else ""
+    order = {element: index for index, element in enumerate(tree.iter())} if openings else {}
     for element, in_table in _walk(tree):
         if not isinstance(element.tag, str):
             continue
@@ -218,6 +240,7 @@ def parse_html(html: str | bytes) -> list[Table]:
             context = " ".join(previous_text)[-600:]
             # The document's first ticker is its own issuer's, under whatever ticker it had then (Brookfield's "BAM",
             # Embraer's "ERJ"); a table after another one is that issuer's release.
+            ticker = next((name for place, name in reversed(openings) if place <= order.get(element, -1)), "")
             found.append(Table(rows=rows, header=header, context=context, index=len(found),
                                ticker=ticker if ticker != issuer else ""))
             if seen_figures:
@@ -234,8 +257,5 @@ def parse_html(html: str | bytes) -> list[Table]:
             for child in element:
                 if child.tail and child.tail.strip():
                     previous_text.append(clean(child.tail))
-            announced = _TICKER.findall(" ".join(previous_text[-3:]))
-            ticker = announced[-1] if announced else ticker
-            issuer = issuer or (announced[0] if announced else "")
             previous_text = previous_text[-40:]
     return found
