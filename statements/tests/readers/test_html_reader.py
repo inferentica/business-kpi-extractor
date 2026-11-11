@@ -373,3 +373,18 @@ def test_an_income_statement_continued_to_its_net_income():
             ("Net income", "6,990", "6,576"))) + "</table>"
     readings, _ = read(first + second, "1231", None)
     assert readings[("income", "2004")].status == "kept"
+
+
+def test_a_cash_flow_continued_page_never_joins_the_income_statement():
+    # Shinhan's 20-F: an income statement before a page titled for the cash flows "(continued)".
+    first = "<p>CONSOLIDATED STATEMENTS OF INCOME (in millions)</p><table><tr><td></td><td>2011</td><td>2010</td></tr>" + "".join(
+        f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+            ("Net interest income", "6,000", "5,500"), ("Other expenses", "(2,000)", "(1,900)"),
+            ("Income before income taxes", "4,000", "3,600"), ("Income taxes", "(1,000)", "(900)"),
+            ("Profit for the year", "3,000", "2,700"))) + "</table>"
+    second = "<p>CONSOLIDATED STATEMENTS OF CASH FLOWS (continued) (in millions)</p><table><tr><td></td><td>2011</td><td>2010</td></tr>" + "".join(
+        f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in (
+            ("Dividend paid", "(500)", "(400)"), ("Net cash used in financing activities", "(800)", "(700)"),
+            ("Cash and cash equivalents at end of year", "9,000", "8,000"))) + "</table>"
+    readings, _ = read(first + second, "1231", None)
+    assert [line["label"] for line in readings[("income", "2011")].lines][-1] == "Profit for the year"

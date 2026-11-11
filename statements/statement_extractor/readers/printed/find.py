@@ -121,6 +121,7 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         group = [table]
         for later in all_tables[position + 1:position + 6]:
             if _complete(kind, group) and not (kind == "income" and re.search(r"\bcontinued\b", later.context[-200:], re.I)
+                                               and _titled(dict(TITLES)["income"], later.context[-200:])
                                                and not any(NET_INCOME.match(label) for label in labels_in_context(group))):
                 break  # an income statement to its profit before tax goes on to its net income (Petrobras's 2005 6-K)
             if len([r for r in later.rows if r.figures]) < 2:
