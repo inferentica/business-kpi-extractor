@@ -51,6 +51,7 @@ class Table:
     context: str  # the text before the table (its title, scale)
     index: int  # the table's place in the document
     header_text: str = ""  # a text table's header lines as printed, before their words are given to columns
+    dollars: bool = False  # a text table's lines print "$" before figures (the parser keeps figures, not the sign)
 
 
 # An account code before a label in Brazil's CVM forms: "3.09 Profit before taxation", "1.01.01 Cash and cash equivalents".

@@ -50,3 +50,49 @@ def test_figures_printed_with_a_dollar_sign_are_a_bare_dollar():
     rows = [Row(label="Sales", level=0, figures={3: 1812.0}, cells=[Cell(0, 1, "Sales"), Cell(2, 1, "$"), Cell(3, 1, "1,812")])]
     group = [Table(rows=rows, header=[], context="Consolidated Statements of Earnings (in millions, except share data)", index=0)]
     assert reporting_currency(group, {(3,): None}, "6-K") == BARE_DOLLARS
+
+
+def _income(lines: str, scale: str = "(in millions)") -> str:
+    return f"<p>Condensed Consolidated Statements of Earnings</p><p>{scale}</p><table>" \
+           "<tr><td></td><td>2004</td><td>2003</td></tr>" + lines + "</table>"
+
+
+def _currencies(html: str) -> set:
+    from statement_extractor.readers.html.read import read_document
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=date(2004, 11, 1), document_end=None,
+                                     fiscal_year_end="1231", year_offset=0)
+    return {reading.currency for reading in readings}
+
+
+ROWS = [("Sales", "958.1", "822.7"), ("Cost of goods sold", "248.6", "228.3"), ("Gross profit", "709.5", "594.4"),
+        ("Earnings before income taxes", "300.0", "250.0"), ("Income taxes", "100.0", "50.0"),
+        ("Net earnings", "200.0", "200.0")]
+
+
+def test_a_dollar_sign_in_the_figures_cell_is_a_bare_dollar():
+    # Alcon's 2004 6-Ks: "$ 880.2" in one cell, under "(in millions, except share data)".
+    lines = "".join(f"<tr><td>{label}</td><td>{'$ ' if i == 0 else ''}{a}</td><td>{b}</td></tr>"
+                    for i, (label, a, b) in enumerate(ROWS))
+    assert _currencies(_income(lines)) == {BARE_DOLLARS}
+    plain = "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in ROWS)
+    assert _currencies(_income(plain)) == {None}
+
+
+def test_a_text_tables_dollar_signs_are_a_bare_dollar():
+    from statement_extractor.readers.text.parse import parse_text
+    text = ("CONSOLIDATED STATEMENTS OF EARNINGS\n(in millions)\n<TABLE>\n" + " " * 40 + "2002        2001\n"
+            + "\n".join(f"{label:<40}{'$' if i == 0 else ' '}{a:>8}    {b:>8}" for i, (label, a, b) in enumerate(ROWS))
+            + "\n</TABLE>\n")
+    assert any(table.dollars for table in parse_text(text))
+
+
+def test_a_currency_in_the_tables_own_headings_is_its_currency():
+    # UBS's restated time series: "USD million, except where indicated" over the dates, "Income statement" the first row.
+    html = "<table><tr><td>USD million, except where indicated</td><td>31.12.18</td><td>31.12.17</td></tr>" \
+           "<tr><td>Income statement</td></tr>" + "".join(
+               f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in ROWS) + "</table>"
+    from statement_extractor.readers.printed.currency import reporting_currency
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.find import find_statements
+    [(_kind, group)] = find_statements(parse_html(html), release=True)
+    assert reporting_currency(group, {}, "6-K") == "USD"

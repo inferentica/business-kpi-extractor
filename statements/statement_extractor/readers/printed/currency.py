@@ -8,12 +8,16 @@ none, the document's own statement of its currency or the form's decides it.
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 from ...domain.basis import BARE_DOLLARS, bare_currency, currencies_named
 from .find import TITLE_PATTERNS
 from .scales import scale_text
 from .tables import Table, header_text
+
+_DOLLAR_CELL = re.compile(r"^\s*\$\s*(?:[\d(.]|$)")
+
 
 def column_currencies(table: Table, columns: list[tuple[int, ...]]) -> dict[tuple[int, ...], str | None]:
     """Each column's currency as its header names it, if it does."""
@@ -33,7 +37,10 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
     start = max(0, max(titles) - 120) if titles else 0
     # Past a title, the text before it is another section's: RPM's 1999 annual report discusses the euro's
     # introduction just above its balance sheet, which names no currency.
-    in_title = currencies_named(text[start:start + 400]) or currencies_named(text[start:])
+    # The table's own column headings are its words too, however far before a title row (UBS's restated time series:
+    # "USD million, except where indicated" over the dates, then "Income statement" as the first row).
+    in_title = currencies_named(text[start:start + 400]) or currencies_named(text[start:]) or \
+        currencies_named(" ".join(cell.text for cells in group[0].header for cell in cells))
     named = [currency for currency in by_column.values() if currency]
     unnamed = [currency for currency in in_title if currency not in named]
     if named and len(named) * 2 < len(by_column) and unnamed:
@@ -51,8 +58,11 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
         return in_title[0]
     # Only the kind ("$ millions", "thousands of pesos"): marked, and decided by the company's own reporting currency.
     bare = bare_currency(text[start:start + 400] if titles else text)
-    if bare is None and any(cell.text.strip() == "$" for table in group for row in table.rows for cell in row.cells):
-        bare = BARE_DOLLARS  # its figures printed "$ 1,812" (Alcon's releases to 2011, "(in millions, except share data)")
+    if bare is None and any(table.dollars or any(_DOLLAR_CELL.match(cell.text) for row in table.rows for cell in row.cells)
+                            for table in group):
+        # Its figures printed "$ 1,812" (Alcon's releases to 2011, "(in millions, except share data)"): the sign in a
+        # cell of its own, in the figure's cell ("$ 880.2", 2004) or on a text line (2002).
+        bare = BARE_DOLLARS
     return bare  # else the document's or the form's (pipeline/printed.py)
 
 

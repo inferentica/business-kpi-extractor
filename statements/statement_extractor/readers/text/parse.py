@@ -226,7 +226,8 @@ def _table(before: str, title_lines: list[str], header_lines: list[str], body: l
     rows = _rows(leading_rows + parsed, columns)
     context = clean(TAG.sub(" ", before + " " + " ".join(title_lines)))
     return Table(rows=rows, header=header, context=context[-600:], index=index,
-                 header_text=clean(" ".join(line for line in header_lines if not RULE.match(line))))
+                 header_text=clean(" ".join(line for line in header_lines if not RULE.match(line))),
+                 dollars=any(re.search(r"\$\s*[\d(]", line) for line in body))
 
 
 def parse_text(text: str) -> list[Table]:
