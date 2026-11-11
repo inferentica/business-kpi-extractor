@@ -322,7 +322,12 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     if (listed := _listed_whole(group, parts, total if unit == "currency" else None)) is not None:
         kept = listed
     else:
-        kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total)
+        # A list that names parents says which rows are lines: every row it names but no parent (JPMorgan's revenue
+        # lines, and its net interest income beside noninterest revenue). Such a row is never a subtotal by chance.
+        named = {kpi.parent for kpi in group.kpis if kpi.parent}
+        lines = frozenset(key for key, (label, _value, _index) in parts.items() if named and (kpi := _listed_kpi(group, label))
+                          and kpi.key not in named and kpi.key != group.total_kpi)
+        kept = remove_subtotals({key: value for key, (_label, value, _index) in parts.items()}, total, lines)
         if total and unit == "currency" and total_index is not None and abs(sum(kept.values()) - total) > abs(total) * 0.001:
             block = _block_summing_to(parts, total_index, total)
             if block:
@@ -330,8 +335,9 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
     # A subtotal the list names as a parent (the owner's Total Optum over Optum Health, Insight and Rx) is kept beside its
     # lines: they are checked against it.
     parents = {kpi.parent for kpi in group.kpis if kpi.parent}
-    for key in parents & set(parts):
-        kept.setdefault(key, parts[key][1])
+    for key, (label, value, _index) in parts.items():  # a row's own key, matched to the list by its label
+        if getattr(_listed_kpi(group, label), "key", None) in parents:
+            kept.setdefault(key, value)
     # A subtotal the list names as a parent but that the table labels as a total ("Total noninterest revenue", JPMorgan's
     # 2016-2017 supplements) is that parent, not a closing total.
     named_parents = {kpi.parent for kpi in group.kpis if kpi.parent}

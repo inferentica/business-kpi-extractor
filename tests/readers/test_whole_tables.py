@@ -343,3 +343,47 @@ def test_listed_rows_that_give_the_total_are_the_breakdown_and_lines_under_them_
     assert parts == {"investment_banking": 2_159e6, "equity": 5_799e6, "fixed_income": 2_011e6, "other": 60e6}
     validate_groups(values, previous={})
     assert all(item.status == "verified" for item in values)
+
+
+JPM_REVENUE = """<p>(in millions)</p><table>
+<tr><td>REVENUE</td><td>1Q24</td></tr>
+<tr><td>Investment banking fees</td><td>$1,954</td></tr>
+<tr><td>Principal transactions</td><td>6,790</td></tr>
+<tr><td>Lending- and deposit-related fees</td><td>1,902</td></tr>
+<tr><td>Asset management fees</td><td>4,146</td></tr>
+<tr><td>Commissions and other fees</td><td>1,805</td></tr>
+<tr><td>Investment securities losses</td><td>(366)</td></tr>
+<tr><td>Mortgage fees and related income</td><td>275</td></tr>
+<tr><td>Card income</td><td>1,218</td></tr>
+<tr><td>Other income (a)</td><td>1,128</td></tr>
+<tr><td>Noninterest revenue</td><td>18,852</td></tr>
+<tr><td>Interest income</td><td>47,438</td></tr>
+<tr><td>Interest expense</td><td>24,356</td></tr>
+<tr><td>Net interest income</td><td>23,082</td></tr>
+<tr><td>TOTAL NET REVENUE</td><td>41,934</td></tr>
+</table>"""
+
+
+def test_a_row_the_list_names_as_a_line_is_never_dropped_as_a_subtotal_by_chance():
+    # JPMorgan Q1 2024: Principal transactions (6,790) equals a sum of other rows, so it was dropped as a subtotal, and its
+    # parent Noninterest revenue was never kept beside its lines (the list's key and the row's own key never matched).
+    lines = [("investment_banking_fees", "Investment Banking Fees"), ("principal_transactions", "Principal Transactions"),
+             ("lending_and_deposit_related_fees", "Lending- and Deposit-Related Fees"), ("asset_management_fees", "Asset Management Fees"),
+             ("commissions_and_other_fees", "Commissions and Other Fees"),
+             ("investment_securities_gains_losses", "Investment Securities Gains/(Losses)"),
+             ("mortgage_fees_and_related_income", "Mortgage Fees and Related Income"), ("card_income", "Card Income"),
+             ("other_income", "Other Income")]
+    spec = Spec.model_validate({"groups": [{"key": "revenue", "label": "Revenue by Product", "kind": "revenue_breakdown",
+                                            "total_kpi": "total_net_revenue", "kpis": [
+        *({"key": key, "label": label, "unit": "currency", "parent": "noninterest_revenue"} for key, label in lines),
+        {"key": "noninterest_revenue", "label": "Noninterest Revenue", "unit": "currency"},
+        {"key": "net_interest_income", "label": "Net Interest Income", "unit": "currency"},
+        {"key": "total_net_revenue", "label": "Total Net Revenue", "unit": "currency"}]}]})
+    document = parse_document(JPM_REVENUE, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    located = ai.Located.model_validate({"period_end": "2024-03-31", "tables": [
+        {"group": "revenue", "table": table, "col": 1, "first_row": 1, "last_row": 13, "total_row": 14}]})
+    values, problems = read_values(document, spec, located, "USD")
+    read = {item.kpi.key: item.value / 1e6 for item in values if not item.is_total}
+    assert problems == [] and set(read) == {key for key, _label in lines} | {"noninterest_revenue", "net_interest_income"}
+    assert read["principal_transactions"] == 6_790 and read["noninterest_revenue"] == 18_852 and read["net_interest_income"] == 23_082
