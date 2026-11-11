@@ -35,7 +35,7 @@ def column_currencies(table: Table, columns: list[tuple[int, ...]]) -> dict[tupl
 
 
 _DEFINED = re.compile(r"((?:u\.?\s?s\.?|united\s+states)\s+dollars?|mexican\s+pesos?|chilean\s+pesos?|(?:brazilian\s+)?reais)"
-                      r"\s*\((\$|ps\.?|ch\$|r\$|us\$)\)", re.I)
+                      r"\s*\(\s*(\$|ps\.?|ch\$|r\$|us\$)\s*\)", re.I)  # Coca-Cola FEMSA: "U.S. dollars ( $ )"
 
 
 def _defined_signs(text: str) -> dict[str, str]:
