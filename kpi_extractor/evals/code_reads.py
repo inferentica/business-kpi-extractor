@@ -14,6 +14,10 @@ Each verified release figure is then scored against code's reading of the same f
 A figure code serves that the store does not serve is listed apart (extra): it is checked against its filing before any
 reader change counts it.
 
+Releases are read as each one arrives (--order arrival, the default): one at a time in date order, each replayed from
+the quarter just before it, as production reads a new release. --order backfill reads them as a company's first run
+does, in four chains of one fiscal quarter each, so each release replays from the same quarter a year earlier.
+
 The latest four quarters of every company and five companies picked by hash are held out: readers are tuned on the rest
 and the held-out part confirms each change.
 
@@ -89,8 +93,9 @@ class CodeOnlyPipeline(SymbolPipeline):
     are frozen, so each quarter replays only from verified places; after, the tested filings hold only what code read, and
     the steps that fill figures by code (XBRL tags, quarter tables, quoted rows) and settle them run as in production."""
 
-    def __init__(self, control: CodeOnlyControl, symbol: str, quarters: int, log=print):
+    def __init__(self, control: CodeOnlyControl, symbol: str, quarters: int, log=print, order: str = "arrival"):
         super().__init__(control, symbol, quarters, False, log=log, reread="code-only")
+        self.order = order
         self.readings: dict[str, list[dict]] = {}
         self.timings: list[float] = []
         self.left: Counter = Counter()  # group (or metric KPI) keys left for the AI
@@ -111,7 +116,11 @@ class CodeOnlyPipeline(SymbolPipeline):
 
     def _process_releases(self, releases, spec, version):
         self.kinds = {group.key: group.kind for group in spec.groups}
-        processed = super()._process_releases(releases, spec, version)
+        if self.order == "backfill":
+            processed = super()._process_releases(releases, spec, version)
+        else:  # one release at a time, as a new release is read: the quarter before it is its reference
+            processed = [ref for release in sorted(releases, key=lambda ref: ref.period_end or date.min)
+                         for ref in super()._process_releases([release], spec, version)]
         self._code_only_state()
         return processed
 
@@ -340,11 +349,11 @@ def reader(value: dict) -> str:
     return next((name for name in CODE_READERS if locator.get(name)), "rule" if locator.get("rule") else "other")
 
 
-def read_company(plane: ControlPlane, symbol: str, quarters: int, held_out: bool) -> dict:
+def read_company(plane: ControlPlane, symbol: str, quarters: int, held_out: bool, order: str = "arrival") -> dict:
     """One company in its own process: its scored rows, the replay outcomes, the time code took, AI requests refused."""
     control = CodeOnlyControl(plane)
     started = time.perf_counter()
-    pipeline = CodeOnlyPipeline(control, symbol, quarters, log=lambda line: print(line, flush=True))
+    pipeline = CodeOnlyPipeline(control, symbol, quarters, log=lambda line: print(line, flush=True), order=order)
     try:
         result = pipeline.run()
     except Exception as error:  # noqa: BLE001
@@ -400,7 +409,8 @@ def _coverage(counts: dict) -> str:
 
 
 def report_text(summary: dict) -> str:
-    lines = ["Code reads, no AI (¥0)", "", "| Set | Figures | Right | Rounded | Wrong | Held | Missed | Coverage | Extra |",
+    order = {"arrival": "each release as it arrives", "backfill": "as a backfill"}.get(summary.get("order"), "")
+    lines = [f"Code reads, no AI (¥0){' · ' + order if order else ''}", "", "| Set | Figures | Right | Rounded | Wrong | Held | Missed | Coverage | Extra |",
              "|---|---|---|---|---|---|---|---|---|"]
     for part in ("tuning", "held out", "all"):
         for kind in ("metric", "breakdown", "all"):
@@ -437,6 +447,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--symbols", required=True, help="Comma-separated tickers")
     parser.add_argument("--quarters", type=int, default=12)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--order", choices=("arrival", "backfill"), default="arrival")
     args = parser.parse_args(argv)
     configure_identity()
     symbols = sorted({symbol.strip().upper() for symbol in args.symbols.split(",") if symbol.strip()})
@@ -446,15 +457,17 @@ def main(argv: list[str] | None = None) -> int:
     plane.run_id = started["runId"]
     with company_pool(max(1, min(args.workers, len(symbols)))) as pool:
         companies = list(pool.map(read_company, [plane] * len(symbols), symbols, [args.quarters] * len(symbols),
-                                  [symbol in held for symbol in symbols]))
-    summary = {**summarize(companies), "heldOutCompanies": sorted(held), "quarters": args.quarters}
+                                  [symbol in held for symbol in symbols], [args.order] * len(symbols)))
+    summary = {**summarize(companies), "heldOutCompanies": sorted(held), "quarters": args.quarters, "order": args.order}
     plane.call("finish", summary={"codeReads": summary})
     text = report_text(summary)
     print(text)
     if path := os.environ.get("GITHUB_STEP_SUMMARY"):
-        Path(path).write_text(text + "\n")
+        with open(path, "a") as out:  # both orders' reports, one after the other
+            out.write(text + "\n\n")
     Path("eval-results").mkdir(exist_ok=True)
-    Path("eval-results/code-reads.json").write_text(json.dumps(
+    name = "code-reads.json" if args.order == "arrival" else f"code-reads-{args.order}.json"
+    Path(f"eval-results/{name}").write_text(json.dumps(
         {"summary": summary, "rows": [row for company in companies for row in company["rows"]]}, default=str, indent=1))
     wrong = summary["table"].get("all|all", {}).get("wrong", 0)
     return 1 if wrong else 0
