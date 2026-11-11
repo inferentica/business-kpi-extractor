@@ -60,8 +60,7 @@ _DOTTED_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b")  # day fir
 _LISTED = re.compile(r"^[\s,]*((19|20)\d{2})?[\s,]*$")  # between days listed one per column: commas, a year at most
 
 
-# Months from and to, over columns that print only their years: CEMEX's "January - September" as the first row under
-# "2026 | 2025", its "Jan - Sep" in another table.
+# Months from and to over year-only columns: CEMEX's "January - September" under "2026 | 2025", Petrobras's "Apr-Jun/2020".
 _MONTH_RANGE = re.compile(rf"\b({_MONTH})\s*(?:-|–|—|to|through)\s*({_MONTH})(?![\w.])", re.I)
 
 
@@ -89,7 +88,7 @@ def _date(month: str, day: str, year: str) -> date | None:
 
 
 # A quarter by name and year: TSMC's "Q3 2007", "3Q 2007", "1Q08", "Third Quarter 2007".
-_QUARTER_NAME = re.compile(r"\b(?:Q([1-4])|([1-4])Q|(first|second|third|fourth)\s+quarter)(?:\s+of)?\s*[,']?\s*((?:19|20)\d{2}|\d{2})\b", re.I)
+_QUARTER_NAME = re.compile(r"\b(?:Q([1-4])|([1-4])Q|(first|second|third|fourth)\s+quarter)(?:\s+of)?\s*[,'\-/]?\s*((?:19|20)\d{2}|\d{2})\b", re.I)  # Petrobras: "3Q-2016"
 _ORDINAL = {"first": 1, "second": 2, "third": 3, "fourth": 4}
 
 
@@ -175,12 +174,6 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         sharing = [other for other in columns if aboves[other] == above]
         if column not in in_order and len(sharing) >= 2 and len(years) == len(sharing):
             years = [years[sharing.index(column)]]  # one header cell over two columns, a year for each (TIM's 6-Ks)
-        if months and kind != "balance" and years and not numeric and not dotted and not _MONTH_DAY.search(above):
-            year = int(years[-1])
-            opened, closed = _date(months.group(1), "1", str(year)), _date(months.group(2), "1", str(year))
-            if opened is not None and closed is not None and opened <= closed:
-                periods[column] = Period(date(year, closed.month, calendar.monthrange(year, closed.month)[1]), opened)
-                continue
         short = _MONTH_YEAR.search(above)
         if short and not years and not numeric:
             # TSMC's 1998-99 balance sheets: "Sep-99 | Jun-99", the month's last day.
@@ -193,6 +186,13 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         if named is not None and kind != "balance":
             periods[column] = Period(named, named - timedelta(days=90))  # "Q3 2007", "3Q07": that quarter
             continue
+        ranged_months = _MONTH_RANGE.search(above) or months  # its own first: Petrobras's "Jan-Jun/2020 | Apr-Jun/2020"
+        if ranged_months and kind != "balance" and years and not numeric and not dotted and not _MONTH_DAY.search(above):
+            year = int(years[-1])
+            opened, closed = _date(ranged_months.group(1), "1", str(year)), _date(ranged_months.group(2), "1", str(year))
+            if opened is not None and closed is not None and opened <= closed:
+                periods[column] = Period(date(year, closed.month, calendar.monthrange(year, closed.month)[1]), opened)
+                continue
         if not years and not numeric and not dotted:
             continue
         span = _SPAN.search(above) or title_span

@@ -37,9 +37,11 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
     start = max(0, max(titles) - 120) if titles else 0
     # Past a title, the text before it is another section's: RPM's 1999 annual report discusses the euro's
     # introduction just above its balance sheet, which names no currency.
-    # The table's own column headings are its words too, however far before a title row (UBS's restated time series:
-    # "USD million, except where indicated" over the dates, then "Income statement" as the first row).
-    in_title = currencies_named(text[start:start + 400]) or currencies_named(text[start:]) or \
+    # The table's own words first: its first rows (Petrobras's real releases print "R$ million" as the first row, after
+    # commentary naming U.S. dollars just above the title), then its headings, however far before a title row (UBS's
+    # restated time series: "USD million, except where indicated" over the dates, then "Income statement").
+    own = " ".join(row.label for row in group[0].rows[:next((i for i, r in enumerate(group[0].rows) if r.figures), 0)][:3])
+    in_title = currencies_named(own) or currencies_named(text[start:start + 400]) or currencies_named(text[start:]) or \
         currencies_named(" ".join(cell.text for cells in group[0].header for cell in cells))
     named = [currency for currency in by_column.values() if currency]
     unnamed = [currency for currency in in_title if currency not in named]

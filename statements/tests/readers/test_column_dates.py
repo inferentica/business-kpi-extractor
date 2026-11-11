@@ -190,3 +190,23 @@ def test_a_column_ending_after_its_filing_is_left_out():
     readings, notes = read_document(html + "</table>", accession="x", form="6-K", filed=day(2026, 10, 26), document_end=None,
                                     fiscal_year_end="1231", year_offset=0)
     assert {r.period_end.year for r in readings} == {2025} and any("ends after the filing" in note for note in notes)
+
+
+def _income(header: str, first_row: str = "") -> list:
+    from datetime import date as day
+    from statement_extractor.readers.html.read import read_document
+    html = f"<p>Income Statement (R$ million)</p><table><tr><td></td>{header}</tr>{first_row}" + "".join(
+        f"<tr><td>{label}</td>" + "".join(f"<td>{value}</td>" for value in values) + "</tr>" for label, values in (
+            ("Sales revenues", ("212", "236", "70", "71")), ("Income before income taxes", ("20", "18", "7", "6")),
+            ("Income taxes", ("(5)", "(4)", "(2)", "(1)")), ("Net income", ("15", "14", "5", "5")))) + "</table>"
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=day(2020, 7, 31), document_end=day(2020, 6, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    return sorted((r.fiscal_year, r.fiscal_period, r.duration) for r in readings)
+
+
+def test_each_columns_own_month_range_and_named_quarters():
+    # Petrobras: "Jan-Jun/2020 | Jan-Jun/2019 | Apr-Jun/2020 | Apr-Jun/2019"; its 2016 release: "2016 | 2015 | 3Q-2016 | 2Q-2016" under "Jan-Sep".
+    assert _income("<td>Jan-Jun/2020</td><td>Jan-Jun/2019</td><td>Apr-Jun/2020</td><td>Apr-Jun/2019</td>") == [
+        ("2019", "Q2", "quarter"), ("2019", "Q2", "ytd"), ("2020", "Q2", "quarter"), ("2020", "Q2", "ytd")]
+    assert _income("<td>2020</td><td>2019</td><td>2Q-2020</td><td>1Q-2020</td>", "<tr><td>Jan-Jun</td></tr>") == [
+        ("2019", "Q2", "ytd"), ("2020", "Q1", "quarter"), ("2020", "Q2", "quarter"), ("2020", "Q2", "ytd")]

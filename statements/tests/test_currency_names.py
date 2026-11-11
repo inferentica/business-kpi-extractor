@@ -59,7 +59,7 @@ def _income(lines: str, scale: str = "(in millions)") -> str:
 
 def _currencies(html: str) -> set:
     from statement_extractor.readers.html.read import read_document
-    readings, _notes = read_document(html, accession="x", form="6-K", filed=date(2004, 11, 1), document_end=None,
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=date(2030, 1, 1), document_end=None,
                                      fiscal_year_end="1231", year_offset=0)
     return {reading.currency for reading in readings}
 
@@ -111,3 +111,12 @@ def test_a_statements_columns_share_its_one_dollar_sign():
 
 def test_brookfields_canadian_dollar_mark():
     assert currencies_named("MILLIONS, EXCEPT PER SHARE AMOUNTS (CDN.$)") == ["CAD"]
+
+
+def test_a_currency_in_the_tables_first_row_beats_the_commentary_above_its_title():
+    # Petrobras's real releases: "… debt … in U.S. dollars in the period. FINANCIAL STATEMENTS Income Statement", then
+    # "R$ million" as the table's first row.
+    html = "<p>mainly reflecting foreign exchange on debt in U.S. dollars in the period. FINANCIAL STATEMENTS Income Statement</p>" \
+           "<table><tr><td></td><td>2016</td><td>2015</td></tr><tr><td>R$ million</td></tr>" + "".join(
+               f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in ROWS) + "</table>"
+    assert _currencies(html) == {"BRL"}
