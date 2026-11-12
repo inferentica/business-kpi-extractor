@@ -600,13 +600,15 @@ def test_a_footnote_mark_on_a_heading_word_is_no_change_of_column():
     assert not _same_header(table, 1, 1, {"header": "price/mix"})
 
 
-def _annual(year, n2, n3, n5, others, members, heading="Years Ended December 31"):
-    total = n2 + n3 + n5 + others
+def _annual(year, n2, n3, n5, others, members, heading="Years Ended December 31", new_row=None):
+    total = n2 + n3 + n5 + others + (new_row or 0)
+    extra = f"<tr><td>A16</td><td>{new_row}</td><td>-</td></tr>" if new_row else ""
     return f"""
 <p>Annual report for the years ended December 31, {year} (Amounts in Thousands of New Taiwan Dollars)</p>
 <table>
   <tr><td></td><td>{heading}</td></tr>
   <tr><td>Resolution</td><td>{year}</td><td>{year - 1}</td></tr>
+  {extra}
   <tr><td>2-nanometer</td><td>{n2}</td><td>1</td></tr>
   <tr><td>3-nanometer</td><td>{n3}</td><td>2</td></tr>
   <tr><td>5-nanometer</td><td>{n5}</td><td>3</td></tr>
@@ -673,3 +675,14 @@ def test_a_row_above_the_old_first_row_is_read_only_when_the_rows_then_add_up():
     assert _with_rows_above(Table("T0", "", rows), 3, 5, 1) == 2  # 108 + 629 + 357 = 1,094, never the "2023" row
     unrelated = rows[:2] + [["Memo: prior year", "99", "-"]] + rows[3:5] + [["Wafer revenue", "986", "1,043"]]
     assert _with_rows_above(Table("T0", "", unrelated), 3, 5, 1) == 3  # 629 + 357 = 986 already: nothing above joins
+
+
+def test_a_years_new_row_stands_when_the_table_adds_up_to_its_total():
+    # TSMC's 2023 technology table opens with a 3-nanometer row 2022's did not have: no place last year, no year-ago
+    # figure, and the rows add up to the wafer revenue the report states only with it.
+    this_year = parse_document(_annual(2026, 110, 230, 320, 410, 300, new_row=55), "https://www.sec.gov/Archives/a2026q4consolidated.htm")
+    control = NoAi()
+    pipeline = _pipeline(control, _year_and_quarter_history())
+    read, problems, located = pipeline._read(lambda: "prompt", this_year, SPEC, date(2026, 12, 31), version=1)
+    assert control.calls == [] and located.annual
+    assert {item.kpi.key: item.value for item in read if not item.is_total}["a16"] == 55_000

@@ -269,7 +269,8 @@ class ReplayReading:
         """Groups a year's reading settles on its own, as _confirmed_groups does a quarter's, against years: its period
         holds, every column is headed as a year, nothing last year's reading found is missing, no figure repeats an
         earlier year's, every check passes against last year, and each figure is where it was last year or matches the
-        figure stored for last year in its own row's year-ago column."""
+        figure stored for last year in its own row's year-ago column (a new row of a table that adds up to its total
+        stands beside the others)."""
         if check_period(located, expected):
             return set()
         history = self._year_history(expected)
@@ -299,8 +300,13 @@ class ReplayReading:
             validate_groups(trial, previous)
             if not all(item.status == "verified" for item in trial):
                 continue
+            # A row new this year (TSMC's 3-nanometer, 2023) has no place last year and no year-ago figure: in a whole
+            # table whose rows add up to the total it states (checked above), it stands beside rows that are confirmed.
+            totalled = whole and any(item.is_total for item in items)
             if all(_same_place(item.locator, last.get(f"{group.key}.{item.kpi.key}") or {})
-                   or self._year_ago_cell_matches(item, document, stored.get(f"{group.key}.{item.kpi.key}")) for item in parts):
+                   or self._year_ago_cell_matches(item, document, stored.get(f"{group.key}.{item.kpi.key}"))
+                   or (totalled and f"{group.key}.{item.kpi.key}" not in last) for item in parts) \
+                    and any(f"{group.key}.{item.kpi.key}" in last for item in parts):
                 confirmed.add(group.key)
         return confirmed
 
