@@ -5,6 +5,7 @@ the run summary's replayOutcomes: the learning loop's measure of where code shou
 from __future__ import annotations
 
 import copy
+import re
 from datetime import date, timedelta
 
 from ..ai import GroupSpec, Located, Spec
@@ -248,6 +249,21 @@ class ReplayReading:
         return {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
                 for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
                 and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
+
+    @staticmethod
+    def _year_ago_contradicts(item: ReadValue, document: Document, before: float | None) -> bool:
+        """A table row whose own year-ago cells all differ from the figure stored for that quarter last year, by more
+        than the row's printed rounding: another measure's row under the same label, not the KPI's place (Uber's
+        "Freight" under Revenue, 1,337, taken for Freight Gross Bookings: Q4's release, with a full-year table more, had
+        the bookings table one place later). A row with no year-ago cell, or no stored figure, says nothing."""
+        table = document.tables.get(str(item.locator.get("table")))
+        cells = _year_ago_cells(document, item.locator, item.value) if before is not None and table is not None else []
+        if not cells:
+            return False
+        text = table.cell(int(item.locator["row"]), int(item.locator["col"])) or ""
+        decimals = re.search(r"\.(\d+)", text)
+        step = 10 ** -(len(decimals.group(1)) if decimals else 0) * abs(item.value / parse_number(text).value)
+        return all(abs(cell - before) > max(step / 2, abs(before) * 1e-4) for cell in cells)
 
     def _one_of(self, document: Document, part: Spec, key: str, ambiguous: AmbiguousQuote, expected: date,
                 currency: str | None, annual: bool = False) -> tuple[Located, list[ReadValue]] | str:

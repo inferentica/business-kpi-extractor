@@ -179,8 +179,8 @@ class AiReading:
             validate_groups(trial, self._previous(expected))
             if not all(item.status == "verified" for item in trial):
                 continue
-            if all(self._same_place_as_last(item, expected, document)
-                   or self._year_ago_cell_matches(item, document, stored.get(f"{group.key}.{item.kpi.key}")) for item in parts):
+            if all(self._same_place_as_last(item, expected, document, before := stored.get(f"{group.key}.{item.kpi.key}"))
+                   or self._year_ago_cell_matches(item, document, before) for item in parts):
                 confirmed.add(group.key)
         return confirmed
 
@@ -279,11 +279,12 @@ class AiReading:
         keys = {f"{item.group.key}.{item.kpi.key}" for item in read}
         return "missing_now" if any(key not in keys for key in last) else "moved"
 
-    def _same_place_as_last(self, item: ReadValue, expected: date, document: Document) -> bool:
-        # The places this document's replay took, an earlier quarter's for a KPI the newest reading lacked among them.
+    def _same_place_as_last(self, item: ReadValue, expected: date, document: Document, before: float | None = None) -> bool:
+        # The places this document's replay took, an earlier quarter's for a KPI the newest reading lacked among them;
+        # a row there whose year-ago cells contradict `before` (last year's stored figure) is another measure's.
         last = getattr(self._local, "places", None) or self._last_locators(expected, _source_template(document.source_url))
         key = f"{item.group.key}.{item.kpi.key}"
-        return key in last and _same_place(item.locator, last[key])
+        return key in last and _same_place(item.locator, last[key]) and not self._year_ago_contradicts(item, document, before)
 
     def _where_it_was(self, read: list[ReadValue], expected: date, document: Document, spec: Spec) -> bool:
         last = asked_of(self._last_locators(expected, _source_template(document.source_url)), spec)
@@ -307,9 +308,9 @@ class AiReading:
         for item in read:
             if item.is_total or item.kpi.key == item.group.total_kpi:
                 continue
-            if self._year_ago_cell_matches(item, document, stored.get(f"{item.group.key}.{item.kpi.key}")):
+            if self._year_ago_cell_matches(item, document, before := stored.get(f"{item.group.key}.{item.kpi.key}")):
                 confirmed += 1
-            elif not self._same_place_as_last(item, expected, document):
+            elif not self._same_place_as_last(item, expected, document, before):
                 return False
         return confirmed >= 2
 
