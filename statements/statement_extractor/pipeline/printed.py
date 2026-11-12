@@ -108,8 +108,8 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             rendered = rendered_readings(parse_html(content), content, accession=ref.accession, form=ref.form,
                                          filed=ref.filed, document_end=document_end,
                                          fiscal_year_end=fiscal_year_end, year_offset=year_offset)
-            kinds = {reading.statement for reading in rendered}
-            readings = [reading for reading in readings if reading.statement not in kinds] + rendered
+            rendered_kinds = {reading.statement for reading in rendered}
+            readings = [reading for reading in readings if reading.statement not in rendered_kinds] + rendered
         others = _other_companies(readings, ref, cover)
         if others:
             readings = [reading for reading in readings if reading.titled not in others]

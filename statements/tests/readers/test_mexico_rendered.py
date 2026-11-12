@@ -74,3 +74,19 @@ def test_a_balance_that_does_not_add_up_is_rejected():
 
 def test_a_release_without_the_reports_header_is_not_rendered():
     assert not is_rendered("<p>[210000] Statement of financial position</p><table></table>")
+
+
+def test_a_6k_carrying_the_printed_report_is_read_through_the_pipeline():
+    # Round 66: the reader's own name for the statements it read hid the pipeline's list of document kinds, and every
+    # such 6-K came back unreadable.
+    from types import SimpleNamespace
+
+    from statement_extractor.pipeline.printed import read_printed
+    document = SimpleNamespace(document="kr6k1qfinan_grupo.htm", document_type="6-K", extension=".htm", content=_document())
+    ref = SimpleNamespace(form="6-K", accession="0000895345-16-000476", filed=date(2016, 5, 3), filing=SimpleNamespace(attachments=[document]))
+    readings, notes, kinds = read_printed(ref, "1231", 0, document_end=date(2016, 3, 31))
+    assert not any("unreadable" in note for note in notes)
+    assert {(r.statement, r.period_end) for r in readings
+            if any(line["concept"].startswith("ifrs-full_") for line in r.lines)} >= {
+        ("balance", date(2016, 3, 31)), ("income", date(2016, 3, 31))}
+    assert "html" in kinds
