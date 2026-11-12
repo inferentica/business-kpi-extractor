@@ -34,6 +34,9 @@ def _company_names(filing) -> list[str]:
     return _NAMES[cik]
 
 
+_HIDDEN_HEADER = re.compile(r"<ix:header>.*?</ix:header>", re.I | re.S)
+
+
 def _cover_text(attachments, forms: tuple[str, ...] = ("6-K",)) -> str | None:
     """A 6-K cover's first words as plain text, or a 20-F's or 40-F's (their covers print the registrant's names the
     same way: "(Exact name of Registrant as specified in its charter)")."""
@@ -46,7 +49,10 @@ def _cover_text(attachments, forms: tuple[str, ...] = ("6-K",)) -> str | None:
             content = content.decode("utf-8")
         except UnicodeDecodeError:
             content = content.decode("latin-1")  # Petrobras's covers
-    text = re.sub(r"<[^>]+>|&nbsp;", " ", html.unescape(str(content or "")) if "&" in str(content or "")[:30_000] else str(content or ""))
+    # An inline XBRL document opens with its hidden header, the facts' contexts and members (CCU's 20-Fs), before
+    # the cover a reader sees.
+    content = _HIDDEN_HEADER.sub(" ", str(content or ""), count=1)[:1_000_000]
+    text = re.sub(r"<[^>]+>|&nbsp;", " ", html.unescape(content) if "&" in content[:30_000] else content)
     return re.sub(r"\s+", " ", text[:30_000])
 
 

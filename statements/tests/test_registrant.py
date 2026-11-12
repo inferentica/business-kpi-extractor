@@ -125,3 +125,17 @@ def test_one_name_in_the_possessive_is_compared():
     cover = "Commission File Number 1-15240 James Hardie Industries N.V. (Translation of registrant's name) Indicate by check mark"
     assert _others(["Amaca’s"], ["JAMES HARDIE INDUSTRIES NV"], cover) == ["Amaca’s"]
     assert _others(["James Hardie’s", "Hardie’s"], ["JAMES HARDIE INDUSTRIES NV"], cover) == []
+
+
+def test_an_inline_xbrl_covers_names_come_after_its_hidden_header():
+    # CCU's FY2025 20-F: 3.5 MB of hidden contexts and members before its cover (round 72 took the members for its
+    # names and left its own statements out as "Compañía Cervecerías Unidas S.A.").
+    from types import SimpleNamespace
+
+    from statement_extractor.pipeline.company_names import _cover_text, _registrant_words
+    header = "<ix:header><ix:resources>" + "<xbrli:context id='c'>CerveceraCcuChileLtdaMember</xbrli:context>" * 20000 + \
+             "</ix:resources></ix:header>"
+    cover = ("<p>Commission file number 1-14226 COMPA&#209;&#205;A CERVECER&#205;AS UNIDAS S.A. (Exact name of Registrant "
+             "as specified in its charter) UNITED BREWERIES COMPANY, INC. (Translation of Registrant's name into English)</p>")
+    document = SimpleNamespace(document_type="20-F", content="<html><body>" + header + cover + "</body></html>")
+    assert _registrant_words(_cover_text([document], ("20-F",))) == {"COMPANIA", "CERVECERIAS", "UNIDAS", "UNITED", "BREWERIES"}
