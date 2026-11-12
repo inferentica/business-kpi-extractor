@@ -801,3 +801,16 @@ def test_a_column_under_a_table_wide_year_is_the_newest():
     assert current_column(single, 2, 2)
     two = Table("T0", "", [["", "June 30, 2023", "June 30, 2022"], ["", "GDV", "Purchase Volume"], ["Worldwide", "2,267", "1,839"]])
     assert current_column(two, 2, 1) and not current_column(two, 2, 2)
+
+
+def test_a_kpi_the_newest_reading_lacks_is_looked_for_where_an_earlier_quarter_found_it():
+    # JPMorgan's operating metrics: one quarter's reading left a KPI out (missed, or not reported that quarter), and
+    # every quarter after had no place for it. Q1 found the memberships; Q2's reading has only the technology table.
+    first = parse_document(report("March 31", 10, 20, 30, 40, 300), URL.format(n=1))
+    q1 = _history(first)
+    q2 = [dict(row, fiscal_period="Q2", period_end="2026-06-30") for row in q1 if row["group_key"] == "kpi_technology"]
+    third = parse_document(report("September 30", 12, 26, 33, 44, 320), URL.format(n=3))
+    control = NoAi()  # no AI call is expected
+    pipeline = _pipeline(control, q1 + q2)
+    read, problems, _ = pipeline._read(lambda: "prompt", third, SPEC, date(2026, 9, 30), version=1)
+    assert control.calls == [] and {item.kpi.key: item.value for item in read if not item.is_total}["members"] == 320_000_000

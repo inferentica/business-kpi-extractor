@@ -59,6 +59,7 @@ class ReplayReading:
         the first kept reading, and the keys read: a group's key, or "group.kpi" for a metric KPI."""
         source = _source_template(document.source_url)
         last = self._last_locators(expected, source)
+        self._local.places = None
         outcomes = self.result.replay_outcomes
 
         def missed(why: str, times: int = 1) -> None:
@@ -77,6 +78,16 @@ class ReplayReading:
                             if value["period_end"] == newest and value.get("locator") and value["validation_status"] == "verified"}
             if quarter_last:  # else the year's places stay, and are left to the AI as before
                 history, last = quarter_history, quarter_last
+        # A metric KPI the newest reading of this kind lacks (missed there, not reported that quarter, or left to the AI)
+        # is looked for where an earlier quarter of this kind found it, within the year: one quarter's miss no longer
+        # leaves it without a place for good. Only KPIs read one by one, never a year's place; every check still holds.
+        groups = {group.key: group for group in spec.groups}
+        oldest = (expected - timedelta(days=400)).isoformat()
+        last = {**last, **{key: value["locator"] for key, value in history.items()
+                           if key not in last and (group := groups.get(key.split(".", 1)[0])) is not None and kpi_by_kpi(group)
+                           and value.get("locator") and value["validation_status"] == "verified"
+                           and value["fiscal_period"] != "FY" and value["period_end"] >= oldest}}
+        self._local.places = last
         accession = next((value.get("source_accession") for key, value in history.items() if key in last), None)
         not_reported = self._not_reported_before(accession, expected)
         items: list[ReadValue] = []
