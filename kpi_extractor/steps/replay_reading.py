@@ -4,6 +4,7 @@ reading must pass. What code leaves goes to the AI, and each group (or metric KP
 the run summary's replayOutcomes: the learning loop's measure of where code should learn next."""
 from __future__ import annotations
 
+import copy
 from datetime import date, timedelta
 
 from ..ai import GroupSpec, Located, Spec
@@ -12,10 +13,11 @@ from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
 from ..readers.quoted_rows import row_line
-from ..readers.replay import AmbiguousQuote, _source_template, replay, reported_period
+from ..readers.replay import AmbiguousQuote, _same_place, _source_template, missing_since, replay, reported_period
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
-from ..readers.trace import trace_replay
-from .shared import AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days
+from ..quality.checks import check_period, validate_groups
+from ..readers.trace import placed_elsewhere, trace_replay
+from .shared import AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _annual_header, _days, _same
 
 REPLAYED = "replayed"
 
@@ -62,7 +64,7 @@ class ReplayReading:
                 outcomes[why] = outcomes.get(why, 0) + times
         if not last:
             missed("no earlier reading of this kind of document", len(spec.groups))
-            return [], None, set()
+            return self._replay_year(document, spec, expected, currency) or ([], None, set())
         history = self._kind_history(expected, source)
         accession = next((value.get("source_accession") for key, value in history.items() if key in last), None)
         not_reported = self._not_reported_before(accession, expected)
@@ -106,18 +108,84 @@ class ReplayReading:
                 kept_located = kept_located or located
             if kpi_by_kpi(group) and not unlooked and done & listed and listed - done <= not_reported:
                 done.add(group.key)  # every KPI the AI would look for was read by code
+        # A reading of the whole document as the year outweighs a quarter's reading of part of it: a year's report
+        # states its sentences once, for the year (TSMC's), and its columns, headed as years, were checked against last year.
+        if left_for_ai(spec, done) is not None and (year := self._replay_year(document, spec, expected, currency)):
+            return year
         return items, kept_located, done
 
+    def _year_history(self, expected: date) -> dict[str, dict]:
+        """Last year's readings of the year (an annual report's figures, read a year before this one ends): each KPI's
+        latest verified AI figure for the fiscal year ending within 20 days of a year before."""
+        target = expected - timedelta(days=365)
+        history: dict[str, dict] = {}
+        for value in list(self.values.values()):
+            if value["method"] == "ai" and value["validation_status"] == "verified" and value["fiscal_period"] == "FY" \
+                    and value.get("locator") and not placed_elsewhere(value) and abs(_days(value["period_end"], target.isoformat())) <= 20:
+                history[f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"] = value
+        return history
+
+    def _replay_year(self, document: Document, spec: Spec, expected: date, currency: str | None):
+        """A year's report read again from last year's: TSMC files its annual consolidated report each Q4, a new file name
+        every year, its figures in "Years ended" columns; replaying Q3's "three months ended" places into it is rightly
+        refused. Read from last year's readings of the year, as a reading of
+        the year (its figures stored for the fiscal year, Q4 derived from them as for the AI's). It stands only whole:
+        every group read, or of a metric group every KPI last year's reading did not note as unreported; otherwise the AI
+        reads the document as before, so a year's figures never sit beside a quarter's reading. Tried when the quarter's
+        replay leaves something for the AI."""
+        history = self._year_history(expected)
+        last = {key: value["locator"] for key, value in history.items()}
+        if not last:
+            return None
+        accession = next((value.get("source_accession") for value in history.values()), None)
+        not_reported = self._not_reported_before(accession, expected)
+        items: list[ReadValue] = []
+        kept, done = None, set()
+        for group in spec.groups:
+            mine = {key: locator for key, locator in last.items() if key.split(".", 1)[0] == group.key}
+            listed = {f"{group.key}.{kpi.key}" for kpi in group.kpis if kpi.key != group.total_kpi}
+            if not mine:
+                if listed <= not_reported:
+                    done.add(group.key)
+                    continue
+                return None
+            if kpi_by_kpi(group):
+                parts = [({key: locator}, Spec.model_validate({"groups": [{**group.model_dump(), "kpis": [
+                    kpi.model_dump() for kpi in group.kpis if f"{group.key}.{kpi.key}" == key]}]}), key)
+                    for key, locator in mine.items() if key in listed]
+                if listed - mine.keys() - not_reported:
+                    return None
+            elif listed - mine.keys() - not_reported and not any(locator.get("whole_table") for locator in mine.values()):
+                return None
+            else:
+                parts = [(mine, Spec.model_validate({"groups": [group.model_dump()]}), group.key)]
+            for locators, part, key in parts:
+                found = self._replay_part(document, part, locators, expected, currency, annual=True)
+                if isinstance(found, str):
+                    return None
+                located, read = found
+                trace_replay(read, locators, history, accession)
+                items += read
+                done.add(key)
+                kept = kept or located
+            done.add(group.key)
+        if kept is None or left_for_ai(spec, done) is not None:
+            return None
+        kept.annual = True
+        self.result.replay_outcomes["replayed as the year"] = self.result.replay_outcomes.get("replayed as the year", 0) + 1
+        return items, kept, done
+
     def _replay_part(self, document: Document, part: Spec, locators: dict[str, dict], expected: date,
-                     currency: str | None) -> tuple[Located, list[ReadValue]] | str:
-        """One group, or one KPI, replayed and checked: its reading and values, or why it does not stand."""
+                     currency: str | None, annual: bool = False) -> tuple[Located, list[ReadValue]] | str:
+        """One group, or one KPI, replayed and checked: its reading and values, or why it does not stand. A year's
+        reading (annual) names no quarter its columns must name."""
         _year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=getattr(self, "offset", 0))
-        located = replay(document, locators, expected, int(period[1]) if period.startswith("Q") else None)
+        located = replay(document, locators, expected, int(period[1]) if period.startswith("Q") and not annual else None)
         if isinstance(located, AmbiguousQuote) and len(locators) == 1:
-            return self._one_of(document, part, next(iter(locators)), located, expected, currency)
+            return self._one_of(document, part, next(iter(locators)), located, expected, currency, annual)
         if isinstance(located, str):
             return located
-        return self._checked(document, part, located, expected, currency)
+        return self._checked(document, part, located, expected, currency, annual=annual)
 
     def _stored_year_ago(self, expected: date) -> dict[str, float]:
         """Each KPI's verified figure for the same quarter one year earlier ("group.kpi" → value)."""
@@ -127,7 +195,7 @@ class ReplayReading:
                 and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
 
     def _one_of(self, document: Document, part: Spec, key: str, ambiguous: AmbiguousQuote, expected: date,
-                currency: str | None) -> tuple[Located, list[ReadValue]] | str:
+                currency: str | None, annual: bool = False) -> tuple[Located, list[ReadValue]] | str:
         """A KPI's sentence found in several places (KKR's "Management Fees" row in the firm's table and again in each
         segment's; Mastercard's bullets for the quarter and again for the year to date): one place is kept only on the
         filing's own evidence, after every check a Flash-only reading must pass. First the places whose row's year-ago
@@ -136,7 +204,8 @@ class ReplayReading:
         period_end = reported_period(document, expected).isoformat()
         passing = []
         for locator, section in ambiguous.candidates:
-            checked = self._checked(document, part, Located(period_end=period_end, values=[locator]), expected, currency)
+            checked = self._checked(document, part, Located(period_end=period_end, values=[locator]), expected, currency,
+                                    annual=annual)
             if not isinstance(checked, str):
                 passing.append((checked, section))
         before = self._stored_year_ago(expected).get(key)
@@ -157,10 +226,12 @@ class ReplayReading:
         return str(ambiguous)
 
     def _checked(self, document: Document, part: Spec, located: Located, expected: date, currency: str | None,
-                 mark: dict | None = None) -> tuple[Located, list[ReadValue]] | str:
+                 mark: dict | None = None, annual: bool = False) -> tuple[Located, list[ReadValue]] | str:
         """A reading code made (a replay, or a learned rule's), kept only when it passes every check a Flash-only
-        reading must. `mark` names the rule that read it, on each value's locator."""
+        reading must. `mark` names the rule that read it, on each value's locator. A year's reading (annual) is
+        checked as one: its columns headed as years, against last year's (_confirmed_years)."""
         keys = {group.key for group in part.groups}
+        located.annual = located.annual or annual
         read, problems = read_values(document, part, located, currency)
         read = [item for item in read if item.group.key in keys]
         for item in read:
@@ -168,11 +239,55 @@ class ReplayReading:
         read, problems = self._drop_wrong_columns(read, problems, document, located, expected)
         if problems or not read:
             return "a check failed"
+        if annual:
+            if not keys <= self._confirmed_years(located, read, part, expected, document):
+                return "not confirmed where it was or by the year-ago column"
+            return located, read
         if self._far_above_quarters(read, expected):
             return "total far above the quarter before"
         if not keys <= self._confirmed_groups(located, read, part, expected, document):
             return "not confirmed where it was or by the year-ago column"
         return located, read
+
+    def _confirmed_years(self, located: Located, read: list[ReadValue], part: Spec, expected: date,
+                         document: Document) -> set[str]:
+        """Groups a year's reading settles on its own, as _confirmed_groups does a quarter's, against years: its period
+        holds, every column is headed as a year, nothing last year's reading found is missing, no figure repeats an
+        earlier year's, every check passes against last year, and each figure is where it was last year or matches the
+        figure stored for last year in its own row's year-ago column."""
+        if check_period(located, expected):
+            return set()
+        history = self._year_history(expected)
+        last = {key: value["locator"] for key, value in history.items()}
+        before = (expected - timedelta(days=20)).isoformat()
+        earlier: dict[str, list[float]] = {}
+        for value in list(self.values.values()):
+            if value["method"] in ("ai", "derived") and value["fiscal_period"] == "FY" and value["validation_status"] != "rejected" \
+                    and value["period_end"] < before:
+                earlier.setdefault(f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}", []).append(float(value["value"]))
+        stored = {key: float(value["value"]) for key, value in history.items()}
+        previous = self._previous(expected, annual=True)
+        confirmed = set()
+        for group in part.groups:
+            items = [item for item in read if item.group.key == group.key]
+            parts = [item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]
+            if not parts or not all(_annual_header(str(item.locator.get("header") or "")) for item in items if item.locator.get("table")):
+                continue
+            keys = {f"{item.group.key}.{item.kpi.key}" for item in items}
+            whole = any(item.locator.get("whole_table") for item in items)
+            if missing_since(last, keys, group.key, whole, {f"{group.key}.{kpi.key}" for kpi in group.kpis}, document):
+                continue
+            if any(item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in
+                   earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
+                continue
+            trial = copy.deepcopy(items)
+            validate_groups(trial, previous)
+            if not all(item.status == "verified" for item in trial):
+                continue
+            if all(_same_place(item.locator, last.get(f"{group.key}.{item.kpi.key}") or {})
+                   or self._year_ago_cell_matches(item, document, stored.get(f"{group.key}.{item.kpi.key}")) for item in parts):
+                confirmed.add(group.key)
+        return confirmed
 
     def _by_rule(self, document: Document, part: Spec, locators: dict[str, dict], key: str, expected: date,
                  currency: str | None, miss: str) -> tuple[Located, list[ReadValue]] | str:

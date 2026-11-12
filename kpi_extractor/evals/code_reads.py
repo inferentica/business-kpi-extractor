@@ -140,8 +140,8 @@ class CodeOnlyPipeline(SymbolPipeline):
                 values[value_key(row)] = MappingProxyType(row)
         del self.store._apply  # the class's own again
 
-    def _replay_part(self, document, part, locators, expected, currency):
-        found = super()._replay_part(document, part, locators, expected, currency)
+    def _replay_part(self, document, part, locators, expected, currency, annual=False):
+        found = super()._replay_part(document, part, locators, expected, currency, annual)
         if isinstance(found, str):
             accession = getattr(self._local, "accession", None)
             lacking = _closest_table(document, locators) if found == "table rows not found" else None
@@ -152,8 +152,8 @@ class CodeOnlyPipeline(SymbolPipeline):
                 self.misses[(accession, key)] = {"why": found, "place": place, "document": document.source_url.rsplit("/", 1)[-1]}
         return found
 
-    def _checked(self, document, part, located, expected, currency, mark=None):
-        found = super()._checked(document, part, located, expected, currency, mark)
+    def _checked(self, document, part, located, expected, currency, mark=None, annual=False):
+        found = super()._checked(document, part, located, expected, currency, mark, annual)
         if found == UNCONFIRMED:
             started = time.perf_counter()  # a diagnosis, not reading: kept out of code's time
             keys = {group.key for group in part.groups}
@@ -164,6 +164,8 @@ class CodeOnlyPipeline(SymbolPipeline):
 
     def _unconfirmed_why(self, located, read, part, expected, document) -> str:
         """Which of the confirmation's conditions (AiReading._confirmed_groups) a code reading failed."""
+        if located.annual and not check_period(located, expected):
+            return "a year's reading not confirmed by last year's place or year-ago column"
         if check_period(located, expected) or located.annual or self._reports_full_year(read, expected):
             return "the reading's period is in doubt"
         earlier = self._earlier_values(expected)
