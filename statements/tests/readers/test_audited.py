@@ -74,3 +74,19 @@ def test_a_statements_own_words_are_no_company():
                                        "S.A.B. de C.V. and subsidiaries", "statements of Financial Position of KT Corporation")
                         + _HEINEKEN)
     assert [table.audited_of for table in tables] == ["", "Heineken N.V."]
+
+
+def test_another_companys_fuller_statement_never_takes_the_companys_periods():
+    # FEMSA's FY2011 20-F: Heineken's balance sheet, fuller than FEMSA's, was read first and FEMSA's skipped as printed
+    # again (round 74's rule fix).
+    fuller = _HEINEKEN.replace("<tr><td>Other assets</td>", "<tr><td>Inventories</td><td>0</td><td>0</td></tr>"
+                               "<tr><td>Prepayments</td><td>0</td><td>0</td></tr><tr><td>Other assets</td>")
+    printed._NAMES["1061736"] = ["MEXICAN ECONOMIC DEVELOPMENT INC"]
+    document = SimpleNamespace(document="d333867d20f.htm", document_type="20-F", extension=".htm",
+                               content=_COVER + _FEMSA + _NOTE + fuller)
+    filing = SimpleNamespace(attachments=[document], cik=1061736, company="MEXICAN ECONOMIC DEVELOPMENT INC",
+                             period_of_report="2020-12-31")
+    ref = SimpleNamespace(form="20-F", accession="0001193125-12-191729", filed=date(2021, 4, 23), filing=filing)
+    readings, _notes, _kinds = printed.read_printed(ref, "1231", 0)
+    assert {(reading.period_end, reading.currency) for reading in readings} == {(date(2020, 12, 31), "MXN"),
+                                                                             (date(2019, 12, 31), "MXN")}

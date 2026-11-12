@@ -34,6 +34,24 @@ def column_currencies(table: Table, columns: list[tuple[int, ...]]) -> dict[tupl
     return found
 
 
+def split_by_sign(table: Table, periods: dict) -> dict:
+    """A heading over two figure columns that print different signs the title defines, one column each: FEMSA's FY2011
+    20-F heads "2011" over "$ 14,470" and "Ps. 201,867" (U.S. dollars, then Mexican pesos), each column its period."""
+    leading = " ".join(row.label for row in table.rows[:next((i for i, r in enumerate(table.rows) if r.figures), 0)][:4])
+    signs = _defined_signs(table.context[-400:] + " " + " ".join(cell.text for cells in table.header for cell in cells)
+                           + " " + leading)
+    if not signs:
+        return periods
+    split = {}
+    for column, period in periods.items():
+        beside = [signs.get(_sign_beside(table, (position,))) for position in column] if len(column) > 1 else []
+        if beside and all(beside) and len(set(beside)) == len(beside):
+            split.update({(position,): period for position in column})
+        else:
+            split[column] = period
+    return split
+
+
 _DEFINED = re.compile(r"((?:u\.?\s?s\.?|united\s+states)\s+dollars?|mexican\s+pesos?|chilean\s+pesos?|(?:brazilian\s+)?reais)"
                       r"\s*\(\s*(\$|ps\.?|ch\$|r\$|us\$)\s*\)", re.I)  # Coca-Cola FEMSA: "U.S. dollars ( $ )"
 
