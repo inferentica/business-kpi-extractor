@@ -545,4 +545,6 @@ def current_column(table: Table, first_data_row: int, col: int) -> bool:
     every = years([cell for row in header_rows for cell in row[1:]])
     if not every:
         return True  # no years in the header: the prior-period checks decide
+    if not column and len(every) == 1:
+        return True  # one year over the whole table (Mastercard's "For the 3 Months ended June 30, 2023"): no other period's column
     return bool(column) and max(column) == max(every)
