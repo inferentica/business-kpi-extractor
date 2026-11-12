@@ -192,9 +192,11 @@ class CodeOnlyPipeline(SymbolPipeline):
             if held is not None:
                 return f"a check holds it ({(held.notes or ['unstated'])[-1][:60]})"
             for item in parts:
-                if self._same_place_as_last(item, expected, document):
-                    continue
                 before = stored.get(f"{group.key}.{item.kpi.key}")
+                if self._same_place_as_last(item, expected, document, before):
+                    continue
+                if self._same_place_as_last(item, expected, document):
+                    return "same row label, but its year-ago column differs from the stored figure"
                 if before is None:
                     return "moved, and no year-ago figure is stored"
                 if not self._year_ago_cell_matches(item, document, before):

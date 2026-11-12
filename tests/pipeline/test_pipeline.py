@@ -2202,3 +2202,26 @@ def test_qwen_profiles_choose_the_model_per_call(monkeypatch):
     assert (ai_provider(False), ai_provider(True)) == ("qwen", "qwen")
     monkeypatch.setenv("KPI_AI_PROFILE", "mixed")  # DeepSeek reads first; Qianwen reads again and reviews
     assert (ai_provider(False), ai_provider(True)) == ("deepseek", "qwen")
+
+
+def test_a_row_whose_year_ago_cell_contradicts_last_years_figure_is_not_the_kpis_place():
+    """Uber's Q1 2026 release: "Freight" under Revenue (1,260 a year ago) sits where Q4's release, with one table more, had
+    "Freight" under Gross Bookings; the bookings stored for Q1 2025 (1,259) rule the row out. A rounded cell ($28.4
+    billion) does not contradict the exact figure stored for it (28,354 million)."""
+    from kpi_extractor.steps.replay_reading import ReplayReading
+    html = ("<table><tr><td></td><td>Three Months Ended March 31,</td><td></td></tr>"
+            "<tr><td>(In millions)</td><td>2025</td><td>2026</td></tr>"
+            "<tr><td>Revenue:</td><td></td><td></td></tr>"
+            "<tr><td>Freight</td><td>1,260</td><td>1,337</td></tr></table>"
+            "<table><tr><td></td><td>Three Months Ended March 31,</td><td></td></tr>"
+            "<tr><td>(In billions)</td><td>2025</td><td>2026</td></tr>"
+            "<tr><td>Remaining performance obligations</td><td>$28.4</td><td>$30.1</td></tr></table>")
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    first, second = list(document.tables)
+    freight = SimpleNamespace(value=1_337e6, locator={"table": first, "row": 3, "col": 2, "row_label": "Freight"})
+    rpo = SimpleNamespace(value=30.1e9, locator={"table": second, "row": 2, "col": 2})
+    assert ReplayReading._year_ago_contradicts(freight, document, 1_259e6)
+    assert not ReplayReading._year_ago_contradicts(freight, document, 1_260e6)
+    assert not ReplayReading._year_ago_contradicts(freight, document, None)
+    assert not ReplayReading._year_ago_contradicts(rpo, document, 28_354e6)
+    assert ReplayReading._year_ago_contradicts(rpo, document, 27_900e6)
