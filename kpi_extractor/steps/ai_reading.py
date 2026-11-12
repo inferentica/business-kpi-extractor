@@ -280,7 +280,8 @@ class AiReading:
         return "missing_now" if any(key not in keys for key in last) else "moved"
 
     def _same_place_as_last(self, item: ReadValue, expected: date, document: Document) -> bool:
-        last = self._last_locators(expected, _source_template(document.source_url))
+        # The places this document's replay took, an earlier quarter's for a KPI the newest reading lacked among them.
+        last = getattr(self._local, "places", None) or self._last_locators(expected, _source_template(document.source_url))
         key = f"{item.group.key}.{item.kpi.key}"
         return key in last and _same_place(item.locator, last[key])
 
