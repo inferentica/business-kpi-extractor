@@ -505,3 +505,12 @@ def test_a_tag_is_learned_from_two_different_figures_never_a_run_of_equal_ones()
                       {("2026", "Q1"): {rate: 5.25}, ("2026", "Q2"): {rate: 5.25}}) == []
     assert learn_tags({("2026", "Q1"): 5.25, ("2026", "Q2"): 5.8},
                       {("2026", "Q1"): {rate: 5.25}, ("2026", "Q2"): {rate: 5.8}}) == [rate]
+
+
+def test_a_coarse_reading_matches_its_tags_figure_whatever_the_float_rounding():
+    from kpi_extractor.readers.tagged_metrics import Tag, learn_tags
+    share = Tag("us-gaap:RevenueRemainingPerformanceObligationPercentage", (), False)
+    # A share tagged 0.57 and 0.29 reads as 56.99999999999999 and 28.999999999999996 percent: the same figures as "57%"
+    # and "29%".
+    assert learn_tags({("2023", "Q3"): 57.0, ("2023", "Q4"): 29.0},
+                      {("2023", "Q3"): {share: 0.57 * 100}, ("2023", "Q4"): {share: 0.29 * 100}}) == [share]

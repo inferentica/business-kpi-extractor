@@ -111,7 +111,7 @@ def _evidence(fact: float, value: float) -> bool:
     (KKR's leveraged credit "7%" learned a tag of another measure from its 7.3 and 7.0, which then gave 8.0 for a
     quarter the release states as 11%)."""
     if not _decimals(value) and abs(value) < 100:
-        return fact == value
+        return abs(fact - value) <= 1e-9 * max(1.0, abs(value))  # the same figure: a tagged 0.57 as a percent is 56.99999999999999
     return agrees(fact, value)
 
 
