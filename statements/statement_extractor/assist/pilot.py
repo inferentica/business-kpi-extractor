@@ -12,6 +12,7 @@ from ..readers.printed.currency import column_currencies, reporting_currency, sp
 from ..readers.printed.dates import column_periods
 from ..readers.printed.find import find_statements, two_columns
 from ..readers.printed.scales import statement_scale
+from ..sources.edgar import configure_identity
 from ..sources.listing import filing_for
 from .client import Client
 from .columns import SYSTEM, AnswerError, column_prompt, parse_columns
@@ -59,6 +60,7 @@ def agrees(rules: dict, answer: dict, reporting: str | None) -> tuple[bool, list
 
 
 def run(out: Path) -> dict:
+    configure_identity()  # SEC's User-Agent, as every read sets it
     client = Client(out / "cache")
     tables = []
     for symbol, accession, end in PILOT + CONTROLS:

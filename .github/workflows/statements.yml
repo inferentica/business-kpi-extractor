@@ -139,7 +139,7 @@ jobs:
 
   report:
     needs: read
-    if: always()
+    if: always() && needs.read.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
