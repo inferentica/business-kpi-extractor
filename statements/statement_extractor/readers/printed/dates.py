@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from ...domain.periods import Period
 from .find import TITLE_PATTERNS
 from .ranges import (dates_in_order, spans_over, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric,
-                     own_month, paired_spans)
+                     own_month, paired_spans, counted_start)
 from .tables import Table, figure_columns, header_text
 
 
@@ -169,7 +169,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             year = int(short.group(2)) + (1900 if int(short.group(2)) > 50 else 2000)
             month = _date(short.group(1), "1", str(year)).month
             end = date(year, month, calendar.monthrange(year, month)[1])
-            periods[column] = Period(end) if kind == "balance" else Period(end, end - timedelta(days=90))
+            periods[column] = Period(end) if kind == "balance" else Period(end, counted_start(end, 91))
             continue
         named = _named_quarter(above, fiscal_year_end)
         quarter_name = _QUARTER_NAME.search(above)  # a column's own year after a title's: "(Fourth Quarter 2011) 2010" (CCU)
@@ -179,7 +179,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             shifted = named.year + own_year[-1] % 100 - printed
             named = date(shifted, named.month, min(named.day, calendar.monthrange(shifted, named.month)[1]))
         if named is not None and kind != "balance":
-            periods[column] = Period(named, named - timedelta(days=90))  # "Q3 2007", "3Q07": that quarter
+            periods[column] = Period(named, counted_start(named, 91))  # "Q3 2007", "3Q07": that quarter
             continue
         ranged_months = _MONTH_RANGE.search(above) or months  # its own first: Petrobras's "Jan-Jun/2020 | Apr-Jun/2020"
         if ranged_months and kind != "balance" and years and not numeric and not dotted and not _MONTH_DAY.search(above):
@@ -270,7 +270,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             opened = date(year, month, min(day_of, calendar.monthrange(year, month)[1])) + timedelta(days=1)
             periods[column] = Period(end, opened)
             continue
-        periods[column] = Period(end, end - timedelta(days=days - 1))
+        periods[column] = Period(end, counted_start(end, days, bool(span and span.group(2) and span.group(2).lower().startswith("week"))))
     paired_spans(periods, columns, title + " " + header_all, fiscal_year_end, first)
     mended_starts(periods, ranged)
     return periods

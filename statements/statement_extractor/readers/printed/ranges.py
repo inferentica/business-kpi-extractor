@@ -162,3 +162,12 @@ def paired_spans(periods: dict, columns: list, text: str, fiscal_year_end: str, 
             first, second = spans(periods[left].end)
             if first != second:
                 periods[left], periods[right] = first, second
+
+
+def counted_start(end: date, days: int, weekly: bool = False) -> date:
+    """A span's first day: whole months back from a month's last day ("Six months ended June 30" opens on 1 January,
+    not 31 December as 182 days back did), else its days back (52- and 53-week years, weeks)."""
+    if weekly or end.day != calendar.monthrange(end.year, end.month)[1]:
+        return end - timedelta(days=days - 1)
+    month = end.month - max(1, round(days / 30.4)) + 1
+    return date(end.year + (month - 1) // 12, (month - 1) % 12 + 1, 1)
