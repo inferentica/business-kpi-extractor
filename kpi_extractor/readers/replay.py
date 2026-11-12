@@ -374,7 +374,52 @@ def _same_header(table: Table, first_data_row: int, col: int, locator: dict, qua
     named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(column_header(table, first_data_row, col, DEEP_HEADER_ROWS))}
     if named and quarter and named != {quarter}:
         return False
-    return comparable_header(column_header(table, first_data_row, col)) == comparable_header(locator["header"])
+    raw_now = column_header(table, first_data_row, col)
+    now, before = comparable_header(raw_now), comparable_header(locator["header"])
+    return _FOOTNOTE.sub("", now) == _FOOTNOTE.sub("", before) \
+        or same_period_words(now, before, cut=len(raw_now) >= _HEADER_CAP or len(locator["header"]) >= _HEADER_CAP)
+
+
+# A footnote mark glued to a heading's word: Coca-Cola's "Unit Case Volume³" heads the column "Unit Case Volume" did.
+_FOOTNOTE = re.compile(r"(?<=[a-z])#")
+_HEADER_CAP = 118  # column_header keeps 120 characters: a header that long may end in a word cut short
+# The spans a header names, each as its kind: what a column's period is, whatever title or unit words come with it.
+_SPANS = [("quarter", r"\bthree months\b|<3 months>|<13 weeks>|\bquarters? ended\b|<(?:first|second|third|fourth) quarter>|<quarter>|\bquarterly\b"),
+          ("half", r"\bsix months\b|<6 months>|<26 weeks>|\bhalf[- ]year"),
+          ("nine", r"\bnine months\b|<9 months>|<39 weeks>"),
+          ("year", r"\btwelve months\b|<12 months>|<5[23] weeks>|\byears? ended\b|\bfull[- ]year\b|\bfiscal year\b|\bannual\b|\bltm\b|\bttm\b"),
+          ("to date", r"\byear[- ]to[- ]date\b|\bytd\b"),
+          ("change", r"%|\bchange\b|\bvariance\b|\byoy\b|\bgrowth\b|\bvs\b|\bincrease\b|\bdecrease\b")]
+# Words that say nothing of what a column measures: the period's own, and scale and unit words beside it.
+_NOT_MEASURE = re.compile(r"^(?:three|six|nine|twelve|months?|weeks?|quarters?|quarterly|years?|ended|ending|fiscal|full|to|date|"
+                          r"ytd|in|millions?|billions?|thousands?|dollars?|usd|unaudited|except|percentages?|per|share|data|"
+                          r"and|of|the|as|at|for|amounts?)$")
+# Words that change what a column measures when a header gains them: never a title.
+_OTHER_MEASURE = re.compile(r"^(?:non-gaap|adjusted|organic|comparable|constant|neutral|excluding|normalized|underlying|core|"
+                            r"pro-forma|proforma|segment|change)$")
+
+
+def _spans(header: str) -> set[str]:
+    return {kind for kind, pattern in _SPANS if re.search(pattern, header)}
+
+
+def same_period_words(now: str, before: str, cut: bool = False) -> bool:
+    """Whether two column headers head the same column though their words drifted (Visa's title row "Q3 FISCAL 2023"
+    some quarters and not others, Morgan Stanley's table titles above "Quarter Ended"): they name the same spans, and
+    one's measure words are the other's with title words in front. The spans must be named, both must name a measure,
+    and no added word may change it (non-GAAP, adjusted, organic)."""
+    if not _spans(now) or _spans(now) != _spans(before):
+        return False
+
+    def words(header: str) -> list[str]:
+        found = re.findall(r"[a-z][a-z-]*[a-z]", _FOOTNOTE.sub("", header))
+        found = found[:-1] if cut and found else found  # the last word may be cut short
+        return [word for word in found if not _NOT_MEASURE.match(word)]
+    a, b = words(now), words(before)
+    short, long = (a, b) if len(a) <= len(b) else (b, a)
+    if not short or long[len(long) - len(short):] != short:
+        return False
+    return not any(_OTHER_MEASURE.match(word) for word in long[:len(long) - len(short)])
 
 
 _QUARTERS = {"first": 1, "second": 2, "third": 3, "fourth": 4}
