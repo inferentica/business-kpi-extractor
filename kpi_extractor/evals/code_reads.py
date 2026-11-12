@@ -302,9 +302,16 @@ def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], 
     quarters = sorted({value["period_end"][:7] for value in truth}, reverse=True)[:HELD_OUT_QUARTERS]
     stored = {value_key(value): value for value in state_values}
     kind = lambda group: "metric" if kinds.get(group, "metric") == "metric" else "breakdown"  # noqa: E731
+    # A filing's own period is the newest it gives; a figure for an earlier one (a comparative or a recast the owner
+    # entered from a later filing) is no release reading code could have made of that filing.
+    own_end: dict[str, str] = {}
+    for value in state_values:
+        if value.get("source_accession"):
+            own_end[value["source_accession"]] = max(own_end.get(value["source_accession"], ""), value["period_end"])
     rows = []
     for value in truth:
         accession, expected = value["source_accession"], float(value["value"])
+        earlier = abs(_days(value["period_end"], own_end.get(accession, value["period_end"]))) > 20
         now = final.get(value_key(value))
         found = float(now["value"]) if now is not None and now.get("validation_status") != "rejected" else None
         if found is None:
@@ -320,7 +327,8 @@ def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], 
         group = value["group_key"].removeprefix(AI_GROUP_PREFIX)
         miss = (misses or {}).get((accession, f"{group}.{value['kpi_key']}")) if outcome == "missed" else None
         rows.append({
-            "why": (miss or {}).get("why") or ("document not read by code" if outcome == "missed" else ""), "miss": miss,
+            "why": (miss or {}).get("why") or (("an earlier period's figure in a later filing" if earlier else "document not read by code")
+                                                if outcome == "missed" else ""), "miss": miss,
             "symbol": symbol, "accession": accession, "group": group, "kpi": value["kpi_key"],
             "label": f"{value.get('group_label')} / {value.get('kpi_label')}", "period": f"{value['fiscal_year']}-{value['fiscal_period']}",
             "kind": kind(group), "origin": origin(value), "expected": expected, "found": found, "outcome": outcome,

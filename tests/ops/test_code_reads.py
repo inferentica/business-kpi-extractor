@@ -145,3 +145,11 @@ def test_a_new_company_lists_every_figure_code_read_for_checking_by_hand():
     assert figure["label"] == "Users / Daily active people" and figure["readBy"] == "quarter_table" and figure["quote"] == "DAP 3.6"
     text = new_text([{"symbol": "ORCL", "figures": [figure], "refused": {}, "errors": [], "seconds": 40.2}])
     assert "| ORCL | 1 | 1 | 0 | release_table 1 | 40 |" in text
+
+
+def test_a_missed_figure_of_an_earlier_period_than_its_filings_is_labelled_so():
+    # Goldman's recast asset and wealth management lines, entered by the owner from a later release: no reading of that
+    # release could give them, so they are not counted as a document code did not read.
+    state = [_value("dau", 3.6), _value("mau", 4.1, period=("2025", "Q2"))]
+    rows = {row["kpi"]: row["why"] for row in score_company("META", state, {}, {"a1"}, {}, held_out=False)}
+    assert rows == {"dau": "document not read by code", "mau": "an earlier period's figure in a later filing"}
