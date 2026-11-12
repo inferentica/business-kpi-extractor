@@ -11,6 +11,8 @@ import re
 
 US_GAAP, IFRS, TAIWAN_IFRS, ROC_GAAP, CANADIAN_GAAP, DUTCH_GAAP = (
     "US GAAP", "IFRS", "Taiwan-IFRS", "ROC GAAP", "Canadian GAAP", "Dutch GAAP")
+MEXICAN_FRS, MEXICAN_GAAP, CHILEAN_GAAP, BRAZILIAN_GAAP, KOREAN_GAAP, UK_GAAP = (
+    "Mexican FRS", "Mexican GAAP", "Chilean GAAP", "Brazilian GAAP", "Korean GAAP", "UK GAAP")
 
 # Each basis by the words that name it, most specific first: IFRS "as endorsed" in Taiwan before IFRS as issued.
 _NAMES = (
@@ -24,22 +26,51 @@ _NAMES = (
                r"generally\s+accepted\s+accounting\s+principles\s+in\s+Taiwan|\bTaiwan\s+GAAP\b|"
                r"generally\s+accepted\s+accounting\s+principles\s+(?:in|of)\s+the\s+Republic\s+of\s+China|\bR\.?O\.?C\.?\s+GAAP\b"),
     (US_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+the\s+United\s+States|"
-              r"generally\s+accepted\s+accounting\s+principles\s+(?:in|of)\s+the\s+United\s+States|\bU\.?\s?S\.?\s+GAAP\b"),
+              r"generally\s+accepted\s+accounting\s+principles\s+(?:in|of)\s+the\s+United\s+States|\bU\.?\s?S\.?\s+GAAP\b|"
+              # CEMIG's 2009 opinion: "in conformity with U.S. generally accepted accounting principles".
+              r"(?:\bU\.?\s?S\.?|United\s+States)\s+generally\s+accepted\s+accounting\s+principles"),
     (CANADIAN_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+Canada|Canadian\s+generally\s+accepted|"
                     r"\bCanadian\s+GAAP\b"),
     (DUTCH_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+the\s+Netherlands|\bDutch\s+GAAP\b"),
+    # The home bases of foreign filers before IFRS, as their auditors name them; each opinion goes on to say how it
+    # differs from U.S. GAAP, which is not the basis (Televisa's "in conformity with Mexican Financial Reporting
+    # Standards. Mexican Financial Reporting Standards vary in certain significant respects from U.S. generally accepted
+    # accounting principles").
+    (MEXICAN_FRS, r"Mexican\s+Financial\s+Reporting\s+Standards|\bMexican\s+FRS\b|\bMFRS\b"),
+    (MEXICAN_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+Mexico|\bMexican\s+GAAP\b"),
+    (CHILEAN_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+Chile|\bChilean\s+GAAP\b"),
+    # Brazil's own practices, unless the same words say the statements are also on IFRS (Brazilian filers' statements
+    # since 2010: "in accordance with accounting practices adopted in Brazil and with IFRS").
+    (BRAZILIAN_GAAP, r"(?:accounting\s+practices\s+adopted\s+in\s+Brazil|Brazilian\s+accounting\s+(?:practices|principles)|"
+                     r"(?:generally\s+accepted\s+)?accounting\s+principles\s+(?:generally\s+accepted\s+)?in\s+Brazil|"
+                     r"\bBrazilian\s+GAAP\b|\bBR\s+GAAP\b)"
+                     r"(?![^.;]{0,60}?\b(?:and|as\s+well\s+as)\b[^.;]{0,80}?(?:IFRS|International\s+Financial\s+Reporting))"),
+    # KEPCO's "the Financial Accounting Standards as established by the Financial Supervisory Commission of the Republic
+    # of Korea"; Korea's IFRS ("Korean International Financial Reporting Standards") is IFRS.
+    (KOREAN_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+(?:the\s+Republic\s+of\s+)?Korea|"
+                  r"financial\s+accounting\s+standards[^.;]{0,80}?(?:in|of)\s+the\s+Republic\s+of\s+Korea|"
+                  r"\bKorean\s+GAAP\b|\bK-GAAP\b"),
+    (UK_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+the\s+United\s+Kingdom|\bU\.?K\.?\s+GAAP\b"),
     # ASML's statutory interim reports: "prepared in accordance with IAS 34", IFRS's standard for interim reports.
-    (IFRS, r"International\s+Financial\s+Reporting\s+Standards|\bIFRSs?\b|\bIAS\s*34\b"),
+    # CEMEX's 2016 opinion: "International Reporting Standards as issued by the International Accounting Standards Board".
+    (IFRS, r"International\s+(?:Financial\s+)?Reporting\s+Standards|\bIFRSs?\b|\bIAS\s*34\b"),
 )
 _ANY_NAME = re.compile("|".join(f"(?P<b{index}>{pattern})" for index, (_basis, pattern) in enumerate(_NAMES)), re.I)
 
 # The auditors' opinion: "present fairly, in all material respects, … in conformity with …".
 # A review's conclusion: "we are not aware of any material modifications … for them to be in conformity with …".
+# Braskem's 2022 opinion leaves out the "with": "… in conformity International Financial Reporting Standards".
 _OPINION = re.compile(r"(?:present\s+fairly|not\s+aware\s+of\s+any\s+material\s+modifications)\b.{0,600}?"
-                      r"\b(?:in\s+conformity\s+with|in\s+accordance\s+with)\b(.{0,500})", re.I | re.S)
+                      r"\b(?:in\s+conformity(?:\s+with)?|in\s+accordance\s+with)\b(.{0,500})", re.I | re.S)
 # A release or a statement's own note: "All figures are based on US GAAP", "prepared in accordance with IFRS".
 _STATED = re.compile(r"\b(?:based\s+on|prepared\s+(?:in\s+accordance\s+with|in\s+conformity\s+with|under|on\s+the\s+basis\s+of)|"
                      r"in\s+(?:conformity|accordance)\s+with)\b(.{0,300})", re.I | re.S)
+
+
+# A 20-F's cover asks every filer the same question, whatever its basis: "If an emerging growth company that prepares
+# its financial statements in accordance with U.S. GAAP, indicate by check mark …".
+_COVER = re.compile(r"\bemerging\s+growth\s+company\s+that\s+prepares\s+its\s+financial\s+statements\s+in\s+accordance\s+"
+                    r"with\s+U\.?\s?S\.?\s+GAAP", re.I)
 
 
 def _named(text: str) -> str | None:
@@ -55,7 +86,7 @@ def stated_basis(text: str) -> str | None:
     says the figures are prepared on or based on."""
     text = re.sub(r"<[^>]+>", " ", text or "")  # HTML read as its words
     text = re.sub(r"&(nbsp|#160|#xa0);", " ", text, flags=re.I)
-    text = re.sub(r"\s+", " ", text)
+    text = _COVER.sub(" ", re.sub(r"\s+", " ", text))
     for match in _OPINION.finditer(text):
         basis = _named(match.group(1))
         if basis is not None:
