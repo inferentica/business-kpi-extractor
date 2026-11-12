@@ -68,6 +68,15 @@ class ReplayReading:
             missed("no earlier reading of this kind of document", len(spec.groups))
             return self._replay_year(document, spec, expected, currency) or ([], None, set())
         history = self._kind_history(expected, source)
+        if all((history.get(key) or {}).get("fiscal_period") == "FY" for key in last):
+            # The newest reading of this kind was the year's (TSMC's Q4 annual report): a quarter replays from the latest
+            # quarter's places, the same layout ("three months ended"), not the year's columns.
+            quarter_history = self._kind_history(expected, source, quarters=True)
+            newest = max((value["period_end"] for value in quarter_history.values()), default=None)
+            quarter_last = {key: value["locator"] for key, value in quarter_history.items()
+                            if value["period_end"] == newest and value.get("locator") and value["validation_status"] == "verified"}
+            if quarter_last:  # else the year's places stay, and are left to the AI as before
+                history, last = quarter_history, quarter_last
         accession = next((value.get("source_accession") for key, value in history.items() if key in last), None)
         not_reported = self._not_reported_before(accession, expected)
         items: list[ReadValue] = []
@@ -378,12 +387,12 @@ class ReplayReading:
                 outcome = f"{ANCHOR} {mode} {'agreed' if row['agreed'] else 'disagreed'}"
                 self.result.replay_outcomes[outcome] = self.result.replay_outcomes.get(outcome, 0) + 1
 
-    def _kind_history(self, before: date, source: str | None) -> dict[str, dict]:
+    def _kind_history(self, before: date, source: str | None, quarters: bool = False) -> dict[str, dict]:
         """The AI's latest readings in the same kind of document. A kind is known by its file name, which issuers change
         (TSMC's report was d…d6k, tsm-ex991_…, tsmc…consolidatdfinan, a0515, a…consolidatedreport- in turn, so replay
         found no earlier reading for most quarters): with none under the name, the latest reading of any kind serves, and
         replay still holds only where the same rows, column and total are found and every check passes."""
-        return self._ai_history(before, source) or (self._ai_history(before) if source is not None else {})
+        return self._ai_history(before, source, quarters) or (self._ai_history(before, None, quarters) if source is not None else {})
 
     def _not_reported_before(self, accession: str | None, expected: date) -> set[str]:
         """KPIs the nearest reading's AI looked for and did not find: not looked for again this quarter. In the newest

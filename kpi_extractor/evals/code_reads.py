@@ -227,10 +227,10 @@ class CodeOnlyPipeline(SymbolPipeline):
             self.log(f"{self.symbol}: {len(self._reread_picked)} releases to read with code alone")
         return accession in self._reread_picked
 
-    def _ai_history(self, before: date, source: str | None = None) -> dict[str, dict]:
+    def _ai_history(self, before: date, source: str | None = None, quarters: bool = False) -> dict[str, dict]:
         """Only quarters before the one being read: a later quarter's place is never lent to an earlier one here."""
         cutoff = before.isoformat()
-        history = super()._ai_history(before, source)
+        history = super()._ai_history(before, source, quarters)
         return {key: value for key, value in history.items() if value["period_end"] < cutoff}
 
     def _read(self, text, document, spec, expected, version=None):
