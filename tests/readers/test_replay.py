@@ -539,7 +539,7 @@ def _choose(candidates, year_ago_rows, stored, prose=True):
     places = [(Locator(kpi="operating.members", block=f"P{i}", quote=f"Growth of {value} in the period." if prose
                        else f"Ending Balance ${value} $1 ${value + 1}", value_text=str(value)), section)
               for i, (value, section) in enumerate(candidates)]
-    def checked(document, part, located, expected, currency, mark=None):
+    def checked(document, part, located, expected, currency, mark=None, annual=False):
         item = SimpleNamespace(value=float(located.values[0].value_text), locator={"block": located.values[0].block})
         return located, [item]
     pipeline._checked = checked
@@ -596,3 +596,69 @@ def test_a_footnote_mark_on_a_heading_word_is_no_change_of_column():
     from kpi_extractor.readers.replay import _same_header
     assert _same_header(table, 1, 1, {"header": "unit case volume"})
     assert not _same_header(table, 1, 1, {"header": "price/mix"})
+
+
+def _annual(year, n2, n3, n5, others, members, heading="Years Ended December 31"):
+    total = n2 + n3 + n5 + others
+    return f"""
+<p>Annual report for the years ended December 31, {year} (Amounts in Thousands of New Taiwan Dollars)</p>
+<table>
+  <tr><td></td><td>{heading}</td></tr>
+  <tr><td>Resolution</td><td>{year}</td><td>{year - 1}</td></tr>
+  <tr><td>2-nanometer</td><td>{n2}</td><td>1</td></tr>
+  <tr><td>3-nanometer</td><td>{n3}</td><td>2</td></tr>
+  <tr><td>5-nanometer</td><td>{n5}</td><td>3</td></tr>
+  <tr><td>Others</td><td>{others}</td><td>4</td></tr>
+  <tr><td>Wafer revenue</td><td>{total}</td><td>10</td></tr>
+</table>
+<p>Paid memberships reached {members} million at the end of the year, up 12% from a year ago.</p>
+"""
+
+
+def _records(document, located, fiscal_year, fiscal_period, period_end, accession):
+    items, problems = read_values(document, SPEC, located, "TWD")
+    assert problems == []
+    return [{"group_key": f"kpi_{item.group.key}", "kpi_key": item.kpi.key, "fiscal_year": fiscal_year, "fiscal_period": fiscal_period,
+             "period_end": period_end, "method": "ai", "validation_status": "verified", "value": item.value,
+             "locator": item.locator, "group_label": item.group.label, "kpi_label": item.kpi.label,
+             "source_url": document.source_url, "source_accession": accession} for item in items if not item.is_total]
+
+
+def _year_and_quarter_history():
+    """Last year's annual report read as the year, and this year's Q3 report read as the quarter."""
+    last_year = parse_document(_annual(2025, 100, 200, 300, 400, 280), "https://www.sec.gov/Archives/a2025q4annualreport.htm")
+    q3 = parse_document(report("September 30", 30, 60, 80, 100, 305), "https://www.sec.gov/Archives/a2026q3report.htm")
+    def located(document, period_end, annual):
+        table = next(iter(document.tables))
+        block = next(key for key, item in document.blocks.items() if "Paid memberships" in item.text)
+        members = "280 million" if annual else "305 million"
+        return ai.Located.model_validate({"period_end": period_end, "annual": annual, "tables": [
+            {"group": "technology", "table": table, "col": 1, "first_row": 2, "last_row": 5, "total_row": 6}],
+            "values": [{"kpi": "operating.members", "block": block, "quote": f"Paid memberships reached {members}",
+                        "value_text": members}]})
+    return (_records(last_year, located(last_year, "2025-12-31", True), "2025", "FY", "2025-12-31", "fy25")
+            + _records(q3, located(q3, "2026-09-30", False), "2026", "Q3", "2026-09-30", "q326"))
+
+
+def test_a_years_report_is_read_again_from_last_years_as_the_year():
+    # TSMC files its annual consolidated report each Q4 under a new name, its figures in "Years Ended" columns: Q3's
+    # "three months ended" places are rightly refused there, and last year's report's places read it as the year.
+    this_year = parse_document(_annual(2026, 110, 230, 320, 410, 300), "https://www.sec.gov/Archives/a2026q4consolidated.htm")
+    control = NoAi()  # any AI call would fail: none is expected
+    pipeline = _pipeline(control, _year_and_quarter_history())
+    read, problems, located = pipeline._read(lambda: "prompt", this_year, SPEC, date(2026, 12, 31), version=1)
+    assert control.calls == [] and problems == [] and located.annual
+    values = {item.kpi.key: item.value for item in read if not item.is_total}
+    assert values["n3"] == 230_000 and values["members"] == 300_000_000
+    assert pipeline.result.replay_outcomes.get("replayed as the year") == 1
+
+
+def test_a_q4_release_headed_as_the_quarter_is_never_read_as_the_year():
+    # The same layout headed "Three Months Ended December 31": last year's year places do not serve, the AI reads it.
+    release = parse_document(_annual(2026, 30, 62, 85, 101, 300, heading="Three Months Ended December 31"),
+                             "https://www.sec.gov/Archives/a2026q4consolidated.htm")
+    flash = {"period_end": "2026-12-31", "values": []}
+    control = NoAi({("locate", "flash"): flash, ("locate", "reasoning"): flash})
+    pipeline = _pipeline(control, _year_and_quarter_history())
+    pipeline._read(lambda: "prompt", release, SPEC, date(2026, 12, 31), version=1)
+    assert ("locate", "flash") in control.calls and "replayed as the year" not in pipeline.result.replay_outcomes
