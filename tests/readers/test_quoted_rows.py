@@ -43,3 +43,11 @@ def test_a_quoted_rows_other_figures_are_its_year_ago_cells():
     document = parse_document("<p>Perpetual Capital AUM ($bn) $ 314 $352 $430 Athene</p>", "https://www.sec.gov/x.htm")
     found = replay_row_line(document, "aum.perpetual", locator)
     assert found.value_text == "$430"
+
+
+def test_a_dollar_sign_set_apart_belongs_to_its_figure():
+    # KKR's decks print "Management Fees $ 654,927 $ 748,888 ...": the row and its year-ago figure are read.
+    from kpi_extractor.readers.quoted_rows import row_line, row_line_others
+    row = row_line("Management Fees $ 654,927 $ 748,888 $ 1,279,855 $ 1,487,044", "748,888")
+    assert row is not None and row.label == "Management Fees" and row.index == 1 and len(row.slots) == 4
+    assert row_line_others("Management Fees $ 654,927 $ 748,888 $ 1,279,855 $ 1,487,044", "748,888") == [654_927, 1_279_855, 1_487_044]

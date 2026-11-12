@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from ..ai import GroupSpec, Located, Spec
-from ..documents.document import Document
+from ..documents.document import Document, parse_number
 from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
@@ -147,6 +147,11 @@ class ReplayReading:
         prose = not any(row_line(locator.quote or "", locator.value_text or "") for locator, _section in ambiguous.candidates)
         if not pool and prose and all(section in ("quarter", "longer") for _locator, section in ambiguous.candidates):
             pool = [checked for checked, section in passing if section == "quarter"]
+        # Every place the filing gives states one figure (KKR's table and its appendix copy): the figure is the filing's
+        # wherever it is read.
+        if not pool and len({parse_number(locator.value_text or "").value if parse_number(locator.value_text or "") else None
+                             for locator, _section in ambiguous.candidates}) == 1:
+            pool = [checked for checked, _section in passing]
         if pool and len({round(checked[1][0].value, 9) for checked in pool}) == 1:
             return pool[0]
         return str(ambiguous)
