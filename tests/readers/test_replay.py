@@ -686,3 +686,26 @@ def test_a_years_new_row_stands_when_the_table_adds_up_to_its_total():
     read, problems, located = pipeline._read(lambda: "prompt", this_year, SPEC, date(2026, 12, 31), version=1)
     assert control.calls == [] and located.annual
     assert {item.kpi.key: item.value for item in read if not item.is_total}["a16"] == 55_000
+
+
+def test_a_figure_repeats_only_a_recent_period_and_not_one_its_row_states_again():
+    from kpi_extractor.ai import GroupSpec, KpiSpec
+    from kpi_extractor.readers.extract import ReadValue
+    # Goldman's $17 billion of long-term net inflows in Q2 2025 was held as a repeat of 2016's: only the 13 months a
+    # release's columns can show count.
+    rows = [{"group_key": "kpi_operating", "kpi_key": "members", "fiscal_year": year, "fiscal_period": "Q2",
+             "period_end": end, "method": "ai", "validation_status": "verified", "value": 17.0, "locator": {}}
+            for year, end in (("2016", "2016-06-30"), ("2025", "2025-06-30"))]
+    pipeline = _pipeline(NoAi(), rows)
+    assert pipeline._earlier_values(date(2026, 6, 30)) == {"operating.members": [17.0]}  # 2025's, not 2016's
+    assert pipeline._earlier_values(date(2027, 9, 30)) == {}
+    # JPMorgan's lending fees were 1,828 in 2Q24 and in 2Q23: the row states both, so this column is not 2Q23's.
+    def table(year_ago):
+        return parse_document(f"""<table><tr><td></td><td>Three Months Ended June 30,</td><td>Three Months Ended June 30,</td></tr>
+            <tr><td></td><td>2024</td><td>2023</td></tr><tr><td>Lending and deposit-related fees</td><td>1,828</td><td>{year_ago}</td></tr>
+            </table>""", URL.format(n=2))
+    group = GroupSpec(key="fees", label="Fees", kind="revenue_breakdown", kpis=[KpiSpec(key="lending", label="Lending", unit="currency")])
+    item = ReadValue(group=group, kpi=group.kpis[0], value=1_828.0, currency="USD", locator={"table": "T0", "row": 2, "col": 1})
+    assert not pipeline._repeats(item, table("1,828"), [1_828.0])
+    assert pipeline._repeats(item, table("1,700"), [1_828.0])  # the year-ago column says otherwise: held
+    assert not pipeline._repeats(item, table("1,700"), [1_700.0])

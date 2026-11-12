@@ -18,7 +18,8 @@ from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, com
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, validate_groups
 from ..readers.trace import placed_elsewhere, trace_replay
-from .shared import AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same
+from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same,
+                     _same_chain, _year_ago_cells)
 
 REPLAYED = "replayed"
 
@@ -114,6 +115,31 @@ class ReplayReading:
         if left_for_ai(spec, done) is not None and (year := self._replay_year(document, spec, expected, currency)):
             return year
         return items, kept_located, done
+
+    def _earlier_values(self, before: date) -> dict[str, list[float]]:
+        """Each KPI's figures of the 13 months before a period: the periods a release's columns can show (a quarter's
+        trend table runs five quarters back), whose figure a reading may have taken in place of this one's. A figure
+        equal to one of years before is no sign of that (Goldman's $17 billion of net inflows in 2025 and in 2016)."""
+        earlier: dict[str, list[float]] = {}
+        chained = getattr(self._local, "chained", False)
+        oldest = (before - timedelta(days=400)).isoformat()
+        for value in list(self.values.values()):
+            if chained and not _same_chain(value["period_end"], before):
+                continue  # the other chains' quarters are compared after reading, in date order
+            if value["method"] == "ai" and oldest <= value["period_end"] < (before - timedelta(days=20)).isoformat():
+                key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
+                earlier.setdefault(key, []).append(float(value["value"]))
+        return earlier
+
+    @staticmethod
+    def _repeats(item: ReadValue, document: Document | None, earlier: list[float]) -> bool:
+        """Whether a figure is the same number as one of its KPI's recent figures (_earlier_values), a sign another
+        period's column was read in place of this one's; unless its row shows that number again in another column
+        headed for the same length of period, so the filing states the two periods alike (JPMorgan's lending fees,
+        1,828 in both 2Q24 and 2Q23)."""
+        if item.kpi.unit not in ("currency", "count") or not any(_same(item.value, value) for value in earlier):
+            return False
+        return document is None or not any(_same(cell, item.value) for cell in _year_ago_cells(document, item.locator, item.value))
 
     def _year_history(self, expected: date) -> dict[str, dict]:
         """Last year's readings of the year (an annual report's figures, read a year before this one ends): each KPI's

@@ -184,8 +184,7 @@ class CodeOnlyPipeline(SymbolPipeline):
                     and not row_gone(document, last[key])]
             if gone:
                 return f"a figure read last quarter is missing now ({gone[0].split('.', 1)[1][:40]})"
-            if any(item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in
-                   earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
+            if any(self._repeats(item, document, earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
                 return "a figure repeats an earlier period's"
             trial = copy.deepcopy(items)
             validate_groups(trial, self._previous(expected))
