@@ -4,7 +4,7 @@ reading must pass. What code leaves goes to the AI, and each group (or metric KP
 the run summary's replayOutcomes: the learning loop's measure of where code should learn next."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from ..ai import GroupSpec, Located, Spec
 from ..documents.document import Document
@@ -14,7 +14,7 @@ from ..readers.anchor import KIND as ANCHOR, anchor_locator
 from ..readers.replay import AmbiguousQuote, _source_template, replay, reported_period
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..readers.trace import trace_replay
-from .shared import AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI
+from .shared import AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _days
 
 REPLAYED = "replayed"
 
@@ -117,6 +117,13 @@ class ReplayReading:
         if isinstance(located, str):
             return located
         return self._checked(document, part, located, expected, currency)
+
+    def _stored_year_ago(self, expected: date) -> dict[str, float]:
+        """Each KPI's verified figure for the same quarter one year earlier ("group.kpi" → value)."""
+        target = (expected - timedelta(days=365)).isoformat()
+        return {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
+                for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
+                and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
 
     def _one_of(self, document: Document, part: Spec, key: str, ambiguous: AmbiguousQuote, expected: date,
                 currency: str | None) -> tuple[Located, list[ReadValue]] | str:

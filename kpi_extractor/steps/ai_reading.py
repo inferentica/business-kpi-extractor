@@ -297,13 +297,6 @@ class AiReading:
                        and _same_place(item.locator, last[f"{item.group.key}.{item.kpi.key}"]))
                    for item in read)
 
-    def _stored_year_ago(self, expected: date) -> dict[str, float]:
-        """Each KPI's verified figure for the same quarter one year earlier ("group.kpi" → value)."""
-        target = (expected - timedelta(days=365)).isoformat()
-        return {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
-                for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
-                and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
-
     def _year_ago_confirms(self, read: list[ReadValue], document: Document, expected: date) -> bool:
         """Every value is accounted for: confirmed by the release's own year-ago column (read by code from the same row,
         in a column headed for the same length of period, equal to what is stored for that quarter last year) or found
