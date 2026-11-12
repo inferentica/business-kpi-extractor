@@ -814,3 +814,65 @@ def test_a_kpi_the_newest_reading_lacks_is_looked_for_where_an_earlier_quarter_f
     pipeline = _pipeline(control, q1 + q2)
     read, problems, _ = pipeline._read(lambda: "prompt", third, SPEC, date(2026, 9, 30), version=1)
     assert control.calls == [] and {item.kpi.key: item.value for item in read if not item.is_total}["members"] == 320_000_000
+
+
+def _uber(q4=False):
+    """Uber's release tables: "Freight" under Gross Bookings, Revenue and Segment Operating Income (a Q4 release has a
+    full-year table first)."""
+    year = "<table><tr><td></td><td>Year Ended December 31,</td><td></td></tr><tr><td>(In millions)</td><td>2024</td><td>2025</td></tr><tr><td>Trips</td><td>11,273</td><td>13,567</td></tr></table>" if q4 else ""
+    def table(title, freight, ago):
+        return (f"<table><tr><td></td><td>Three Months Ended March 31,</td><td></td></tr>"
+                f"<tr><td>(In millions)</td><td>2025</td><td>2026</td></tr><tr><td>{title}:</td><td></td><td></td></tr>"
+                f"<tr><td>Freight</td><td>{ago}</td><td>{freight}</td></tr></table>")
+    html = year + table("Gross Bookings", "1,334", "1,259") + table("Revenue", "1,337", "1,260") \
+        + table("Segment Operating Income (Loss)", "(30)", "(25)")
+    return parse_document(html, "https://www.sec.gov/x/uberq126earningspressrelea.htm")
+
+
+def test_a_row_label_other_tables_give_other_figures_is_not_placed_by_the_table_number_alone():
+    from kpi_extractor.readers.replay import AmbiguousQuote, chosen_by_number
+    document = _uber()
+    gross, revenue, _income = list(document.tables)
+    # Q4's place, one table later: the revenue table now has that number.
+    place = {"row_label": "Freight", "table": revenue, "row": 3, "col": 2, "header": "three months ended @ #"}
+    alone = replay(document, {"operating.freight_gross_bookings": place}, date(2026, 3, 31))
+    assert isinstance(alone, AmbiguousQuote) and alone == "row in several tables"
+    assert [(locator.table, section) for locator, section in alone.candidates] == [(revenue, "last"), (gross, None), (_income, None)]
+    # Within a group the table number still places it, marked for the year-ago check.
+    other = {"row_label": "Freight", "table": _income, "row": 3, "col": 2, "header": "three months ended @ #"}
+    replay(document, {"operating.freight_gross_bookings": place, "operating.freight_income": other}, date(2026, 3, 31))
+    assert {(revenue, 3, 2), (_income, 3, 2)} <= chosen_by_number(document)
+
+
+def test_a_row_label_every_table_gives_one_figure_is_the_filings_figure_wherever_it_sits():
+    # Goldman's summary page and its detail table: "Advisory" $1,494 in both; last quarter's table number is neither.
+    row = "<tr><td></td><td>Three Months Ended March 31,</td><td></td></tr><tr><td></td><td>2026</td><td>2025</td></tr><tr><td>Advisory</td><td>$1,494</td><td>$792</td></tr>"
+    document = parse_document(f"<table>{row}</table><table>{row}</table>", "https://www.sec.gov/x.htm")
+    located = replay(document, {"revenue.advisory": {"row_label": "Advisory", "table": "T9", "row": 2, "col": 1,
+                                                    "header": "three months ended @ #"}}, date(2026, 3, 31))
+    assert not isinstance(located, str) and located.values[0].table == next(iter(document.tables))
+
+
+def test_one_of_several_tables_is_the_one_whose_year_ago_cell_holds_the_stored_figure(monkeypatch):
+    from kpi_extractor.steps import replay_reading
+    from kpi_extractor.readers.replay import AmbiguousQuote
+    from kpi_extractor.ai import Locator
+    monkeypatch.setattr(replay_reading, "reported_period", lambda document, expected: expected)
+    pipeline = _pipeline(NoAi(), [])
+    places = lambda: AmbiguousQuote([(Locator(kpi="operating.members", table="T1", row=3, col=2), "last"),
+                                     (Locator(kpi="operating.members", table="T0", row=3, col=2), None)], "row in several tables")
+    figures, year_ago = {"T0": 1_334, "T1": 1_337}, {"T0": 1_259, "T1": 1_260}
+    def checked(document, part, located, expected, currency, mark=None, annual=False):
+        table = located.values[0].table
+        return located, [SimpleNamespace(value=figures[table], locator={"table": table})]
+    pipeline._checked = checked
+    pipeline._year_ago_cell_matches = lambda item, document, before: before == year_ago[item.locator["table"]]
+    def choose(stored):
+        pipeline._stored_year_ago = lambda expected: {"operating.members": stored} if stored is not None else {}
+        return pipeline._one_of(None, SPEC, "operating.members", places(), Q2, "USD")
+    # Uber's Q1 2026: last year's bookings (1,259) pick the bookings table over last quarter's table number.
+    assert choose(1_259)[1][0].value == 1_334
+    # A stored figure no table's year-ago cell holds (restated since): neither is taken.
+    assert choose(1_200) == "row in several tables"
+    # Nothing stored to decide by: last quarter's table, as before.
+    assert choose(None)[1][0].value == 1_337

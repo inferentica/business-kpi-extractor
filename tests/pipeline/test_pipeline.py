@@ -2208,6 +2208,7 @@ def test_a_row_whose_year_ago_cell_contradicts_last_years_figure_is_not_the_kpis
     """Uber's Q1 2026 release: "Freight" under Revenue (1,260 a year ago) sits where Q4's release, with one table more, had
     "Freight" under Gross Bookings; the bookings stored for Q1 2025 (1,259) rule the row out. A rounded cell ($28.4
     billion) does not contradict the exact figure stored for it (28,354 million)."""
+    from kpi_extractor.readers.replay import chosen_by_number
     from kpi_extractor.steps.replay_reading import ReplayReading
     html = ("<table><tr><td></td><td>Three Months Ended March 31,</td><td></td></tr>"
             "<tr><td>(In millions)</td><td>2025</td><td>2026</td></tr>"
@@ -2220,6 +2221,9 @@ def test_a_row_whose_year_ago_cell_contradicts_last_years_figure_is_not_the_kpis
     first, second = list(document.tables)
     freight = SimpleNamespace(value=1_337e6, locator={"table": first, "row": 3, "col": 2, "row_label": "Freight"})
     rpo = SimpleNamespace(value=30.1e9, locator={"table": second, "row": 2, "col": 2})
+    # Asked only of a place taken by last quarter's table number alone (a row restated since is otherwise the KPI's).
+    assert not ReplayReading._year_ago_contradicts(freight, document, 1_259e6)
+    chosen_by_number(document).update({(first, 3, 2), (second, 2, 2)})
     assert ReplayReading._year_ago_contradicts(freight, document, 1_259e6)
     assert not ReplayReading._year_ago_contradicts(freight, document, 1_260e6)
     assert not ReplayReading._year_ago_contradicts(freight, document, None)
