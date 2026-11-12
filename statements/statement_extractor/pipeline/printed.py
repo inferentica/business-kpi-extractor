@@ -12,6 +12,8 @@ from ..domain.calendar import ANNUAL_FORMS
 from ..readers.html.parse import parse_html
 from ..readers.html.read import read_document
 from ..readers.printed.mexico_coded import MARKER as MEXICO_MARKER, coded_readings
+from ..readers.printed.mexico_lettered import is_lettered, lettered_readings
+from ..readers.printed.mexico_rendered import is_rendered, rendered_readings
 from ..readers.printed.sign_index import printed_figures
 from ..readers.printed.summary import read_summaries
 from ..readers.positioned.layout import is_positioned, positioned_text
@@ -95,6 +97,19 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             readings = readings + coded_readings(parse_html(content), accession=ref.accession, form=ref.form,
                                                  filed=ref.filed, document_end=document_end,
                                                  fiscal_year_end=fiscal_year_end, year_offset=year_offset)
+        if printed == "html" and is_lettered(content):
+            # Mexico's earlier template (readers/printed/mexico_lettered.py): read by its lettered account codes.
+            readings = readings + lettered_readings(parse_html(content), content, accession=ref.accession, form=ref.form,
+                                                    filed=ref.filed, document_end=document_end,
+                                                    fiscal_year_end=fiscal_year_end, year_offset=year_offset)
+        if printed == "html" and is_rendered(content):
+            # A Mexican issuer's quarterly XBRL report printed in a 6-K (readers/printed/mexico_rendered.py): its
+            # statements read by their roles, in place of what the general reader made of those tables.
+            rendered = rendered_readings(parse_html(content), content, accession=ref.accession, form=ref.form,
+                                         filed=ref.filed, document_end=document_end,
+                                         fiscal_year_end=fiscal_year_end, year_offset=year_offset)
+            kinds = {reading.statement for reading in rendered}
+            readings = [reading for reading in readings if reading.statement not in kinds] + rendered
         others = _other_companies(readings, ref, cover)
         if others:
             readings = [reading for reading in readings if reading.titled not in others]
