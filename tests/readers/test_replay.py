@@ -867,6 +867,9 @@ def test_one_of_several_tables_is_the_one_whose_year_ago_cell_holds_the_stored_f
         return located, [SimpleNamespace(value=figures[table], locator={"table": table})]
     pipeline._checked = checked
     pipeline._year_ago_cell_matches = lambda item, document, before: before == year_ago[item.locator["table"]]
+    pipeline._year_ago_differs = lambda item, document, before: before is not None and before != year_ago[item.locator["table"]] \
+        and item.locator["table"] in shows_year_ago
+    shows_year_ago = {"T0", "T1"}
     def choose(stored):
         pipeline._stored_year_ago = lambda expected: {"operating.members": stored} if stored is not None else {}
         return pipeline._one_of(None, SPEC, "operating.members", places(), Q2, "USD")
@@ -876,3 +879,6 @@ def test_one_of_several_tables_is_the_one_whose_year_ago_cell_holds_the_stored_f
     assert choose(1_200) == "row in several tables"
     # Nothing stored to decide by: last quarter's table, as before.
     assert choose(None)[1][0].value == 1_337
+    # Tables with no year-ago cell (Coca-Cola's changes): nothing contradicts last quarter's table, so it stands.
+    shows_year_ago.clear()
+    assert choose(1_200)[1][0].value == 1_337

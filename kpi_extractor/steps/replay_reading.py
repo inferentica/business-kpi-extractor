@@ -259,10 +259,15 @@ class ReplayReading:
         tables that give its label other figures (readers/replay.py, chosen_by_number): a label one table gives a
         figure, or every table the same one, is the KPI's even when restated since (Goldman's FICC financing, recast in
         2026). A row with no year-ago cell, or no stored figure, says nothing."""
-        table = document.tables.get(str(item.locator.get("table")))
         place = (str(item.locator.get("table")), item.locator.get("row"), item.locator.get("col"))
-        cells = _year_ago_cells(document, item.locator, item.value) \
-            if before is not None and table is not None and place in chosen_by_number(document) else []
+        return place in chosen_by_number(document) and ReplayReading._year_ago_differs(item, document, before)
+
+    @staticmethod
+    def _year_ago_differs(item: ReadValue, document: Document, before: float | None) -> bool:
+        """Whether a table row's year-ago cells all differ from `before` by more than the row's printed rounding (False
+        with no year-ago cell or nothing stored)."""
+        table = document.tables.get(str(item.locator.get("table")))
+        cells = _year_ago_cells(document, item.locator, item.value) if before is not None and table is not None else []
         if not cells:
             return False
         text = table.cell(int(item.locator["row"]), int(item.locator["col"])) or ""
@@ -298,9 +303,12 @@ class ReplayReading:
                 and len({parse_number(locator.value_text or "").value if parse_number(locator.value_text or "") else None
                          for locator, _section in ambiguous.candidates}) == 1:
             pool = [checked for checked, _section in passing]
-        # A table row in several tables with no year-ago figure stored to decide by: last quarter's table, as before.
-        if not pool and before is None:
-            pool = [checked for checked, section in passing if section == "last"]
+        # A table row in several tables no year-ago cell decides (none stored, or tables of changes with no year-ago
+        # column: Coca-Cola's unit case volume): last quarter's table, as before, unless its own row's year-ago cells
+        # contradict the stored figure (Uber's "Freight" under Revenue).
+        if not pool:
+            pool = [checked for checked, section in passing
+                    if section == "last" and not self._year_ago_differs(checked[1][0], document, before)]
         if pool and len({round(checked[1][0].value, 9) for checked in pool}) == 1:
             return pool[0]
         return str(ambiguous)
