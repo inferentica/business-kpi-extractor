@@ -122,14 +122,16 @@ def learn_tag(readings: dict[tuple[str, str], float], facts: dict[tuple[str, str
 
 
 def learn_tags(readings: dict[tuple[str, str], float], facts: dict[tuple[str, str], dict[Tag, float]]) -> list[Tag]:
-    """Every tag whose fact equals the KPI's reading in at least two quarters and never differs from one: a company
-    that retags a line (Adobe's customer groups, by segment in FY2025 and on their own since) gives one per layout."""
-    matched: dict[Tag, int] = {}
+    """Every tag whose fact equals the KPI's reading in at least two quarters of different figures and never differs
+    from one: a company that retags a line (Adobe's customer groups, by segment in FY2025 and on their own since) gives
+    one per layout. Equal readings count once: a figure that does not move (KKR's 5.25% rate on its junior notes) matched
+    a run of equal readings (its leveraged credit return, 5.25% two quarters running) by chance."""
+    matched: dict[Tag, set[float]] = {}
     for quarter, value in readings.items():
         for tag, fact in (facts.get(quarter) or {}).items():
             if fact and _evidence(fact, value):
-                matched[tag] = matched.get(tag, 0) + 1
-    return [tag for tag, count in matched.items() if count >= MIN_MATCHES and not any(
+                matched.setdefault(tag, set()).add(round(value, 9))
+    return [tag for tag, values in matched.items() if len(values) >= MIN_MATCHES and not any(
         tag in (facts.get(quarter) or {}) and not agrees(facts[quarter][tag], value) for quarter, value in readings.items())]
 
 
