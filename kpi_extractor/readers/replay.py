@@ -111,6 +111,10 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
     for table in _tables_by_preference(document, locator.get("table")):
         rows = [index for index, row in enumerate(table.rows)
                 if clean(_row_label(row, col)).lower() == label and parse_number(table.cell(index, col))]
+        if len(rows) > 1 and locator.get("row") in rows and _same_span_above(table, int(locator["row"]), col):
+            # A label the table repeats once per section (Mastercard's "Worldwide" under each card program, then again
+            # for six months): the row where it sat last quarter, while no row above it opens another period's section.
+            rows = [int(locator["row"])]
         if len(rows) > 1:
             misses.append("row label found more than once")
         elif rows and not current_column(table, rows[0], col):
@@ -212,6 +216,18 @@ def _with_rows_above(table: Table, first_row: int, total_row: int, col: int) -> 
         if adds_up(start):
             return start  # the nearest start that adds up: never the header row above it ("Resolution 2023 2022")
     return first_row
+
+
+def _same_span_above(table: Table, row: int, col: int) -> bool:
+    """Whether every row between a column's header and a row is of the header's period: none opens a section of another
+    span inside the table (Mastercard's "For the 6 Months Ended June 30" below its three months' rows)."""
+    first = next((i for i, r in enumerate(table.rows) if r and any(parse_number(c) for c in r[1:]) and re.search(r"[A-Za-z]", r[0])), row)
+    heading = _spans(comparable_header(column_header(table, first, col))) - {"change"}
+    for index in range(first, row):
+        words = re.sub(r"\b(\d{1,2})\s*-?\s*(months?|weeks?)\b", r"<\1 \2>", clean(" ".join(table.rows[index])).lower())
+        if (named := _spans(words) - {"change"}) and named != heading:
+            return False
+    return True
 
 
 def stated_total(document: Document, parts: list[Locator], key: str) -> Locator | None:

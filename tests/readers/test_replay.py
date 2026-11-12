@@ -758,3 +758,36 @@ def test_a_quarter_after_a_year_report_replays_from_the_latest_quarters_places()
     read, problems, located = pipeline._read(lambda: "prompt", q1, SPEC, date(2026, 3, 31), version=1)
     assert control.calls == [] and not located.annual
     assert {item.kpi.key: item.value for item in read if not item.is_total}["n3"] == 26_000
+
+
+def _mastercard(worldwide_first, worldwide_six):
+    rows = "".join(f"<tr><td>{label}</td><td>{gdv}</td></tr>" for label, gdv in [
+        ("APMEA", "$572"), ("Worldwide", worldwide_first), ("Mastercard Credit", ""), ("APMEA", "$300"), ("Worldwide", "1,079"),
+        ("For the 6 Months Ended June 30, 2023", ""), ("APMEA", "$1,100"), ("Worldwide", worldwide_six)])
+    return parse_document(f"""<html><body><table><tr><td></td><td>For the 3 Months Ended June 30, 2023</td></tr>
+        <tr><td></td><td>GDV (Bil.)</td></tr><tr><td>All Mastercard Branded Programs</td><td></td></tr>{rows}</table></body></html>""",
+        "https://www.sec.gov/Archives/ma06302023-exx991xearnings.htm")
+
+
+def test_a_label_the_table_repeats_per_section_is_read_where_it_sat_last_quarter():
+    # Mastercard repeats "Worldwide" under each card program, then again for six months: the row it sat in last quarter
+    # (always its first, the three months' all programs) is read, while no row above it opens another period's section.
+    from kpi_extractor.readers.replay import _replay_value
+    document = _mastercard("2,267", "4,375")
+    table = next(iter(document.tables.values()))
+    first = next(i for i, row in enumerate(table.rows) if row[0] == "Worldwide")
+    six = max(i for i, row in enumerate(table.rows) if row[0] == "Worldwide")
+    header = R_column_header(table, first, 1)
+    found = _replay_value(document, "operating.gdv", {"table": table.id, "row": first, "col": 1, "row_label": "Worldwide", "header": header})
+    assert not isinstance(found, str) and found.row == first
+    # Last quarter's place in the six months' section is never taken: a row above it opens another span.
+    assert _replay_value(document, "operating.gdv", {"table": table.id, "row": six, "col": 1, "row_label": "Worldwide",
+                                                     "header": header}) == "row label found more than once"
+    # Nor a row where the label no longer sits.
+    assert _replay_value(document, "operating.gdv", {"table": table.id, "row": first + 1, "col": 1, "row_label": "Worldwide",
+                                                     "header": header}) == "row label found more than once"
+
+
+def R_column_header(table, row, col):
+    from kpi_extractor.readers.extract import column_header
+    return column_header(table, row, col)
