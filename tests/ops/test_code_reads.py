@@ -153,3 +153,10 @@ def test_a_missed_figure_of_an_earlier_period_than_its_filings_is_labelled_so():
     state = [_value("dau", 3.6), _value("mau", 4.1, period=("2025", "Q2"))]
     rows = {row["kpi"]: row["why"] for row in score_company("META", state, {}, {"a1"}, {}, held_out=False)}
     assert rows == {"dau": "document not read by code", "mau": "an earlier period's figure in a later filing"}
+
+
+def test_a_filings_own_period_comes_from_its_record_when_its_figures_are_all_comparatives():
+    # Adobe's 2023 customer-group lines are stored under a 2026 report whose own figures sit elsewhere.
+    state = [_value("dau", 3.6, period=("2025", "Q2"))]
+    rows = score_company("META", state, {}, {"a1"}, {}, held_out=False, filings={"a1": {"period_end": "2026-06-30"}})
+    assert rows[0]["why"] == "an earlier period's figure in a later filing"

@@ -294,7 +294,7 @@ def _key(value: dict) -> tuple:
 
 
 def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], tested: set[str], final: dict,
-                  held_out: bool, misses: dict | None = None) -> list[dict]:
+                  held_out: bool, misses: dict | None = None, filings: dict | None = None) -> list[dict]:
     """One row per verified release figure of the tested filings, scored on the company's figures as code alone left
     them; and one per figure code serves that the store does not."""
     truth = [value for value in state_values if value.get("method") == "ai" and value.get("validation_status") == "verified"
@@ -308,6 +308,10 @@ def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], 
     for value in state_values:
         if value.get("source_accession"):
             own_end[value["source_accession"]] = max(own_end.get(value["source_accession"], ""), value["period_end"])
+    # The filing's own record says its period best: its stored figures may all be comparatives (Adobe's 2023 lines
+    # under a 2026 report).
+    own_end.update({accession: str(filing["period_end"])[:10] for accession, filing in (filings or {}).items()
+                    if filing.get("period_end")})
     rows = []
     for value in truth:
         accession, expected = value["source_accession"], float(value["value"])
@@ -374,7 +378,8 @@ def read_company(plane: ControlPlane, symbol: str, quarters: int, held_out: bool
     state = [dict(value) for value in pipeline.store._loaded.values()]
     kinds = pipeline.kinds
     return {
-        "symbol": symbol, "rows": score_company(symbol, state, kinds, set(pipeline.readings), dict(pipeline.store._values), held_out, pipeline.misses),
+        "symbol": symbol, "rows": score_company(symbol, state, kinds, set(pipeline.readings), dict(pipeline.store._values), held_out, pipeline.misses,
+                                pipeline.filings),
         "outcomes": dict(result.replay_outcomes), "left": dict(pipeline.left), "refused": dict(control.refused),
         "aiCalls": 0, "errors": result.errors[:5], "documents": len(pipeline.timings),
         "codeSeconds": pipeline.timings, "seconds": time.perf_counter() - started,
