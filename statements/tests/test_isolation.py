@@ -1,5 +1,6 @@
-"""The statements package stays apart from the KPI extractor: it reaches the shared base layer only through sources/edgar.py,
-and nothing in it can call an AI."""
+"""The statements package stays apart from the KPI extractor: it reaches the shared base layer only through sources/edgar.py.
+AI is called only from assist/ (the column-map pilot, decision 2026-11-12), through no AI library, and nothing that
+reads, chooses or serves statements imports it."""
 import ast
 from pathlib import Path
 
@@ -34,3 +35,14 @@ def test_nothing_can_call_an_ai():
     for path in PACKAGE.rglob("*.py"):
         for name in _imports(path):
             assert not name.startswith(FORBIDDEN), f"{path.name} imports {name}"
+
+
+def test_only_assist_reaches_an_ai_and_nothing_reads_through_it():
+    for path in PACKAGE.rglob("*.py"):
+        relative = path.relative_to(PACKAGE).as_posix()
+        text = path.read_text()
+        if not relative.startswith("assist/"):
+            assert "deepseek" not in text.lower(), f"{relative} names DeepSeek"
+            assert not any(name.startswith(("statement_extractor.assist", "..assist", ".assist")) for name in _imports(path)), relative
+            assert "assist" not in {node.module for node in ast.walk(ast.parse(text))
+                                    if isinstance(node, ast.ImportFrom) and node.module and node.level > 0}, relative

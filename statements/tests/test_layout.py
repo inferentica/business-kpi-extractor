@@ -15,6 +15,8 @@ ALLOWED = {
     "store": {"domain"},
     "quality": {"domain", "selection"},
     "pipeline": {"domain", "checks", "readers", "selection", "quality", "sources", "store"},
+    # The AI pilot (decision 2026-11-12): it reads tables beside the pipeline; nothing imports it (tests/test_isolation.py).
+    "assist": {"domain", "readers", "sources"},
 }
 
 

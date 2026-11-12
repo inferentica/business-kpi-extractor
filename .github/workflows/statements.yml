@@ -1,7 +1,8 @@
 name: Statements
 
 # The three financial statements, read by rules only (statements/). A pilot reads each company into files and hands
-# them back as this run's artifacts; it stores nothing anywhere else, holds no secrets and calls no AI.
+# them back as this run's artifacts; it stores nothing anywhere else and calls no AI. Only the AI pilot job, run by hand
+# (assist_pilot), asks DeepSeek, through Quotiva's statements-ai function with this run's OIDC token: no key here.
 on:
   push:
     branches: ["statements/**"]
@@ -18,6 +19,11 @@ on:
         description: "Earliest filing date to read (YYYY-MM-DD); the pilot set's when empty"
         required: false
         type: string
+      assist_pilot:
+        description: "Run the AI column-map pilot (statement_extractor.assist) instead of reading"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -48,7 +54,7 @@ jobs:
     needs: test
     # Reads run on a run branch (statements/run-round, statements/run-<set>) or by hand; a push to any other branch
     # (statements/foundation) only tests, so its pilot reads do not take runners from the round that reads them too.
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref_name, 'statements/run-')
+    if: (github.event_name == 'workflow_dispatch' && !inputs.assist_pilot) || startsWith(github.ref_name, 'statements/run-')
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.list.outputs.matrix }}
@@ -156,6 +162,37 @@ jobs:
         with:
           name: statements-golden
           path: golden_results.json
+          retention-days: 30
+
+  # The AI column-map pilot (decision 2026-11-12): DeepSeek's column maps beside the rules' for the pilot 20-Fs, with
+  # calls, yuan and seconds. Nothing it answers is read into a statement.
+  assist-pilot:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && inputs.assist_pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - run: python -m statement_extractor.assist.pilot pilot-out
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: statements-assist-pilot
+          path: pilot-out/
           retention-days: 30
 
   # Raw printed rows for hand checks (statements/evals/handcheck/queue.json), on a commit whose message asks for
