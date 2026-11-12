@@ -73,7 +73,7 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
         if locator.get("whole_table"):
             tables.setdefault(key.split(".", 1)[0], []).append((key, locator))
             continue
-        found = _replay_value(document, key, locator, quarter)
+        found = _replay_value(document, key, locator, quarter, alone=len(last) == 1)
         if isinstance(found, str):
             return found
         values.append(found)
@@ -100,7 +100,7 @@ def reported_period(document: Document, expected: date) -> date:
     return counts.most_common(1)[0][0] if counts else expected
 
 
-def _replay_value(document: Document, key: str, locator: dict, quarter: int | None = None) -> Locator | str:
+def _replay_value(document: Document, key: str, locator: dict, quarter: int | None = None, alone: bool = False) -> Locator | str:
     if "quote" in locator:
         return _replay_quote(document, key, locator)
     label = clean(locator.get("row_label") or "").lower()
@@ -125,8 +125,22 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
             matches.append((table.id, rows[0]))
     if not matches:
         return misses[0] if misses else "row label not found"
-    if len(matches) > 1 and matches[0][0] != locator.get("table"):
-        return "row in several tables"  # and none of them is last quarter's
+    figures = {parse_number(document.tables[table_id].cell(row, col)).value for table_id, row in matches}
+    if len(figures) > 1:
+        # The label gives other figures in other tables (Uber's "Freight" under Gross Bookings, Revenue and Segment
+        # Operating Income; a Q4 release's full-year table more moves them all one place on): last quarter's table
+        # number alone does not tell them apart. A KPI read alone is kept at one place on the filing's evidence
+        # (steps/replay_reading.py, _one_of); within a group, last quarter's table stands only while its row's year-ago
+        # cells do not contradict the figure stored for last year (_year_ago_contradicts).
+        if alone:
+            return AmbiguousQuote([(Locator(kpi=key, table=table_id, row=row, col=col, scale=locator.get("scale"),
+                                            scale_text=locator.get("scale_text")),
+                                    "last" if table_id == locator.get("table") else None) for table_id, row in matches],
+                                  "row in several tables")
+        if matches[0][0] != locator.get("table"):
+            return "row in several tables"  # and none of them is last quarter's
+        chosen_by_number(document).add((matches[0][0], matches[0][1], col))
+    # Otherwise every table gives the one figure (Goldman's summary page and its detail table): it is the filing's.
     table_id, row = matches[0]
     # The scale words last quarter's reading quoted ("(in thousands)") go with the place: the scale check still holds the
     # figure unless the words are in this filing beside its table (UnitedHealth's members were held for an unstated scale).
@@ -331,15 +345,26 @@ _MAX_PLACES = 8
 
 
 class AmbiguousQuote(str):
-    """"sentence found more than once", with each place it was found and the span its section names ("quarter",
-    "longer" or None). The reading step keeps one place only on the filing's own evidence: its row's year-ago column
-    equal to the stored year-ago figure, or its section naming the quarter (steps/replay_reading.py)."""
+    """"sentence found more than once" (or a table row's "row in several tables"), with each place it was found and
+    the span its section names ("quarter", "longer" or None; for a table row, "last" for last quarter's table). The
+    reading step keeps one place only on the filing's own evidence: its row's year-ago column equal to the stored
+    year-ago figure, or its section naming the quarter (steps/replay_reading.py)."""
     candidates: list[tuple[Locator, str | None]]
 
-    def __new__(cls, candidates: list[tuple[Locator, str | None]]):
-        self = super().__new__(cls, "sentence found more than once")
+    def __new__(cls, candidates: list[tuple[Locator, str | None]], why: str = "sentence found more than once"):
+        self = super().__new__(cls, why)
         self.candidates = candidates
         return self
+
+
+def chosen_by_number(document: Document) -> set[tuple[str, int, int]]:
+    """The table cells (table, row, column) a replay took by last quarter's table number alone, among tables that give
+    their label other figures."""
+    chosen = getattr(document, "_chosen_by_number", None)
+    if chosen is None:
+        chosen = set()
+        object.__setattr__(document, "_chosen_by_number", chosen)
+    return chosen
 
 
 # A section's period, as the words before a place name it: a quarter ("second quarter 2023 results", "three months")

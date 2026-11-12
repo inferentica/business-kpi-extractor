@@ -14,8 +14,8 @@ from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
 from ..readers.quoted_rows import row_line
-from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, comparable_header, missing_since, replay,
-                              reported_period, stated_total)
+from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, chosen_by_number, comparable_header,
+                              missing_since, replay, reported_period, stated_total)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, validate_groups
 from ..readers.trace import placed_elsewhere, trace_replay
@@ -255,9 +255,14 @@ class ReplayReading:
         """A table row whose own year-ago cells all differ from the figure stored for that quarter last year, by more
         than the row's printed rounding: another measure's row under the same label, not the KPI's place (Uber's
         "Freight" under Revenue, 1,337, taken for Freight Gross Bookings: Q4's release, with a full-year table more, had
-        the bookings table one place later). A row with no year-ago cell, or no stored figure, says nothing."""
+        the bookings table one place later). Asked only of a place taken by last quarter's table number alone, among
+        tables that give its label other figures (readers/replay.py, chosen_by_number): a label one table gives a
+        figure, or every table the same one, is the KPI's even when restated since (Goldman's FICC financing, recast in
+        2026). A row with no year-ago cell, or no stored figure, says nothing."""
         table = document.tables.get(str(item.locator.get("table")))
-        cells = _year_ago_cells(document, item.locator, item.value) if before is not None and table is not None else []
+        place = (str(item.locator.get("table")), item.locator.get("row"), item.locator.get("col"))
+        cells = _year_ago_cells(document, item.locator, item.value) \
+            if before is not None and table is not None and place in chosen_by_number(document) else []
         if not cells:
             return False
         text = table.cell(int(item.locator["row"]), int(item.locator["col"])) or ""
@@ -289,9 +294,13 @@ class ReplayReading:
             pool = [checked for checked, section in passing if section == "quarter"]
         # Every place the filing gives states one figure (KKR's table and its appendix copy): the figure is the filing's
         # wherever it is read.
-        if not pool and len({parse_number(locator.value_text or "").value if parse_number(locator.value_text or "") else None
-                             for locator, _section in ambiguous.candidates}) == 1:
+        if not pool and all(locator.value_text for locator, _section in ambiguous.candidates) \
+                and len({parse_number(locator.value_text or "").value if parse_number(locator.value_text or "") else None
+                         for locator, _section in ambiguous.candidates}) == 1:
             pool = [checked for checked, _section in passing]
+        # A table row in several tables with no year-ago figure stored to decide by: last quarter's table, as before.
+        if not pool and before is None:
+            pool = [checked for checked, section in passing if section == "last"]
         if pool and len({round(checked[1][0].value, 9) for checked in pool}) == 1:
             return pool[0]
         return str(ambiguous)
