@@ -10,6 +10,7 @@ THOUSANDS OF MEXICAN PESOS"). BMV keeps only the last 20 quarters' packages (sou
 back to the template's first quarter."""
 from __future__ import annotations
 
+import html
 import re
 from datetime import date
 
@@ -54,13 +55,20 @@ def is_rendered(content: str) -> bool:
     head = content[:3_000_000]
     if "0000]" not in head:
         return False
-    text = clean(re.sub(r"<[^>]+>", " ", head))
+    text = clean(html.unescape(re.sub(r"<[^>]+>", " ", head)))
     return MARKER.search(text) is not None and _CURRENCY.search(text) is not None
 
 
-def _periods(text: str) -> list[Period]:
-    return [Period(date.fromisoformat(end or start), date.fromisoformat(start) if end else None)
-            for start, end in _DATES.findall(text)]
+def _periods(text: str) -> list[Period | None]:
+    """Each dated column's period; None for a date no calendar has (Televisa's Q1 2017 report: "Close Current Quarter
+    2017-02-31"), never a guess at the date meant."""
+    periods: list[Period | None] = []
+    for start, end in _DATES.findall(text):
+        try:
+            periods.append(Period(date.fromisoformat(end or start), date.fromisoformat(start) if end else None))
+        except ValueError:
+            periods.append(None)
+    return periods
 
 
 def _pages(tables, first: int) -> list:
@@ -81,7 +89,7 @@ def _pages(tables, first: int) -> list:
 
 def rendered_readings(tables, content: str, *, accession: str, form: str, filed: date, document_end: date | None,
                       fiscal_year_end: str, year_offset: int) -> list[Reading]:
-    text = clean(re.sub(r"<[^>]+>", " ", content[:3_000_000]))
+    text = clean(html.unescape(re.sub(r"<[^>]+>", " ", content[:3_000_000])))
     currency = _CURRENCY.search(text)
     rounding = _ROUNDING.search(text)
     unit = {"thousands": 1e3, "millions": 1e6}[rounding.group(1).lower()] if rounding else 1.0
@@ -93,7 +101,8 @@ def rendered_readings(tables, content: str, *, accession: str, form: str, filed:
         if not markers or not table.header:
             continue
         kind = _KIND[markers[-1]]
-        columns = [(cell.start, period) for cell in table.header[0] for period in _periods(cell.text)[:1]]
+        columns = [(cell.start, period) for cell in table.header[0] for period in _periods(cell.text)[:1]
+                   if period is not None]
         if not columns:
             continue
         rows = [row for page in _pages(tables, index) for row in page.rows]
@@ -120,7 +129,7 @@ def rendered_readings(tables, content: str, *, accession: str, form: str, filed:
             readings.append(Reading(
                 statement=kind, duration=labelled[2], fiscal_year=labelled[0], fiscal_period=labelled[1],
                 period_end=period.end, period_start=period.start, currency=currency.group(1) if currency else None,
-                accession=accession, form=form, filed=filed, basis="IFRS", scope=scope, source="html", lines=lines,
+                accession=accession, form=form, filed=filed, basis="IFRS", scope=scope, source="html", lines=lines, template=True,
                 own=document_end is not None and abs((period.end - document_end).days) <= 7,
                 checks=tagged_checks(kind, tagged, unit, tuple(line["value"] for line in lines if line["value"] is not None))))
     return readings

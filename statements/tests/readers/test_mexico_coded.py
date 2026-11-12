@@ -62,3 +62,29 @@ def test_other_comprehensive_income_and_data_tables_are_no_statement():
                   [["REF", "ACCOUNT / SUBACCOUNT", "CURRENT YEAR", "PREVIOUS YEAR"], ["CUMULATIVE", "QUARTER", "CUMULATIVE", "QUARTER"]],
                   [("40200000", "NET INCOME (LOSS)", "3,744,988", "2,211,834", "3,739,467", "1,784,719")])
     assert _read(html) == []
+
+
+def _balance_and_cash_flow(title: str) -> str:
+    balance = _table("STATEMENT OF FINANCIAL POSITION AS OF JUNE 30, 2013 AND DECEMBER 31, 2012 (THOUSANDS OF MEXICAN PESOS) "
+                     "CONSOLIDATED", [["REF", "ACCOUNT / SUBACCOUNT", "CURRENT YEAR", "END OF PREVIOUS YEAR"], ["AMOUNT", "AMOUNT"]],
+                     [("10000000", "TOTAL ASSETS", "170,030,776", "164,997,151"), ("11000000", "CURRENT ASSETS", "55,022,714", "54,637,754"),
+                      ("11010000", "CASH AND CASH EQUIVALENTS", "16,073,577", "19,063,325"),
+                      ("12000000", "NON-CURRENT ASSETS", "115,008,062", "110,359,397"),
+                      ("20000000", "TOTAL LIABILITIES", "98,383,313", "96,531,574"), ("30000000", "STOCKHOLDERS' EQUITY", "71,647,463", "68,465,577")])
+    flows = _table(f"STATEMENTS OF CASH FLOWS (INDIRECT METHOD) {title} (THOUSANDS OF MEXICAN PESOS) CONSOLIDATED",
+                   [["REF", "ACCOUNT / SUBACCOUNT", "CURRENT YEAR", "PREVIOUS YEAR"], ["AMOUNT", "AMOUNT"]],
+                   [("50070000", "OPERATING", "6,000,000", "5,000,000"), ("50080000", "INVESTING", "(4,000,000)", "(3,000,000)"),
+                    ("50090000", "FINANCING", "(4,989,748)", "(1,000,000)"), ("50100000", "NET CHANGE", "(2,989,748)", "1,000,000"),
+                    ("50110000", "EXCHANGE", "0", "0"), ("50120000", "OPENING", "19,063,325", "17,000,000"),
+                    ("50130000", "CLOSING", "16,073,577", "18,000,000")])
+    return balance + flows
+
+
+def test_a_cash_flow_statement_is_dated_only_where_its_closing_cash_is_the_balance_sheets():
+    # Televisa's Q2 2012 report heads its six months "FOR THE THREE MONTHS ENDED MARCH 31, 2012 AND 2011", closing on
+    # June's cash: round 67 served it as 2011's first quarter.
+    flows = [r for r in _read(_balance_and_cash_flow("FOR THE SIX MONTHS ENDED JUNE 30, 2013 AND 2012")) if r.statement == "cash_flow"]
+    assert {(r.period_end, r.duration) for r in flows} == {(date(2013, 6, 30), "ytd"), (date(2012, 6, 30), "ytd")}
+    mistitled = _read(_balance_and_cash_flow("FOR THE THREE MONTHS ENDED MARCH 31, 2013 AND 2012"))
+    assert [r for r in mistitled if r.statement == "cash_flow"] == []
+    assert {r.period_end for r in mistitled if r.statement == "balance"} == {date(2013, 6, 30), date(2012, 12, 31)}

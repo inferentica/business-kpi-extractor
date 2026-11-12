@@ -87,6 +87,7 @@ def _checks(kind: str, values: dict, unit: float) -> list[Check]:
 def coded_readings(tables, *, accession: str, form: str, filed: date, document_end: date | None,
                    fiscal_year_end: str, year_offset: int) -> list[Reading]:
     readings: list[Reading] = []
+    origins: list[int] = []
     for table in tables:
         heading_rows = [row for row in table.rows[:3] if not row.figures]
         if not any(MARKER in row.label.upper() for row in heading_rows):
@@ -132,7 +133,22 @@ def coded_readings(tables, *, accession: str, form: str, filed: date, document_e
                 filed=filed, own=document_end is not None and abs((period.end - document_end).days) <= 7, source="html",
                 scope="consolidated" if "consolidated" in title.lower() else "parent", lines=lines,
                 checks=_checks(kind, values, unit)))
-    return readings
+            origins.append(table.index)
+    return _dated_cash_flows(readings, origins)
+
+
+def _dated_cash_flows(readings: list[Reading], origins: list[int]) -> list[Reading]:
+    """A cash flow statement is kept where its own period's closing cash is the balance sheet's cash on that day: the
+    title's dates can be another statement's (Televisa's Q2 2012 report heads its six months "FOR THE THREE MONTHS ENDED
+    MARCH 31, 2012 AND 2011", closing on June's cash)."""
+    def account(reading: Reading, code: str) -> float | None:
+        return next((line["value"] for line in reading.lines if line["code"] == code), None)
+
+    cash = {reading.period_end: account(reading, "11010000") for reading in readings if reading.statement == "balance"}
+    proven = {origin for reading, origin in zip(readings, origins) if reading.statement == "cash_flow"
+              and cash.get(reading.period_end) is not None and account(reading, "50130000") is not None
+              and abs(cash[reading.period_end] - account(reading, "50130000")) <= 2 * max(1.0, abs(cash[reading.period_end]) * 1e-9)}
+    return [reading for reading, origin in zip(readings, origins) if reading.statement != "cash_flow" or origin in proven]
 
 
 def _periods(kind: str, title: str, positions: list[int], heading: str) -> dict[int, Period]:

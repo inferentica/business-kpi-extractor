@@ -90,3 +90,20 @@ def test_a_6k_carrying_the_printed_report_is_read_through_the_pipeline():
             if any(line["concept"].startswith("ifrs-full_") for line in r.lines)} >= {
         ("balance", date(2016, 3, 31)), ("income", date(2016, 3, 31))}
     assert "html" in kinds
+
+
+def test_a_date_no_calendar_has_leaves_its_column_unread():
+    # Televisa's Q1 2017 report heads its balance sheet "Close Current Quarter 2017-02-31": that column is not read
+    # (round 66 found the 6-K unreadable), the other is.
+    content = _document().replace("Close Current Quarter 2016-03-31", "Close Current Quarter 2016-02-31")
+    readings = rendered_readings(parse_html(content), content, accession="x", form="6-K", filed=date(2016, 5, 3),
+                                 document_end=date(2016, 3, 31), fiscal_year_end="1231", year_offset=0)
+    assert {(r.statement, r.period_end) for r in readings if r.statement == "balance"} == {("balance", date(2015, 12, 31))}
+
+
+def test_the_reports_header_is_read_through_its_entities():
+    # Televisa's Q2 2018 report: "Description of presentation&#160;currency: MXN" (round 67 left it unread).
+    content = _document().replace("presentation currency: MXN", "presentation&#160;currency:&#160;MXN")
+    assert is_rendered(content)
+    assert {r.currency for r in rendered_readings(parse_html(content), content, accession="x", form="6-K", filed=date(2016, 5, 3),
+                                                  document_end=date(2016, 3, 31), fiscal_year_end="1231", year_offset=0)} == {"MXN"}
