@@ -13,11 +13,12 @@ from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
 from ..readers.quoted_rows import row_line
-from ..readers.replay import AmbiguousQuote, _same_place, _source_template, missing_since, replay, reported_period
+from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, comparable_header, missing_since, replay,
+                              reported_period)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, validate_groups
 from ..readers.trace import placed_elsewhere, trace_replay
-from .shared import AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI, _annual_header, _days, _same
+from .shared import AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same
 
 REPLAYED = "replayed"
 
@@ -169,7 +170,9 @@ class ReplayReading:
                 done.add(key)
                 kept = kept or located
             done.add(group.key)
-        if kept is None or left_for_ai(spec, done) is not None:
+        # The document is a year's report only if some of its figures sit in columns headed as years.
+        if kept is None or left_for_ai(spec, done) is not None \
+                or not any(_annual_header(str(item.locator.get("header") or "")) for item in items):
             return None
         kept.annual = True
         self.result.replay_outcomes["replayed as the year"] = self.result.replay_outcomes.get("replayed as the year", 0) + 1
@@ -249,6 +252,18 @@ class ReplayReading:
             return "not confirmed where it was or by the year-ago column"
         return located, read
 
+    @staticmethod
+    def _year_column(item: ReadValue, last: dict[str, dict]) -> bool:
+        """A year's reading's column: headed as a year, or headed with no period at all exactly as last year's place was
+        (TSMC's wafer shipments, "Shipments (piece)"); never one headed as a quarter. _replay_year asks another group
+        of the document to sit in columns headed as years."""
+        header = str(item.locator.get("header") or "")
+        if _annual_header(header):
+            return True
+        place = last.get(f"{item.group.key}.{item.kpi.key}") or {}
+        return bool(header) and not _ANNUAL_HEADER.search(header) and not _QUARTER_HEADER.search(header) \
+            and comparable_header(header) == comparable_header(str(place.get("header") or ""))
+
     def _confirmed_years(self, located: Located, read: list[ReadValue], part: Spec, expected: date,
                          document: Document) -> set[str]:
         """Groups a year's reading settles on its own, as _confirmed_groups does a quarter's, against years: its period
@@ -271,7 +286,7 @@ class ReplayReading:
         for group in part.groups:
             items = [item for item in read if item.group.key == group.key]
             parts = [item for item in items if not (item.is_total or item.kpi.key == group.total_kpi)]
-            if not parts or not all(_annual_header(str(item.locator.get("header") or "")) for item in items if item.locator.get("table")):
+            if not parts or not all(self._year_column(item, last) for item in items if item.locator.get("table")):
                 continue
             keys = {f"{item.group.key}.{item.kpi.key}" for item in items}
             whole = any(item.locator.get("whole_table") for item in items)

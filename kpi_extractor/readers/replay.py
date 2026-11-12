@@ -185,12 +185,33 @@ def _replay_table(document: Document, group: str, parts: list[dict], quarter: in
         if total_row is not None and first_row <= total_row <= last_row:
             misses.append("total row inside the table's rows")
             continue
+        if total_row is not None:
+            first_row = _with_rows_above(table, first_row, total_row, col)
         if not current_column(table, first_row, col) or not _same_header(table, first_row, col, first, quarter):
             misses.append("column header changed" if "header" in first else "column header not recorded")
             continue
         return TableLocator(group=group, table=table.id, col=col, first_row=first_row, last_row=last_row,
                             total_row=total_row, scale=first.get("scale"), scale_text=first.get("scale_text"))
     return misses[0] if misses else "table rows not found"
+
+
+def _with_rows_above(table: Table, first_row: int, total_row: int, col: int) -> int:
+    """A table's rows from the first one above last quarter's first row that a new line takes (TSMC's 3-nanometer row
+    heads its technology table from 2023): only when the rows down to the total then add up to it and did not before."""
+    def adds_up(start: int) -> bool:
+        total = parse_number(table.cell(total_row, col))
+        parts = [parse_number(table.cell(index, col)) for index in range(start, total_row)]
+        if total is None or any(part is None for part in parts):
+            return False
+        return abs(sum(part.value for part in parts) - total.value) <= max(abs(total.value) * 1e-6, 1.0)
+    if adds_up(first_row):
+        return first_row
+    start = first_row
+    while start > 0 and parse_number(table.cell(start - 1, col)) is not None and re.search(r"[A-Za-z]", _row_label(table.rows[start - 1], col)):
+        start -= 1
+        if adds_up(start):
+            return start  # the nearest start that adds up: never the header row above it ("Resolution 2023 2022")
+    return first_row
 
 
 def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:

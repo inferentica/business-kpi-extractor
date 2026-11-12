@@ -91,7 +91,9 @@ def test_next_quarter_is_read_again_by_code_with_new_rows_and_new_numbers():
     assert problems == []
     read = {item.kpi.key: item.value for item in values if not item.is_total}
     assert read["members"] == 310_000_000
-    assert read["n3"] == 25_000 and "a16" not in read  # the listed 3nm KPI keeps its key  # the new row sits above the old first row
+    # The listed 3nm KPI keeps its key; the new A16 row above the old first row is read, as the rows then add up to
+    # the wafer revenue the report states (TSMC's 3-nanometer row headed its table in 2023 and was dropped).
+    assert read["n3"] == 25_000 and read["a16"] == 7_000
 
 
 def test_a_replayed_quarter_needs_no_ai_call():
@@ -662,3 +664,12 @@ def test_a_q4_release_headed_as_the_quarter_is_never_read_as_the_year():
     pipeline = _pipeline(control, _year_and_quarter_history())
     pipeline._read(lambda: "prompt", release, SPEC, date(2026, 12, 31), version=1)
     assert ("locate", "flash") in control.calls and "replayed as the year" not in pipeline.result.replay_outcomes
+
+
+def test_a_row_above_the_old_first_row_is_read_only_when_the_rows_then_add_up():
+    from kpi_extractor.readers.replay import _with_rows_above
+    rows = [["", "Years Ended December 31"], ["Resolution", "2023", "2022"], ["3-nanometer", "108", "-"],
+            ["5-nanometer", "629", "508"], ["7-nanometer", "357", "535"], ["Wafer revenue", "1,094", "1,043"]]
+    assert _with_rows_above(Table("T0", "", rows), 3, 5, 1) == 2  # 108 + 629 + 357 = 1,094, never the "2023" row
+    unrelated = rows[:2] + [["Memo: prior year", "99", "-"]] + rows[3:5] + [["Wafer revenue", "986", "1,043"]]
+    assert _with_rows_above(Table("T0", "", unrelated), 3, 5, 1) == 3  # 629 + 357 = 986 already: nothing above joins
