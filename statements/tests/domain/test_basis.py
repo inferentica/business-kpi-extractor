@@ -48,3 +48,45 @@ def test_an_opinion_without_its_with_and_the_cover_pages_question():
     # CEMEX's 2016 opinion: "International Reporting Standards".
     assert stated_basis(_FAIRLY + "in conformity with International Reporting Standards as issued by the International "
                         "Accounting Standards Board.") == IFRS
+
+
+def test_words_that_name_brazils_practices_without_making_them_the_basis():
+    # Round 69: Petrobras' releases and Ambev's 2013 report read "Brazilian GAAP".
+    assert stated_basis("<p>Adjusted EBITDA and Net Debt are not defined under BR GAAP or IFRS.</p><p>The figures are "
+                        "prepared in accordance with international accounting standards (IFRS).</p>") == IFRS
+    assert stated_basis("<p>The individual financial statements were prepared in accordance with the accounting practices "
+                        "adopted in Brazil. In the case of the Company, those practices differ from the IFRS applicable to "
+                        "separate financial statements.</p><p>The consolidated statements were prepared in accordance with "
+                        "IFRS.</p>") == IFRS
+    # Gerdau's 2010 releases.
+    assert stated_basis("<p>Prepared in accordance with the international accounting practices issued by the International "
+                        "Accounting Standards Board (IASB) and the accounting practices adopted in Brazil.</p>") == IFRS
+
+
+def test_a_former_basis_is_not_the_documents():
+    # Lloyds' 2005 interim report (round 69 read "UK GAAP").
+    assert stated_basis("<p>Up to 31 December 2004 the Group prepared its financial statements in accordance with UK "
+                        "Generally Accepted Accounting Principles (UK GAAP). On 1 January 2005 the Group implemented "
+                        "International Financial Reporting Standards (IFRS). In this document the 2004 comparative financial "
+                        "information has been restated, prepared in accordance with IFRS.</p>") == IFRS
+
+
+def test_a_releases_results_under_a_basis():
+    # FEMSA's Q1 2012 release, whose later note on a subsidiary's cash flow names Mexican FRS.
+    assert stated_basis("<p>FEMSA announced today its operational and financial results for the first quarter of 2012 under "
+                        "International Financial Reporting Standards (IFRS).</p><p>These differences are presented in the "
+                        "cash flow statement in accordance with Mexican Financial Reporting Standards.</p>") == IFRS
+
+
+def test_the_20f_covers_ticked_box_where_no_opinion_is_read():
+    # Sabesp's FY2011 20-F (its opinion not in the document's text), Braskem's boxes, Alcon's.
+    question = "Indicate by check mark which basis of accounting the registrant has used to prepare the financial statements included in this filing: "
+    body = "<p>Our statutory financial statements are prepared in accordance with the accounting practices adopted in Brazil.</p>"
+    assert stated_basis("<p>" + question + "U.S. GAAP o International Financial Reporting Standards as issued by the "
+                        "International Accounting Standards Board &#254; Other o If &#8220;Other&#8221; has been checked</p>" + body) == IFRS
+    assert stated_basis("<p>" + question + "U.S. GAAP &#9744; International Financial Reporting Standards as issued by the "
+                        "International Accounting Standards Board &#9746; Other &#9744; If</p>" + body) == IFRS
+    assert stated_basis("<p>" + question + "U.S. GAAP X International Financial Reporting Standards as issued Other by the "
+                        "International Accounting Standards Board If</p>" + body) == US_GAAP
+    assert stated_basis("<p>" + question + "&#9744; U.S. GAAP &#9744; International Financial Reporting Standards &#9746; Other If</p>"
+                        + body) == BRAZILIAN_GAAP  # "Other" ticked: the document's words decide

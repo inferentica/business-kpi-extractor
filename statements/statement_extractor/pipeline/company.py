@@ -17,6 +17,7 @@ from pathlib import Path
 from ..checks.across import cash_against_balances
 from ..domain.basis import BARE_DOLLARS, BARE_PESOS, same_kind
 from ..domain.calendar import ANNUAL_FORMS, year_end_for
+from ..domain.model import REGULATOR_SOURCES
 from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period, summarise
 from ..readers.xbrl.read import read_filing
@@ -236,11 +237,15 @@ def _release_bases(readings) -> None:
     management reports are on ROC GAAP like its FY2010 20-F)."""
     annual = {reading.fiscal_year: reading.basis for reading in readings
               if reading.own and reading.form in ANNUAL_FORMS and reading.basis}
+    # Else the home regulator's annual statements of that year: SQM's 2010, on IFRS at CMF, where the 20-F we hold
+    # closest is 2009's on Chilean GAAP.
+    home = {reading.fiscal_year: reading.basis for reading in readings
+            if reading.own and reading.source in REGULATOR_SOURCES and reading.fiscal_period == "FY" and reading.basis}
     for reading in readings:
-        if reading.form == "6-K" and reading.basis is None and annual:
+        if reading.form == "6-K" and reading.basis is None and (annual or reading.fiscal_year in home):
             # Else the nearest year's: TSMC's 1997-99 quarters, before its first 20-F we hold (FY2000, ROC GAAP).
-            nearest = min(annual, key=lambda year: abs(int(year) - int(reading.fiscal_year)))
-            reading.basis = annual.get(reading.fiscal_year) or annual[nearest]
+            nearest = min(annual, key=lambda year: abs(int(year) - int(reading.fiscal_year))) if annual else None
+            reading.basis = annual.get(reading.fiscal_year) or home.get(reading.fiscal_year) or annual[nearest]
 
 
 _OFF_YEAR = re.compile(r"column duration_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2}) off the calendar")

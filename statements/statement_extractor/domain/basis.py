@@ -7,6 +7,7 @@ GAAP"). XBRL says it by its taxonomy: us-gaap or ifrs-full concepts.
 """
 from __future__ import annotations
 
+import html
 import re
 
 US_GAAP, IFRS, TAIWAN_IFRS, ROC_GAAP, CANADIAN_GAAP, DUTCH_GAAP = (
@@ -44,7 +45,12 @@ _NAMES = (
     (BRAZILIAN_GAAP, r"(?:accounting\s+practices\s+adopted\s+in\s+Brazil|Brazilian\s+accounting\s+(?:practices|principles)|"
                      r"(?:generally\s+accepted\s+)?accounting\s+principles\s+(?:generally\s+accepted\s+)?in\s+Brazil|"
                      r"\bBrazilian\s+GAAP\b|\bBR\s+GAAP\b)"
-                     r"(?![^.;]{0,60}?\b(?:and|as\s+well\s+as)\b[^.;]{0,80}?(?:IFRS|International\s+Financial\s+Reporting))"),
+                     r"(?![^.;]{0,60}?\b(?:and|or|as\s+well\s+as)\b[^.;]{0,80}?(?:IFRS|International\s+Financial\s+Reporting))"
+                     # nor where the words are about the parent company's own statements: "the individual financial
+                     # statements … in accordance with accounting practices adopted in Brazil. In the case of the
+                     # Company, those practices differ from the IFRS applicable to separate financial statements"
+                     # (Ambev's 2013 report); "not defined under BR GAAP or IFRS" (Petrobras' releases) names neither.
+                     r"(?!.{0,80}?differ\w*\s+from\s+(?:the\s+)?IFRS\s+applicable\s+to\s+separate)"),
     # KEPCO's "the Financial Accounting Standards as established by the Financial Supervisory Commission of the Republic
     # of Korea"; Korea's IFRS ("Korean International Financial Reporting Standards") is IFRS.
     (KOREAN_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+(?:the\s+Republic\s+of\s+)?Korea|"
@@ -53,7 +59,10 @@ _NAMES = (
     (UK_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+the\s+United\s+Kingdom|\bU\.?K\.?\s+GAAP\b"),
     # ASML's statutory interim reports: "prepared in accordance with IAS 34", IFRS's standard for interim reports.
     # CEMEX's 2016 opinion: "International Reporting Standards as issued by the International Accounting Standards Board".
-    (IFRS, r"International\s+(?:Financial\s+)?Reporting\s+Standards|\bIFRSs?\b|\bIAS\s*34\b"),
+    # Gerdau's 2010 releases: "the international accounting practices issued by the International Accounting Standards
+    # Board (IASB) and the accounting practices adopted in Brazil".
+    (IFRS, r"International\s+(?:Financial\s+)?Reporting\s+Standards|\bIFRSs?\b|\bIAS\s*34\b|"
+           r"international\s+accounting\s+(?:practices|standards)\s+issued\s+by\s+the\s+International\s+Accounting\s+Standards\s+Board"),
 )
 _ANY_NAME = re.compile("|".join(f"(?P<b{index}>{pattern})" for index, (_basis, pattern) in enumerate(_NAMES)), re.I)
 
@@ -62,9 +71,22 @@ _ANY_NAME = re.compile("|".join(f"(?P<b{index}>{pattern})" for index, (_basis, p
 # Braskem's 2022 opinion leaves out the "with": "… in conformity International Financial Reporting Standards".
 _OPINION = re.compile(r"(?:present\s+fairly|not\s+aware\s+of\s+any\s+material\s+modifications)\b.{0,600}?"
                       r"\b(?:in\s+conformity(?:\s+with)?|in\s+accordance\s+with)\b(.{0,500})", re.I | re.S)
-# A release or a statement's own note: "All figures are based on US GAAP", "prepared in accordance with IFRS".
+# A release or a statement's own note: "All figures are based on US GAAP", "prepared in accordance with IFRS", FEMSA's
+# "announced today its operational and financial results for the first quarter of 2012 under International Financial
+# Reporting Standards".
 _STATED = re.compile(r"\b(?:based\s+on|prepared\s+(?:in\s+accordance\s+with|in\s+conformity\s+with|under|on\s+the\s+basis\s+of)|"
-                     r"in\s+(?:conformity|accordance)\s+with)\b(.{0,300})", re.I | re.S)
+                     r"in\s+(?:conformity|accordance)\s+with|results\s+(?:for\s+[^.;]{0,60}?\s+)?under)\b(.{0,300})", re.I | re.S)
+# A basis the company used before, not this document's: Lloyds' 2005 interim report, "Up to 31 December 2004 the Group
+# prepared its financial statements in accordance with UK Generally Accepted Accounting Principles (UK GAAP). On 1
+# January 2005 the Group implemented International Financial Reporting Standards".
+_FORMER = re.compile(r"\b(?:up\s+to|until|prior\s+to)\b[^.;]{0,90}$", re.I)
+# The 20-F cover's question, "Indicate by check mark which basis of accounting the registrant has used to prepare the
+# financial statements included in this filing: U.S. GAAP o International Financial Reporting Standards as issued by
+# the International Accounting Standards Board þ Other o", each box beside its basis.
+_COVER_BOXES = re.compile(r"basis\s+of\s+accounting\s+the\s+registrant\s+has\s+used[^:]{0,120}:?(.{0,400}?)(?:\bIf\b|$)", re.I)
+_BOX = re.compile(r"(U\.?\s?S\.?\s+GAAP)|(International\s+Financial\s+Reporting\s+Standards)|(\bOther\b)|"
+                  r"(?<!\S)([þýxX☒■✓✔☑]|[oq¨☐□])(?!\S)", re.I)
+_TICKED = set("þýxX☒■✓✔☑")
 
 
 # A 20-F's cover asks every filer the same question, whatever its basis: "If an emerging growth company that prepares
@@ -82,8 +104,8 @@ def _named(text: str) -> str | None:
 
 
 def stated_basis(text: str) -> str | None:
-    """The basis a document's statements are prepared on: the auditors' opinion's, else the first basis a sentence
-    says the figures are prepared on or based on."""
+    """The basis a document's statements are prepared on: the auditors' opinion's, else the box a 20-F's cover ticks,
+    else the first basis a sentence says the figures are prepared on or based on."""
     text = re.sub(r"<[^>]+>", " ", text or "")  # HTML read as its words
     text = re.sub(r"&(nbsp|#160|#xa0);", " ", text, flags=re.I)
     text = _COVER.sub(" ", re.sub(r"\s+", " ", text))
@@ -91,11 +113,41 @@ def stated_basis(text: str) -> str | None:
         basis = _named(match.group(1))
         if basis is not None:
             return basis
-    for match in _STATED.finditer(text):
+    boxed = _cover_basis(text)
+    if boxed is not None:
+        return boxed
+    position = 0
+    while (match := _STATED.search(text, position)) is not None:
+        position = match.end()
+        if _FORMER.search(text[max(0, match.start() - 120):match.start()]):
+            position = match.start(1)  # the words after a former basis are read again: the next sentence may state it
+            continue
         basis = _named(match.group(1)[:200])
         if basis is not None:
             return basis
     return None
+
+
+def _cover_basis(text: str) -> str | None:
+    """The basis a 20-F's cover ticks, where one box of U.S. GAAP and IFRS is ticked; the boxes print after their
+    bases or before them."""
+    match = _COVER_BOXES.search(text)
+    if match is None:
+        return None
+    tokens = [(US_GAAP if found.group(1) else IFRS if found.group(2) else "other" if found.group(3) else None, found.group(4))
+              for found in _BOX.finditer(html.unescape(match.group(1)))]
+    if not tokens:
+        return None
+    after = tokens[0][0] is not None  # "U.S. GAAP o IFRS þ", else "☐ U.S. GAAP ☒ IFRS"
+    ticked = []
+    for index, (basis, _mark) in enumerate(tokens):
+        if basis is None:
+            continue
+        beside = index + 1 if after else index - 1
+        mark = tokens[beside][1] if 0 <= beside < len(tokens) else None
+        if mark is not None and mark in _TICKED:
+            ticked.append(basis)
+    return ticked[0] if len(ticked) == 1 and ticked[0] != "other" else None
 
 
 def default_basis(form: str) -> str | None:
