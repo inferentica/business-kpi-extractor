@@ -556,17 +556,6 @@ class SeriesChecks:
                 sums[item.group.key] = sums.get(item.group.key, 0.0) + item.value
         return any(abs(total - annual) <= abs(annual) * 0.01 for total in sums.values() for annual in annual_totals)
 
-    def _earlier_values(self, before: date) -> dict[str, list[float]]:
-        earlier: dict[str, list[float]] = {}
-        chained = getattr(self._local, "chained", False)
-        for value in list(self.values.values()):
-            if chained and not _same_chain(value["period_end"], before):
-                continue  # the other chains' quarters are compared after reading, in date order
-            if value["method"] == "ai" and value["period_end"] < (before - timedelta(days=20)).isoformat():
-                key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
-                earlier.setdefault(key, []).append(float(value["value"]))
-        return earlier
-
     def _previous(self, before: date, annual: bool = False) -> dict[str, float]:
         """The latest verified value of each AI KPI in the period before, for jump checks: the quarter before a
         quarter, the year before a year (a year is never compared with a quarter)."""

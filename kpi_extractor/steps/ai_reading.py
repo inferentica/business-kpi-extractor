@@ -173,8 +173,7 @@ class AiReading:
             # missing: a key the current list no longer has, a row the filing no longer has).
             if missing_since(last, keys, group.key, whole, listed, document):
                 continue
-            if any(item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in
-                   earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
+            if any(self._repeats(item, document, earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
                 continue
             trial = copy.deepcopy(items)
             validate_groups(trial, self._previous(expected))
@@ -266,7 +265,7 @@ class AiReading:
             key = f"{item.group.key}.{item.kpi.key}"
             if item.is_total or item.kpi.key == item.group.total_kpi:
                 continue  # totals are not stored; the parts must still add up to them
-            if item.kpi.unit in ("currency", "count") and any(_same(item.value, value) for value in earlier.get(key, [])):
+            if self._repeats(item, document, earlier.get(key, [])):
                 return "repeats_earlier"  # the same number as an earlier period: likely a prior-period column
         trial = copy.deepcopy(read)
         validate_groups(trial, self._previous(expected))
