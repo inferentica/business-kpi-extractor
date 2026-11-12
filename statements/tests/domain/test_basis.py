@@ -90,3 +90,13 @@ def test_the_20f_covers_ticked_box_where_no_opinion_is_read():
                         "International Accounting Standards Board If</p>" + body) == US_GAAP
     assert stated_basis("<p>" + question + "&#9744; U.S. GAAP &#9744; International Financial Reporting Standards &#9746; Other If</p>"
                         + body) == BRAZILIAN_GAAP  # "Other" ticked: the document's words decide
+
+
+def test_a_brazilian_quarterly_reviews_cvm_standards():
+    # Sabesp's Q3 2009 ITR (round 70 took its 20-F's IFRS for it).
+    assert stated_basis("<p>Based on our limited review, we are not aware of any material modifications that should be made "
+                        "to the accounting information included in the Quarterly Information referred to above in order that "
+                        "it be stated in accordance with the standards issued by the Brazilian Securities Commission (CVM) "
+                        "applicable to the preparation of Quarterly Information, including CVM Instruction 469/08.</p>") == BRAZILIAN_GAAP
+    assert stated_basis("<p>Prepared in accordance with CPC 21 and IAS 34 and the standards issued by the Brazilian Securities "
+                        "Commission (CVM).</p>") == IFRS

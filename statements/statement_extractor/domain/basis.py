@@ -44,7 +44,10 @@ _NAMES = (
     # since 2010: "in accordance with accounting practices adopted in Brazil and with IFRS").
     (BRAZILIAN_GAAP, r"(?:accounting\s+practices\s+adopted\s+in\s+Brazil|Brazilian\s+accounting\s+(?:practices|principles)|"
                      r"(?:generally\s+accepted\s+)?accounting\s+principles\s+(?:generally\s+accepted\s+)?in\s+Brazil|"
-                     r"\bBrazilian\s+GAAP\b|\bBR\s+GAAP\b)"
+                     r"\bBrazilian\s+GAAP\b|\bBR\s+GAAP\b|"
+                     # Sabesp's Q3 2009 ITR review: "stated in accordance with the standards issued by the Brazilian
+                     # Securities Commission (CVM) applicable to the preparation of Quarterly Information".
+                     r"standards\s+issued\s+by\s+the\s+Brazilian\s+Securities\s+(?:and\s+Exchange\s+)?Commission)"
                      r"(?![^.;]{0,60}?\b(?:and|or|as\s+well\s+as)\b[^.;]{0,80}?(?:IFRS|International\s+Financial\s+Reporting))"
                      # nor where the words are about the parent company's own statements: "the individual financial
                      # statements … in accordance with accounting practices adopted in Brazil. In the case of the
