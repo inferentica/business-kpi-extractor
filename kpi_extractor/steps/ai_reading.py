@@ -483,7 +483,7 @@ class AiReading:
         rendered = sum(len((document.tables.get(key) or document.blocks[key]).render()) for key in found)
         return found if rendered <= MAX_DOCUMENT_CHARS * 0.9 else None
 
-    def _ai_history(self, before: date, source: str | None = None) -> dict[str, dict]:
+    def _ai_history(self, before: date, source: str | None = None, quarters: bool = False) -> dict[str, dict]:
         """The latest AI value of each KPI before a date (optionally only from one kind of document); when none is
         before it (an older quarter read after newer ones), the nearest reading after it, which plays the same part:
         where each KPI was found in the nearest quarter. A figure whose place holds another figure never serves."""
@@ -492,7 +492,8 @@ class AiReading:
         cutoff = before.isoformat()
         chained = getattr(self._local, "chained", False)
         for value in list(self.values.values()):
-            if value["method"] != "ai" or placed_elsewhere(value) or abs(_days(value["period_end"], cutoff)) <= 20:
+            if value["method"] != "ai" or placed_elsewhere(value) or abs(_days(value["period_end"], cutoff)) <= 20 \
+                    or (quarters and value["fiscal_period"] == "FY"):  # quarters: a year's readings left out
                 continue
             if chained and (value["period_end"] > cutoff or not _same_chain(value["period_end"], before)):
                 continue  # in a chain: only its own earlier quarters, which are always read first

@@ -741,3 +741,20 @@ def test_a_slides_unlabeled_subtotal_right_after_the_parts_is_their_total():
              Locator(kpi="g.fees", block=block, quote="Policy Fees 315,382 333,900 629,184 662,847", value_text="333,900")]
     total = stated_total(document, parts, "g.total")
     assert total is not None and total.value_text == "1,269,694" and total.quote == "941,811 1,269,694 1,729,237 7,635,163"
+
+
+def test_a_quarter_after_a_year_report_replays_from_the_latest_quarters_places():
+    # TSMC's Q1 reports: the newest reading of their kind is Q4's annual report, read as the year, whose places are
+    # never replayed into a quarter; the Q3 report's "three months ended" places serve instead.
+    year = [dict(row, fiscal_year="2025", fiscal_period="FY", period_end="2025-12-31") for row in _year_and_quarter_history()
+            if row["fiscal_period"] == "FY"]
+    # Each report under a name of its own, as TSMC's are: no earlier reading shares the Q1 report's kind.
+    quarter = [dict(row, fiscal_year="2025", fiscal_period="Q3", period_end="2025-09-30",
+                    source_url="https://www.sec.gov/Archives/tsmc2025q3financialstatements.htm")
+               for row in _year_and_quarter_history() if row["fiscal_period"] == "Q3"]
+    q1 = parse_document(report("March 31", 12, 26, 33, 44, 320), "https://www.sec.gov/Archives/a2026q1consolidatdfinan.htm")
+    control = NoAi()  # no AI call is expected
+    pipeline = _pipeline(control, year + quarter)
+    read, problems, located = pipeline._read(lambda: "prompt", q1, SPEC, date(2026, 3, 31), version=1)
+    assert control.calls == [] and not located.annual
+    assert {item.kpi.key: item.value for item in read if not item.is_total}["n3"] == 26_000
