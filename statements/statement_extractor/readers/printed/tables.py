@@ -53,6 +53,7 @@ class Table:
     header_text: str = ""  # a text table's header lines as printed, before their words are given to columns
     dollars: bool = False  # a text table's lines print "$" before figures (the parser keeps figures, not the sign)
     release_of: str = ""  # the issuer whose release opening (dateline, name, NYSE ticker) last came before the table
+    audited_of: str = ""  # the company the auditors' report last before the table names (readers/html/audited.py)
 
 
 # An account code before a label in Brazil's CVM forms: "3.09 Profit before taxation", "1.01.01 Cash and cash equivalents".

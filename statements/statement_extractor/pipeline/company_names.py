@@ -34,9 +34,10 @@ def _company_names(filing) -> list[str]:
     return _NAMES[cik]
 
 
-def _cover_text(attachments) -> str | None:
-    """A 6-K cover's first words as plain text."""
-    cover = next((item for item in attachments if str(item.document_type or "").upper().startswith("6-K")), None)
+def _cover_text(attachments, forms: tuple[str, ...] = ("6-K",)) -> str | None:
+    """A 6-K cover's first words as plain text, or a 20-F's or 40-F's (their covers print the registrant's names the
+    same way: "(Exact name of Registrant as specified in its charter)")."""
+    cover = next((item for item in attachments if str(item.document_type or "").upper().startswith(forms)), None)
     if cover is None:
         return None
     content = cover.content
@@ -99,17 +100,19 @@ def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
     SUBSIDIARIES CONSOLIDATED BALANCE SHEETS"), or a listed subsidiary's, its parent's name and a market's. A name is
     the company's own when it shares a word with the company's EDGAR name or a former one, or with the registrant's names
     on the 6-K's cover (FEMSA's titles print "FOMENTO ECONÓMICO MEXICANO", EDGAR "MEXICAN ECONOMIC DEVELOPMENT INC").
-    Only names of two words or more are compared, or one in the possessive ("Amaca’s Income Statements"); an annual report, with no cover to give its own names, is never
-    checked."""
+    Only names of two words or more are compared, or one in the possessive ("Amaca’s Income Statements"), or the legal
+    name an auditors' report gives an untitled statement ("Heineken N.V."). An annual report is checked against the
+    registrant's names on its own cover (pipeline/printed.py)."""
     if cover is None:
         return []
     own = set().union(*(_named(name) for name in _company_names(ref.filing)), _registrant_words(cover))
     if not own:
         return []
     others = []
-    for printed in {reading.titled for reading in readings if reading.titled}:
+    audited = {getattr(reading, "audited_of", "") for reading in readings} - {""}
+    for printed in {reading.titled for reading in readings if reading.titled} | audited:
         words = _named(printed.removesuffix("’s"))
-        if (len(words) >= 2 or printed.endswith("’s") and words) and (not words & own and not any(
+        if (len(words) >= 2 or (printed.endswith("’s") or printed in audited) and words) and (not words & own and not any(
                 SequenceMatcher(None, word, other).ratio() >= 0.85 for word in words for other in own)
                 or words & own and (words - own) & _REGIONS):
             others.append(printed)

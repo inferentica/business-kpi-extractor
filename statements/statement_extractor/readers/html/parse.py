@@ -9,6 +9,7 @@ import re
 import lxml.html
 
 from ...domain.basis import currencies_named, is_currency_word
+from .audited import audit_reports
 from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_header_figures,
                               is_subheader, number)
 
@@ -238,8 +239,8 @@ def parse_html(html: str | bytes) -> list[Table]:
     tree = lxml.html.fromstring(raw)
     found = []
     previous_text: list[str] = []
-    openings = _openings(tree)
-    order = {element: index for index, element in enumerate(tree.iter())} if openings else {}
+    openings, audits = _openings(tree), audit_reports(_texts(tree))
+    order = {element: index for index, element in enumerate(tree.iter())} if openings or audits else {}
     for element, in_table in _walk(tree):
         if not isinstance(element.tag, str):
             continue
@@ -260,7 +261,9 @@ def parse_html(html: str | bytes) -> list[Table]:
                 rows += right[next((index for index, row in enumerate(right) if row.figures), len(right)):]
             context = " ".join(previous_text)[-600:]
             release_of = next((name for place, name in reversed(openings) if place <= order.get(element, -1)), "")
-            found.append(Table(rows=rows, header=header, context=context, index=len(found), release_of=release_of))
+            audited_of = next((name for place, name in reversed(audits) if place <= order.get(element, -1)), "")
+            found.append(Table(rows=rows, header=header, context=context, index=len(found), release_of=release_of,
+                               audited_of=audited_of))
             if seen_figures:
                 previous_text = []
             else:

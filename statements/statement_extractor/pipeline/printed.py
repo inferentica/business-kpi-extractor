@@ -51,6 +51,10 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
     attachments = list(ref.filing.attachments)
     other = another_registrant(ref, attachments) if release else None
     cover = _cover_text(attachments) if release else None
+    # An annual report's own cover names its registrant, against which its statements' titles are checked: another
+    # company's statements it carries are never the company's (Heineken's in FEMSA's 20-Fs).
+    annual_cover = ref.form.upper().startswith(("20-F", "40-F"))
+    names_cover = cover if release else _cover_text(attachments, ("20-F", "40-F")) if annual_cover else None
     if other:
         # A subsidiary's report furnished beside the company's (Lloyds Bank plc's under Lloyds Banking Group): another
         # issuer's statements, never the company's.
@@ -110,9 +114,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                                          fiscal_year_end=fiscal_year_end, year_offset=year_offset)
             rendered_kinds = {reading.statement for reading in rendered}
             readings = [reading for reading in readings if reading.statement not in rendered_kinds] + rendered
-        others = _other_companies(readings, ref, cover)
+        others = _other_companies(readings, ref, names_cover)
         if others:
-            readings = [reading for reading in readings if reading.titled not in others]
+            readings = [reading for reading in readings if reading.titled not in others and reading.audited_of not in others]
             document_notes.append(f"another company's statements left out ({'; '.join(sorted(others))[:120]})")
         issuers = _other_issuers(readings, ref, cover)
         if issuers:
@@ -151,8 +155,8 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                                              form=ref.form, filed=ref.filed, document_end=document_end,
                                              fiscal_year_end=fiscal_year_end, year_offset=year_offset)
         held = {(reading.key, reading.basis) for reading in found}
-        others = _other_companies(readings, ref, cover)
-        readings = [reading for reading in readings if reading.titled not in others]
+        others = _other_companies(readings, ref, names_cover)
+        readings = [reading for reading in readings if reading.titled not in others and reading.audited_of not in others]
         for reading in readings:
             reading.basis, reading.currency = basis, _decided(reading.currency, currency)
         share_currency(scaled + readings)  # Petrobras' real release prints its cash flow with no scale as well

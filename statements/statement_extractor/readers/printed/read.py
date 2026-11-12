@@ -109,6 +109,8 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             reading.accession, reading.form, reading.filed, reading.currency = accession, form, filed, currency
             reading.scope = scopes.get(dated[index]) or statement_scope(kind, group, form, found)
             reading.titled = titled_company(kind, group[0])
+            # Untitled, the company the auditors' report before it names: Heineken's statements in FEMSA's 20-Fs.
+            reading.audited_of = "" if reading.titled else group[0].audited_of
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
             readings.append(reading)
     return readings, notes

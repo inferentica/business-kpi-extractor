@@ -50,6 +50,7 @@ class Reading:
     # as positive amounts.
     template: bool = False
     release_of: str = ""  # the issuer a release opening named before the statement (pipeline/printed.py)
+    audited_of: str = ""  # the company the auditors' report before an untitled statement names (readers/html/audited.py)
 
     @property
     def key(self) -> tuple[str, str, str, str]:
@@ -77,7 +78,7 @@ class Reading:
         data["period_start"] = self.period_start.isoformat() if self.period_start else None
         data["filed"] = self.filed.isoformat()
         data["status"] = self.status
-        data.pop("titled"), data.pop("release_of"), data.pop("template")
+        data.pop("titled"), data.pop("release_of"), data.pop("template"), data.pop("audited_of")
         if not with_lines:
             data.pop("lines")
             data["line_count"] = len(self.lines)
