@@ -218,7 +218,8 @@ def stated_total(document: Document, parts: list[Locator], key: str) -> Locator 
     """The total a breakdown read part by part leaves unread: totals are never stored, so last quarter's reading gives
     no place for them (KKR's insurance revenue under its quoted rows, ASML's "Total net sales" under its two lines).
     It is the one row the filing states, in the same table and column, or among the same block's quoted rows in the
-    same place, whose figure is the parts' figures added up; found more than once or not at all, there is none."""
+    same place (a slide's unlabeled subtotal right after the parts' last row among them), whose figure is the parts'
+    figures added up; found more than once or not at all, there is none."""
     def close(a: float, b: float) -> bool:
         return abs(a - b) <= max(abs(b) * 1e-6, 0.5)
     if len(parts) >= 2 and all(part.table and part.row is not None and part.col is not None for part in parts) \
@@ -246,12 +247,20 @@ def stated_total(document: Document, parts: list[Locator], key: str) -> Locator 
     whole = sum(figure.value for figure in figures)
     labels = {line.label.lower() for line in lines}
     pattern = re.compile(rf"(?<![A-Za-z])([A-Za-z][A-Za-z ,'&()/-]{{2,80}}?)((?:\s+(?:{_SLOT})(?=\s|$)){{{count}}})(?!\s+(?:{_SLOT})(?=\s|$))")
+    text = document.blocks[parts[0].block].text
     found = []
-    for match in pattern.finditer(document.blocks[parts[0].block].text):
+    for match in pattern.finditer(text):
         slots = re.findall(rf"(?:{_SLOT})(?=\s|$)", match.group(2).strip())
         figure = parse_number(slots[index]) if index < len(slots) else None
         if match.group(1).strip().lower() not in labels and figure is not None and close(figure.value, whole):
             found.append((match.group(0).strip(), slots[index]))
+    # A slide's subtotal row has no label: the run of as many figures right after the parts' last row (KKR's insurance
+    # revenue, "2,175,174 2,611,461 4,176,622 10,311,731" under "Other Income").
+    ends = [text.find(part.quote) + len(part.quote) for part in parts if part.quote and part.quote in text]
+    if len(ends) == len(parts) and (after := re.match(rf"((?:\s+(?:{_SLOT})(?=\s|$)){{{count}}})(?!\s+(?:{_SLOT})(?=\s|$))", text[max(ends):])):
+        slots = re.findall(rf"(?:{_SLOT})(?=\s|$)", after.group(1).strip())
+        if (figure := parse_number(slots[index])) is not None and close(figure.value, whole):
+            found.append((after.group(1).strip(), slots[index]))
     if len(found) != 1:
         return None
     return Locator(kpi=key, block=parts[0].block, quote=found[0][0], value_text=found[0][1])
