@@ -516,3 +516,48 @@ def test_a_shortened_sentence_never_drops_the_figures_period_or_lands_on_another
     # Too few words to name the figure: "was $5 billion" alone could be any figure.
     assert _replayed("It was $5.2 billion, up 10% year-over-year", "$5.2 billion", "It was $6.0 billion, flat") \
         == "sentence not found"
+
+
+def test_a_sentence_found_in_several_places_hands_back_each_place_with_its_section():
+    # Mastercard's release gives the quarter's bullets, then the same bullets under "Year-to-date Results".
+    document = parse_document("<html><body><p>Mastercard's second quarter 2023 results, versus the year ago period.</p>"
+                              "<p>Cross-border volume growth of 24% on a local currency basis.</p><p>Year-to-date Results</p>"
+                              "<p>Primary drivers were as follows: Cross-border volume growth of 29% on a local currency basis.</p>"
+                              "</body></html>", URL.format(n=2))
+    found = replay(document, {"operating.members": {"block": "P1", "quote": "Cross-border volume growth of 35% on a local "
+                                                    "currency basis.", "value_text": "35%"}}, Q2)
+    from kpi_extractor.readers.replay import AmbiguousQuote
+    assert isinstance(found, AmbiguousQuote) and found == "sentence found more than once"
+    assert [(locator.value_text, section) for locator, section in found.candidates] == [("24%", "quarter"), ("29%", "longer")]
+
+
+def _choose(candidates, year_ago_rows, stored):
+    """The reading step's choice among places, with every check passing and each place's year-ago cells given."""
+    from kpi_extractor.readers.replay import AmbiguousQuote
+    from kpi_extractor.ai import Locator
+    pipeline = _pipeline(NoAi(), [])
+    places = [(Locator(kpi="operating.members", block=f"P{i}", quote=f"row {value}", value_text=str(value)), section)
+              for i, (value, section) in enumerate(candidates)]
+    def checked(document, part, located, expected, currency, mark=None):
+        item = SimpleNamespace(value=float(located.values[0].value_text), locator={"block": located.values[0].block})
+        return located, [item]
+    pipeline._checked = checked
+    pipeline._stored_year_ago = lambda expected: {"operating.members": stored} if stored is not None else {}
+    pipeline._year_ago_cell_matches = lambda item, document, before: before is not None and before in year_ago_rows[item.locator["block"]]
+    result = pipeline._one_of(None, SPEC, "operating.members", AmbiguousQuote(places), Q2, "USD")
+    return result if isinstance(result, str) else result[1][0].value
+
+
+def test_one_of_several_places_is_kept_only_on_the_filings_own_evidence(monkeypatch):
+    from kpi_extractor.steps import replay_reading
+    monkeypatch.setattr(replay_reading, "reported_period", lambda document, expected: expected)
+    # KKR: the firm's "Management Fees" row and each segment's; only the firm's year-ago column holds the stored figure.
+    rows = {"P0": [654_927], "P1": [299_099], "P2": [161_707]}
+    assert _choose([(748_888, None), (320_081, None), (201_590, None)], rows, 654_927) == 748_888
+    # The same table again in the appendix: two places, one figure.
+    assert _choose([(748_888, None), (748_888, None)], {"P0": [654_927], "P1": [654_927]}, 654_927) == 748_888
+    # Mastercard: no year-ago column; the quarter's section is kept, the year to date's is not.
+    assert _choose([(24, "quarter"), (29, "longer")], {"P0": [], "P1": []}, None) == 24
+    # Two different figures still standing: neither is taken.
+    assert _choose([(24, "quarter"), (21, "quarter")], {"P0": [], "P1": []}, None) == "sentence found more than once"
+    assert _choose([(24, None), (29, None)], {"P0": [], "P1": []}, None) == "sentence found more than once"

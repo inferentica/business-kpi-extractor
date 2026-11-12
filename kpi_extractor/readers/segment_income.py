@@ -29,12 +29,17 @@ _NEUTRAL = {("ConsolidationItemsAxis", "OperatingSegmentsMember"), ("Consolidate
 # Items the consolidation axis tags between the segments and operating income, under the filing's own name when it has
 # a short one.
 _RECONCILING = {"CorporateNonSegmentMember": "Corporate", "MaterialReconcilingItemsMember": "Reconciling items",
-                "SegmentReconcilingItemsMember": "Reconciling items", "IntersegmentEliminationMember": "Eliminations"}
+                "SegmentReconcilingItemsMember": "Reconciling items", "IntersegmentEliminationMember": "Eliminations",
+                "CorporateReconcilingItemsAndEliminationsMember": "Corporate and eliminations"}
 _LEFT_OVER = "Unallocated"
 # A company's own segment measures, when it tags no operating income by segment (Brookfield Asset Management's
 # "Segment Earnings", its fee-related earnings, over its "Segment Revenue").
 _OWN_PROFIT = re.compile(r"^[\w-]+:Segment(?:Earnings|Profit|ProfitLoss|OperatingIncome(?:Loss)?)$")
-_OWN_REVENUE = re.compile(r"^[\w-]+:SegmentRevenues?$")
+# A bank's segments are measured on a fully taxable-equivalent basis (Bank of America's "Total revenue, net of interest
+# expense (FTE basis)", bac:RevenuesNetOfInterestExpenseFullTaxEquivalentBasis): its segments and "All Other" add up to
+# that total, not to GAAP revenue, which is the FTE total less the FTE adjustment.
+_OWN_REVENUE = re.compile(r"^[\w-]+:(?:SegmentRevenues?|RevenuesNetOfInterestExpense\w*Tax(?:able)?EquivalentBasis)$")
+_TAX_EQUIVALENT = re.compile(r"Tax(?:able)?EquivalentBasis$")
 # A company's own segment contribution (Palantir's "pltr:Contribution", each segment's revenue less its own costs, since
 # its first inline-XBRL 10-Q): its filing reconciles it to operating income, so the rows do too, with the costs it
 # leaves out under the names its reconciliation gives them.
@@ -231,7 +236,8 @@ def segment_revenue(facts: pd.DataFrame, period_end: date, annual: bool,
     """A company's own segment revenue measure (Brookfield Asset Management's fee revenues by segment), which its
     segment profit is measured against, beside its GAAP revenue by segment."""
     concept = _own_concept(facts, _OWN_REVENUE)
-    return _measure(facts, concept, REVENUE_GROUP_LABEL, period_end, annual, label, children) if concept else None
+    name = f"{REVENUE_GROUP_LABEL} (FTE basis)" if concept and _TAX_EQUIVALENT.search(concept) else REVENUE_GROUP_LABEL
+    return _measure(facts, concept, name, period_end, annual, label, children) if concept else None
 
 
 def _measure(facts: pd.DataFrame, concept: str, name: str, period_end: date, annual: bool,

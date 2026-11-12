@@ -11,7 +11,7 @@ from ..documents.document import Document
 from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
-from ..readers.replay import _source_template, replay, reported_period
+from ..readers.replay import AmbiguousQuote, _source_template, replay, reported_period
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..readers.trace import trace_replay
 from .shared import AI_GROUP_PREFIX, _NOT_REPORTED, _READ_BY_AI
@@ -112,9 +112,31 @@ class ReplayReading:
         """One group, or one KPI, replayed and checked: its reading and values, or why it does not stand."""
         _year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=getattr(self, "offset", 0))
         located = replay(document, locators, expected, int(period[1]) if period.startswith("Q") else None)
+        if isinstance(located, AmbiguousQuote) and len(locators) == 1:
+            return self._one_of(document, part, next(iter(locators)), located, expected, currency)
         if isinstance(located, str):
             return located
         return self._checked(document, part, located, expected, currency)
+
+    def _one_of(self, document: Document, part: Spec, key: str, ambiguous: AmbiguousQuote, expected: date,
+                currency: str | None) -> tuple[Located, list[ReadValue]] | str:
+        """A KPI's sentence found in several places (KKR's "Management Fees" row in the firm's table and again in each
+        segment's; Mastercard's bullets for the quarter and again for the year to date): one place is kept only on the
+        filing's own evidence, after every check a Flash-only reading must pass. First the places whose row's year-ago
+        column holds the figure stored for that quarter last year; failing those, the places whose section names the
+        quarter rather than a longer span. They must all give one figure (a table the filing repeats in its appendix)."""
+        period_end = reported_period(document, expected).isoformat()
+        passing = []
+        for locator, section in ambiguous.candidates:
+            checked = self._checked(document, part, Located(period_end=period_end, values=[locator]), expected, currency)
+            if not isinstance(checked, str):
+                passing.append((checked, section))
+        before = self._stored_year_ago(expected).get(key)
+        pool = [checked for checked, _section in passing if self._year_ago_cell_matches(checked[1][0], document, before)] \
+            or [checked for checked, section in passing if section == "quarter"]
+        if pool and len({round(checked[1][0].value, 9) for checked in pool}) == 1:
+            return pool[0]
+        return str(ambiguous)
 
     def _checked(self, document: Document, part: Spec, located: Located, expected: date, currency: str | None,
                  mark: dict | None = None) -> tuple[Located, list[ReadValue]] | str:

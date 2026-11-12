@@ -241,3 +241,22 @@ def test_a_total_beside_its_parts_names_nothing():
     rows += [{**fact(value, start, end, None, item), "concept": concept} for concept, value in lines.items()]
     income = segment_income(pd.DataFrame(rows), date(2026, 3, 31), False, {}.get, None, {"x:One": "One", "x:Two": "Two", "x:All": "All"}.get)
     assert income.current.rows[-1][1] == "Unallocated"
+
+
+def test_a_banks_segments_on_a_tax_equivalent_basis_are_its_revenue_by_segment():
+    # Bank of America's FY2025 10-K: its four segments and All Other (corporate reconciling items and eliminations) add
+    # up to its total revenue on a fully taxable-equivalent basis, 113,706, which its GAAP revenue (113,097) is less the
+    # 609 FTE adjustment.
+    from kpi_extractor.readers.segment_income import segment_revenue
+    start, end, concept = "2025-01-01", "2025-12-31", "bac:RevenuesNetOfInterestExpenseFullTaxEquivalentBasis"
+    rows = [{**fact(value, start, end, member, "us-gaap:OperatingSegmentsMember"), "concept": concept} for member, value in (
+        ("bac:ConsumerBankingSegmentMember", 43_673e6), ("bac:GlobalWealthAndInvestmentManagementSegmentMember", 24_883e6),
+        ("bac:GlobalBankingSegmentMember", 24_108e6), ("bac:GlobalMarketsSegmentMember", 24_096e6))]
+    rows += [{**fact(-3_054e6, start, end, None, "us-gaap:CorporateReconcilingItemsAndEliminationsMember"), "concept": concept},
+             {**fact(113_706e6, start, end), "concept": concept},
+             {**fact(113_097e6, start, end), "concept": "us-gaap:Revenues"}]
+    labels = {"us-gaap:CorporateReconcilingItemsAndEliminationsMember": "All Other"}
+    revenue = segment_revenue(pd.DataFrame(rows), date(2025, 12, 31), True, labels.get)
+    assert revenue.label == "Revenue by Segment (FTE basis)" and revenue.current.total == 113_706e6
+    rows_read = {name: value for _key, name, _member, value in revenue.current.rows}
+    assert rows_read["All Other"] == -3_054e6 and sum(rows_read.values()) == 113_706e6 and len(rows_read) == 5
