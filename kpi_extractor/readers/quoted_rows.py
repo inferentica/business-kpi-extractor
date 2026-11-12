@@ -27,7 +27,8 @@ class RowLine:
 def row_line(quote: str, value_text: str) -> RowLine | None:
     """The quote as a row: its label and figures, when it is one (two figures or more after a label with letters) and
     the value read is one of the figures, written once."""
-    tokens = clean(quote).split(" ")
+    # "$ 654,927" is one figure (KKR's decks set the sign apart), as replay_row_line reads it.
+    tokens = re.sub(r"\$\s+(?=[(\d-])", "$", clean(quote)).split(" ")
     slots: list[str] = []
     while tokens and _SLOT_ONLY.match(tokens[-1]):
         slots.insert(0, tokens.pop())

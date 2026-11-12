@@ -559,6 +559,8 @@ def test_one_of_several_places_is_kept_only_on_the_filings_own_evidence(monkeypa
     assert _choose([(748_888, None), (748_888, None)], {"P0": [654_927], "P1": [654_927]}, 654_927) == 748_888
     # Mastercard: no year-ago column; the quarter's section is kept, the year to date's is not.
     assert _choose([(24, "quarter"), (29, "longer")], {"P0": [], "P1": []}, None) == 24
+    # A table row repeated with one figure, no year-ago figure stored: the figure stands.
+    assert _choose([(114_675, None), (114_675, None)], {"P0": [], "P1": []}, None, prose=False) == 114_675
     # Two different figures still standing: neither is taken.
     assert _choose([(24, "quarter"), (21, "quarter")], {"P0": [], "P1": []}, None) == "sentence found more than once"
     assert _choose([(24, None), (29, None)], {"P0": [], "P1": []}, None) == "sentence found more than once"
