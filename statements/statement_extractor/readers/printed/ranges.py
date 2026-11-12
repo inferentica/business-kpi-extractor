@@ -128,7 +128,8 @@ def _signs_beside(table: Table, position: int, after: int = 0) -> set[str]:
     for row in [row for row in table.rows if row.figures][:6]:
         found |= {cell.text.strip() for cell in row.cells
                   if after < cell.start < position and position - cell.start <= 2 and cell.start not in row.figures
-                  and 0 < len(cell.text.strip()) <= 4 and not re.search(r"\d", cell.text)}
+                  and 0 < len(cell.text.strip()) <= 4 and not re.search(r"\d", cell.text)
+                  and re.search(r"[^\W\d_]|[$€£¥₩]", cell.text)}  # never a negative figure's closing ")" (KEPCO)
     return found
 
 

@@ -19,7 +19,7 @@ _LINES = [("Revenue", "1,761.3", "3,003.6", "1,557.0", "2,642.9"), ("Cost of sal
 def _read(content, end, filed):
     readings, _notes = read_document(content, accession="x", form="6-K", filed=filed, document_end=end, fiscal_year_end="1231",
                                      year_offset=0)
-    return {(r.period_start, r.period_end): next(line["value"] for line in r.lines if line["label"] == "Revenue")
+    return {(r.period_start, r.period_end): next(line["value"] for line in r.lines if line["label"].startswith("Revenue"))
             for r in readings if r.statement == "income"}
 
 
@@ -77,3 +77,17 @@ def test_the_groups_statements_are_kept_beside_the_holding_companys():
     readings, _notes, _kinds = printed.read_printed(ref, "1231", 0, document_end=date(2015, 9, 30))
     nine_months = {r.scope for r in readings if r.statement == "income" and r.period_start == date(2015, 1, 1)}
     assert nine_months == {"parent", "consolidated"}
+
+
+def test_a_negative_figures_closing_bracket_is_no_currency():
+    # KEPCO's Q3 2006 cash flows: "(1,018,757 | )" puts the bracket in a cell of its own beside the nine months, which
+    # round 77 took for a sign; the continuation page then stayed whole and no longer lined up with the first.
+    rows = [_row("Revenue", "Won", "1,761.3", "", "3,003.6", "", "Won", "1,557.0", "", "2,642.9", "")] + \
+           [_row(label, "", a.strip("()"), ")" if a.startswith("(") else "", b.strip("()"), ")" if b.startswith("(") else "",
+                 "", c.strip("()"), ")" if c.startswith("(") else "", d.strip("()"), ")" if d.startswith("(") else "")
+            for label, a, b, c, d in _LINES[1:]]
+    content = _income("Korea Electric Power Corporation Statements of Income For the three-month and nine-month periods ended "
+                      "September 30, 2006 and 2005 (In millions of Korean Won)",
+                      "<tr><td></td><td colspan='5'>2006</td><td colspan='5'>2005</td></tr>", rows)
+    found = _read(content, date(2006, 9, 30), date(2006, 11, 14))
+    assert {(start, end) for start, end in found} >= {(date(2006, 7, 1), date(2006, 9, 30)), (date(2006, 1, 1), date(2006, 9, 30))}
