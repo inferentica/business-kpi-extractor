@@ -121,12 +121,14 @@ _QUARTER_FIRST = re.compile(r"\b(?:quarter|three[\s-]+months?)\s+and\s+(?:the\s+
 _TO_DATE_FIRST = re.compile(r"\b(?:year[\s-]+to[\s-]+date|six|nine)(?:[\s-]+months?)?\s+and\s+(?:the\s+)?(?:quarter|three)\b", re.I)
 
 
-def _signs_beside(table: Table, position: int) -> set[str]:
-    """The non-figure cells printed just before a figure position in the first figure rows ("$", "Ps.")."""
+def _signs_beside(table: Table, position: int, after: int = 0) -> set[str]:
+    """The signs printed just before a figure position, after `after`, in the first figure rows ("$", "Ps.", "W"):
+    short cells with no digit, never a row's label."""
     found = set()
     for row in [row for row in table.rows if row.figures][:6]:
         found |= {cell.text.strip() for cell in row.cells
-                  if position - 2 <= cell.start < position and cell.text.strip() and cell.start not in row.figures}
+                  if after < cell.start < position and position - cell.start <= 2 and cell.start not in row.figures
+                  and 0 < len(cell.text.strip()) <= 4 and not re.search(r"\d", cell.text)}
     return found
 
 
@@ -147,9 +149,11 @@ def paired_spans(periods: dict, columns: list, text: str, fiscal_year_end: str, 
     dated = [column for column in columns if column in periods]
     for column in dated:  # one heading over two figure columns
         period = periods[column]
-        # Never a translation beside its currency ("$ 14,470 | Ps. 201,867": FEMSA's, currency.split_by_sign).
+        # Never a translation beside its currency ("$ 14,470 | Ps. 201,867": FEMSA's, currency.split_by_sign); a sign
+        # before the first column alone is the statement's own (Shinhan's "W 2,744,317 | 8,374,623").
+        signs = (_signs_beside(table, column[0]), _signs_beside(table, column[1], column[0])) if len(column) == 2 else (set(), set())
         if len(column) == 2 and period.start is not None and spans(period.end)[0] != spans(period.end)[1] \
-                and _signs_beside(table, column[0]) == _signs_beside(table, column[1]):
+                and not (all(signs) and signs[0] != signs[1]):
             del periods[column]
             periods.update(dict(zip(((column[0],), (column[1],)), spans(period.end))))
     for left, right in zip(dated, dated[1:]):  # two columns read as the same span

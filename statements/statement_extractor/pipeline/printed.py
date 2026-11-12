@@ -144,9 +144,11 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             reading.basis = basis
             reading.currency = _decided(reading.currency, currency)
         share_currency(readings)
-        # One presentation per period and basis: ASML's 6-Ks file an IFRS interim report before the US GAAP release.
-        held = {(reading.key, reading.basis) for reading in found}
-        found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
+        # One presentation per period, basis and scope: ASML's 6-Ks file an IFRS interim report before the US GAAP
+        # release; Shinhan's file the holding company's statements (EX-99.1) before the group's (EX-99.2), which were
+        # dropped behind them until round 76.
+        held = {(reading.key, reading.basis, reading.scope) for reading in found}
+        found.extend(reading for reading in readings if (reading.key, reading.basis, reading.scope) not in held)
         notes.extend(f"{attachment.document}: {note}" for note in document_notes)
         kinds.append(printed)
     for reader, content, basis, currency, document, scaled in unscaled:
@@ -154,13 +156,13 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         readings, proved = with_proven_scale(reader, content, schedules, list(found), accession=ref.accession,
                                              form=ref.form, filed=ref.filed, document_end=document_end,
                                              fiscal_year_end=fiscal_year_end, year_offset=year_offset)
-        held = {(reading.key, reading.basis) for reading in found}
+        held = {(reading.key, reading.basis, reading.scope) for reading in found}
         others = _other_companies(readings, ref, names_cover)
         readings = [reading for reading in readings if reading.titled not in others and reading.audited_of not in others]
         for reading in readings:
             reading.basis, reading.currency = basis, _decided(reading.currency, currency)
         share_currency(scaled + readings)  # Petrobras' real release prints its cash flow with no scale as well
-        found.extend(reading for reading in readings if (reading.key, reading.basis) not in held)
+        found.extend(reading for reading in readings if (reading.key, reading.basis, reading.scope) not in held)
         notes.extend(f"{document}: {note}" for note in split_titled(proved)[1])
     if document_end is None and ref.form in ANNUAL_FORMS:
         _own_year(found, ref.filed)
