@@ -531,12 +531,13 @@ def test_a_sentence_found_in_several_places_hands_back_each_place_with_its_secti
     assert [(locator.value_text, section) for locator, section in found.candidates] == [("24%", "quarter"), ("29%", "longer")]
 
 
-def _choose(candidates, year_ago_rows, stored):
+def _choose(candidates, year_ago_rows, stored, prose=True):
     """The reading step's choice among places, with every check passing and each place's year-ago cells given."""
     from kpi_extractor.readers.replay import AmbiguousQuote
     from kpi_extractor.ai import Locator
     pipeline = _pipeline(NoAi(), [])
-    places = [(Locator(kpi="operating.members", block=f"P{i}", quote=f"row {value}", value_text=str(value)), section)
+    places = [(Locator(kpi="operating.members", block=f"P{i}", quote=f"Growth of {value} in the period." if prose
+                       else f"Ending Balance ${value} $1 ${value + 1}", value_text=str(value)), section)
               for i, (value, section) in enumerate(candidates)]
     def checked(document, part, located, expected, currency, mark=None):
         item = SimpleNamespace(value=float(located.values[0].value_text), locator={"block": located.values[0].block})
@@ -561,3 +562,8 @@ def test_one_of_several_places_is_kept_only_on_the_filings_own_evidence(monkeypa
     # Two different figures still standing: neither is taken.
     assert _choose([(24, "quarter"), (21, "quarter")], {"P0": [], "P1": []}, None) == "sentence found more than once"
     assert _choose([(24, None), (29, None)], {"P0": [], "P1": []}, None) == "sentence found more than once"
+    assert _choose([(24, "quarter"), (29, None)], {"P0": [], "P1": []}, None) == "sentence found more than once"
+    # Apollo: "Ending Balance" rows of two roll-forwards (total AUM, fee-generating AUM), with no year-ago column: the
+    # quarter's section names no table, so the total AUM's quarter row is never taken for the fee-generating one.
+    assert _choose([(1_073_599, "quarter"), (1_150_000, "longer")], {"P0": [], "P1": []}, 685_026, prose=False) \
+        == "sentence found more than once"

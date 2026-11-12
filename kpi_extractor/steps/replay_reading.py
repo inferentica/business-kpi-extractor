@@ -11,6 +11,7 @@ from ..documents.document import Document
 from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
+from ..readers.quoted_rows import row_line
 from ..readers.replay import AmbiguousQuote, _source_template, replay, reported_period
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..readers.trace import trace_replay
@@ -131,7 +132,7 @@ class ReplayReading:
         segment's; Mastercard's bullets for the quarter and again for the year to date): one place is kept only on the
         filing's own evidence, after every check a Flash-only reading must pass. First the places whose row's year-ago
         column holds the figure stored for that quarter last year; failing those, the places whose section names the
-        quarter rather than a longer span. They must all give one figure (a table the filing repeats in its appendix)."""
+        quarter rather than a longer span, for sentences of prose only. They must all give one figure (a table the filing repeats in its appendix)."""
         period_end = reported_period(document, expected).isoformat()
         passing = []
         for locator, section in ambiguous.candidates:
@@ -139,8 +140,13 @@ class ReplayReading:
             if not isinstance(checked, str):
                 passing.append((checked, section))
         before = self._stored_year_ago(expected).get(key)
-        pool = [checked for checked, _section in passing if self._year_ago_cell_matches(checked[1][0], document, before)] \
-            or [checked for checked, section in passing if section == "quarter"]
+        pool = [checked for checked, _section in passing if self._year_ago_cell_matches(checked[1][0], document, before)]
+        # Sections decide only between sentences of prose that each sit under a named period, the quarter's and longer
+        # spans' (Mastercard): table rows quoted as lines repeat across different tables (Apollo's "Ending Balance" ends
+        # its AUM and its fee-generating AUM roll-forwards, each for the quarter and the twelve months).
+        prose = not any(row_line(locator.quote or "", locator.value_text or "") for locator, _section in ambiguous.candidates)
+        if not pool and prose and all(section in ("quarter", "longer") for _locator, section in ambiguous.candidates):
+            pool = [checked for checked, section in passing if section == "quarter"]
         if pool and len({round(checked[1][0].value, 9) for checked in pool}) == 1:
             return pool[0]
         return str(ambiguous)
