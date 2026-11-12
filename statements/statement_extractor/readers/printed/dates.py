@@ -8,7 +8,8 @@ from datetime import date, timedelta
 
 from ...domain.periods import Period
 from .find import TITLE_PATTERNS
-from .ranges import dates_in_order, spans_over, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric, own_month
+from .ranges import (dates_in_order, spans_over, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric,
+                     own_month, paired_spans)
 from .tables import Table, figure_columns, header_text
 
 
@@ -264,6 +265,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             periods[column] = Period(end, opened)
             continue
         periods[column] = Period(end, end - timedelta(days=days - 1))
+    paired_spans(periods, columns, title + " " + header_all, fiscal_year_end, first)
     mended_starts(periods, ranged)
     return periods
 

@@ -1,9 +1,10 @@
 """Slashed and dotted dates, and the periods a header's ranges of them give."""
 from __future__ import annotations
 
+import calendar
 import re
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 
 from ...domain.periods import Period
 from ...domain.basis import currencies_named
@@ -112,3 +113,47 @@ def spans_over(table: Table, columns: list[tuple[int, ...]], span) -> dict[tuple
             for column, text in over.items():
                 found[column].append(text)
     return {column: " ".join(texts) for column, texts in found.items() if texts and span.search(" ".join(texts))}
+
+
+# "Quarter and Year to date on June 30, 2014 and 2013" (Embraer's 6-Ks), "For the three-month and nine-month periods
+# ended September 30, 2015 and 2014" (Shinhan's): the title's order of the two spans each date is printed with.
+_QUARTER_FIRST = re.compile(r"\b(?:quarter|three[\s-]+months?)\s+and\s+(?:the\s+)?(?:year[\s-]+to[\s-]+date|six|nine)\b", re.I)
+_TO_DATE_FIRST = re.compile(r"\b(?:year[\s-]+to[\s-]+date|six|nine)(?:[\s-]+months?)?\s+and\s+(?:the\s+)?(?:quarter|three)\b", re.I)
+
+
+def _signs_beside(table: Table, position: int) -> set[str]:
+    """The non-figure cells printed just before a figure position in the first figure rows ("$", "Ps.")."""
+    found = set()
+    for row in [row for row in table.rows if row.figures][:6]:
+        found |= {cell.text.strip() for cell in row.cells
+                  if position - 2 <= cell.start < position and cell.text.strip() and cell.start not in row.figures}
+    return found
+
+
+def paired_spans(periods: dict, columns: list, text: str, fiscal_year_end: str, table: Table) -> None:
+    """The quarter and the year to date of one date, under a title naming both, in the title's order: two columns side
+    by side read as the same span ("06.30.2014 | 06.30.2014", Embraer), or one year's heading over two figure columns
+    (Shinhan's "2015" over its three and nine months). In the first quarter the two are one span: nothing changes."""
+    quarter_first, to_date_first = _QUARTER_FIRST.search(text), _TO_DATE_FIRST.search(text)
+    if bool(quarter_first) == bool(to_date_first):
+        return  # neither, or both: the order is not the title's to give
+    def spans(end: date) -> tuple:
+        month = end.month - 2
+        quarter = Period(end, date(end.year + (month - 1) // 12, (month - 1) % 12 + 1, 1))
+        fiscal_month, fiscal_day = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
+        year = end.year if (end.month, end.day) > (fiscal_month, fiscal_day) else end.year - 1
+        to_date = Period(end, date(year, fiscal_month, min(fiscal_day, calendar.monthrange(year, fiscal_month)[1])) + timedelta(days=1))
+        return (quarter, to_date) if quarter_first else (to_date, quarter)
+    dated = [column for column in columns if column in periods]
+    for column in dated:  # one heading over two figure columns
+        period = periods[column]
+        # Never a translation beside its currency ("$ 14,470 | Ps. 201,867": FEMSA's, currency.split_by_sign).
+        if len(column) == 2 and period.start is not None and spans(period.end)[0] != spans(period.end)[1] \
+                and _signs_beside(table, column[0]) == _signs_beside(table, column[1]):
+            del periods[column]
+            periods.update(dict(zip(((column[0],), (column[1],)), spans(period.end))))
+    for left, right in zip(dated, dated[1:]):  # two columns read as the same span
+        if left in periods and right in periods and periods[left] == periods[right] and periods[left].start is not None:
+            first, second = spans(periods[left].end)
+            if first != second:
+                periods[left], periods[right] = first, second
