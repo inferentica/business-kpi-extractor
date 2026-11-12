@@ -727,3 +727,17 @@ def test_a_quoted_breakdowns_total_is_the_one_row_of_its_block_holding_the_parts
     # Two rows holding the sum: no total.
     twice = parse_document(f"<p>{text} Revenues 1 1,269,694 3 4</p>", URL.format(n=2))
     assert stated_total(twice, [p.model_copy(update={"block": next(iter(twice.blocks))}) for p in parts], "g.total") is None
+
+
+def test_a_slides_unlabeled_subtotal_right_after_the_parts_is_their_total():
+    from kpi_extractor.ai import Locator
+    from kpi_extractor.readers.replay import stated_total
+    # KKR's income statement slide: the insurance lines, then their subtotal with no label, then "Total Revenues".
+    text = ("Insurance Net Premiums 626,429 935,794 1,100,053 6,972,316 Policy Fees 315,382 333,900 629,184 662,847 "
+            "941,811 1,269,694 1,729,237 7,635,163 Total Revenues $ 3,626,518 $ 4,171,910 $ 6,754,000 $ 13,828,648")
+    document = parse_document(f"<p>{text}</p>", URL.format(n=2))
+    block = next(iter(document.blocks))
+    parts = [Locator(kpi="g.premiums", block=block, quote="Insurance Net Premiums 626,429 935,794 1,100,053 6,972,316", value_text="935,794"),
+             Locator(kpi="g.fees", block=block, quote="Policy Fees 315,382 333,900 629,184 662,847", value_text="333,900")]
+    total = stated_total(document, parts, "g.total")
+    assert total is not None and total.value_text == "1,269,694" and total.quote == "941,811 1,269,694 1,729,237 7,635,163"
