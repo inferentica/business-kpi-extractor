@@ -9,7 +9,7 @@ import re
 import lxml.html
 
 from ...domain.basis import currencies_named, is_currency_word
-from .audited import audit_reports
+from .audited import audit_reports, audited_names
 from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_header_figures,
                               is_subheader, number)
 
@@ -237,7 +237,7 @@ def parse_html(html: str | bytes) -> list[Table]:
     raw = re.sub(rb"(?is)<(font|span)\b[^>]*(?:vertical-align:\s*super|position:\s*relative;\s*top:\s*-\d)[^>]*>\s*[\w*]{1,2}\s*(?:<font[^>]*>\s*</font>\s*)?</\1>"
                  rb"(?!\s*(?:<[^>]+>\s*)*[/\xe2\x81\x84])", b"", raw)
     tree = lxml.html.fromstring(raw)
-    found = []
+    found, places = [], []
     previous_text: list[str] = []
     openings, audits = _openings(tree), audit_reports(_texts(tree))
     order = {element: index for index, element in enumerate(tree.iter())} if openings or audits else {}
@@ -261,9 +261,8 @@ def parse_html(html: str | bytes) -> list[Table]:
                 rows += right[next((index for index, row in enumerate(right) if row.figures), len(right)):]
             context = " ".join(previous_text)[-600:]
             release_of = next((name for place, name in reversed(openings) if place <= order.get(element, -1)), "")
-            audited_of = next((name for place, name in reversed(audits) if place <= order.get(element, -1)), "")
-            found.append(Table(rows=rows, header=header, context=context, index=len(found), release_of=release_of,
-                               audited_of=audited_of))
+            found.append(Table(rows=rows, header=header, context=context, index=len(found), release_of=release_of))
+            places.append((order.get(element, -1), bool(seen_figures)))
             if seen_figures:
                 previous_text = []
             else:
@@ -279,4 +278,6 @@ def parse_html(html: str | bytes) -> list[Table]:
                 if child.tail and child.tail.strip():
                     previous_text.append(clean(child.tail))
             previous_text = previous_text[-40:]
+    for table, name in zip(found, audited_names(audits, places) if audits else []):
+        table.audited_of = name
     return found
