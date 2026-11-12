@@ -11,6 +11,9 @@ from .tolerance import close
 _SUBTOTAL_LABEL = re.compile(r"^$|^total\b|\bnet\b|^gross\b|\bincome\b|\bprofit\b|\bloss\b|\bearnings\b|\bbefore\b|"
                              r"\bafter\b|\bcomprehensive\b|^revenues?\b|\bmargin\b|\bactivities\b|^cash\s+(generated|provided|used)\b",
                              re.I)
+# IFRS's two groups of other comprehensive income, a subtotal even of one line: Woori prints "Items that will not be
+# reclassified to profit or loss 7,585" under its only line, "Remeasurement of the net defined benefit liability 7,585".
+_ONE_LINE_GROUP = re.compile(r"^items\s+that\s+(will|may|are|would)\s+(not\s+)?(be\s+)?(subsequently\s+)?reclassified\b", re.I)
 # Subtotals that sum lines under more than one heading.
 _SPANS_HEADINGS = re.compile(r"^total\b|comprehensive\s+income|\bfor\s+the\s+(year|period)\b|\bactivities\b|\boperations\b",
                              re.I)
@@ -23,7 +26,7 @@ def subtotals(printed) -> dict[int, int]:
     for index, (label, _level, value) in enumerate(printed):
         # A line of its own ("Retained earnings") is no subtotal because its figure happens to equal two lines above
         # it; one that sums three or more is (Lloyds' "Financial assets at amortised cost" after its four lines).
-        least = 2 if _SUBTOTAL_LABEL.search(label) or _repeats_its_heading(printed, index) \
+        least = 1 if _ONE_LINE_GROUP.match(label) else 2 if _SUBTOTAL_LABEL.search(label) or _repeats_its_heading(printed, index) \
             or _totals_its_others(printed, index) or _names_its_lines(printed, index) else 3
         if value is None:
             continue

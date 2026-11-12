@@ -10,29 +10,9 @@ import lxml.html
 
 from ...domain.basis import currencies_named, is_currency_word
 from .audited import audit_reports, audited_names
+from .cells import _cells, _spanned
 from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_header_figures,
                               is_subheader, number)
-
-
-def _text(element) -> str:
-    try:
-        return clean(element.text_content())
-    except ValueError:  # a comment or processing instruction
-        return ""
-
-
-def _cells(tr) -> list[Cell]:
-    cells, position = [], 0
-    for td in tr:
-        if not isinstance(td.tag, str) or td.tag not in ("td", "th"):
-            continue
-        try:
-            span = max(1, int(td.get("colspan") or 1))
-        except ValueError:
-            span = 1
-        cells.append(Cell(position, span, _text(td)))
-        position += span
-    return cells
 
 
 def _row(cells: list[Cell]) -> Row | None:
@@ -249,7 +229,7 @@ def parse_html(html: str | bytes) -> list[Table]:
                 continue
             # A row styled invisible sizes the columns and is never seen (Brookfield's 2011 annual report: a hidden first
             # row of "00000000" atop each statement, which read as figures and left the years below as a line).
-            lines = [_cells(tr) for tr in element.iter("tr") if not _HIDDEN.search(tr.get("style") or "")]
+            lines = _spanned(tr for tr in element.iter("tr") if not _HIDDEN.search(tr.get("style") or ""))
             rows, header, seen_figures = _rows(lines)
             middle = _side_by_side(lines)
             if middle is not None:
