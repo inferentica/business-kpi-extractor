@@ -56,3 +56,31 @@ def test_an_ifrs_group_of_one_line_is_its_subtotal():
                ("Loss on cash flow hedge", 0, -39177.0), ("Items subsequently reclassified to net income", 0, -227024.0),
                ("Other comprehensive income (loss), net of tax", 0, -219439.0)]
     assert subtotals(printed).get(2) == 1
+
+
+def test_a_columns_own_year_under_a_titles_quarter():
+    # CCU's Q4 2011 release: "Exhibit 1: Income Statement (Fourth Quarter 2011)" over "2011 | 2010 | 2011 | 2010" in pesos
+    # and dollars; the 2010 pesos were dated Q4 2011 and dropped, the 2010 dollars kept as pesos (round 79).
+    html = ("<table><tr><td colspan='2'>Exhibit 1: Income Statement (Fourth Quarter 2011)</td></tr>"
+            "<tr><td rowspan='2'>Q4</td><td>2011</td><td>2010</td><td>2011</td><td>2010</td></tr>"
+            "<tr><td>(CLP million)</td><td>(CLP million)</td><td>(US$ million)</td><td>(US$ million)</td></tr>"
+            + _row("Net sales", "315,857", "250,725", "608.4", "482.9") + _row("Cost of goods sold", "(139,301)", "(111,076)", "(268.3)", "(213.9)")
+            + _row("Gross profit", "176,556", "139,649", "340.1", "269.0") + _row("Income before taxes", "100,000", "80,000", "192.6", "154.1")
+            + _row("Income taxes", "(20,000)", "(16,000)", "(38.5)", "(30.8)") + _row("Net income", "80,000", "64,000", "154.1", "123.3") + "</table>")
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=date(2012, 2, 1), document_end=date(2011, 12, 31),
+                                     fiscal_year_end="1231", year_offset=0)
+    sales = {r.period_end: next(line["value"] for line in r.lines if line["label"] == "Net sales") for r in readings}
+    assert sales == {date(2011, 12, 31): 315_857e6, date(2010, 12, 31): 250_725e6}
+
+
+def test_earnings_per_american_depositary_share_is_per_share():
+    html = ("<p>Grupo Aeroportuario del Sureste Consolidated Statement of Income for the nine months ended September 30, "
+            "2019 and 2018 (Thousands of Mexican pesos)</p><table><tr><td></td><td>2018</td><td>2019</td></tr>"
+            + _row("Total Revenues", "11,800,000", "12,300,000") + _row("Operating Costs", "(6,148,727)", "(5,808,689)")
+            + _row("Income Before Income Taxes", "4,978,517", "5,986,610") + _row("Provision for Income Tax", "1,406,455", "1,603,522")
+            + _row("Net Income for the Year", "3,572,062", "4,383,088")
+            + _row("Earning per American Depositary Share (in U.S. Dollars)", "5.9608", "7.1108") + "</table>")
+    readings, _notes = read_document(html, accession="x", form="6-K", filed=date(2019, 10, 24), document_end=date(2019, 9, 30),
+                                     fiscal_year_end="1231", year_offset=0)
+    per_ads = {r.period_end.year: next(line["value"] for line in r.lines if line["label"].startswith("Earning per")) for r in readings}
+    assert per_ads == {2018: 5.9608, 2019: 7.1108}

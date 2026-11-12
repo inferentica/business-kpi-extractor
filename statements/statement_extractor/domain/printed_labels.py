@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 
 
-PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+)?share|per\s+ads|^(basic|diluted)\b|earnings\s+per|\beps\b", re.I)
+# ASUR's "Earning per American Depositary Share (in U.S. Dollars) 7.1108", read at its statement's thousands until round 79.
+PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+)?share|per\s+ads|per\s+american\s+depositary\s+(share|receipt)|"
+                       r"^(basic|diluted)\b|earnings?\s+per|\beps\b", re.I)
 
 
 SHARE_COUNT = re.compile(r"\bshares\b|weighted[-\s]average", re.I)

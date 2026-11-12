@@ -172,6 +172,12 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             periods[column] = Period(end) if kind == "balance" else Period(end, end - timedelta(days=90))
             continue
         named = _named_quarter(above, fiscal_year_end)
+        quarter_name = _QUARTER_NAME.search(above)  # a column's own year after a title's: "(Fourth Quarter 2011) 2010" (CCU)
+        own_year = [int(year) for year in _YEAR.findall(above[quarter_name.end():])] if quarter_name and named else []
+        printed = int(quarter_name.group(4)) % 100 if own_year else None
+        if own_year and own_year[-1] % 100 != printed:  # the quarter of the column's own year, by the years between
+            shifted = named.year + own_year[-1] % 100 - printed
+            named = date(shifted, named.month, min(named.day, calendar.monthrange(shifted, named.month)[1]))
         if named is not None and kind != "balance":
             periods[column] = Period(named, named - timedelta(days=90))  # "Q3 2007", "3Q07": that quarter
             continue
