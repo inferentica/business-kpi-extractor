@@ -105,6 +105,16 @@ def refines(fact: float, stated: float) -> bool:
     return fact != stated and agrees(fact, stated)
 
 
+def _evidence(fact: float, value: float) -> bool:
+    """Whether a tagged figure is evidence of a reading's tag. A whole figure of one or two digits ("7%", "11%") agrees
+    with anything within half a unit, and a report tags dozens of such percentages: only the same figure exactly counts
+    (KKR's leveraged credit "7%" learned a tag of another measure from its 7.3 and 7.0, which then gave 8.0 for a
+    quarter the release states as 11%)."""
+    if not _decimals(value) and abs(value) < 100:
+        return fact == value
+    return agrees(fact, value)
+
+
 def learn_tag(readings: dict[tuple[str, str], float], facts: dict[tuple[str, str], dict[Tag, float]]) -> Tag | None:
     """The one tag whose fact equals the KPI's reading in at least two quarters and never differs from one."""
     candidates = learn_tags(readings, facts)
@@ -117,7 +127,7 @@ def learn_tags(readings: dict[tuple[str, str], float], facts: dict[tuple[str, st
     matched: dict[Tag, int] = {}
     for quarter, value in readings.items():
         for tag, fact in (facts.get(quarter) or {}).items():
-            if fact and agrees(fact, value):
+            if fact and _evidence(fact, value):
                 matched[tag] = matched.get(tag, 0) + 1
     return [tag for tag, count in matched.items() if count >= MIN_MATCHES and not any(
         tag in (facts.get(quarter) or {}) and not agrees(facts[quarter][tag], value) for quarter, value in readings.items())]
