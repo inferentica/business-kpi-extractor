@@ -8,7 +8,7 @@ import re
 
 from .labels import _as_date, _axis_name, _fiscal_year, _member_labels, _snake, _title, drop_declared_parents, humanize, local_name
 from .members import _by_key, _PRODUCT_OR_SERVICE, _two_partitions, drop_overlaps, member_key, remove_subtotals, subtotal_tree
-from .model import _CONSOLIDATION_NAMES, _IGNORED_AXES, _NEUTRAL_MEMBERS, _PART_AXES, _SEGMENT_AXES, _STANDARD_AXES, _UNALLOCATED, MAX_RECONCILIATION_ERROR, MAX_UNALLOCATED, REVENUE_CONCEPTS, XbrlBreakdowns, XbrlCandidate, XbrlGroup
+from .model import _CONSOLIDATION_NAMES, _IGNORED_AXES, _NEUTRAL_MEMBERS, _PART_AXES, _RECONCILING, _SEGMENT_AXES, _STANDARD_AXES, _UNALLOCATED, MAX_RECONCILIATION_ERROR, MAX_UNALLOCATED, REVENUE_CONCEPTS, XbrlBreakdowns, XbrlCandidate, XbrlGroup
 
 
 def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
@@ -71,10 +71,15 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     # Services"), so the year-ago and to-date figures are read from facts tagged the same way.
     fixed_for: dict[tuple[str, str], tuple[str, str]] = {}
     eliminations: dict[str, dict[str, float]] = {}
+    # Reconciling items tagged on the consolidation axis beside one more axis (Qualcomm since 2025: "Nonreportable
+    # segments" under All Other Segments, "Unallocated revenues" under a licensing dispute): concept → {dimensions: value}.
+    reconciling: dict[str, dict[frozenset, float]] = {}
     for concept, dimensions, value, level in tagged:
         if set(dimensions) == {"ConsolidationItemsAxis"} and value:
             items = eliminations.setdefault(concept, {})
             items[dimensions["ConsolidationItemsAxis"]] = items.get(dimensions["ConsolidationItemsAxis"], 0.0) + value
+        if len(dimensions) == 2 and local_name(dimensions.get("ConsolidationItemsAxis", "")) in _RECONCILING:
+            reconciling.setdefault(concept, {}).setdefault(frozenset(dimensions.items()), value)
         if any(axis in _IGNORED_AXES for axis in dimensions):
             continue
         if len(dimensions) == 1:
@@ -125,7 +130,14 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         if levels == {True}:
             segment_level.update((key[0], axis) for axis in key[1] if (key[0], axis) not in single_by_level[False])
 
+    # (concept, axis) → member → the (concept, dimensions) of the reconciling facts joined as that row, and the
+    # consolidated revenue the split then adds up to.
+    joined: dict[tuple[str, str], dict[str, list[tuple[str, frozenset]]]] = {}
+    joined_totals: dict[tuple[str, str], float] = {}
+
     def total_for(concept: str, axis: str | None = None) -> float | None:
+        if (concept, axis) in joined_totals:
+            return joined_totals[(concept, axis)]
         if (concept, axis) in part_of:
             return part_of[(concept, axis)]
         if (concept, axis) in segment_level and segment_totals.get(concept):
@@ -144,12 +156,42 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         leaves = drop_overlaps(remove_subtotals(rows, total), total)
         return bool(total) and abs(sum(leaves.values()) - total) <= abs(total) * MAX_RECONCILIATION_ERROR
 
+    def reconciling_rows(concept: str, axis: str) -> tuple[dict[str, float], dict[str, list[tuple[str, frozenset]]]]:
+        """The reconciling facts as rows of a segment split: one on the segment axis is its member (All Other Segments),
+        one on another axis is its consolidation item ("Reconciling items"). Each set of dimensions is read once, from
+        the segments' own concept first (Qualcomm tags its segments as contract revenue and these as revenues)."""
+        rows: dict[str, float] = {}
+        sources: dict[str, list[tuple[str, frozenset]]] = {}
+        seen: set[frozenset] = set()
+        for name in dict.fromkeys((concept, *REVENUE_CONCEPTS)):
+            for dimensions, value in reconciling.get(name, {}).items():
+                if dimensions in seen:
+                    continue
+                seen.add(dimensions)
+                tags = dict(dimensions)
+                other = next(key for key in tags if key != "ConsolidationItemsAxis")
+                member = tags[other] if other == axis else tags["ConsolidationItemsAxis"]
+                rows[member] = rows.get(member, 0.0) + value
+                sources.setdefault(member, []).append((name, dimensions))
+        return rows, sources
+
+    consolidated = next((pure_totals[name] for name in REVENUE_CONCEPTS if name in pure_totals), None)
     for (concept, axis), members in single.items():
         extra = {member: values[0] for member, values in beside.get((concept, axis), {}).items()
                  if member not in members and len(values) == 1}
         # Only when the axis's own members fall short of revenue and the extra ones complete it.
         if extra and not adds_up(members, total_for(concept, axis)) and adds_up({**members, **extra}, total_for(concept, axis)):
             members = {**members, **extra}
+        # Segments short of revenue by the reconciling items tagged beside them: joined only when the split then adds
+        # up exactly to consolidated revenue (Qualcomm's QCT, QTL and QSI with its nonreportable segments and
+        # unallocated revenues), never in place of a line the split already has.
+        if axis in _SEGMENT_AXES and consolidated and not adds_up(members, total_for(concept, axis)):
+            rows, sources = reconciling_rows(concept, axis)
+            if rows and not set(rows) & set(members) \
+                    and abs(sum(members.values()) + sum(rows.values()) - consolidated) <= max(abs(consolidated) * 1e-6, 0.5):
+                members = {**members, **rows}
+                joined[(concept, axis)] = sources
+                joined_totals[(concept, axis)] = consolidated
         candidates.setdefault(axis, []).append((concept, members))
     for (concept, axes), items in paired.items():
         found = False
@@ -331,7 +373,8 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         outside = unallocated(axis, concept, members)
         outside_label = outside_name(outside) if outside is not None else None
         members = reconciled(axis, concept, members)
-        consolidation = [member for member in members if member in eliminations.get(concept, {})]
+        sources = joined.get((concept, axis), {})
+        consolidation = [member for member in members if member in eliminations.get(concept, {}) and member not in sources]
         if outside is not None:
             leaf_members = set(drop_overlaps(remove_subtotals(members, total), total))
             members = {**members, _UNALLOCATED: outside}
@@ -341,6 +384,8 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             if consolidation and rows:
                 items = _consolidation_items(source, concept, dimension_columns)
                 rows.update({member: items[member] for member in consolidation if member in items})
+            if sources and rows:
+                rows.update(_reconciling_values(source, sources, dimension_columns))
             if outside is not None and rows and (whole := frame_total(source, concept, own_level)) is not None:
                 rows[_UNALLOCATED] = whole - sum(value for member, value in rows.items() if member in leaf_members)
             return rows
@@ -358,6 +403,10 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         if outside is not None:
             prior_ytd_total = frame_total(prior_ytd_frame, concept, own_level)
         prior_total = frame_total(prior_frame, concept, own_level)
+        if sources:
+            # Joined with its reconciling items, the split is of consolidated revenue in every period.
+            ytd_total, prior_ytd_total, prior_total = (frame_total(source, concept)
+                                                       for source in (ytd_frame, prior_ytd_frame, prior_frame))
         if error is not None and abs(error) <= MAX_RECONCILIATION_ERROR:
             # Products against services (Amazon, Microsoft) is a view of its own beside the product lines, not a
             # coarser version of them: both are published, so neither depends on the AI listing it.
@@ -461,6 +510,21 @@ def _consolidation_items(frame: pd.DataFrame, concept: str, dimension_columns: l
             member = dimensions["ConsolidationItemsAxis"]
             items[member] = items.get(member, 0.0) + float(fact["numeric_value"])
     return items
+
+
+def _reconciling_values(frame: pd.DataFrame, sources: dict[str, list[tuple[str, frozenset]]],
+                        dimension_columns: list[str]) -> dict[str, float]:
+    """The joined reconciling rows in another period's facts: each row's facts tagged exactly as in the period read."""
+    wanted = {(name, dimensions): member for member, tags in sources.items() for name, dimensions in tags}
+    values: dict[tuple[str, frozenset], float] = {}
+    for _, fact in frame[frame["concept"].isin({name for name, _d in wanted})].iterrows():
+        dimensions = frozenset((_axis_name(column), str(fact[column])) for column in dimension_columns if pd.notna(fact[column]))
+        if (fact["concept"], dimensions) in wanted:
+            values.setdefault((fact["concept"], dimensions), float(fact["numeric_value"]))
+    rows: dict[str, float] = {}
+    for key, value in values.items():
+        rows[wanted[key]] = rows.get(wanted[key], 0.0) + value
+    return rows
 
 
 def _plain_revenue_figures(facts: pd.DataFrame, period_end, annual: bool, label: Callable[[str], str | None]) -> list[tuple[float, str]]:

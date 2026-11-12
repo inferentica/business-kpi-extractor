@@ -436,3 +436,48 @@ def test_a_line_that_offsets_its_segment_level_twin_is_no_part_of_the_split():
     ])
     group = next(g for g in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups if g.key == "products")
     assert group.total == 615.0 and {key for key, *_rest in group.members} == {"assetmanagement1", "transactionfee", "feecredit"}
+
+
+def test_reconciling_items_tagged_beside_another_axis_complete_the_segments():
+    # Qualcomm's Q3 FY2026 10-Q: QCT, QTL and QSI as contract revenue at the segments' level, its nonreportable segments
+    # as revenues on All Other Segments beside "material reconciling items", and unallocated revenues (none this
+    # quarter) beside a licensing dispute: 8,504 + 1,278 + 0 + 165 + 0 = 9,947.
+    segment, dispute = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_LitigationCaseAxis"
+    contract, revenues = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", "us-gaap:Revenues"
+    reconciling = "us-gaap:MaterialReconcilingItemsMember"
+    def quarter(start, end, qct, qtl, other, unallocated, total):
+        return [_fact(revenues, total, start=start, end=end),
+                _fact(revenues, qct + qtl, None, axis=segment, consolidation="us-gaap:OperatingSegmentsMember", start=start, end=end),
+                _fact(contract, qct, "qcom:QctMember", axis=segment, consolidation="us-gaap:OperatingSegmentsMember", start=start, end=end),
+                _fact(contract, qtl, "qcom:QtlMember", axis=segment, consolidation="us-gaap:OperatingSegmentsMember", start=start, end=end),
+                _fact(contract, 0.0, "qcom:QsiMember", axis=segment, consolidation="us-gaap:OperatingSegmentsMember", start=start, end=end),
+                _fact(revenues, other, "us-gaap:AllOtherSegmentsMember", axis=segment, consolidation=reconciling, start=start, end=end),
+                _fact(revenues, unallocated, "us-gaap:LicensingAgreementsMember", axis=dispute, consolidation=reconciling, start=start, end=end)]
+    facts = pd.DataFrame(quarter("2026-03-30", "2026-06-28", 8_504.0, 1_278.0, 165.0, 0.0, 9_947.0)
+                         + quarter("2025-03-31", "2025-06-29", 8_993.0, 1_318.0, 54.0, 0.0, 10_365.0))
+    group = extract_breakdowns(facts, {"document_period_end_date": "2026-06-28"}, "10-Q").groups[0]
+    assert group.key == "segments" and group.total == 9_947.0 and group.reconciliation_error == pytest.approx(0)
+    assert {key: value for key, _label, value in group.members} == {"qct": 8_504.0, "qtl": 1_278.0, "other": 165.0}
+    assert group.prior == {"qct": 8_993.0, "qtl": 1_318.0, "qsi": 0.0, "other": 54.0, "reconcilingitems": 0.0}
+    assert group.prior_total == 10_365.0
+
+
+def test_reconciling_items_are_read_line_by_line_not_as_their_total():
+    # Qualcomm's Q2 FY2025 10-Q prints one "Reconciling items" line of 191 and tags it on the consolidation axis alone,
+    # while its second table splits it: nonreportable segments 48 and unallocated revenues 143. The segments read with
+    # those two lines, so the nonreportable segments stay one series (48, not 191).
+    segment, dispute = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_LitigationCaseAxis"
+    revenues, reconciling = "us-gaap:Revenues", "us-gaap:MaterialReconcilingItemsMember"
+    facts = pd.DataFrame([
+        _fact(revenues, 10_979.0),
+        _fact(revenues, 9_469.0, "qcom:QctMember", axis=segment),
+        _fact(revenues, 1_319.0, "qcom:QtlMember", axis=segment),
+        _fact(revenues, 0.0, "qcom:QsiMember", axis=segment),
+        _fact(revenues, 48.0, "us-gaap:AllOtherSegmentsMember", axis=segment),
+        _fact(revenues, 191.0, None, axis=segment, consolidation=reconciling),
+        _fact(revenues, 143.0, "us-gaap:LicensingAgreementsMember", axis=dispute, consolidation=reconciling),
+    ])
+    group = extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups[0]
+    members = {key: value for key, _label, value in group.members}
+    assert members == {"qct": 9_469.0, "qtl": 1_319.0, "reconcilingitems": 143.0, "other": 48.0}
+    assert group.reconciliation_error == pytest.approx(0)

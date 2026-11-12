@@ -32,6 +32,11 @@ _CONSOLIDATION_NAMES = {"IntersegmentEliminationMember": "Eliminations", "Corpor
                         "SegmentReconcilingItemsMember": "Reconciling items"}
 
 
+# Consolidation items that reconcile segments to revenue (not intersegment eliminations, which sit inside a segment's
+# own figure when tagged beside it).
+_RECONCILING = {"MaterialReconcilingItemsMember", "SegmentReconcilingItemsMember", "CorporateNonSegmentMember"}
+
+
 _SEGMENT_AXES = {"StatementBusinessSegmentsAxis", "SegmentsAxis"}
 
 
