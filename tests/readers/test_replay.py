@@ -791,3 +791,13 @@ def test_a_label_the_table_repeats_per_section_is_read_where_it_sat_last_quarter
 def R_column_header(table, row, col):
     from kpi_extractor.readers.extract import column_header
     return column_header(table, row, col)
+
+
+def test_a_column_under_a_table_wide_year_is_the_newest():
+    # Mastercard's operating table names its period once, over its first column: its other columns carry no year of
+    # their own. A table naming one year has no other period's column; one naming two still needs the column's own.
+    from kpi_extractor.readers.replay import current_column
+    single = Table("T0", "", [["", "For the 3 Months ended June 30, 2023", ""], ["", "GDV", "Purchase Volume"], ["Worldwide", "2,267", "1,839"]])
+    assert current_column(single, 2, 2)
+    two = Table("T0", "", [["", "June 30, 2023", "June 30, 2022"], ["", "GDV", "Purchase Volume"], ["Worldwide", "2,267", "1,839"]])
+    assert current_column(two, 2, 1) and not current_column(two, 2, 2)
