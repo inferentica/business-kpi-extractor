@@ -482,3 +482,16 @@ def test_a_valuation_models_input_is_never_a_kpis_figure():
             "dim_srt_RangeAxis": None}
     found = quarter_facts(pd.DataFrame([multiple, tagged_input, kept]), date(2025, 6, 30))
     assert found == {Tag("us-gaap:Revenues", (), True): 9.0}
+
+
+def test_a_coarse_whole_reading_learns_a_tag_only_from_the_same_figure_exactly():
+    from kpi_extractor.readers.tagged_metrics import Tag, learn_tags
+    other = Tag("kkr:SomeOtherPercentage", (), False)
+    returns = Tag("kkr:LeveragedCreditReturn", (), False)
+    readings = {("2024", "Q4"): 7.0, ("2025", "Q2"): 7.0}
+    # 7.3 and 6.8 agree with "7%" within half a unit, but are no evidence of its tag; 7.0 twice is.
+    facts = {("2024", "Q4"): {other: 7.3, returns: 7.0}, ("2025", "Q2"): {other: 6.8, returns: 7.0}}
+    assert learn_tags(readings, facts) == [returns]
+    # A larger or more precise figure keeps its tolerance: "$677 billion" is 676.5 to 677.5 billion.
+    assert learn_tags({("2024", "Q4"): 677e9, ("2025", "Q2"): 702e9},
+                      {("2024", "Q4"): {other: 677.2e9}, ("2025", "Q2"): {other: 701.8e9}}) == [other]
