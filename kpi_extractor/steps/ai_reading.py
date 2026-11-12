@@ -159,10 +159,7 @@ class AiReading:
             return set()
         earlier = self._earlier_values(expected)
         last = self._last_locators(expected, _source_template(document.source_url))
-        target = (expected - timedelta(days=365)).isoformat()
-        stored = {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
-                  for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
-                  and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
+        stored = self._stored_year_ago(expected)
         confirmed = set()
         for group in spec.groups:
             items = [item for item in read if item.group.key == group.key]
@@ -305,10 +302,7 @@ class AiReading:
         in a column headed for the same length of period, equal to what is stored for that quarter last year) or found
         where it was last quarter; at least two by the year-ago column. A value with neither (a new KPI, a quoted
         figure) sends the reading to the reasoning reader. Costs no AI."""
-        target = (expected - timedelta(days=365)).isoformat()
-        stored = {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
-                  for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
-                  and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
+        stored = self._stored_year_ago(expected)
         confirmed = 0
         for item in read:
             if item.is_total or item.kpi.key == item.group.total_kpi:

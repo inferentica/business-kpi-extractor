@@ -227,13 +227,52 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:
                 break
     if not found:
         return "sentence not found"
-    if len(found) != 1:  # more than one sentence of that shape (this year's and last year's)
-        return "sentence found more than once"
-    block_id, match = found[0]
-    new_value = prefix + match.group(value_group) + suffix
-    if new_value not in match.group(0):
+    places = [(block_id, match, prefix + match.group(value_group) + suffix) for block_id, match in found[:_MAX_PLACES]]
+    places = [(block_id, match, value) for block_id, match, value in places if value in match.group(0)]
+    if len(found) != 1:  # more than one sentence of that shape (this year's and last year's, a segment's table)
+        return AmbiguousQuote([(Locator(kpi=key, block=block_id, quote=match.group(0), value_text=value),
+                                section_span(document, block_id, match.start())) for block_id, match, value in places])
+    if not places:
         return "sentence not found"
+    block_id, match, new_value = places[0]
     return Locator(kpi=key, block=block_id, quote=match.group(0), value_text=new_value)
+
+
+_MAX_PLACES = 8
+
+
+class AmbiguousQuote(str):
+    """"sentence found more than once", with each place it was found and the span its section names ("quarter",
+    "longer" or None). The reading step keeps one place only on the filing's own evidence: its row's year-ago column
+    equal to the stored year-ago figure, or its section naming the quarter (steps/replay_reading.py)."""
+    candidates: list[tuple[Locator, str | None]]
+
+    def __new__(cls, candidates: list[tuple[Locator, str | None]]):
+        self = super().__new__(cls, "sentence found more than once")
+        self.candidates = candidates
+        return self
+
+
+# A section's period, as the words before a place name it: a quarter ("second quarter 2023 results", "three months")
+# or a longer span (Mastercard's "Year-to-date Results" and "Full Year Results" repeat the quarter's bullets).
+_SECTION_SPAN = re.compile(r"\b(?:(?:first|second|third|fourth)[- ]quarter|q[1-4]|three months|"
+                           r"(year[- ]to[- ]date|full[- ]year|six months|nine months|twelve months|fiscal year))\b", re.I)
+
+
+def section_span(document: Document, block_id: str, start: int) -> str | None:
+    """The period the section holding a place names: the last period words before it, in its own passage and then the
+    passages before (tables are skipped: their column headers name every span they show)."""
+    if block_id not in document.blocks:
+        return None
+    texts = [document.blocks[block_id].text[:start]]
+    if block_id in document.order:
+        at = document.order.index(block_id)
+        texts += [document.blocks[key].text for key in reversed(document.order[:at]) if key in document.blocks]
+    for text in texts:
+        spans = list(_SECTION_SPAN.finditer(text))
+        if spans:
+            return "longer" if spans[-1].group(1) else "quarter"
+    return None
 
 
 def _find_sentence(document: Document, quote: str, tokens: list[re.Match], value: re.Match) -> tuple[list, int | None]:
