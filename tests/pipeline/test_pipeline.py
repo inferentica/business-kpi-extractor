@@ -278,8 +278,24 @@ def test_breakdown_totals_do_not_block_flash_alone():
                for item in items if item.kpi.key != "total"]
     control = FakeControl({("locate", "flash"): _breakdown_answer()})
     pipeline = _pipeline(control, history)
+    pipeline._replay_groups = lambda *args: ([], None, set())  # the AI's own reading, as when code cannot replay it
     read, _, _ = pipeline._read("prompt", document, BREAKDOWN_SPEC, EXPECTED)
     assert control.calls == [("locate", "flash")] and len(read) == 3
+
+
+def test_a_breakdown_replayed_part_by_part_takes_the_total_its_filing_states():
+    # Totals are never stored, so last quarter's reading gives no place for "Total revenue": it is the row of the same
+    # table and column that holds the parts added up (ASML's "Total net sales" under its two lines).
+    document = parse_document(BREAKDOWN_RELEASE, "https://www.sec.gov/x.htm")
+    items, _ = read_values(document, BREAKDOWN_SPEC, ai.Located.model_validate(_breakdown_answer()), "USD")
+    history = [{"group_key": "kpi_segments", "kpi_key": item.kpi.key, "fiscal_year": "2026", "fiscal_period": "Q1",
+                "period_end": "2026-03-31", "method": "ai", "validation_status": "verified", "value": item.value * 0.9,
+                "locator": item.locator, "source_url": "https://www.sec.gov/x.htm"}
+               for item in items if item.kpi.key != "total"]
+    control = FakeControl({})
+    read, _, _ = _pipeline(control, history)._read("prompt", document, BREAKDOWN_SPEC, EXPECTED)
+    assert control.calls == []
+    assert {item.kpi.key: item.value for item in read} == {"cloud": 700e6, "devices": 300e6, "total": 1_000e6}
 
 
 def test_a_document_adding_up_to_full_year_revenue_is_annual():

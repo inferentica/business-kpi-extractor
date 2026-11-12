@@ -12,7 +12,7 @@ from ..documents.document import Document, Table, clean, parse_number
 from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from .anchor import anchor_words
 from .extract import _row_label, column_header
-from .quoted_rows import replay_row_line
+from .quoted_rows import _SLOT, replay_row_line, row_line
 from ..rules.period import DEEP_HEADER_ROWS
 from ..xbrl import member_key
 
@@ -212,6 +212,49 @@ def _with_rows_above(table: Table, first_row: int, total_row: int, col: int) -> 
         if adds_up(start):
             return start  # the nearest start that adds up: never the header row above it ("Resolution 2023 2022")
     return first_row
+
+
+def stated_total(document: Document, parts: list[Locator], key: str) -> Locator | None:
+    """The total a breakdown read part by part leaves unread: totals are never stored, so last quarter's reading gives
+    no place for them (KKR's insurance revenue under its quoted rows, ASML's "Total net sales" under its two lines).
+    It is the one row the filing states, in the same table and column, or among the same block's quoted rows in the
+    same place, whose figure is the parts' figures added up; found more than once or not at all, there is none."""
+    def close(a: float, b: float) -> bool:
+        return abs(a - b) <= max(abs(b) * 1e-6, 0.5)
+    if len(parts) >= 2 and all(part.table and part.row is not None and part.col is not None for part in parts) \
+            and len({(part.table, part.col) for part in parts}) == 1 and (table := document.tables.get(parts[0].table)):
+        col = parts[0].col
+        cells = [parse_number(table.cell(part.row, col)) for part in parts]
+        if any(cell is None for cell in cells):
+            return None
+        whole = sum(cell.value for cell in cells)
+        taken = {part.row for part in parts}
+        rows = [index for index, row in enumerate(table.rows) if index not in taken and re.search(r"[A-Za-z]", _row_label(row, col))
+                and (cell := parse_number(table.cell(index, col))) is not None and close(cell.value, whole)]
+        if len(rows) != 1:
+            return None
+        return Locator(kpi=key, table=table.id, row=rows[0], col=col, row_label=_row_label(table.rows[rows[0]], col),
+                       scale=parts[0].scale, scale_text=parts[0].scale_text)
+    lines = [row_line(part.quote or "", part.value_text or "") for part in parts]
+    if len(parts) < 2 or any(line is None for line in lines) or len({part.block for part in parts}) != 1 \
+            or len({(len(line.slots), line.index) for line in lines}) != 1 or parts[0].block not in document.blocks:
+        return None
+    count, index = len(lines[0].slots), lines[0].index
+    figures = [parse_number(line.slots[index]) for line in lines]
+    if any(figure is None for figure in figures):
+        return None
+    whole = sum(figure.value for figure in figures)
+    labels = {line.label.lower() for line in lines}
+    pattern = re.compile(rf"(?<![A-Za-z])([A-Za-z][A-Za-z ,'&()/-]{{2,80}}?)((?:\s+(?:{_SLOT})(?=\s|$)){{{count}}})(?!\s+(?:{_SLOT})(?=\s|$))")
+    found = []
+    for match in pattern.finditer(document.blocks[parts[0].block].text):
+        slots = re.findall(rf"(?:{_SLOT})(?=\s|$)", match.group(2).strip())
+        figure = parse_number(slots[index]) if index < len(slots) else None
+        if match.group(1).strip().lower() not in labels and figure is not None and close(figure.value, whole):
+            found.append((match.group(0).strip(), slots[index]))
+    if len(found) != 1:
+        return None
+    return Locator(kpi=key, block=parts[0].block, quote=found[0][0], value_text=found[0][1])
 
 
 def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:

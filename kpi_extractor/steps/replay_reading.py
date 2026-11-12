@@ -14,7 +14,7 @@ from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
 from ..readers.quoted_rows import row_line
 from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, comparable_header, missing_since, replay,
-                              reported_period)
+                              reported_period, stated_total)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, validate_groups
 from ..readers.trace import placed_elsewhere, trace_replay
@@ -214,6 +214,12 @@ class ReplayReading:
             return self._one_of(document, part, next(iter(locators)), located, expected, currency, annual)
         if isinstance(located, str):
             return located
+        # A breakdown read part by part takes the total the filing states for its parts (totals are never stored).
+        group = part.groups[0]
+        if group.kind == "revenue_breakdown" and group.total_kpi and not located.tables \
+                and not any(value.kpi == f"{group.key}.{group.total_kpi}" for value in located.values) \
+                and (total := stated_total(document, located.values, f"{group.key}.{group.total_kpi}")):
+            located.values.append(total)
         return self._checked(document, part, located, expected, currency, annual=annual)
 
     def _stored_year_ago(self, expected: date) -> dict[str, float]:
