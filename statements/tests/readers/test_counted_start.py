@@ -14,6 +14,6 @@ def test_whole_months_back_from_a_months_last_day():
 
 
 def test_days_back_where_a_period_ends_inside_its_month_or_runs_in_weeks():
-    assert counted_start(date(2024, 9, 1), 364) == date(2023, 9, 3)  # Costco's 52-week year
+    assert counted_start(date(2024, 9, 1), 364) == date(2023, 9, 4)  # Costco's 52-week year, from 4 September 2023
     assert counted_start(date(2014, 6, 29), 91) == date(2014, 3, 31)  # ASML's quarter to its last Sunday
     assert counted_start(date(2025, 5, 31), 84, weekly=True) == date(2025, 3, 9)  # "Twelve weeks ended May 31"
