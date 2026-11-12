@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from kpi_extractor import ai
 from kpi_extractor.ai import Spec
-from kpi_extractor.documents.document import parse_document
+from kpi_extractor.documents.document import Table, parse_document
 from kpi_extractor.readers.extract import read_values
 from kpi_extractor.pipeline import SymbolPipeline
 from kpi_extractor.readers.replay import replay, reported_period, row_gone
@@ -569,3 +569,30 @@ def test_one_of_several_places_is_kept_only_on_the_filings_own_evidence(monkeypa
     # quarter's section names no table, so the total AUM's quarter row is never taken for the fee-generating one.
     assert _choose([(1_073_599, "quarter"), (1_150_000, "longer")], {"P0": [], "P1": []}, 685_026, prose=False) \
         == "sentence found more than once"
+
+
+def test_a_column_header_whose_title_or_unit_words_drifted_still_heads_the_same_column():
+    from kpi_extractor.readers.replay import comparable_header, same_period_words
+    same = lambda now, before, cut=False: same_period_words(comparable_header(now), comparable_header(before), cut)
+    # Visa: the quarter's title row ("Q3 FISCAL 2023") one quarter, "USD" the next.
+    assert same("income statement summary three months endedseptember # # usd (in millions# except percentages and per share data)",
+                "<third quarter> fiscal # income statement summary three months endedjune # # (in millions# except percentages and per sh", cut=True)
+    # Morgan Stanley: the table's title rows above "Quarter Ended".
+    assert same("investment management financial information and statistical data (unaudited# dollars in billions) quarter ended @ # #",
+                "financial information and statistical data quarter ended @ # #")
+    # A change column, a nine-month column, a measure no header names, an added measure word: never the same column.
+    assert not same("income statement summary <third quarter> % change", "income statement summary three months ended @ #")
+    assert not same("income statement summary nine months ended @ #", "income statement summary three months ended @ #")
+    assert not same("wealth management statistical data quarter ended @ #", "quarter ended @ #")
+    assert not same("non-gaap income statement summary three months ended @ #", "income statement summary three months ended @ #")
+    assert not same("adjusted income statement summary three months ended @ #", "income statement summary three months ended @ #")
+    # No span named at all: only the exact comparison can say.
+    assert not same("unit case volume", "unit case volume")
+
+
+def test_a_footnote_mark_on_a_heading_word_is_no_change_of_column():
+    # Coca-Cola's "Unit Case Volume³" (2024) heads the column "Unit Case Volume" did.
+    table = Table("T0", "", [["Percent Change", "Unit Case Volume3"], ["Consolidated", "1"]])
+    from kpi_extractor.readers.replay import _same_header
+    assert _same_header(table, 1, 1, {"header": "unit case volume"})
+    assert not _same_header(table, 1, 1, {"header": "price/mix"})
