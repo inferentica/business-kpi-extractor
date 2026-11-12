@@ -208,28 +208,25 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:
         return "quote not recorded"
     prefix = value_text[:numbers[index].start() - start]
     suffix = value_text[numbers[index].end() - start:]
-    found = []
-    # Strict first (only the value and period words change, so "3-nanometer" stays 3), then every number may change.
-    for loose in (False, True):
-        pattern, position, group, value_group = [], 0, 0, None
-        for token in tokens:
-            pattern.append(re.escape(quote[position:token.start()]))
-            if token is numbers[index] or (loose and _is_number(token) and not _names(quote, token)):
-                group += 1
-                value_group = group if token is numbers[index] else value_group
-                pattern.append(r"(\d[\d.,]*)")
-            elif _is_number(token):
-                pattern.append(re.escape(token.group()))
-            else:
-                pattern.append(r"[A-Za-z0-9]+")
-            position = token.end()
-        pattern.append(re.escape(quote[position:]))
-        compiled = re.compile("".join(pattern), re.I)
-        found = [(block.id, match) for block in document.blocks.values() for match in compiled.finditer(block.text)]
-        if found:
-            break
+    value_token = numbers[index]
+    found, value_group = _find_sentence(document, quote, tokens, value_token)
     if not found:
-        return replay_row_line(document, key, locator)  # a table row quoted as a line, whose signs or marks changed
+        row = replay_row_line(document, key, locator)  # a table row quoted as a line, whose signs or marks changed
+        if not isinstance(row, str) or row != "sentence not found":
+            return row
+        # The words after the figure changed ("$316 billion, up 3% year-over-year" became "$321 billion, remained flat
+        # year-over-year"): the sentence is found by its words up to the figure, the longest such start first.
+        pinned = bool(_PERIOD_AFTER.search(quote, start + len(value_text)))
+        for cut in _cuts(quote, start + len(value_text), tokens):
+            found, value_group = _find_sentence(document, quote[:cut], [t for t in tokens if t.end() <= cut], value_token)
+            if found:
+                # A start no period word pins ("Revenue was $5.2 billion") is not the quarter's figure when the rest of
+                # its new sentence names a span the old one did not ("... for the full year").
+                if not pinned and len(found) == 1 and _new_span(document, found[0], quote[cut:]):
+                    return "sentence not found"
+                break
+    if not found:
+        return "sentence not found"
     if len(found) != 1:  # more than one sentence of that shape (this year's and last year's)
         return "sentence found more than once"
     block_id, match = found[0]
@@ -237,6 +234,78 @@ def _replay_quote(document: Document, key: str, locator: dict) -> Locator | str:
     if new_value not in match.group(0):
         return "sentence not found"
     return Locator(kpi=key, block=block_id, quote=match.group(0), value_text=new_value)
+
+
+def _find_sentence(document: Document, quote: str, tokens: list[re.Match], value: re.Match) -> tuple[list, int | None]:
+    """Where the quote's sentence is in the filing, with its numbers and period words free: in the passages, else in
+    the tables read as text (Visa's results sit in a one-column layout table, a reading the reader already takes).
+    Strict first (only the value and period words change, so "3-nanometer" stays 3), then every number may change."""
+    for texts in (lambda: ((block.id, block.text) for block in document.blocks.values()), lambda: _tables_as_text(document)):
+        for loose in (False, True):
+            pattern, position, group, value_group = [], 0, 0, None
+            for token in tokens:
+                pattern.append(re.escape(quote[position:token.start()]))
+                if token is value or (loose and _is_number(token) and not _names(quote, token)):
+                    group += 1
+                    value_group = group if token is value else value_group
+                    pattern.append(r"(\d[\d.,]*)")
+                elif _is_number(token):
+                    pattern.append(re.escape(token.group()))
+                else:
+                    pattern.append(r"[A-Za-z0-9]+")
+                position = token.end()
+            pattern.append(re.escape(quote[position:]))
+            compiled = re.compile("".join(pattern), re.I)
+            found = [(block_id, match) for block_id, text in texts() for match in compiled.finditer(text)]
+            if found:
+                return found, value_group
+    return [], None
+
+
+_SPAN = re.compile(r"\b(?:full[- ]year|(?:for|during|in) the year|annual|year[- ]to[- ]date|ytd|ltm|last twelve months|"
+                   r"trailing|(?:three|six|nine|twelve) months|fiscal (?:year|20\d\d)|cumulative|since)\b", re.I)
+
+
+def _new_span(document: Document, found: tuple[str, re.Match], dropped: str) -> bool:
+    """Whether the rest of a shortened quote's new sentence names a period span its dropped words did not."""
+    block_id, match = found
+    text = next((t for i, t in _tables_as_text(document) if i == block_id), None) \
+        if block_id not in document.blocks else document.blocks[block_id].text
+    rest = re.split(r"(?<=[.;•])\s|•", (text or "")[match.end():], maxsplit=1)[0]
+    spans = lambda words: {span.group(0).lower() for span in _SPAN.finditer(words)}
+    return bool(spans(rest) - spans(dropped))
+
+
+def _tables_as_text(document: Document) -> list[tuple[str, str]]:
+    """Every table's cells as one text, as the reader reads a quote from a table (readers/extract.py), worked out once."""
+    cached = getattr(document, "_table_text_cache", None)
+    if cached is None:
+        cached = [(table.id, clean(" ".join(cell for row in table.rows for cell in row if cell)))
+                  for table in document.tables.values()]
+        object.__setattr__(document, "_table_text_cache", cached)
+    return cached
+
+
+# Words that name a figure's period: a cut never drops the first of them after the figure ("in the quarter"), so a
+# shortened sentence still says which period its figure is for. "Year-over-year", "the prior year" and "a year ago" are
+# comparisons, not the figure's period.
+_PERIOD_AFTER = re.compile(_PERIOD_WORD + r"|(?<![-\w])(?<!prior )(?<!last )(?<!previous )(?:quarters?|years?)(?![-\w])(?!\s+ago)"
+                           r"|\b(?:ltm|months|annual|annually|ytd|year-to-date|full-year|period|ended|as of)\b", re.I)
+_MIN_WORDS = 4
+
+
+def _cuts(quote: str, value_end: int, tokens: list[re.Match]) -> list[int]:
+    """Where last quarter's quote may end instead, longest first: after a word past the figure and the first period word
+    that follows it, keeping at least four words other than period words so the start still names the figure."""
+    floor = value_end
+    period = _PERIOD_AFTER.search(quote, value_end)
+    if period:
+        floor = period.end()
+    cuts = [match.start() for match in re.finditer(r"(?<=\S)\s", quote) if match.start() >= floor]
+    if floor > value_end and floor < len(quote):
+        cuts.append(floor)
+    words = lambda text: [w for w in re.findall(r"[A-Za-z]{2,}", text) if not _PERIOD_AFTER.fullmatch(w)]
+    return sorted({cut for cut in cuts if cut < len(quote) and len(words(quote[:cut])) >= _MIN_WORDS}, reverse=True)
 
 
 # What makes a number part of a name: a letter glued after it ("5G", "3nm") but not a scale ("$97bn"), a hyphened word

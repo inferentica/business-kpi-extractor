@@ -478,3 +478,41 @@ def test_a_row_the_filing_no_longer_has_is_left_out_and_the_rest_replay():
     carried = report("June 30", 11, 25, 31, 42, 310) + "<table><tr><td>10-nanometer</td><td>7</td></tr></table>"
     assert not row_gone(parse_document(carried, URL.format(n=2)), {"row_label": "10-nanometer"})
     assert row_gone(second, {"row_label": "10-nanometer"})
+
+
+def test_a_sentence_set_in_a_layout_table_is_replayed():
+    # Visa's releases set their results in a one-column table of paragraphs: replay looked in passages only, so its
+    # processed transactions went to the AI every quarter.
+    before = ("Total processed transactions, which represent transactions processed by Visa, for the three months ended "
+              "March 31, 2023, were 50.1 billion")
+    document = parse_document("<html><body><p>Visa Inc. reports fiscal third quarter 2023 results</p><table><tr><td>Net revenues were $8.1 billion, an increase of 12%.</td></tr><tr><td>"
+                              "Total processed transactions, which represent transactions processed by Visa, for the three "
+                              "months ended June 30, 2023, were 54.0 billion, a 10% increase over the prior year.</td></tr></table></body></html>",
+                              URL.format(n=2))
+    found = replay(document, {"operating.members": {"block": "T0", "quote": before, "value_text": "50.1 billion"}}, Q2)
+    assert not isinstance(found, str) and found.values[0].value_text == "54.0 billion" and found.values[0].block == "T0"
+
+
+def test_a_sentence_whose_words_after_the_figure_changed_is_found_by_its_start():
+    # KKR: "$316 billion, up 3% year-over-year" became "$321 billion, remained flat year-over-year".
+    assert _replayed("Performance Fee Eligible AUM: $316 billion, up 3% year-over-year", "$316 billion",
+                     "Performance Fee Eligible AUM: $321 billion, remained flat year-over-year") == "$321 billion"
+    assert _replayed("there was $37 billion of committed capital with a weighted average management fee rate of ~100 bps",
+                     "$37 billion", "At quarter end, there was $38 billion of committed capital with a weighted average "
+                     "management fee rate of approximately 100 bps") == "$38 billion"
+    # The quarter the figure is for stays in the start: "for the year" after the year's figure does not matter.
+    assert _replayed("Capital Invested of $9 billion in the quarter and $44 billion in the LTM", "$9 billion",
+                     "Capital Invested of $16 billion in the quarter and $44 billion for the year") == "$16 billion"
+
+
+def test_a_shortened_sentence_never_drops_the_figures_period_or_lands_on_another_span():
+    # The period word after the figure is never cut, so the LTM's figure is not read from the quarter's sentence.
+    assert _replayed("The infrastructure portfolio appreciated 18% and real estate appreciated 3% in the LTM", "18%",
+                     "The infrastructure portfolio appreciated 4% and real estate appreciated 1% in the quarter") \
+        == "sentence not found"
+    # A start with no period word is not taken where the new sentence goes on to name the full year.
+    assert _replayed("Revenue was $5.2 billion, up 10% year-over-year", "$5.2 billion",
+                     "Revenue was $21.0 billion for the full year, up 9% year-over-year") == "sentence not found"
+    # Too few words to name the figure: "was $5 billion" alone could be any figure.
+    assert _replayed("It was $5.2 billion, up 10% year-over-year", "$5.2 billion", "It was $6.0 billion, flat") \
+        == "sentence not found"
