@@ -45,6 +45,8 @@ _DISCONTINUED = re.compile(r"\b(?:statements?\s+of\s+(?:operations|income)|incom
 _UNDERLYING = re.compile(r"\bunderlying\s+basis\b", re.I)
 
 
+# Volaris's 20-F: "the selected consolidated statements of operations data", its table's first row "CONSOLIDATED STATEMENTS OF OPERATIONS".
+_SELECTED_DATA = re.compile(r"\bselected\s+(?:consolidated\s+)?(?:financial|statements?|operating)\b|\bstatements?\s+of\s+\w+(?:\s+\w+)?\s+data\b", re.I)
 # "quarterly" names quarterly-data tables, not the report's own running header (Tennant's "Quarterly Report – Form 10-Q"
 # atop every page).
 _NOT_IN_RELEASE = re.compile(_NOT_STATEMENT.pattern.replace("summary|", "").replace("|quarterly(?!\\s+report)|", "|"), re.I)
@@ -91,13 +93,13 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             kind = None  # an earlier statement's title, then this one's (UBS: "Income statement" … "Statement of comprehensive income")
         leading, heading = " ".join(row.label for row in _leading(table)), _heading(table.context[-200:])
         own = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
-        if kind is None or own not in (None, kind):
-            # A title printed as the table's own first rows, above its figures (PepsiCo's 2013 balance sheet), when
-            # nothing before the table names it, or when that names another (Coca-Cola FEMSA's paragraph on its BMV
-            # filing's "detailed cash flow statement and selected notes … segment information", round 85). The words
-            # before it are then its title's only from their last sentence.
-            kind, heading = own, ""
-            title_text = (re.split(r"(?<=[.!?])\s+(?=[A-Z])", table.context[-300:])[-1] if own else title_text) + " " + leading
+        if kind is None:
+            # A title printed as the table's own first rows (PepsiCo's 2013 balance sheet) when nothing before it names one.
+            kind, title_text = own, title_text + " " + leading
+        elif own not in (None, kind) and not _SELECTED_DATA.search(table.context[-600:]):
+            # …or when the words before it name another (Coca-Cola FEMSA's "detailed cash flow statement and selected
+            # notes … segment information", round 85): they are then its title's only from their last sentence.
+            kind, heading, title_text = own, "", re.split(r"(?<=[.!?])\s+(?=[A-Z])", table.context[-300:])[-1] + " " + leading
         # A first row naming the statement is its title, wherever it falls among them: UBS's Pillar 3 report heads a
         # table "Table 33: Reconciliation of accounting balance sheet to balance sheet under the regulatory scope of
         # consolidation", with two rows of text below it before "Assets".
