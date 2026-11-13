@@ -22,3 +22,17 @@ def test_a_members_own_figure_wins_over_its_share_tagged_with_another_axis():
     only_fixed = facts.iloc[[0]]
     assert _single_axis_members(only_fixed, "us-gaap:Revenues", "ProductOrServiceAxis", [PRODUCT, SEGMENT], fixed) == \
         {"xom:SalesAndOtherOperatingRevenueMember": 19e6}
+
+
+def test_a_split_tagged_alone_beats_one_completed_with_a_fixed_members_siblings():
+    # Adobe's 2024 Q2 10-Q tags its three segments alone ($3,908 + $1,327 + $74 million) and its subscription revenue by
+    # segment ($3,828, $1,204, $28 million) beside Product and Services: the joined split has five lines and still adds
+    # up, but its "Digital Media" is subscription only. The segments are the ones tagged alone.
+    import json
+    from pathlib import Path
+    from kpi_extractor.xbrl.breakdowns import extract_breakdowns
+    saved = json.loads((Path(__file__).parent.parent / "fixtures" / "xbrl_revenue_adbe_q2_2024.json").read_text())
+    found = extract_breakdowns(pd.DataFrame(saved["facts"]), saved["entity"], "10-Q")
+    segments = next(group for group in found.groups if group.key == "segments")
+    assert [(key, value) for key, _name, value in segments.members] == [
+        ("digitalmedia", 3_908e6), ("digitalexperience", 1_327e6), ("publishingandadvertising", 74e6)]
