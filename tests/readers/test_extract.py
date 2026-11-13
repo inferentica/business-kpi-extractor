@@ -289,6 +289,8 @@ def test_a_per_unit_row_in_a_table_in_millions_is_not_scaled():
     assert _row_scale("Starlink consumer ARPU ($ per month) $69 $66") == 1.0
     assert _row_scale("Starlink consumer subscribers (# in millions, as of period end) 13.6") == 1e6
     assert _row_scale("Consumer revenues $3,121") is None
+    assert _row_scale("Brent ($/b) 74.35") == _row_scale("Natural Gas ($/kcf) 2.57") == 1.0
+    assert _row_scale("Net income ($ in millions) 5") == 1e6
 
 
 def _read_one(html, label, unit, row, col, scale=None, currency="USD"):
@@ -879,6 +881,23 @@ def test_one_place_written_two_ways_is_named():
     assert _places("Europe Revenue", own=True) - _places("EMEA") == {"EUROPE"}
     assert _places("Europe, Middle East and Africa Revenue", own=True) == {"EMEA"}
     assert _places("EMEA") <= _places("Europe, Middle East & Africa")
+
+
+
+def test_a_place_in_a_sections_title_names_every_row_of_the_section():
+    # Exxon's realizations: "Natural Gas ($/kcf)" sits under "Crude ($/b)", both under "United States ExxonMobil"; the
+    # next section's title names the place for its own rows only.
+    from kpi_extractor.rules.identity import _place_not_named
+    html = """<table><tr><td>Average Realization Data</td><td>2Q23</td><td>1Q23</td></tr>
+<tr><td>United States ExxonMobil</td><td></td><td></td></tr>
+<tr><td>Crude ($/b)</td><td>71.36</td><td>73.95</td></tr><tr><td>Natural Gas ($/kcf)</td><td>1.45</td><td>3.20</td></tr>
+<tr><td>Benchmarks</td><td></td><td></td></tr><tr><td>WTI ($/b)</td><td>73.78</td><td>76.11</td></tr>
+<tr><td>Henry Hub ($/mbtu)</td><td>2.09</td><td>3.44</td></tr></table>"""
+    document = parse_document(html, "https://example.com/x.htm")
+    table = document.tables[next(iter(document.tables))]
+    assert _place_not_named("U.S. Natural Gas Realization", table, 3, 1) is None
+    assert _place_not_named("U.S. Crude Realization", table, 2, 1) is None
+    assert _place_not_named("U.S. Natural Gas Realization", table, 6, 1) == "US"
 
 
 KO_Q4 = """<p>Revenues and Volume</p><table>

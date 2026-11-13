@@ -22,6 +22,19 @@ def test_size_holds_picks_the_filings_holding_a_figure_held_for_its_size_alone()
     assert picked_filings("size-holds", values) == {"JUMP", "PART"}
 
 
+def test_unit_price_rows_picks_prices_read_with_a_scale_and_section_place_holds():
+    row = lambda accession, status, factor, label="Brent ($/b)", **extra: {
+        "method": "ai", "validation_status": status, "source_accession": accession, "notes": [],
+        "locator": {"row_label": label, "scale_from": {"factor": factor}}, **extra}
+    values = {1: row("SCALED", "verified", 1e6),  # served at the document's "in millions"
+              2: row("HELD", "needs_review", 1),
+              3: row("RIGHT", "verified", 1),
+              4: row("REVENUE", "verified", 1e6, label="Total revenues"),
+              5: row("OWNER", "verified", 1e6, owner_decision="confirmed"),
+              6: held("PLACE", "the row and its headings name no: US")}
+    assert picked_filings("unit-price-rows", values) == {"SCALED", "HELD", "PLACE"}
+
+
 def test_an_unknown_selector_is_refused():
     with pytest.raises(ValueError, match="Unknown re-read selector"):
         picked_filings("everything", {})

@@ -1728,6 +1728,10 @@ def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
     yields = [{**row(year, period, value), "unit": "currency", "kpi_label": "U.S. Domestic Composite Yield"}
               for year, period, value in (("2025", "Q1", 14280.0), ("2025", "Q2", 14500.0), ("2025", "Q3", 14900.0), ("2026", "Q1", 15.32))]
     assert _pipeline(None, yields)._scale_runs() == []
+    # Nor a price whose row states its unit, under a label that does not (Exxon's "Brent ($/b)", $74.35 cut to 0.000074).
+    brent = [{**row(year, period, value), "unit": "currency", "kpi_label": "Brent", "locator": {"row_label": "Brent ($/b)"}}
+             for year, period, value in (("2018", "Q1", 0.000067), ("2018", "Q2", 74.35), ("2018", "Q3", 0.000076), ("2018", "Q4", 0.000068))]
+    assert _pipeline(None, brent)._scale_runs() == []
 
 
 def test_a_worked_out_remainder_takes_the_name_the_reports_table_gives_it():

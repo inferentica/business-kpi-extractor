@@ -12,6 +12,7 @@ from ..domain.derive import derive_periods, same_derivation
 from ..documents.document import Document, parse_number
 from ..quality.checks import JUMP_NOTE, count_jump, parts_add_up, reported_matches
 from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
+from ..rules.scale import _PER_UNIT
 from ..sources.base import FilingRef
 from .shared import (_rescaled, AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
                      _year_ago_cells, held_for_later, list_parents, value_key)
@@ -443,7 +444,9 @@ class SeriesChecks:
             # A per-unit amount has no table scale to put back: FedEx's $15.32 composite yield, read right, was raised
             # a thousandfold to match quarters read wrongly with the table's "in thousands".
             if (v["method"] == "ai" and v["group_kind"] == "metric" and v["validation_status"] != "rejected"
-                    and v["unit"] != "percent" and float(v["value"]) > 0 and not _PER_UNIT_KPI.search(v.get("kpi_label") or "")):
+                    and v["unit"] != "percent" and float(v["value"]) > 0 and not _PER_UNIT_KPI.search(v.get("kpi_label") or "")
+                    # Nor one whose row states its unit (Exxon's "Brent ($/b)"): $74.35 was cut to 0.000074.
+                    and not _PER_UNIT.search(str((v.get("locator") or {}).get("row_label") or ""))):
                 series.setdefault((v["group_key"], v["kpi_key"], v["fiscal_period"] == "FY"), []).append(v)
         records = []
         for rows in series.values():
