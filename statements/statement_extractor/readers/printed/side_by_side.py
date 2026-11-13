@@ -11,8 +11,9 @@ from .tables import Table
 # The two headings side by side, the parent's first: as the table's own row ("Parent Company Consolidated"), or in
 # the header above the columns.
 # Not the report's name ("the individual and consolidated quarterly information"). Ultrapar's 2010 6-Ks print "Parent |
-# Consolidated"; Copel's 2003 quarterly information "Company | Consolidated", capitalised as headings.
-SIDE_BY_SIDE = re.compile(r"\b(parent(?:\s+company)?|individual)\s+consolidated\b|(?-i:\bCompany\s+Consolidated\b)", re.I)
+# Consolidated"; Copel's 2003 quarterly information "Company | Consolidated", capitalised as headings, never the second
+# date's "Company" after the first's "Consolidated" (its 2002 6-Ks: "Consolidated | Company" under each date, round 94).
+SIDE_BY_SIDE = re.compile(r"\b(parent(?:\s+company)?|individual)\s+consolidated\b|(?-i:(?<!Consolidated )\bCompany\s+Consolidated\b)", re.I)
 
 
 def _side_by_side(group: list[Table]) -> bool:

@@ -17,9 +17,9 @@ TITLES = (
                           r"statements?\s+of\s+(consolidated\s+)?profit\s+or\s+loss(\s+and\s+(other\s+)?comprehensive\s+income)?|"
                           # UK GAAP (Lloyds TSB to 2004): "CONSOLIDATED PROFIT AND LOSS ACCOUNT".
                           r"profit\s+and\s+loss\s+accounts?)\b", re.I))),
-    ("balance", Widened(re.compile(r"\b(consolidated\s+)?((?<!off-)(?<!off )(?<!on-)(?<!on )balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?financial\s+(position|condition))\b", re.I))),
-    # Never an "off-balance sheet" or "on-balance sheet" (UBS's credit-risk notes, round 88). Morgan Stanley: "Consolidated
-    # Cash Flow Statements".
+    ("balance", Widened(re.compile(r"\b(consolidated\s+)?((?<!\boff-)(?<!\boff )(?<!\bon-)(?<!\bon )balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?financial\s+(position|condition))\b", re.I))),
+    # Never an "off-balance sheet" or "on-balance sheet" (UBS's notes), whole words: "MICROSOFT CORPORATION BALANCE SHEETS"
+    # was lost in round 94. Morgan Stanley: "Consolidated Cash Flow Statements".
     ("cash_flow", Widened(re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?cash\s+flows?|cash\s+flows?\s+statements?)\b", re.I))),
 )
 

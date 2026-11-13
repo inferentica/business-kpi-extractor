@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 
+from ...domain.basis import currencies_named
 from .tables import Table
 
 _UNIT = r"(thousands?|millions?|billions?)"  # TSMC's 2003 quarterly reports: "In Thousand New Taiwan Dollars"
@@ -38,6 +39,9 @@ _UNITS_STATED = re.compile(r"\(\s*(?:in|expressed\s+in)\s+(?:U\.?\s?S\.?|US|Cana
 _UNIT_CELL = re.compile(r"^" + _UNIT + r"(?:\s+of)?(?:,?\s+except\b.*)?$", re.I)
 
 
+TRANSLATED = re.compile(r"\btranslat(?:ion|ed)\s+(?:in)?to\s+", re.I)  # "Translation into U.S. dollars"
+
+
 def scale_text(group: list[Table]) -> str:
     first = group[0]
     leading = []
@@ -58,6 +62,12 @@ _CURRENCY_WORDS = re.compile(r"\b(won|yen|euros?|pounds|reais|francs|yuan|renmin
 def _scale(match: re.Match) -> float:
     unit = next((unit for unit in match.groups() if unit), None)
     return _SCALES[unit.lower()] if unit else 1e6  # "£m"
+
+
+def _parenthesis(text: str, start: int) -> str:
+    """The words from `start` to the parenthesis that closes them."""
+    end = text.find(")", start)
+    return text[start:end if end != -1 else start + 60]
 
 
 def statement_scale(group: list[Table]) -> float | None:
@@ -87,7 +97,14 @@ def statement_scale(group: list[Table]) -> float | None:
     if _UNITS_STATED.search(text):
         found.add(1.0)  # Gildan's 2003-05 statements: "(In US dollars)", every figure printed in full
     if len(found) == 2 and matches and len({word.lower() for word in _CURRENCY_WORDS.findall(raw)}) >= 2:
-        return _scale(matches[0])
+        # Not the translation's, stated after its own heading: KB's 2010 20-F prints "Translation into U.S. dollars
+        # (Note 1) (In thousands)" before "(In millions of Korean won)" (its balance sheets read a thousandth until round 94).
+        # The one that names a currency other than the translation's: KB's 2010 20-F prints "Translation into U.S. dollars
+        # (Note 1) (In thousands)" before "(In millions of Korean won)" (its balance sheets read a thousandth until round
+        # 94); SK Telecom's "Korean won | Translation into U.S. dollars | (In millions) | (In thousands)" names none.
+        translated = {code for heading in TRANSLATED.finditer(text) for code in currencies_named(text[heading.end():heading.end() + 40])[:1]}
+        own = [match for match in matches if set(currencies_named(_parenthesis(text, match.start()))) - translated]
+        return _scale((own or matches)[0])
     return found.pop() if len(found) == 1 else None
 
 

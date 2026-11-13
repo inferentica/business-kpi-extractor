@@ -13,7 +13,7 @@ from collections import Counter
 
 from ...domain.basis import BARE_DOLLARS, bare_currency, currencies_named
 from .find import TITLE_PATTERNS
-from .scales import scale_text
+from .scales import TRANSLATED, scale_text
 from .tables import Table, header_text
 
 _DOLLAR_CELL = re.compile(r"^\s*\$\s*(?:[\d(.]|$)")
@@ -96,9 +96,12 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
     # The table's own words first: its first rows (Petrobras's real releases print "R$ million" as the first row, after
     # commentary naming U.S. dollars just above the title), then its headings, however far before a title row (UBS's
     # restated time series: "USD million, except where indicated" over the dates, then "Income statement").
-    own = " ".join(row.label for row in group[0].rows[:next((i for i, r in enumerate(group[0].rows) if r.figures), 0)][:3])
-    in_title = currencies_named(own) or currencies_named(text[start:start + 400]) or currencies_named(text[start:]) or \
-        currencies_named(" ".join(cell.text for cells in group[0].header for cell in cells))
+    # A heading cell that states the scale with its currency comes before them: KT's "(in millions of Korean won)" over
+    # its labels, the translation's "(in thousands of US dollars)" on the first row (served as dollars until round 94).
+    stated = [cell.text for cells in group[0].header for cell in cells if _STATED_SCALE.search(cell.text)]
+    own = " ".join(stated + [row.label for row in group[0].rows[:next((i for i, r in enumerate(group[0].rows) if r.figures), 0)][:3]])
+    in_title = _reported_first(own) or _reported_first(text[start:start + 400]) or _reported_first(text[start:]) or \
+        _reported_first(" ".join(cell.text for cells in group[0].header for cell in cells))
     named = [currency for currency in by_column.values() if currency]
     unnamed = [currency for currency in in_title if currency not in named]
     if named and len(named) * 2 < len(by_column) and unnamed:
@@ -122,6 +125,18 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
         # cell of its own, in the figure's cell ("$ 880.2", 2004) or on a text line (2002).
         bare = BARE_DOLLARS
     return bare  # else the document's or the form's (pipeline/printed.py)
+
+
+_STATED_SCALE = re.compile(r"\b(?:thousands?|millions?|billions?)\s+of\b", re.I)
+
+
+def _reported_first(text: str) -> list[str]:
+    """The currencies a text names, a translation's last: KB's 20-Fs head their statements "Translation into U.S.
+    dollars (Note 3)" above "(In millions of Korean won) (In thousands of US dollars)", the won columns served as dollars
+    until round 94."""
+    named = currencies_named(text)
+    translated = {code for match in TRANSLATED.finditer(text or "") for code in currencies_named(text[match.end():match.end() + 40])[:1]}
+    return [code for code in named if code not in translated] + [code for code in named if code in translated]
 
 
 def translations(columns: list[tuple[int, ...]], periods: dict, by_column: dict, reporting: str | None,

@@ -206,9 +206,10 @@ def without_repeats(table: Table, periods: dict) -> dict:
     """Left out, columns under the same heading as an earlier column, dated the same, with other figures: a misprinted heading,
     never that period again. Embraer's Q3 2011 cash flows head their nine months "Three months ended on" as well, beside
     the quarter's own (read as the quarter twice until round 90). Not a parent's columns beside the group's."""
+    from .scales import scale_text
     from .side_by_side import _side_by_side
-    if _side_by_side([table]):
-        return periods
+    if _side_by_side([table]) or len(currencies_named(scale_text([table]))) > 1:
+        return periods  # a translation's columns repeat the periods: left out by read.py's translations, kept in place
     dropped, seen = set(), {}
     for column in sorted(periods):
         heading = header_text(table, column[0])
