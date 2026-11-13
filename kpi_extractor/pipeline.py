@@ -197,7 +197,9 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self._read_ahead(ref)
         # The earnings releases are listed while the reports are read: the listing waits only on SEC and the archive.
         passed: list[FilingRef] = []
-        listing = self._prefetch.submit(self.source.earnings_releases, company, self.since, self.archive, passed, known_urls)
+        # From the window's first fiscal year's Q1, as the reports (domain/fiscal.py, with_first_year).
+        listing = self._prefetch.submit(self.source.earnings_releases, company, self.since - timedelta(days=300), self.archive,
+                                        passed, known_urls)
         self.offset = self._year_offset(reports)
         for ref in reports:
             later = [other for other in pending if other.filed > ref.filed or (other.filed == ref.filed and other is not ref)]
@@ -206,7 +208,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             reading = self._read_report(ref)
             if reading is not None:
                 self.store.record_or_fail(reading)
-        releases = [ref for ref in sorted(listing.result(), key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
+        releases = [ref for ref in sorted(with_first_year(listing.result(), self.since, self.profile.fiscal_year_end),
+                                          key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
         for ref in passed:
             if ref.accession not in self.filings:
                 self.store.record(FilingReading(ref, "skipped", notes=[_PASSED_OVER], counted=False))
