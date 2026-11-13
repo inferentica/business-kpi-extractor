@@ -214,6 +214,15 @@ class CompanyStore:
         self._send(filings=[carried])
         self._filings[carried["accession"]] = {**self._filings[carried["accession"]], "spec_version": carried["spec_version"]}
 
+    def name_registrant(self, accession: str, name: str) -> None:
+        """The registrant's name on a report's cover, kept with the filing as it is stored: Quotiva takes the company's
+        legal name from its newest report's (owner, 2026-11-13). Sent only when new or changed."""
+        previous = self._filings.get(accession)
+        if previous is None or previous.get("registrant_name") == name:
+            return
+        self._send(filings=[{**previous, "registrant_name": name}])
+        self._filings[accession] = {**previous, "registrant_name": name}
+
     def statements(self, accession: str, lines: list[dict]) -> None:
         self.control.call("store_statements", symbol=self.symbol, accession=accession, lines=lines)
 
