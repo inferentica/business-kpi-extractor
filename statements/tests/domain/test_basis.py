@@ -100,3 +100,14 @@ def test_a_brazilian_quarterly_reviews_cvm_standards():
                         "applicable to the preparation of Quarterly Information, including CVM Instruction 469/08.</p>") == BRAZILIAN_GAAP
     assert stated_basis("<p>Prepared in accordance with CPC 21 and IAS 34 and the standards issued by the Brazilian Securities "
                         "Commission (CVM).</p>") == IFRS
+
+
+def test_the_groups_opinion_decides_over_the_parents_own():
+    # Braskem's 2017 statements: the individual statements' opinion, then the consolidated (round 85 read Brazilian GAAP).
+    assert stated_basis("<p>In our opinion, the accompanying individual financial statements present fairly, in all material "
+                        "respects, the financial position of Braskem S.A. as at December 31, 2017 in accordance with "
+                        "Accounting Practices Adopted in Brazil.</p><p>Opinion on the consolidated financial statements</p><p>In "
+                        "our opinion, the accompanying consolidated financial statements present fairly, in all material "
+                        "respects, the consolidated financial position of Braskem S.A. as at December 31, 2017 in accordance "
+                        "with International Financial Reporting Standards (IFRS) issued by the IASB and accounting practices "
+                        "adopted in Brazil.</p>") == IFRS

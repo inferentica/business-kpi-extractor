@@ -112,10 +112,15 @@ def stated_basis(text: str) -> str | None:
     text = re.sub(r"<[^>]+>", " ", text or "")  # HTML read as its words
     text = re.sub(r"&(nbsp|#160|#xa0);", " ", text, flags=re.I)
     text = _COVER.sub(" ", re.sub(r"\s+", " ", text))
-    for match in _OPINION.finditer(text):
-        basis = _named(match.group(1))
-        if basis is not None:
-            return basis
+    # The group's opinion before the parent's own: Braskem's 2017 statements open with the individual statements'
+    # "Accounting Practices Adopted in Brazil", then the consolidated statements' IFRS (round 85).
+    opinions, position = [], 0
+    while (match := _OPINION.search(text, position)) is not None:
+        position = match.start(1)  # the next opinion may sit in this one's words
+        if (basis := _named(match.group(1))) is not None:
+            opinions.append((basis, "consolidated" in match.group(0)[:match.start(1) - match.start()].lower()))
+    if opinions:
+        return next((basis for basis, group in opinions if group), opinions[0][0])
     boxed = _cover_basis(text)
     if boxed is not None:
         return boxed

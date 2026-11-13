@@ -89,12 +89,15 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             title_text = table.context[-300:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in table.header[:2])
         if kind is not None and _retitled(kind, title_text):
             kind = None  # an earlier statement's title, then this one's (UBS: "Income statement" … "Statement of comprehensive income")
-        if kind is None:
+        leading, heading = " ".join(row.label for row in _leading(table)), _heading(table.context[-200:])
+        own = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
+        if kind is None or own not in (None, kind):
             # A title printed as the table's own first rows, above its figures (PepsiCo's 2013 balance sheet), when
-            # nothing before the table names it.
-            leading = " ".join(row.label for row in _leading(table))
-            kind = next((name for name, pattern in TITLES if _titled(pattern, leading)), None)
-            title_text += " " + leading
+            # nothing before the table names it, or when that names another (Coca-Cola FEMSA's paragraph on its BMV
+            # filing's "detailed cash flow statement and selected notes … segment information", round 85). The words
+            # before it are then its title's only from their last sentence.
+            kind, heading = own, ""
+            title_text = (re.split(r"(?<=[.!?])\s+(?=[A-Z])", table.context[-300:])[-1] if own else title_text) + " " + leading
         # A first row naming the statement is its title, wherever it falls among them: UBS's Pillar 3 report heads a
         # table "Table 33: Reconciliation of accounting balance sheet to balance sheet under the regulatory scope of
         # consolidation", with two rows of text below it before "Assets".
@@ -116,7 +119,7 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         # A parent company's columns beside the group's are no parent-only statement (side_by_side.py).
         title_text = SIDE_BY_SIDE.sub(" ", title_text)
         if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
-                not_statement.search(_RUNNING_LINK.sub(" ", _heading(table.context[-200:]))) or \
+                not_statement.search(_RUNNING_LINK.sub(" ", heading)) or \
                 _DISCONTINUED.search(table.context[-600:]) or _UNDERLYING.search(
                     _heading(table.context[-200:]) + " " + " ".join(cell.text for cells in table.header[:2] for cell in cells)) or len([r for r in table.rows if r.figures]) < 4:
             continue
