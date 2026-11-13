@@ -119,3 +119,25 @@ def test_a_quarters_own_report_in_the_currency_before_its_change():
         item.checks.append(Check("balance", "pass"))
     chosen = {(record["fiscal_year"], record["fiscal_period"]): record for record in choose(readings)}
     assert chosen[("2018", "Q1")]["status"] == "kept"  # UBS's Q1 2018 report, in francs before its move to dollars
+
+
+def test_a_quarter_heading_over_its_currency_and_translation():
+    # TSMC's archived Q1 1999 cash flow: "1Q  1999" over USD and NTD, then "1Q  1998" and "4Q  1998" (4Q 1998 read as
+    # the year 1998, the 1999 NTD column set aside with the dollars, until round 89).
+    from statement_extractor.readers.text.read import read_document
+    text = ("                     UNCONSOLIDATED STATEMENT OF CASH FLOWS\n"
+            "                  (Figures in Million of New Taiwan dollars (NTD) and U.S. dollars (USD))\n"
+            + " " * 69 + "1Q  1999          1Q  1998     4Q  1998\n"
+            + " " * 64 + "USD         NTD          NTD          NTD\n"
+            "      Cash Flows from Operating Activities:\n"
+            "          Net Income                                                126       4,090        6,947        2,524\n"
+            "          Net Cash Provided from Operating Activities               230       7,495       11,181        9,652\n"
+            "          Net Cash Used in Investing Activities                    -145      -4,726       -9,027       -3,448\n"
+            "          Net Cash Provided by Financing Activities                  22         730        1,144       -1,666\n"
+            "      Net Increase (Decrease) in Cash and Cash Equivalents          107       3,499        3,299        4,537\n"
+            "      Cash and Cash Equivalents at Beginning of Period              251       8,292        2,534        3,755\n"
+            "      Cash and Cash Equivalents at End of Period                    357      11,792        5,833        8,292\n")
+    readings, _notes = read_document(text, accession="x", form="6-K", filed=date(1999, 4, 30), document_end=date(1999, 3, 31),
+                                     fiscal_year_end="1231", year_offset=0)
+    assert sorted((r.period_start, r.period_end) for r in readings) == [
+        (date(1998, 1, 1), date(1998, 3, 31)), (date(1998, 10, 1), date(1998, 12, 31)), (date(1999, 1, 1), date(1999, 3, 31))]

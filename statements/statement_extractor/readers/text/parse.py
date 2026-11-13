@@ -21,7 +21,7 @@ _ALIGN = 3  # characters a figure can sit off its column
 _SPAN_WORDS = re.compile(r"\b(months|weeks|year|quarter)s?\s+ended\b", re.I)
 # A span or a date heading over a group of columns: "Half-year to", "30 June", "31 December" (Lloyds TSB).
 _GROUP_HEADING = re.compile(r"\b(months|weeks|year|quarter)s?\s+ended\b|\bhalf[-\s]year\b|"
-                            r"^\d{1,2}\s+[A-Za-z]{3,9}$|^[A-Za-z]{3,9}\.?\s+\d{1,2},?$", re.I)
+                            r"^\d{1,2}\s+[A-Za-z]{3,9}$|^[A-Za-z]{3,9}\.?\s+\d{1,2},?$|^(?:[1-4]Q|Q[1-4])\s+(?:19|20)\d{2}$", re.I)
 
 
 def _columns(lines: list[Line]) -> list[int]:
@@ -46,6 +46,10 @@ def _header(line: str, columns: list[int]) -> list[Cell]:
     """A header line's words as cells over the columns they name: one word per column where there are as many, else
     each column takes the word nearest above it (a span over several columns)."""
     found = chunks(re.sub(r"(?<![A-Za-z.])\$", " ", line))  # a dollar sign alone, not a currency's: "NT$", "U.S.$"
+    for index in range(len(found) - 1, 0, -1):  # a quarter and its year are one heading: TSMC's "1Q  1999" over US$ and NT$
+        before, after = found[index - 1], found[index]
+        if re.fullmatch(r"[1-4]Q|Q[1-4]", before.text) and re.fullmatch(r"(?:19|20)\d{2}", after.text) and after.start - before.end <= 3:
+            found[index - 1:index + 1] = [Chunk(before.start, after.end, f"{before.text} {after.text}")]
     # A "%" over no figure column (TSMC prints its percentages as "7%", which are no figures) heads nothing; one over
     # plain figures (ASML's "EUR  %" with 100.0 below) marks its column as percentages.
     found = [chunk for chunk in found if "%" not in chunk.text or any(abs(column - chunk.end) <= 2 for column in columns)]
