@@ -803,6 +803,26 @@ def test_a_column_under_a_table_wide_year_is_the_newest():
     assert current_column(two, 2, 1) and not current_column(two, 2, 2)
 
 
+def test_a_trend_tables_newest_quarter_is_found_when_its_header_runs_words_and_year_together():
+    # Bank of America's supplement: "SecondQuarter2025" over each quarter, beside "Six Months Ended" columns whose years
+    # sit on the row below. The newest quarter's column replays; a neighbouring quarter's never stands in for it.
+    from kpi_extractor.readers.replay import _replay_value, current_column
+    table = Table("C_T28", "", [
+        ["", "Consumer Banking Key Indicators", "", "", "", ""],
+        ["", "Six Months EndedJune 30", "", "SecondQuarter2025", "FirstQuarter2025", "SecondQuarter2024"],
+        ["", "2025", "2024", "", "", ""],
+        ["Active mobile banking users (in thousands)", "40,840", "39,190", "40,840", "40,492", "39,190"]])
+    assert current_column(table, 3, 3) and not current_column(table, 3, 5)
+    document = SimpleNamespace(tables={"C_T28": table})
+    header = R_column_header(table, 3, 3)
+    found = _replay_value(document, "k", {"table": "C_T28", "row": 3, "col": 3, "header": header,
+                                          "row_label": "Active mobile banking users (in thousands)"}, quarter=2)
+    assert (found.table, found.row, found.col) == ("C_T28", 3, 3)
+    wrong = _replay_value(document, "k", {"table": "C_T28", "row": 3, "col": 4, "header": R_column_header(table, 3, 4),
+                                          "row_label": "Active mobile banking users (in thousands)"}, quarter=2)
+    assert isinstance(wrong, str)
+
+
 def test_a_kpi_the_newest_reading_lacks_is_looked_for_where_an_earlier_quarter_found_it():
     # JPMorgan's operating metrics: one quarter's reading left a KPI out (missed, or not reported that quarter), and
     # every quarter after had no place for it. Q1 found the memberships; Q2's reading has only the technology table.
