@@ -204,7 +204,10 @@ def _later_year(annual: dict, next_year: dict | None) -> dict | None:
     if not next_year:
         return None
     priors = {key: (row.get("locator") or {}).get("prior") for key, row in next_year.items()}
-    total = _total(annual)
+    # The restated year adds up to the total the same report restates beside it (Bank of America's 2019 10-K: 2018 at
+    # $91,630 million, first reported $91,857 million), else to the year as first reported.
+    restated = next((t for row in next_year.values() if isinstance(t := (row.get("locator") or {}).get("prior_total"), (int, float))), None)
+    total = restated if restated is not None else _total(annual)
     if not all(isinstance(value, (int, float)) for value in priors.values()) or total is None \
             or abs(sum(priors.values()) - total) > abs(total) * 0.001:
         return None
