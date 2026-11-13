@@ -11,10 +11,10 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from ...domain.basis import BARE_DOLLARS, bare_currency, currencies_named
+from ...domain.basis import BARE_DOLLARS, bare_currency, currencies_named, is_currency_word
 from .find import TITLE_PATTERNS
 from .scales import TRANSLATED, scale_text
-from .tables import Table, header_text
+from .tables import Table, figure_columns, header_text
 
 _DOLLAR_CELL = re.compile(r"^\s*\$\s*(?:[\d(.]|$)")
 
@@ -31,7 +31,27 @@ def column_currencies(table: Table, columns: list[tuple[int, ...]]) -> dict[tupl
         named = currencies_named(header_text(table, column[0]) or header_text(table, column[-1]))
         # Two currencies over one column (TSMC's "3Q 2002 NTD" with a "USD" set off from the row below): neither.
         found[column] = named[0] if len(named) == 1 else signs.get(_sign_beside(table, column)) if signs else None
+        found[column] = found[column] or (None if named else _named_above(table, column))
     return found
+
+
+def _bare(text: str) -> str:
+    return re.sub(r"[()*]", " ", text).strip()
+
+
+def _named_above(table: Table, column: tuple[int, ...]) -> str | None:
+    """A currency named alone on a row above the figures, over the column: Volaris's 2020 releases print "(US Dollars)*"
+    over the first of their two March 2020 columns, the pesos beside it (its dollars served until round 95)."""
+    for row in table.rows:
+        if row.figures:
+            return None
+        marks = [cell for cell in row.cells if cell.start > 0 and cell.text.strip()]
+        if len(marks) != 1 or marks[0].start != column[0]:
+            continue  # one mark over one column; several head groups of columns (SK Telecom's "Korean won | Translation")
+        text = _bare(marks[0].text)
+        if text and is_currency_word(text) and currencies_named(text):
+            return currencies_named(text)[0]
+    return None
 
 
 def split_by_sign(table: Table, periods: dict) -> dict:
@@ -96,10 +116,15 @@ def reporting_currency(group: list[Table], by_column: dict, form: str) -> str | 
     # The table's own words first: its first rows (Petrobras's real releases print "R$ million" as the first row, after
     # commentary naming U.S. dollars just above the title), then its headings, however far before a title row (UBS's
     # restated time series: "USD million, except where indicated" over the dates, then "Income statement").
-    # A heading cell that states the scale with its currency comes before them: KT's "(in millions of Korean won)" over
-    # its labels, the translation's "(in thousands of US dollars)" on the first row (served as dollars until round 94).
-    stated = [cell.text for cells in group[0].header for cell in cells if _STATED_SCALE.search(cell.text)]
-    own = " ".join(stated + [row.label for row in group[0].rows[:next((i for i, r in enumerate(group[0].rows) if r.figures), 0)][:3]])
+    # A heading cell over the labels that states the scale with its currency comes before them: KT's "(in millions of
+    # Korean won)", the translation's "(in thousands of US dollars)" on the first row (served as dollars until round 94).
+    # Never one over a column, which may name its year: America Movil's "Millions of U.S. dollars 2013", Volaris's "2014
+    # (Thousands of U.S.dollars*)" and "(Thousands of U.S. dollars*, except for earnings per share)" (round 95).
+    figures = {position for column in figure_columns(group[0]) for position in column}
+    stated = [cell.text for cells in group[0].header for cell in cells if not any(cell.start <= position < cell.end for position in figures)
+              and cell.start < min(figures, default=0) and _STATED_SCALE.search(cell.text) and not re.search(r"\b(?:19|20)\d{2}\b", cell.text)]
+    own = " ".join(stated + [row.label for row in group[0].rows[:next((i for i, r in enumerate(group[0].rows) if r.figures), 0)][:3]
+                             if not is_currency_word(_bare(row.label))])  # not a column's own mark: Volaris's "(US Dollars)*"
     in_title = _reported_first(own) or _reported_first(text[start:start + 400]) or _reported_first(text[start:]) or \
         _reported_first(" ".join(cell.text for cells in group[0].header for cell in cells))
     named = [currency for currency in by_column.values() if currency]

@@ -81,3 +81,27 @@ def test_the_group_first_under_each_date_is_no_parent_first_layout():
     from statement_extractor.readers.printed.side_by_side import SIDE_BY_SIDE
     assert SIDE_BY_SIDE.search("Company Consolidated Company Consolidated")  # Copel 2003: the parent's first
     assert not SIDE_BY_SIDE.search("September 30, 2002 June 30, 2002 Consolidated Company Consolidated Company")  # Copel 2002
+
+
+# America Movil's 20-Fs head the translation's own column "Millions of U.S. dollars 2013"; Volaris's releases "(Thousands
+# of U.S. dollars*) 2020" over it, its first column, or "(US Dollars)*" on a row above it.
+AMX_2013 = ("<p>AMERICA MOVIL, S.A.B. DE C.V. AND SUBSIDIARIES Consolidated Statements of Financial Position (In thousands of "
+            "Mexican pesos)</p><table>" + row("", "At December 31, 2012", "2013", "Millions of U.S. dollars 2013")
+            + figures(("45,487,200", "48,163,550", "3,683"), ("987,684,683", "1,025,592,433", "78,423"),
+                      ("700,000,000", "720,000,000", "55,056"), ("287,684,683", "305,592,433", "23,367")) + "</table>")
+VOLARIS_2020 = ("<p>Controladora Vuela Compania de Aviacion Consolidated Statement of Financial Position (In millions of Mexican "
+                "pesos)</p><table>" + row("", "March 31, 2020 Unaudited", "March 31, 2020 Unaudited", "December 31, 2019 Audited")
+                + row("", "(US Dollars)*", "", "")
+                + figures(("453", "10,658", "7,980"), ("2,947", "69,312", "63,295"), ("2,500", "58,800", "52,000"),
+                          ("447", "10,512", "11,295")) + "</table>")
+
+
+def test_a_translation_columns_own_heading_names_no_statement_currency():
+    by_year = read(AMX_2013, date(2013, 12, 31))
+    assert {r.currency for r in by_year.values()} == {"MXN"} and by_year[2013].lines[0]["value"] == 48_163_550e3
+
+
+def test_a_currency_named_over_one_column_marks_that_column_the_translation():
+    by_year = read(VOLARIS_2020, date(2020, 3, 31))
+    cash = next(line["value"] for line in by_year[2020].lines if line["label"] == "Cash and cash equivalents")
+    assert by_year[2020].currency == "MXN" and cash == 10_658e6
