@@ -45,6 +45,15 @@ def _place_held(value: dict) -> bool:
             and any(str(note).startswith(PLACE_NOT_NAMED) for note in value.get("notes") or []))
 
 
+# Notes the wave 2 audit's repairs held figures with (2026-11-13): read again once PRs 48 and 52 refuse what misread them.
+_AUDIT_HOLDS = ("read from the same table cell as another listed metric", "a percent read from an amounts row")
+
+
+def _audit_held(value: dict) -> bool:
+    return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
+            and any(str(note).startswith(_AUDIT_HOLDS) for note in value.get("notes") or []))
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -58,6 +67,8 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
                   "says which line sits within which (KKR's capital markets fees within its transaction fees)", _sum_held),
     "place-holds": ("figures held because their row named no place their KPI names, before a place written two ways "
                     "counted as named (Coca-Cola's EMEA row reads Europe, Middle East & Africa)", _place_held),
+    "audit-holds": ("figures the wave 2 audit held: two listed metrics read from one cell (Exxon's \"Worldwide\" rows), "
+                    "a percent read from an amounts row (Wells Fargo's allowance coverage)", _audit_held),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }
