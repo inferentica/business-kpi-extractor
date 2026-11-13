@@ -570,16 +570,23 @@ def _plain_revenue_figures(facts: pd.DataFrame, period_end, annual: bool, label:
 def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str],
                          fixed: tuple[str, str] | None = None, segment_level: bool | None = None) -> dict[str, float]:
     """Members of one axis for one concept, from facts tagged with that axis alone, or with it and the one member of
-    another axis its period's facts all carry (fixed); only the consolidated facts (segment_level False), only the
+    another axis its period's facts all carry (fixed), the axis alone first (Exxon's 9M 2022 sales: $305,511 million
+    alone, $19 million for Corporate and Financing); only the consolidated facts (segment_level False), only the
     segments' own (True), or both (None)."""
     members: dict[str, float] = {}
+    shares: set[str] = set()  # members known so far only with the fixed member
     for _, fact in frame[frame["concept"] == concept].iterrows():
         dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
         kept = {a: m for a, m in dimensions.items() if (a, local_name(m)) not in _NEUTRAL_MEMBERS}
         if (segment_level is not None and (len(kept) != len(dimensions)) != segment_level) or axis not in kept:
             continue
-        if len(kept) == 1 or (fixed and len(kept) == 2 and kept.get(fixed[0]) == fixed[1]):
-            members.setdefault(kept[axis], float(fact["numeric_value"]))
+        member = kept[axis]
+        if len(kept) == 1 and (member not in members or member in shares):
+            members[member] = float(fact["numeric_value"])
+            shares.discard(member)
+        elif fixed and len(kept) == 2 and kept.get(fixed[0]) == fixed[1] and member not in members:
+            members[member] = float(fact["numeric_value"])
+            shares.add(member)
     return members
 
 
