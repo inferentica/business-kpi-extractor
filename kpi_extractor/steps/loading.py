@@ -57,11 +57,11 @@ class FilingLoading:
         return future.result()
 
     def _archive_xbrl(self, ref: FilingRef) -> None:
-        self.source.archive_tagged_facts(ref, self.archive)
+        self.source.archive_tagged_facts(ref, self._archive_of(ref))
 
     def _load_xbrl(self, ref: FilingRef):
         """A filing's XBRL, through its source (which keeps it in the archive)."""
-        return self.source.tagged_facts(ref, self.archive)
+        return self.source.tagged_facts(ref, self._archive_of(ref))
 
     def _exhibit(self, exhibit) -> Future:
         if exhibit.url not in self._exhibits:

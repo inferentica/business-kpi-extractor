@@ -71,7 +71,7 @@ class Archive:
         """Where the company's SEC filing list (CIK0000320193.json) or one of its older pages sits."""
         return f"filings/{self.cik}/submissions/{name or f'CIK{self.cik:010d}.json'}.gz"
 
-    def filing_list(self, now: datetime | None = None) -> tuple[dict | None, str]:
+    def filing_list(self, now: datetime | None = None, max_age: timedelta | None = FILING_LIST_AGE) -> tuple[dict | None, str]:
         """The company's SEC filing list as Bedrock's worker keeps it here, its older pages merged in (as edgartools
         merges a bulk download's), and why not when it cannot stand in for SEC's: missing, written more than 90 minutes
         ago, an older page missing, or a filing whose full submission was archived since and that it does not list."""
@@ -84,7 +84,7 @@ class Archive:
             age = (now or datetime.now(timezone.utc)) - datetime.fromisoformat(written.replace("Z", "+00:00"))
         except ValueError:
             return None, "archived filing list has no write time"
-        if age > FILING_LIST_AGE:
+        if max_age is not None and age > max_age:
             return None, f"archived filing list is {age.total_seconds() / 3600:.1f} h old"
         data = self._read_gzipped_json(key)
         filings = (data or {}).get("filings") or {}
