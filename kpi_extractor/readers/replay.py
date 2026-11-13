@@ -23,7 +23,8 @@ _PERIOD_WORD = (r"\b(?:" + "|".join(_MONTHS) + r"|jan|feb|mar|apr|jun|jul|aug|se
                 r"|first|second|third|fourth|q[1-4]|[1-4]q)\b")
 # Period words first, so a quarter's label ("3Q'22") is one period word, not a number glued to a letter.
 _TOKEN = re.compile(_PERIOD_WORD + r"|\d[\d.,]*", re.I)
-_YEAR = re.compile(r"\b(20\d{2})\b|(?:\bQ[1-4]|\b[1-4]Q|\bFY)\s*'?(\d{2})\b|'(\d{2})\b", re.I)
+# A year may run into the word before it: Bank of America's supplement heads its quarters "SecondQuarter2025".
+_YEAR = re.compile(r"(?<!\d)(20\d{2})(?!\d)|(?:\bQ[1-4]|\b[1-4]Q|\bFY)\s*'?(\d{2})\b|'(\d{2})\b", re.I)
 
 _PERIOD_WORDS = re.compile(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
                            r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|first|second|third|fourth|q[1-4])\b")
@@ -82,6 +83,9 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
         found = _replay_table(document, group, [locator for _key, locator in rows], quarter)
         if isinstance(found, str):
             return found
+        # Each row keyed as last quarter's reading keyed it, where its label does not name a listed KPI by itself.
+        found._row_keys = {member_key(locator["row_label"]): key.split(".", 1)[1] for key, locator in rows
+                           if locator.get("row_label")}
         table_locators.append(found)
     return Located(period_end=reported_period(document, expected).isoformat(), tables=table_locators, values=values)
 
@@ -537,7 +541,7 @@ def same_period_words(now: str, before: str, cut: bool = False) -> bool:
 
 
 _QUARTERS = {"first": 1, "second": 2, "third": 3, "fourth": 4}
-_QUARTER_NAME = re.compile(r"<?\b(first|second|third|fourth) quarter\b>?")
+_QUARTER_NAME = re.compile(r"<?\b(first|second|third|fourth) ?quarter(?![a-z])>?")  # "secondquarter" run together too
 _FULL_MONTH = ("january|february|march|april|june|july|august|september|october|november|december")
 
 

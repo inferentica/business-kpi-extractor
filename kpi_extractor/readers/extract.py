@@ -29,7 +29,7 @@ from ..rules.period import (  # noqa: F401 - re-exported for callers of extract
     _QUARTER, _stands_at_period_end, _STOCK_KPI, _YEAR, _YEAR_ROW, _YTD_TITLE,
     column_dates, column_duration_problem, column_header, header_contradicts, quarter_for_trailing_kpi)
 from ..rules.identity import (  # noqa: F401 - re-exported for callers of extract
-    _combined_line, _FOOTNOTE, _identity, _label_words, _listed_kpi, _NOT_THE_PLACE,
+    _combined_line, _FOOTNOTE, _identity, _label_words, _listed_kpi, kept_key, _NOT_THE_PLACE,
     _PLACE, _measure_not_named, _place_not_named, _places, _plain_label, _row_label, _row_named_twice,
     _SPACED_FOOTNOTE, _SUB_ROW, _tail, _TOTAL_LABEL, _TWIN_REACH, labels_agree,
     PLACE_NOT_NAMED, row_key, ROW_NAMED_TWICE)
@@ -382,8 +382,8 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                 own = _row_scale_words(row_text)  # a row's own "(in billions)" wins, as read_row reads it
                 row_from = ScaleFrom(own[0], "row", own[1]) if own else reading_from
             record["scale_from"] = row_from.record()
-        values.append(ReadValue(group, _listed_kpi(group, label) or KpiSpec(key=row_key(label), label=label[:80], unit=unit,
-                                                                            parent=parent_of.get(key)),
+        values.append(ReadValue(group, _listed_kpi(group, label) or kept_key(group, locator, label)
+                                or KpiSpec(key=row_key(label), label=label[:80], unit=unit, parent=parent_of.get(key)),
                                 value, currency, record))
     if total_row is not None:
         record = {"table": total_table.id, "row": total_index, "col": total_col, "row_label": "Total", "whole_table": True,

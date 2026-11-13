@@ -803,6 +803,51 @@ def test_a_column_under_a_table_wide_year_is_the_newest():
     assert current_column(two, 2, 1) and not current_column(two, 2, 2)
 
 
+def test_a_replayed_tables_row_keeps_the_kpi_last_quarters_reading_gave_it():
+    # PNC's noninterest income: its "Other" row is the listed "Other Noninterest Income", as the AI read it last quarter.
+    # Read again by code, the row kept its own key ("other"), so the group seemed to lose a KPI every quarter.
+    from kpi_extractor.ai import Spec
+    from kpi_extractor.readers.replay import replay
+    html = """<table><tr><td>In millions</td><td>1Q23</td><td>4Q22</td></tr>
+<tr><td>Asset management and brokerage</td><td>$356</td><td>$345</td></tr><tr><td>Card and cash management</td><td>659</td><td>671</td></tr>
+<tr><td>Other</td><td>258</td><td>247</td></tr><tr><td>Total noninterest income</td><td>$1,273</td><td>$1,263</td></tr></table>"""
+    document = parse_document(html, URL.format(n=7))
+    table = next(iter(document.tables))
+    spec = Spec.model_validate({"groups": [{"key": "revenue_by_type", "label": "Noninterest income", "kind": "revenue_breakdown",
+                                            "kpis": [{"key": "asset_management_brokerage", "label": "Asset Management and Brokerage", "unit": "currency"},
+                                                     {"key": "card_cash_management", "label": "Card and Cash Management", "unit": "currency"},
+                                                     {"key": "other_noninterest_income", "label": "Other Noninterest Income", "unit": "currency"}]}]})
+    place = lambda row, label: {"table": table, "row": row, "col": 1, "row_label": label, "header": R_column_header(document.tables[table], 1, 1),
+                                "whole_table": True, "total_row_label": "Total noninterest income", "scale": 1e6}
+    last = {"revenue_by_type.asset_management_brokerage": place(1, "Asset management and brokerage"),
+            "revenue_by_type.card_cash_management": place(2, "Card and cash management"),
+            "revenue_by_type.other_noninterest_income": place(3, "Other")}
+    located = replay(document, last, date(2023, 3, 31), quarter=1)
+    values, _problems = read_values(document, spec, located, "USD")
+    assert {value.kpi.key: value.value for value in values if not value.is_total} == {
+        "asset_management_brokerage": 356e6, "card_cash_management": 659e6, "other_noninterest_income": 258e6}
+
+
+def test_a_trend_tables_newest_quarter_is_found_when_its_header_runs_words_and_year_together():
+    # Bank of America's supplement: "SecondQuarter2025" over each quarter, beside "Six Months Ended" columns whose years
+    # sit on the row below. The newest quarter's column replays; a neighbouring quarter's never stands in for it.
+    from kpi_extractor.readers.replay import _replay_value, current_column
+    table = Table("C_T28", "", [
+        ["", "Consumer Banking Key Indicators", "", "", "", ""],
+        ["", "Six Months EndedJune 30", "", "SecondQuarter2025", "FirstQuarter2025", "SecondQuarter2024"],
+        ["", "2025", "2024", "", "", ""],
+        ["Active mobile banking users (in thousands)", "40,840", "39,190", "40,840", "40,492", "39,190"]])
+    assert current_column(table, 3, 3) and not current_column(table, 3, 5)
+    document = SimpleNamespace(tables={"C_T28": table})
+    header = R_column_header(table, 3, 3)
+    found = _replay_value(document, "k", {"table": "C_T28", "row": 3, "col": 3, "header": header,
+                                          "row_label": "Active mobile banking users (in thousands)"}, quarter=2)
+    assert (found.table, found.row, found.col) == ("C_T28", 3, 3)
+    wrong = _replay_value(document, "k", {"table": "C_T28", "row": 3, "col": 4, "header": R_column_header(table, 3, 4),
+                                          "row_label": "Active mobile banking users (in thousands)"}, quarter=2)
+    assert isinstance(wrong, str)
+
+
 def test_a_kpi_the_newest_reading_lacks_is_looked_for_where_an_earlier_quarter_found_it():
     # JPMorgan's operating metrics: one quarter's reading left a KPI out (missed, or not reported that quarter), and
     # every quarter after had no place for it. Q1 found the memberships; Q2's reading has only the technology table.
