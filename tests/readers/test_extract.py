@@ -987,3 +987,29 @@ def test_a_percent_is_never_read_from_an_amount_under_another_columns_percent_he
     assert values == [] and "is an amount, not a percentage" in problems[0]
     values, problems = read(ratios, 4)
     assert [item.value for item in values] == [1.40] and problems == []
+
+
+def test_a_total_row_stands_only_for_the_metric_its_section_title_names():
+    # Exxon ends every section with "Worldwide"; six metrics were read from the capital expenditure table's (7,159).
+    def section(title, rows):
+        return f"<tr><td>3Q24</td><td>2Q24</td><td>{title}</td></tr>" + "".join(
+            f"<tr><td>{a}</td><td>{b}</td><td>{label}</td></tr>" for a, b, label in rows)
+    volumes = section("Refinery throughput, thousand barrels per day (kbd)", [("1,855", "1,746", "United States"), ("3,985", "3,740", "Worldwide")]) \
+        + section("Energy Products sales, thousand barrels per day (kbd)", [("2,822", "2,639", "United States"), ("5,580", "5,320", "Worldwide")]) \
+        + section("Chemical Products sales, thousand metric tons (kt)", [("1,707", "1,802", "United States"), ("4,830", "4,873", "Worldwide")])
+    capex = section("Dollars in millions (unless otherwise noted)", [("", "", "Upstream"), ("3,017", "2,773", "United States"),
+                    ("", "", "Other"), ("212", "144", "Other"), ("7,159", "7,039", "Worldwide")])
+    document = parse_document(f"<table>{volumes}</table><table>{capex}</table>", "https://example.com/xom.htm")
+    volume, spending = list(document.tables)
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "energy", "label": "Energy Products Sales", "unit": "count"},
+        {"key": "chemical", "label": "Chemical Products Sales", "unit": "count"},
+        {"key": "throughput", "label": "Refinery Throughput", "unit": "count"}]}]})
+    def read(kpi, table, row):
+        return read_values(document, spec, Located.model_validate({"period_end": "2024-09-30", "values": [
+            {"kpi": f"ops.{kpi}", "table": table, "row": row, "col": 0, "row_label": "Worldwide"}]}), "USD")
+    assert [item.value for item in read("energy", volume, 5)[0]] == [5_580]
+    assert [item.value for item in read("chemical", volume, 8)[0]] == [4_830]
+    for kpi, table, row in (("energy", volume, 8), ("chemical", volume, 5), ("throughput", volume, 5), ("energy", spending, 5)):
+        values, problems = read(kpi, table, row)
+        assert values == [] and "row mismatch" in problems[0]

@@ -190,3 +190,63 @@ def _place_not_named(label: str, table: Table, row: int, col: int) -> str | None
     named = _places(around)
     missing = places - named
     return ", ".join(sorted(missing)) if missing else None
+
+
+# A row named only as a total ("Worldwide", "Total") means its section's total: Exxon ends each section of its volume
+# tables with "Worldwide" (crude production, gas production, throughput, each product's sales, capital expenditure),
+# and six metrics were read from the capital expenditure table's "Worldwide" row (7,159). Such a row stands for a
+# metric only under a section title that names the metric: the AI is asked again, as for any row mismatch.
+MEASURE_NOT_NAMED = "row mismatch"
+_AGGREGATE_ROW = re.compile(r"^(?:total )?(?:worldwide|total|consolidated|overall|global|all segments|total company)(?: total)?$")
+_PERIOD_CELL = re.compile(r"(?:[1-4]q|q[1-4])\s*'?\d{2,4}|(?:fy|ytd)?\s*(?:19|20)\d{2}|ytd.*", re.I)
+_PLAIN_WORDS = {"total", "worldwide", "global", "consolidated", "company", "group", "the", "of", "and", "in", "per",
+                "for", "net", "day", "from"}
+
+
+def _section_titles(table: Table) -> list[tuple[int, str]]:
+    """Each section title of a table, with its last row: rows of words and no figures but period names ("3Q24 | 2Q24 |
+    Refinery throughput, thousand barrels per day (kbd) | YTD 2024"), consecutive ones as one title (Exxon's 2021
+    "Net production of crude oil, natural gas / liquids, bitumen and synthetic oil, / thousand barrels per day")."""
+    titles: list[tuple[int, str]] = []
+    for index, cells in enumerate(table.rows):
+        figures = [cell for cell in cells if cell.strip() and parse_number(cell) is not None
+                   and not _PERIOD_CELL.fullmatch(cell.strip())]
+        if figures or not any(re.search(r"[A-Za-z]{3}", cell) for cell in cells):
+            continue
+        text = " ".join(cell for cell in cells if cell.strip())
+        if titles and titles[-1][0] == index - 1:
+            titles[-1] = (index, f"{titles[-1][1]} {text}")
+        else:
+            titles.append((index, text))
+    return titles
+
+
+def _measure_words(text: str) -> set[str]:
+    """A label's words for naming a measure, plurals as singulars ("sales" is "sale", "products" "product")."""
+    return {re.sub(r"(?<=[a-z]{3})s$", "", word) for word in _label_words(text) if len(word) > 2 and word not in _PLAIN_WORDS}
+
+
+def _measure_not_named(label: str, table: Table, row: int, col: int) -> str | None:
+    """Why a row named only as a total is not this metric's (another section's total), or None. Its own section's
+    title must name the metric best of the table's titles (the most of its words, then the fewest others: Exxon's
+    "Net production of crude oil, natural gas liquids..." names natural gas too, but its gas section names it better),
+    and at least half the metric's words no other title uses ("energy" among product sales; the gas section's "available
+    for sale" names no energy product)."""
+    if row >= len(table.rows) or not _AGGREGATE_ROW.match(" ".join(_label_words(_row_label(table.rows[row], col)))):
+        return None
+    titles = _section_titles(table)
+    own = next(((index, text) for index, text in reversed(titles) if index < row), None)
+    wanted = _measure_words(label)
+    # One title is the table's own heading: its total is the table's, nothing to tell apart (ConocoPhillips' "Total").
+    if own is None or not wanted or len(titles) < 2:
+        return None
+    here = _measure_words(own[1])
+    elsewhere = set().union(*(_measure_words(text) for index, text in titles if index != own[0]))
+    # Only words some title uses: Exxon's 2021 tables say "Petroleum product sales", never "energy".
+    distinctive = (wanted & (here | elsewhere)) - elsewhere
+    best = max((len(wanted & _measure_words(text)), -len(_measure_words(text))) for _index, text in titles)
+    if 2 * len(wanted & here) >= len(wanted) and (len(wanted & here), -len(here)) == best \
+            and 2 * len(distinctive & here) >= len(distinctive):
+        return None
+    return (f"{MEASURE_NOT_NAMED}: {_row_label(table.rows[row], col)!r} in {table.id} r{row} is the total of "
+            f"{own[1].strip()[:80]!r}, not {label}")
