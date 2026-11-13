@@ -25,8 +25,10 @@ class Widened:
 
 
 # ASUR's "Earning per American Depositary Share (in U.S. Dollars) 7.1108", read at its statement's thousands until round 79.
+# Copel's "Earnings (loss) per thousand outstanding shares", in reais as printed (served at the thousands scale to round 96).
 PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+|series\s+\W?\w+\W?\s*)?share|per\s+ads|per\s+american\s+depositary\s+(share|receipt)|"
-                       r"^(basic|diluted)\b|earnings?\s+per|\beps\b", re.I)
+                       r"per\s+(?:one\s+)?thousand\s+(?:\w+\s+){0,2}shares|"
+                       r"^(basic|diluted)\b|earnings?(?:\s*\((?:loss|losses)\))?\s+per|\beps\b", re.I)
 
 
 # Operating data a release prints atop its income statement, in units of its own (Coca-Cola FEMSA's "Volume (million

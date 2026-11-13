@@ -52,3 +52,13 @@ def test_a_statement_ends_before_the_figures_after_it():
             Row("EBITDA & CAPEX", 0), Row("EBITDA", 0, {1: 6716.0}), Row("FINANCIAL RATIOS", 0), Row("Liquidity", 0, {1: 1.53})]
     assert [row.label for row in statement_rows(rows)] == ["Net consolidated income", "Net majority income"]
     assert len(statement_rows([Row("EBITDA & CAPEX", 0), Row("EBITDA", 0, {1: 1.0})])) == 2  # nothing before it: no statement ended
+
+
+def test_earnings_or_losses_per_share_and_per_thousand_shares_are_per_share():
+    # Copel's "Earnings (loss) per thousand outstanding shares" (R$ 0.5183), Morgan Stanley's "Earnings (losses) per basic
+    # common share", Apple's "Earnings (loss) per common and common equivalent share": served at the money scale to round 96.
+    from statement_extractor.domain.printed_labels import PER_SHARE
+    for label in ("Earnings (loss) per thousand outstanding shares", "Net income per thousand shares at year-end – in reais",
+                  "Earnings (losses) per basic common share", "Earnings (loss) per common and common equivalent share"):
+        assert PER_SHARE.search(label), label
+    assert not PER_SHARE.search("Net income") and not PER_SHARE.search("Losses on shares of associates")
