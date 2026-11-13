@@ -44,7 +44,8 @@ One concern per file, no module over 300 lines, and each folder imports only the
 A pilot runs on GitHub-hosted runners on every push to a `statements/**` branch. It reads the companies in
 `pilot.json`, one job each, and hands back the files as artifacts:
 
-- `readings.jsonl`: every column read, with its checks;
+- `readings.jsonl`: every column read, with its checks; a column read from XBRL also carries Arelle's verdicts
+  (`arelle`: its facts against our figures, and the filing's own calculation file), which decide nothing yet;
 - `chosen.json`: one statement per period, with lines and source;
 - `filings.json` and `summary.json`.
 

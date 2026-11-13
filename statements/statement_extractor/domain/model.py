@@ -51,6 +51,8 @@ class Reading:
     template: bool = False
     release_of: str = ""  # the issuer a release opening named before the statement (pipeline/printed.py)
     audited_of: str = ""  # the company the auditors' report before an untitled statement names (readers/html/audited.py)
+    # Arelle's verdicts on a column read from XBRL (checks/arelle.py): beside the checks, never deciding its status.
+    arelle: dict | None = None
 
     @property
     def key(self) -> tuple[str, str, str, str]:

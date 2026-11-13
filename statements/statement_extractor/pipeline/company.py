@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 from ..checks.across import cash_against_balances
+from ..checks.arelle import ARELLE_BUDGET, arelle_summary, check_filing, enabled as arelle_cache
 from ..domain.basis import BARE_DOLLARS, BARE_PESOS, same_kind
 from ..domain.calendar import ANNUAL_FORMS, year_end_for
 from ..domain.model import REGULATOR_SOURCES
@@ -103,6 +104,10 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
                        **own_period(own, ref.form),
                        "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
                        "columns": len(found), "notes": notes})
+        if (cache := arelle_cache()) and found and phases.get("arelle", 0.0) < ARELLE_BUDGET:
+            checked = time.time()  # Arelle's second reading of the filing, a check only (checks/arelle.py)
+            record["arelle"] = check_filing(ref.filing, found, cache)
+            phases["arelle"] = round(phases.get("arelle", 0.0) + time.time() - checked, 1)
         filings.append(record)
         readings.extend(found)
         log(f"{symbol}: {ref.form} {ref.filed} {len(found)} columns, own {[f'{s}/{d}:{st}' for s, d, st in record['own']]}")
@@ -140,6 +145,8 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     summary["summary_figures"] = summary_coverage(summary_figures, chosen)
     summary["regulator_reads"] = regulator_reads
     summary["phases"] = phases
+    if arelle_cache():
+        summary["arelle"] = arelle_summary(readings, filings, arelle_cache())
     with (out / "readings.jsonl").open("w") as handle:
         for reading in readings:
             handle.write(json.dumps(reading.to_json(), default=str) + "\n")

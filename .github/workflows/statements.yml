@@ -107,6 +107,7 @@ jobs:
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
       STATEMENTS_ARCHIVE_CACHE: archive-cache  # archived reports fetched once, kept between runs
       DART_API_KEY: ${{ secrets.DART_API_KEY }}  # OpenDART (Korea's FSS) for KEPCO's own filings
+      STATEMENTS_ARELLE_CACHE: ${{ github.workspace }}/arelle-cache  # Arelle's taxonomies, this job only (checks/arelle.py)
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v10.2.0
@@ -117,7 +118,7 @@ jobs:
           cache-dependency-glob: |
             pyproject.toml
             statements/pyproject.toml
-      - run: uv pip install . ./statements
+      - run: uv pip install . './statements[arelle]'
       - uses: actions/cache/restore@v4
         with:
           path: archive-cache
