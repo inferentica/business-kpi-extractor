@@ -2229,3 +2229,26 @@ def test_a_row_whose_year_ago_cell_contradicts_last_years_figure_is_not_the_kpis
     assert not ReplayReading._year_ago_contradicts(freight, document, None)
     assert not ReplayReading._year_ago_contradicts(rpo, document, 28_354e6)
     assert ReplayReading._year_ago_contradicts(rpo, document, 27_900e6)
+
+
+def test_two_listed_metrics_read_from_one_cell_are_both_held():
+    """Exxon: six listed metrics each read from the capital expenditure table's "Worldwide" row (7,159). A found row on a
+    listed metric's cell is its copy and holds nothing."""
+    from kpi_extractor.ai import GroupSpec
+    from kpi_extractor.quality.checks import SHARED_CELL, validate_groups
+    group = GroupSpec.model_validate({"key": "operating", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "crude", "label": "Crude production", "unit": "count"}, {"key": "throughput", "label": "Refinery throughput", "unit": "count"},
+        {"key": "chemicals", "label": "Chemical sales", "unit": "count"}]})
+    kpis = {kpi.key: kpi for kpi in group.kpis}
+    item = lambda key, row, kpi=None: SimpleNamespace(group=group, kpi=kpi or kpis[key], value=7159.0, is_total=False,
+                                                      status="verified", notes=[],
+                                                      locator={"table": "A_T32", "row": row, "col": 0})
+    crude, throughput, chemicals = item("crude", 19), item("throughput", 19), item("chemicals", 12)
+    validate_groups([crude, throughput, chemicals], {})
+    assert (crude.status, throughput.status, chemicals.status) == ("needs_review", "needs_review", "verified")
+    assert crude.notes == [SHARED_CELL]
+    # A found row (not on the list) on a listed metric's cell is its copy.
+    from kpi_extractor.ai import KpiSpec
+    listed, copy_ = item("crude", 7), item("x", 7, KpiSpec(key="worldwide", label="Worldwide", unit="count"))
+    validate_groups([listed, copy_], {})
+    assert listed.status == "verified" and copy_.status == "verified"
