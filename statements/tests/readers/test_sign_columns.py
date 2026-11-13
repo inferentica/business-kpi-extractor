@@ -36,3 +36,26 @@ def test_signs_the_title_does_not_define_leave_the_column_as_it_was():
                                      year_offset=0)
     assert all(next(line["value"] for line in reading.lines if line["label"] == "Net sales") != 201_867e6
                for reading in readings if reading.fiscal_year == "2011")
+
+
+def test_a_sign_under_the_heading_names_its_columns_currency():
+    # FEMSA's FY2024 20-F: each heading spans three cells; its first row prints the sign in the heading's first cell and
+    # the figure in the next two, later rows the figure across all three. The signs went unseen, the title's dollars were
+    # taken for the reporting currency and the pesos left out (round 82).
+    def first(label, *pairs):
+        return "<tr><td colspan='3'>" + label + "</td>" + "".join(
+            f"<td>{sign}</td><td colspan='2'>{figure}</td>" for sign, figure in pairs) + "</tr>"
+
+    def later(label, *figures):
+        return "<tr><td colspan='3'>" + label + "</td>" + "".join(f"<td colspan='3'>{figure}</td>" for figure in figures) + "</tr>"
+    html = ("<p>FOMENTO ECON&#211;MICO MEXICANO, S.A.B. DE C.V. AND SUBSIDIARIES Consolidated Income Statements For the "
+            "years ended December 31, 2024 and 2023. In millions of U.S. dollars ($) and in millions of Mexican pesos (Ps.).</p>"
+            "<table><tr><td colspan='3'></td><td colspan='3'>2024 (1)</td><td colspan='3'>2024</td><td colspan='3'>2023</td></tr>"
+            + first("Net sales", ("$", "38,300"), ("Ps.", "781,600"), ("Ps.", "702,700"))
+            + later("Cost of sales", "23,000", "469,500", "421,000") + later("Gross profit", "15,300", "312,100", "281,700")
+            + later("Income before income taxes", "3,143", "64,140", "58,000") + later("Income taxes", "1,000", "20,400", "18,500")
+            + later("Net income", "2,143", "43,740", "39,500") + "</table>")
+    readings, notes = read_document(html, accession="x", form="20-F", filed=date(2025, 4, 25), document_end=date(2024, 12, 31),
+                                    fiscal_year_end="1231", year_offset=0)
+    sales = {r.fiscal_year: (r.currency, next(line["value"] for line in r.lines if line["label"] == "Net sales")) for r in readings}
+    assert sales == {"2024": ("MXN", 781_600e6), "2023": ("MXN", 702_700e6)}

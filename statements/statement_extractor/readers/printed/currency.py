@@ -73,6 +73,9 @@ def _sign_beside(table: Table, column: tuple[int, ...]) -> str | None:
         inside = _SIGN_IN_CELL.match(own.text) if own is not None else None
         if inside:
             return inside.group(1).lower().rstrip(".")  # "Ps. 35,497"
+        if own is not None and own.text.strip() and not row.figures.get(own.start) and any(
+                position in row.figures for position in (column[0] + 1, column[0] + 2)):
+            return own.text.strip().lower().rstrip(".")  # the sign under the heading, its figure just right (FEMSA's FY2024 20-F)
         before = [cell for cell in row.cells if cell.start < column[0] and column[0] - cell.start <= 2 and cell.text.strip()]
         if before and not row.figures.get(before[-1].start):
             return before[-1].text.strip().lower().rstrip(".")
