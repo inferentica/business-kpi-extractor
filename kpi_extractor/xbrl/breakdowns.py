@@ -243,10 +243,11 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             the_member = items[0][0][fixed]
             siblings = {member: value for member, value in single.get((concept, fixed), {}).items() if member != the_member}
             whole = total_for(concept, other)
-            if fixed not in _SEGMENT_AXES and siblings and not adds_up(members, whole) \
-                    and adds_up({**members, **siblings}, whole):
-                members = {**members, **siblings}
-                siblings_for[(other, concept)] = (fixed, set(siblings))
+            if fixed not in _SEGMENT_AXES and siblings and not adds_up(members, whole):
+                exact = _refined_rest(members, siblings, whole)
+                if adds_up({**members, **siblings}, whole) or exact:
+                    members = {**members, **(exact or siblings)}
+                    siblings_for[(other, concept)] = (fixed, set(siblings))
             candidates.setdefault(other, []).append((concept, members))
             fixed_for.setdefault((other, concept), (fixed, the_member))
             found = True
@@ -563,6 +564,29 @@ def _plain_revenue_figures(facts: pd.DataFrame, period_end, annual: bool, label:
         name = own if isinstance(own, str) and own.strip() else label(str(fact["concept"])) or humanize(str(fact["concept"]))
         figures.append((float(fact["numeric_value"]), name.strip()))
     return figures
+
+
+def _rounding_unit(value: float) -> float:
+    """The place a tagged figure is rounded to, read from its trailing zeros (200,000,000 → 100,000,000)."""
+    unit, whole = 1.0, abs(round(value))
+    while whole and whole % 10 == 0 and unit < 1e12:
+        whole //= 10
+        unit *= 10
+    return unit
+
+
+def _refined_rest(members: dict[str, float], siblings: dict[str, float], total: float | None) -> dict[str, float] | None:
+    """One member completing a split, tagged to a coarser place than the split's own (Netflix's DVD in its 10-Ks, "$0.2
+    billion" beside regions to the thousand): what revenue leaves after the split, when that rounds to the tagged
+    figure, is the same figure to more places (FY2020: 239.4 million against 200 million). None otherwise."""
+    if not total or len(siblings) != 1:
+        return None
+    member, tagged = next(iter(siblings.items()))
+    unit = _rounding_unit(tagged)
+    rest = total - sum(members.values())
+    if unit < 1e6 or rest <= 0 or max(_rounding_unit(value) for value in members.values()) >= unit:
+        return None
+    return {member: rest} if abs(rest - tagged) <= unit / 2 else None
 
 
 def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str],
