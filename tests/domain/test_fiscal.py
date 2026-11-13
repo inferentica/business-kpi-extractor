@@ -122,3 +122,23 @@ def test_one_mistagged_report_does_not_rename_every_fiscal_year():
     assert fiscal_label(date(2026, 8, 31), "0531", year_offset=0) == ("2027", "Q1")
     # A tie goes to the newest report.
     assert learn_year_offset([(date(2026, 7, 26), "2027", False), (date(2026, 4, 26), "2026", False)], "0125") == 0
+
+
+def test_the_window_reads_the_earlier_reports_of_its_first_fiscal_year():
+    # Amazon: the window opens on its Q2 2016 10-Q, whose year-ago columns give Q2 2015; FY2015 comes from the next 10-K.
+    # Q4 2015, the year less three quarters, needs Q1 2015, which only the Q1 2016 10-Q gives: it is read too, and
+    # nothing older (the FY2015 10-K and Q3 2015 10-Q stay out).
+    from types import SimpleNamespace
+    from kpi_extractor.domain.fiscal import with_first_year
+    ref = lambda form, filed: SimpleNamespace(form=form, filed=filed)
+    reports = [ref("10-Q", date(2015, 10, 23)), ref("10-K", date(2016, 1, 29)), ref("10-Q", date(2016, 4, 29)),
+               ref("10-Q", date(2016, 7, 29)), ref("10-Q", date(2016, 10, 28))]
+    kept = with_first_year(reports, date(2016, 5, 15), "1231")
+    assert [item.filed for item in kept] == [date(2016, 4, 29), date(2016, 7, 29), date(2016, 10, 28)]
+    # Apple, fiscal years ending in late September: a window opening on its fiscal Q3 2016 10-Q takes fiscal Q1 and Q2.
+    apple = [ref("10-K", date(2015, 10, 28)), ref("10-Q", date(2016, 1, 27)), ref("10-Q", date(2016, 4, 27)),
+             ref("10-Q", date(2016, 7, 27))]
+    assert [item.filed for item in with_first_year(apple, date(2016, 5, 15), "0924")] == \
+        [date(2016, 1, 27), date(2016, 4, 27), date(2016, 7, 27)]
+    # No fiscal calendar known: the window as it was.
+    assert [item.filed for item in with_first_year(reports, date(2016, 5, 15), None)] == [date(2016, 7, 29), date(2016, 10, 28)]
