@@ -514,3 +514,49 @@ def test_a_coarse_reading_matches_its_tags_figure_whatever_the_float_rounding():
     # and "29%".
     assert learn_tags({("2023", "Q3"): 57.0, ("2023", "Q4"): 29.0},
                       {("2023", "Q3"): {share: 0.57 * 100}, ("2023", "Q4"): {share: 0.29 * 100}}) == [share]
+
+
+def test_a_reports_other_split_of_the_same_total_never_replaces_the_releases_lines():
+    # Wells Fargo: its 10-Q's "Other" (412) takes in lines its supplement shows apart (105); the 10-Q's lines add up to
+    # the same total, yet each is another figure. The held quarter stays held.
+    from datetime import date as day
+    from types import SimpleNamespace
+
+    from kpi_extractor import ai
+    from kpi_extractor.pipeline import SymbolPipeline
+    ends = {"q1": "2026-03-31", "q2": "2026-06-30", "q3": "2026-09-30"}
+    starts = {"q1": "2026-01-01", "q2": "2026-04-01", "q3": "2026-07-01"}
+    figures = {"q1": (1_192_504e3, 252_709e3), "q2": (1_249_964e3, 221_269e3), "q3": (1_200_000e3, 330_000e3)}
+    members = {"fees": "kkr:ManagementFeesMember", "other": "kkr:OtherMember"}
+
+    def frame_of(accession):
+        return pd.DataFrame([{"concept": "us-gaap:Revenues", "numeric_value": value, "period_type": "duration",
+                              "period_start": starts[accession], "period_end": ends[accession], "dim_srt_ProductOrServiceAxis": member}
+                             for member, value in zip(members.values(), figures[accession])])
+    pipeline = SymbolPipeline(None, "WFC", quarters=4, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(name="Wells Fargo", fiscal_year_end="1231", foreign=False)
+    pipeline.offset = 0
+    pipeline.filings = {a: {"accession": a, "period_end": e, "status": "processed"} for a, e in ends.items()}
+    pipeline.values = {}
+    read = {"Q1": (1_192_504e3, 252_709e3, 1_445_213e3, "verified"), "Q2": (1_249_964e3, 221_269e3, 1_471_233e3, "verified"),
+            "Q3": (1_300_000e3, 230_000e3, 1_530_000e3, "needs_review")}
+    for period, (fees, other, total, status) in read.items():
+        for kpi, value in (("fees", fees), ("other", other), ("total", total)):
+            pipeline.store._values[("kpi_ni", kpi, "2026", period)] = {
+                "group_key": "kpi_ni", "group_label": "NI", "group_kind": "revenue_breakdown", "group_order": 20, "kpi_key": kpi,
+                "kpi_label": kpi, "kpi_order": 0, "unit": "currency", "currency": "USD", "fiscal_year": "2026", "fiscal_period": period,
+                "period_end": ends[f"q{period[1]}"], "method": "ai", "validation_status": status, "source_accession": "release",
+                "value": value, "notes": ["parts differ from the total by -4.2%"] if status == "needs_review" else [],
+                "locator": {"total": total}}
+    pipeline._xbrl = lambda ref: SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: frame_of(ref.accession)))
+    stored = []
+    pipeline.store.write = stored.extend
+    pipeline.store.curation = lambda *_args: None
+    spec = ai.Spec.model_validate({"groups": [{"key": "ni", "label": "NI", "kind": "revenue_breakdown", "total_kpi": "total", "kpis": [
+        {"key": "total", "label": "Total", "unit": "currency"}, {"key": "fees", "label": "Fees", "unit": "currency"},
+        {"key": "other", "label": "Other", "unit": "currency"}]}]})
+    reports = [SimpleNamespace(accession=a, form="10-Q", filed=day(2026, 11, 1), source_url="u") for a in ends]
+    pipeline.store.write(pipeline._fill_tagged_metrics(reports, spec))
+    q3 = [v for v in stored if v["fiscal_period"] == "Q3"]
+    assert not [v for v in q3 if v["validation_status"] == "verified"]
+    assert not [v for v in stored if v["value"] in (1_200_000e3, 330_000e3)]

@@ -242,6 +242,24 @@ def _flag(items: Iterable, note: str) -> None:
         item.notes.append(note)
 
 
+SHARED_CELL = "read from the same table cell as another listed metric"
+
+
+def _shared_cells(values: list) -> None:
+    """Two listed metrics read from one table cell: at most one of them is that cell's figure. Exxon's six "Worldwide"
+    rows (production, throughput, sales) were each read from the capital expenditure table's "Worldwide" row, 7,159,
+    and all six passed every check. Both are held. A found row on a listed metric's cell is its copy, not a second
+    metric (UnitedHealthcare's Employer & Individual, read as Domestic and again under its own name)."""
+    by_cell: dict[tuple, list] = {}
+    for item in values:
+        cell = cell_of(item.locator)
+        if cell is not None and any(kpi.key == item.kpi.key for kpi in item.group.kpis):
+            by_cell.setdefault(cell, []).append(item)
+    for items in by_cell.values():
+        if len({(item.group.key, item.kpi.key) for item in items}) > 1:
+            _flag((item for item in items if SHARED_CELL not in item.notes), SHARED_CELL)
+
+
 def validate_groups(values: list, previous: dict[str, float]) -> None:
     """Marks every value of a group that fails its check as needs_review, with the reason."""
     by_group: dict[str, list] = {}
@@ -250,6 +268,7 @@ def validate_groups(values: list, previous: dict[str, float]) -> None:
     for items in by_group.values():
         for finding in findings(READING_CHECKS, reading_figures(items), previous=previous):
             _flag((figure.source for figure in finding.figures), finding.note)
+    _shared_cells(values)
 
 
 def check_period(located, expected: date) -> str | None:

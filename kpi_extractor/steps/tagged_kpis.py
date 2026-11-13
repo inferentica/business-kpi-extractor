@@ -238,7 +238,8 @@ class TaggedKpiReading:
         """A flagged breakdown quarter whose every line is its report's exact tagged figure (for a Q4, the 10-K's year less
         three settled quarters) is settled: KKR tags each of its asset management segment's five revenue lines to the
         thousand but not their total, so no total proves them. A quarter whose lines, with those its report tags and its
-        reading missed or misread, then add up (each parent to its lines, the top lines to the total) takes them all.
+        reading missed, then add up (each parent to its lines, the top lines to the total) takes them all; a line the
+        reading gave takes its report's figure only when that is the same figure to more places.
         A line's tags are those that equal its readings in at least two quarters and never differ; a total the group
         lists must be its lines added up, to its rounding."""
         rows = {value_key(v): v for v in self.values.values() if v["group_key"] == key and v["validation_status"] != "rejected"
@@ -316,6 +317,11 @@ class TaggedKpiReading:
                 continue
             added = {kpi: value for kpi in listed if kpi not in parts and (value := tagged(quarter, kpi)) is not None}
             changed = {kpi for kpi, value in figures.items() if value != float(parts[kpi]["value"])}
+            # Only the same figure to more places replaces a line the release states: a report that splits the total
+            # another way gives other figures that add up just as well (Wells Fargo's 10-Q "Other", 412 against its
+            # supplement's 105).
+            if any(not refines(figures[kpi], float(parts[kpi]["value"])) for kpi in changed):
+                continue
             if not whole({**figures, **added}, total):
                 # The lines as read, when each is its report's figure and they add up (KKR's asset management lines).
                 if changed or not whole(figures, total):
