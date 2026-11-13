@@ -9,6 +9,7 @@ from ..sources.archive import filing_folder
 from ..quality.checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
 from ..documents.document import Document, clean, parse_number
 from ..readers.extract import column_header
+from ..rules.period import release_unit
 from ..readers.quoted_rows import row_line_others
 from ..sources.base import FilingRef
 
@@ -54,14 +55,17 @@ def _year_ago_cells(document: Document, locator: dict, value: float) -> list[flo
     table = document.tables.get(str(locator.get("table")))
     if table is None and locator.get("quote") and (parsed := parse_number(locator.get("value_text") or "")) and parsed.value:
         # A table row quoted as a line of text: its other figures (the year-ago one among them, where it shows one).
-        return [other * value / parsed.value for other in row_line_others(locator["quote"], locator["value_text"])]
+        unit = release_unit(value, parsed.value)
+        return [] if unit is None else [other * unit for other in row_line_others(locator["quote"], locator["value_text"])]
     if table is None or locator.get("row") is None or locator.get("col") is None:
         return []
     row, col = int(locator["row"]), int(locator["col"])
     current = parse_number(table.cell(row, col))
     if current is None or not current.value:
         return []
-    factor = value / current.value
+    factor = release_unit(value, current.value)
+    if factor is None:
+        return []
     first = next((i for i, r in enumerate(table.rows) if r and any(parse_number(c) for c in r[1:])
                   and re.search(r"[A-Za-z]", r[0]) and not all(re.fullmatch(r"(19|20)\d{2}", c.strip()) for c in r[1:] if c)), 1)
     period = column_header(table, first, col)  # "three months ended @ # #": years blanked, duration kept

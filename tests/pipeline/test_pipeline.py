@@ -1389,6 +1389,32 @@ def test_a_reserved_section_fits_before_earlier_choices_fill_the_budget():
     assert "40,853,554" in text and len(text) <= 2_100
 
 
+def test_a_year_ago_cell_keeps_its_release_unit_beside_a_restated_figure():
+    # Bank of America's Q4 2019 equities: $1,015 million stored (restated a year later), $1,018 million in that release.
+    # Its year-ago cell, $1,071 million, was scaled by 1,015/1,018 into $1,067,843,811.39.
+    from kpi_extractor.documents.document import parse_document
+    from kpi_extractor.steps.shared import _year_ago_cells
+    html = ("<table><tr><td></td><td>Three Months Ended</td><td>Three Months Ended</td></tr>"
+            "<tr><td></td><td>December 31, 2019</td><td>December 31, 2018</td></tr>"
+            "<tr><td>Equities</td><td>1,018</td><td>1,071</td></tr></table>")
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    locator = {"table": next(iter(document.tables)), "row": 2, "col": 1}
+    assert _year_ago_cells(document, locator, 1015e6) == [1071e6]
+    assert _year_ago_cells(document, locator, 3.5) == []  # not the row's figure in any unit
+
+
+def test_a_restatement_with_a_fraction_of_a_dollar_returns_to_its_filed_figure():
+    def row(key, value, was):
+        return {"group_key": "kpi_trading", "group_kind": "revenue_breakdown", "group_label": "Trading", "kpi_key": key,
+                "kpi_label": key, "fiscal_year": "2018", "fiscal_period": "Q4", "period_end": "2018-12-31", "method": "ai",
+                "validation_status": "verified", "value": value, "locator": {}, "unit": "currency",
+                "notes": [f"restated in the next year's release (was {was})"]}
+    pipeline = _pipeline(FakeControl({}), [row("equities", 1_067_843_811.39, 1065000000), row("ficc", 1_516_135_612.54, 1491000000)])
+    pipeline.store.write(pipeline._prove_flagged([]))
+    assert {v["kpi_key"]: (v["value"], v["validation_status"], v["notes"]) for v in pipeline.values.values()} == {
+        "equities": (1065e6, "needs_review", []), "ficc": (1491e6, "needs_review", [])}
+
+
 def test_a_restated_figure_keeps_the_filed_one_exactly():
     # TSMC's Q3 2018 7nm: 25,336,977 thousand came back as 25,337,000 from a note written to six digits.
     assert f"{25_336_977_000.0:.15g}" == "25336977000"
