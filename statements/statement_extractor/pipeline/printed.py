@@ -125,7 +125,11 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             document_notes.append(f"another issuer's release left out ({'; '.join(issuers)[:120]})")
         printed_titles, document_notes = split_titled(document_notes)
         if titled is not None:
-            titled |= printed_titles | {(kind,) for kind in headed_kinds(content)}
+            # Another company's statements print none of the company's: HBOS's 2008 accounts in Lloyds' June 2010 6-K. A
+            # heading counts where no table of its statement was read; a read one's columns say what it prints.
+            kinds = {reading.statement for reading in readings} if others else {"income", "balance", "cash_flow"}
+            heads = {(kind,) for kind in headed_kinds(content) if kind not in {reading.statement for reading in readings}}
+            titled |= {title for title in printed_titles | heads if title[0] in kinds}
         if signs is not None:
             parse = {"html": parse_html, "text": parse_text, "positioned": parse_text, "slides": parse_slides}[printed]
             for key, figures in printed_figures(parse(content)).items():

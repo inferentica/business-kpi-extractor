@@ -46,8 +46,8 @@ ASSETS = re.compile(r"^(total\s+)?assets$", re.I)
 # KBR 2007: "Total liabilities, minority interest and shareholders' equity and accumulated other comprehensive loss".
 LIABILITIES_AND_EQUITY = re.compile(r"^(total\s+liabilities.*|liabilities\s+and\s+(stockholders|shareholders)['’´]?\s+)\b(equity|investment|deficit|capital)(\s*\(deficit\))?"
                                     r"(\s+and\s+accumulated\s+other\s+comprehensive\s+(income|loss|\(loss\)\s+income))?$|"
-                                    # KEPCO: "Total Shareholders' Equity and Liabilities"
-                                    r"^total\s+(stockholders|shareholders)['’´]?\s+equity\s+and\s+liabilities$", re.I)
+                                    # KEPCO: "Total Shareholders' Equity and Liabilities"; PicS's "TOTAL EQUITY AND LIABILITIES"
+                                    r"^total\s+((stockholders|shareholders)['’´]?\s+)?equity\s+and\s+liabilities$", re.I)
 
 
 LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
@@ -75,6 +75,8 @@ OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(begi
 NET_OPENING = re.compile(r"^initial\s+balance,?\s+net\b", re.I)
 # FEMSA's "Ending balance" before the discontinued operations' cash is taken off ("Total ending balance … net").
 GROSS_CLOSING = re.compile(r"^ending\s+balance$", re.I)
+# A UK GAAP cash flow statement's (FRS 1) line before its financing section: "Net cash inflow (outflow) before financing".
+BEFORE_FINANCING = re.compile(r"^net\s+cash\s+(?:inflow|outflow)[^:]*\bbefore\s+financing$", re.I)
 
 
 CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(total\s+)?(ending|closing)\b.*\bcash\b|^closing\s+balance$", re.I)
@@ -106,14 +108,14 @@ PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+b
 # Kroger 2009: "Net earnings including noncontrolling interests", then the parent's share.
 NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+profit(\s*/\s*\(loss\)|\s+\(loss\))?$|"
                         # IFRS: TIM's "Net profit for the period", Petrobras's "Net income for the period"
-                        r"^net\s+(income|profit|earnings|loss)(\s*/\s*\(loss\)|\s+\(loss\))?\s+for\s+the\s+(period|year|quarter)$|^net\s+\((loss|income)\)\s+(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
+                        r"^net\s+(income|profit|earnings|loss)(\s*/\s*\(loss\)|\s+\(loss\))?\s+for\s+the\s+(period|year|quarter)$|^net\s+\((loss|income)\)\s*/?\s*(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
                         # Canadian GAAP from 2007, no other comprehensive income: Gildan's "Net earnings and comprehensive income".
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+and\s+comprehensive\s+(income|earnings)(\s+\(loss\))?$|"
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
                          r"^income\s+\(loss\)\s+after\s+taxes$|"  # Copel's 2003 quarterly information
-                         r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"
+                         r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^(\(loss\)\s+)?profit(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"; Lloyds 2011: "(Loss) profit …"
                         # UK GAAP (Lloyds TSB): "Profit for the period attributable to shareholders", before dividends.
                         r"^profit\s+for\s+the\s+(year|period|half-year)\s+attributable\s+to\s+(equity\s+)?shareholders$|"
                         # Lloyds' quarterly updates since 2025: "Profit before tax", "Tax expense", "Profit after tax".

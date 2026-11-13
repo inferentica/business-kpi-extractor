@@ -73,6 +73,7 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
     # then (Alcon inside Novartis, April 2011 to its spin-off in April 2019).
     reported = {str(f.get("fiscal_year")) for f in filings if f.get("fiscal_year")
                 and f["form"].upper().startswith(("20-F", "40-F", "10-K", "ARS"))}
+    gap = _registrant_gap(filings, quarters)
     expected = found = parent_only = derivable = not_filing = 0
     missing, unprinted = [], []
     for year in range(int(quarters[0][0]), int(latest[0]) + 1):
@@ -80,7 +81,7 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
             quarter = f"Q{number}"
             if (str(year), quarter) > latest:
                 break
-            if str(year) not in released and str(year) not in reported:
+            if str(year) not in released and str(year) not in reported or (str(year), quarter) in gap:
                 not_filing += 1
                 continue
             wanted = [("income", [(quarter, "quarter")])]
@@ -111,6 +112,30 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
             "quarters_parent_only": parent_only,
             "quarters_missing": missing[:40], "quarters_unprinted": len(unprinted), "quarters_not_filing": not_filing,
             "quarters_unprinted_list": unprinted[:120]}
+
+
+def _registrant_gap(filings, quarters: list) -> set:
+    """The quarters between two releases more than six quarters apart with no annual report filed between them: the
+    company was no registrant then, though the years at either end hold a filing (Alcon's last release before Novartis
+    took it over came in April 2011, its first after the spin-off in April 2019: 2011 Q2 to 2018 Q3)."""
+    index = lambda quarter: int(quarter[0]) * 4 + int(quarter[1][1])  # noqa: E731
+    if not quarters or any("filed" not in filing for filing in filings):
+        return set()  # no dates, no gap to tell
+    filed = {}
+    for filing in filings:
+        if filing["form"] == "6-K" and filing.get("release_quarter"):
+            filed.setdefault(tuple(filing["release_quarter"]), []).append(filing["filed"])
+    annual = [filing["filed"] for filing in filings if filing["form"].upper().startswith(("20-F", "40-F", "10-K"))]
+    gap = set()
+    # Before the company's first filing of any kind it was no registrant: PicS's first came in March 2026, its 2025 Q4
+    # release, so its 2025 Q1-Q3 are not counted.
+    if min(filing["filed"] for filing in filings) >= min(filed.get(quarters[0], ["0"])):
+        gap.update((quarters[0][0], f"Q{number}") for number in range(1, int(quarters[0][1][1])))
+    for before, after in zip(quarters, quarters[1:]):
+        if index(after) - index(before) > 6 and not any(max(filed[before]) < day < min(filed[after]) for day in annual):
+            gap.update((str(number // 4), f"Q{number % 4 or 4}") if number % 4 else (str(number // 4 - 1), "Q4")
+                       for number in range(index(before) + 1, index(after)))
+    return gap
 
 
 def _counts(chosen, field: str, kind=lambda value: value) -> dict:

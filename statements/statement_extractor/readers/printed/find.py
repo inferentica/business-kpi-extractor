@@ -6,7 +6,7 @@ import re
 from dataclasses import replace
 
 from ...domain.basis import currencies_named
-from ...domain.printed_labels import (ASSETS, BARE_TOTAL, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES,
+from ...domain.printed_labels import (ASSETS, BARE_TOTAL, BEFORE_FINANCING, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES,
                                       LIABILITIES_AND_EQUITY, NET_INCOME, PRETAX, SECTIONS, EQUITY_SECTION)
 from .side_by_side import SIDE_BY_SIDE
 from .tables import Table, figure_columns, number
@@ -17,8 +17,9 @@ TITLES = (
                           r"statements?\s+of\s+(consolidated\s+)?profit\s+or\s+loss(\s+and\s+(other\s+)?comprehensive\s+income)?|"
                           # UK GAAP (Lloyds TSB to 2004): "CONSOLIDATED PROFIT AND LOSS ACCOUNT".
                           r"profit\s+and\s+loss\s+accounts?)\b", re.I)),
-    ("balance", re.compile(r"\b(consolidated\s+)?(balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?financial\s+(position|condition))\b", re.I)),
-    # Morgan Stanley: "Consolidated Cash Flow Statements".
+    ("balance", re.compile(r"\b(consolidated\s+)?((?<!off-)(?<!off )(?<!on-)(?<!on )balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?financial\s+(position|condition))\b", re.I)),
+    # Never an "off-balance sheet" or "on-balance sheet" (UBS's credit-risk notes, round 88). Morgan Stanley: "Consolidated
+    # Cash Flow Statements".
     ("cash_flow", re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?cash\s+flows?|cash\s+flows?\s+statements?)\b", re.I)),
 )
 
@@ -29,8 +30,8 @@ _NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bcomparison\b.{0,120}?\bve
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
                             r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b|"
                             # Chase's 1998 reconciliation of reported results to an operating basis, headed "INCOME STATEMENT";
-                            # Coca-Cola FEMSA's "Comparable Income Statement" (no acquisitions, constant currency).
-                            r"operating\s+basis|reported\s+results|comparable\s+(?:income|results|basis)|"
+                            # Coca-Cola FEMSA's "Comparable Income Statement"; Lloyds' "summary income statement on an EEV basis".
+                            r"operating\s+basis|reported\s+results|comparable\s+(?:income|results|basis)|\beev\s+basis|"
                             # A foreign filer's reconciliation to U.S. GAAP (TSMC: "reconciliation of the significant
                             # balance sheet accounts to the amounts determined under U.S. GAAP"), its rows "As reported".
                             r"reconciliation\s+of|amounts\s+determined\s+under|(under|to|with)\s+u\.?\s?s\.?\s+gaap", re.I)
@@ -42,13 +43,12 @@ _DISCONTINUED = re.compile(r"\b(?:statements?\s+of\s+(?:operations|income)|incom
                            r"discontinued\s+operations\b", re.I)
 # Results restated by the company's own measures beside its statutory statements (Lloyds: "UNDERLYING BASIS CONSOLIDATED
 # INCOME STATEMENT", "INCOME STATEMENT - UNDERLYING BASIS"): only the statutory statement is the company's own.
-_UNDERLYING = re.compile(r"\bunderlying\s+basis\b", re.I)
+_UNDERLYING = re.compile(r"\bunderlying\s+basis\b|\bcombined\s+businesses\b", re.I)  # and Lloyds' 2010-12 "Combined businesses"
 
 
 # Volaris's 20-F: "the selected consolidated statements of operations data", its table's first row "CONSOLIDATED STATEMENTS OF OPERATIONS".
 _SELECTED_DATA = re.compile(r"\bselected\s+(?:consolidated\s+)?(?:financial|statements?|operating)\b|\bstatements?\s+of\s+\w+(?:\s+\w+)?\s+data\b", re.I)
-# "quarterly" names quarterly-data tables, not the report's own running header (Tennant's "Quarterly Report – Form 10-Q"
-# atop every page).
+# "quarterly" names quarterly-data tables, not the report's running header (Tennant's "Quarterly Report – Form 10-Q").
 _NOT_IN_RELEASE = re.compile(_NOT_STATEMENT.pattern.replace("summary|", "").replace("|quarterly(?!\\s+report)|", "|"), re.I)
 
 
@@ -205,7 +205,7 @@ def _leading(table: Table) -> list:
 
 # Words that put a statement's name inside a sentence ("as reported on the Consolidated Statement of Income").
 _SENTENCE_WORDS = {"the", "on", "in", "of", "our", "its", "their", "to", "from", "see", "with", "by", "and", "these", "this",
-                   "those", "such", "accompanying", "following", "into", "within", "per", "under", "a", "an", "related",
+                   "those", "such", "accompanying", "following", "into", "within", "per", "under", "a", "an", "related", "about",
                    # "presents average balance sheets for the three month periods" (SYBT's MD&A): averages, no statement
                    "average", "presents", "present", "summarized"}
 
@@ -285,7 +285,7 @@ def _complete(kind: str, group: list[Table]) -> bool:
             any(LIABILITIES_AND_EQUITY.match(label) or EQUITY.match(label) for label in labels) or bare >= 2
             or any(EQUITY_SECTION.search(label) for label in labels) and any(LIABILITIES.match(label) for label in labels))
     if kind == "cash_flow":
-        return any(CLOSING.search(label) for label in labels) or sum(1 for label in labels if DATED_CASH.search(label)) >= 2
+        return any(CLOSING.search(label) or BEFORE_FINANCING.match(label) for label in labels) or sum(1 for label in labels if DATED_CASH.search(label)) >= 2
     return any(NET_INCOME.match(label) or PRETAX.search(label) for label in labels)
 
 def two_columns(table, periods: dict) -> set:

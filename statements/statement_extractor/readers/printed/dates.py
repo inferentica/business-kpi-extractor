@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from ...domain.periods import Period
 from .find import TITLE_PATTERNS
 from .ranges import (dates_in_order, spans_over, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric,
-                     own_month, paired_spans, counted_start, slashed_day_first, off_title)
+                     own_month, paired_spans, counted_start, slashed_day_first, off_title, YEAR_TO_DATE)
 from .tables import Table, figure_columns, header_text
 
 
@@ -190,7 +190,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                 continue
         if not years and not numeric and not dotted:
             continue
-        span = _SPAN.search(above) or title_span
+        span = _SPAN.search(above) or (None if YEAR_TO_DATE.search(above) else title_span)
         days = 364
         if span is not None and span.group(1):
             days = _span_days(span.group(1), span.group(2))

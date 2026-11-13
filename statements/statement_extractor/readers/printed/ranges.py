@@ -23,6 +23,10 @@ def numeric_date(match: re.Match, day_first: bool = False) -> date | None:  # "3
         return None
 
 
+# A column of its own under "Year-to-date", beside "For the quarter ended" (UBS's quarterly reports): from the year's start.
+YEAR_TO_DATE = re.compile(r"\byear[-\s]to[-\s]date\b", re.I)
+
+
 def slashed_day_first(text: str) -> bool:
     """Slashed dates read day first only where one can only be read so and none only month first: Copel's 2009 ITRs
     print "30/06/2009 | 31/03/2009", its 2004 ITR "01/04/2003 a 6/30/2003", PepsiCo "3/21/09"."""

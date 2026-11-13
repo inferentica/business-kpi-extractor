@@ -22,9 +22,13 @@ _HEADING_WORDS = {"for", "as", "at", "in", "of", "year", "years", "three", "six"
 
 
 def titled_notes(kind: str, periods: dict, document_end: date | None, fiscal_year_end: str, year_offset: int) -> list[str]:
-    """A note for each of the document's own periods a found statement prints; with none dated, one for its kind."""
+    """A note for each of the document's own periods a found statement prints; with none dated, one for its kind. One
+    whose columns are all dated to other periods prints none of the document's (Lloyds TSB's June 2003 6-K, its 2002
+    halves restated)."""
     own = {label_period(period, fiscal_year_end, year_offset) for period in periods.values()
            if document_end is not None and abs(period.end - document_end) <= timedelta(days=7)} - {None}
+    if not own and periods and document_end is not None and all(period.end < document_end - timedelta(days=7) for period in periods.values()):
+        return []
     if not own:
         return [f"{MARK}{kind}"]
     return [f"{MARK}{kind} {' '.join(label)}" for label in sorted(own)]

@@ -55,7 +55,8 @@ def _row(cells: list[Cell]) -> Row | None:
         if level is None:
             level = cell.start
         label_parts.append(text)
-    label = NOTE_MARK.sub("", " ".join(label_parts)).strip()
+    # Rules run on after a label are no part of it: Alcon's 2002 "Total liabilities and shareholders' equity ===== =====".
+    label = NOTE_MARK.sub("", re.sub(r"(\s+[=_\-]{3,})+$", "", " ".join(label_parts))).strip()
     code = ACCOUNT_CODE.match(label)
     account = code.group(0).strip() if code else ""
     if code:  # a CVM account code: its depth is the line's level ("3.10" over "3.10.01")

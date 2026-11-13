@@ -4,9 +4,10 @@ from __future__ import annotations
 import re
 
 from ..domain.model import FAIL, NONE, PASS, Check
-from ..domain.printed_labels import (CHANGE, CLOSING, DATED_CASH, EFFECT, EXCHANGE, GROSS_CLOSING, NET_OPENING, OPENING,
+from ..domain.printed_labels import (BEFORE_FINANCING, CHANGE, CLOSING, DATED_CASH, EFFECT, EXCHANGE, GROSS_CLOSING, NET_OPENING, OPENING,
                                      SECTION_HEADS, SECTION_KINDS, SECTIONS)
 from .match import first_match
+from .subtotals import subtotals
 from .tolerance import close
 
 
@@ -20,7 +21,7 @@ def cash_check(figures) -> Check:
     if (not opening or not closing) and len(dated) >= 2:
         opening, closing = dated[0], dated[-1]
     if not opening or not closing:
-        return Check("cash", NONE, "no opening and closing cash")
+        return _frs1(figures) or Check("cash", NONE, "no opening and closing cash")
     # Every beginning balance opens the period (TSMC: cash held for sale at the beginning of the year, then cash),
     # unless one is printed net of the others (Coca-Cola FEMSA's "Initial balance, net").
     net_opening = first_match(figures, NET_OPENING)
@@ -51,22 +52,45 @@ def cash_check(figures) -> Check:
     placed = [(index, value) for index, (label, _level, value) in enumerate(figures)
               if SECTIONS.search(label) and re.search(r"^net|^cash|^total", label, re.I)]
     sections = [value for _index, value in placed]
-    candidates = list(changes)
-    candidates += [change + effect for change in changes for effect in effects]
-    candidates += [change + sum(effects) for change in changes if len(effects) > 1]
+    # Each change with the printed figures it takes, opening and closing among them: each is exact to half a unit (UBS's
+    # Q3 2022 cash flow, 207,875 - 2,382 - 15,788 against 189,707, rejected until round 88).
+    candidates = [(change, 3) for change in changes]
+    candidates += [(change + effect, 4) for change in changes for effect in effects]
+    candidates += [(change + sum(effects), 3 + len(effects)) for change in changes if len(effects) > 1]
     if len(changes) > 1:  # the year's change and its restricted cash's (Coca-Cola FEMSA), with what lies between
-        candidates += [sum(changes) + sum(between)]
+        candidates += [(sum(changes) + sum(between), 2 + len(changes) + len(between))]
     if len(sections) >= 3:
-        candidates += [sum(sections[:3]), sum(sections[:3]) + sum(effects[:1])]
+        candidates += [(sum(sections[:3]), 5), (sum(sections[:3]) + sum(effects[:1]), 5 + len(effects[:1]))]
         # The effect of exchange rates on cash printed after the sections, not an operating adjustment of the same
         # words before them (Gildan's 2001 "Foreign exchange loss (gain)" among its adjustments to net earnings).
         after = [value for index, (label, _level, value) in enumerate(figures) if index > placed[2][0] and value is not None
                  and (EXCHANGE.search(label) or EFFECT.match(label))]
-        candidates += [sum(sections[:3]) + sum(after)]
+        candidates += [(sum(sections[:3]) + sum(after), 5 + len(after))]
     closings = [closing[1]] + [value for label, _level, value in figures if GROSS_CLOSING.match(label) and value is not None]
-    for change in candidates:
-        if any(close(opening[1] + change, end, 3) for end in closings):
+    for change, terms in candidates:
+        if any(close(opening[1] + change, end, terms) for end in closings):
             return Check("cash", PASS)
     if not candidates:
         return Check("cash", NONE, "no change in cash")
-    return Check("cash", FAIL, f"opening {opening[1]:,.1f} + change {candidates[0]:,.1f} vs closing {closing[1]:,.1f}")
+    return Check("cash", FAIL, f"opening {opening[1]:,.1f} + change {candidates[0][0]:,.1f} vs closing {closing[1]:,.1f}")
+
+
+_FINANCING = re.compile(r"^net\s+cash\s+(?:inflow|outflow)[^:]*\bfrom\s+financing$", re.I)
+
+
+def _frs1(figures) -> Check | None:
+    """A UK GAAP cash flow statement (FRS 1) closes on the change in cash, its balances in a note: the net cash flow
+    before financing sums the operating cash flow and the sections after it, each at its own total, financing sums
+    its lines, and the change is the two (Lloyds TSB's half-years to 2004: 4,670 + 5 - 337 - 324 - 1,055 - 7 - 1,311
+    = 1,641; 1,641 + 503 = 2,144)."""
+    before = next((index for index, (label, _level, value) in enumerate(figures) if value is not None and BEFORE_FINANCING.match(label)), None)
+    financing = next((index for index, (label, _level, value) in enumerate(figures) if value is not None and _FINANCING.match(label)), None)
+    change = next((index for index, (label, _level, value) in enumerate(figures) if value is not None and CHANGE.search(label)
+                   and financing is not None and index > financing), None)
+    if None in (before, financing, change) or not before < financing < change:
+        return None
+    starts = subtotals(figures)
+    if before in starts and financing in starts and close(figures[before][2] + figures[financing][2], figures[change][2], 3):
+        return Check("cash", PASS)
+    return Check("cash", FAIL, f"FRS 1: before financing {figures[before][2]:,.1f} + financing {figures[financing][2]:,.1f} "
+                               f"vs change {figures[change][2]:,.1f}")

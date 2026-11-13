@@ -25,7 +25,9 @@ _GLYPH = 0.5
 
 
 def is_positioned(content: str) -> bool:
-    """Pages of absolutely placed text and no tables."""
+    """Pages of absolutely placed text and no tables, after an inline XBRL document's hidden header (UBS's Q2 reports
+    since 2021: some 3 MB of contexts before the first page, unread until round 88)."""
+    content = content[max(0, content.find("</ix:header>")):]
     head = content[:400_000].lower()
     return len(_PAGE.findall(content[:2_000_000])) >= 3 and head.count("position:absolute") > 300 and "<tr" not in head
 

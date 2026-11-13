@@ -43,8 +43,12 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         # A statement in a currency the company does not report in is a convenience translation read as the
         # statement (TSMC's archived Q3 2001 nine months in US$): never served, even where nothing else covers the
         # period.
+        # A quarter's own report in the currency of the year before counts too: UBS's Q1 and Q2 2018 reports, in francs
+        # before it moved to dollars that October (round 88).
+        before = by_year.get(str(int(key[1]) - 1), set()) if key[2] != "FY" and key[1].isdigit() else set()
         kept = [reading for reading in group if reading.status == "kept"
-                and (reading.currency is None or reading.currency in by_year.get(key[1], {reporting} - {None}) or not reporting)]
+                and (reading.currency is None or reading.currency in by_year.get(key[1], {reporting} - {None}) or not reporting
+                     or reading.own and reading.currency in before)]
         own = next((reading for reading in sorted(group, key=lambda item: item.filed) if reading.own), None)
         # A report filed with the SEC (10-K, 20-F, 10-Q) wins over a release for the same period: a release's year and
         # year-end columns are unaudited, and the annual report that follows is the company's statement of them.

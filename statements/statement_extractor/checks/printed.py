@@ -43,7 +43,7 @@ def balance_check(figures) -> Check:
 _NO_PART = re.compile(r"^(total|gross|net|operating\s+(income|profit|loss))\b", re.I)
 
 
-def _without_parts(lines: list, same_level: bool = False) -> list:
+def _without_parts(lines: list, same_level: bool = False, single: bool = False) -> list:
     """Lines with the parts printed below their own total left out: Brazil's CVM forms print each account, then the
     accounts it sums ("Provision for income tax and social contribution" -54,877, then "Income tax" -39,517 and "Social
     contribution" -15,360). Parts sum to their total exactly, two or more of them, all with figures."""
@@ -61,7 +61,8 @@ def _without_parts(lines: list, same_level: bool = False) -> list:
                     same_level and (_NO_PART.match(part_label) or _NO_PART.match(label) or not value):
                 break  # parts sit below their total, a level deeper (the CVM forms' account codes)
             running += part
-            if count >= 2 and close(running, value, 0 if not same_level else count) and (value != 0 or count == 2):
+            if count >= 2 and close(running, value, 0 if not same_level else count) and (value != 0 or count == 2) or \
+                    single and count == 1 and value and part == value and part_label != label:
                 skip = count
                 break
     return kept
@@ -150,6 +151,14 @@ def total_check(printed) -> Check:
         again = _totals(_without_parts(printed, same_level=True))
         if again.result == PASS:
             return again
+        # Totals over totals over their parts, a part alone equal to its total: PicS's "Financial assets", then "…at
+        # fair value through other comprehensive income 2,873,043" over its one line, "Financial Investments 2,873,043".
+        stripped = printed
+        for _ in range(3):
+            stripped = _without_parts(stripped, same_level=True, single=True)
+            again = _totals(stripped)
+            if again.result == PASS:
+                return again
     return check
 
 
