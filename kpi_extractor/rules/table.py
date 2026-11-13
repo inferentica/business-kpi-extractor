@@ -35,6 +35,21 @@ def _section_heading(table: Table, row: int) -> str:
     return " ".join(headings)
 
 
+def not_a_percent(table: Table, row: int, col: int, text: str) -> str | None:
+    """Why a cell with no % sign is not a percent, or None when it is marked as one where it sits: its row, its own
+    column's heading, the table's heading over its labels (Coca-Cola's "Percent Change"), or the heading over its row
+    (PepsiCo's "Impact on % Change of:"). Not other columns' headings: Wells Fargo heads a "% Change from" column over
+    every table, and its Consumer Banking "Total loans" ($335,644 million) was taken for allowance coverage (1.40%).
+    A cell printed with a currency sign is an amount."""
+    if re.search(r"[$€£¥₩₹]", text):
+        return f"{text!r} is an amount, not a percentage"
+    first = next((i for i, cells in enumerate(table.rows) if cells and re.search(r"[A-Za-z]", cells[0])
+                  and any(parse_number(cell) for cell in cells[1:])), 1)
+    heading = " ".join(cells[index] for cells in table.rows[:max(first, 1)][:6] for index in {0, col} if index < len(cells))
+    where = f"{' '.join(table.rows[row])} {heading} {_section_heading(table, row)}"
+    return None if re.search(r"%|\bpercent", where, re.I) else f"{text!r} is not a percentage"
+
+
 def _shape_words(cell: str) -> str:
     # A footnote mark run into a heading ("Unit Case Volume3") does not change it.
     return " ".join(re.findall(r"[a-z]+", re.sub(r"(?<=[a-z]{3})\d{1,2}\b", "", clean(cell or "").lower())))
