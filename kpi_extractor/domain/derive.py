@@ -43,6 +43,13 @@ def derive_periods(values: list[dict]) -> list[dict]:
                 ways.append(lambda own=own: _combine_year_to_date(annual, *own))
             if restated_nine:
                 ways.append(lambda nine=restated_nine: _combine_year_to_date(annual, *nine))
+            # Quarters from next year's reports (their year-ago columns) less the year as next year's 10-K restates it:
+            # one basis throughout (Bank of America's 2018, read from its 2019 filings' comparatives).
+            first = next(iter(annual))
+            later = _later_year(annual, following.get("FY")) if all(quarters) and all(first in quarter for quarter in quarters) \
+                and _later_basis([quarter[first] for quarter in quarters], annual[first]) else None
+            if later and _same_keys(later, *quarters):
+                ways.append(lambda later=later: _combine(later, quarters, "Q4"))
             if all(quarters) and _same_keys(annual, *quarters):
                 ways.append(lambda: _combine(annual, quarters, "Q4"))
             restated = _restated_year(annual, following.get("FY"), following.get("Q3"))
@@ -189,6 +196,23 @@ def _nine_months(annual: dict, third: dict | None, next_third: dict | None) -> t
         if total is not None and set(values) == set(annual):
             return values, float(total), rows
     return None
+
+
+def _later_year(annual: dict, next_year: dict | None) -> dict | None:
+    """The year as next year's 10-K restates it (its year-ago column), on the basis of quarters taken from next year's
+    reports, when it covers the same rows and adds up to the year's reported revenue."""
+    if not next_year:
+        return None
+    priors = {key: (row.get("locator") or {}).get("prior") for key, row in next_year.items()}
+    total = _total(annual)
+    if not all(isinstance(value, (int, float)) for value in priors.values()) or total is None \
+            or abs(sum(priors.values()) - total) > abs(total) * 0.001:
+        return None
+    base = next(iter(annual.values()))
+    return {key: {**row, "fiscal_year": base["fiscal_year"], "fiscal_period": "FY", "period_end": base["period_end"],
+                  "value": priors[key], "locator": {**(row.get("locator") or {}), "total": total, "year_ago": True},
+                  "notes": [*(row.get("notes") or []), "the year as the following year's 10-K restates it"]}
+            for key, row in next_year.items()}
 
 
 def _restated_year(annual: dict, next_year: dict | None, next_third: dict | None):
