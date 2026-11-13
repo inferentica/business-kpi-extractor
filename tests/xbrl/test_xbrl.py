@@ -505,3 +505,24 @@ def test_regions_tagged_under_one_product_are_completed_by_that_axiss_other_memb
         "unitedstatesandcanada": 3_234_643e3, "emea": 2_400_480e3, "latinamerica": 860_882e3, "asiapacific": 799_480e3,
         "dvd": 46_292e3}
     assert geography.reconciliation_error == pytest.approx(0)
+
+
+def test_a_completing_member_tagged_coarsely_takes_the_exact_rest_it_rounds_to():
+    # Netflix's FY2020 10-K tags DVD "$0.2 billion" beside regions to the thousand: revenue less the regions is
+    # 239.4 million, which rounds to it. A rest it does not round to is never taken.
+    def fact(value, product=None, region=None):
+        return {"concept": "us-gaap:Revenues", "numeric_value": value, "period_type": "duration",
+                "period_start": "2020-01-01", "period_end": "2020-12-31", "unit_ref": "usd",
+                "dim_srt_ProductOrServiceAxis": product, "dim_srt_StatementGeographicalAxis": region}
+    regions = [fact(11_455_396e3, "nflx:StreamingMember", "nflx:UnitedStatesAndCanadaMember"),
+               fact(7_772_252e3, "nflx:StreamingMember", "nflx:EMEAMember"),
+               fact(3_156_727e3, "nflx:StreamingMember", "nflx:LatinAmericaMember"),
+               fact(2_372_300e3, "nflx:StreamingMember", "nflx:AsiaPacificMember")]
+    entity = {"document_period_end_date": "2020-12-31", "fiscal_period": "FY", "fiscal_year": 2020}
+    rows = [fact(24_996_056e3), *regions, fact(200_000_000, "nflx:DVDMember")]
+    geography = next(g for g in extract_breakdowns(pd.DataFrame(rows), entity, "10-K", lambda _q: None, {}).groups
+                     if g.key == "geography")
+    assert dict((key, value) for key, _name, value in geography.members)["dvd"] == pytest.approx(239_381e3)
+    rows = [fact(24_996_056e3), *regions, fact(100_000_000, "nflx:DVDMember")]  # 239.4 does not round to 0.1 billion
+    assert not [g for g in extract_breakdowns(pd.DataFrame(rows), entity, "10-K", lambda _q: None, {}).groups
+                if g.key == "geography"]
