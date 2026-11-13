@@ -279,3 +279,18 @@ def test_a_found_row_on_a_listed_kpis_cell_is_set_aside_as_its_copy():
     assert out["unitedhealthcareemployerandindividual"]["notes"] == ["the same cell as employer_individual_domestic"]
     assert out["employer_individual_domestic"]["validation_status"] == out["medicare_retirement"]["validation_status"] == "verified"
     assert cell_copies(records, {}) == records  # no list known: nothing is decided
+
+
+def test_a_reports_registrant_name_is_sent_with_its_filing_as_stored_once():
+    # Quotiva takes a company's legal name from its newest report's cover: the name goes with the filing's own record,
+    # so nothing else of it changes, and only when new or changed.
+    control = Control()
+    store = _store(control)
+    store._filings.update({"r1": {"accession": "r1", "status": "processed", "attempts": 1, "notes": ["xbrl reader 48"],
+                                  "value_count": 9, "spec_version": 3, "source_url": "u", "period_end": "2026-09-30"}})
+    store.name_registrant("r1", "Wells Fargo & Company")
+    store.name_registrant("r1", "Wells Fargo & Company")
+    store.name_registrant("unknown", "Someone")
+    sent = [payload["filings"] for _operation, payload in control.calls if payload.get("filings")]
+    assert sent == [[{"accession": "r1", "status": "processed", "attempts": 1, "notes": ["xbrl reader 48"], "value_count": 9,
+                      "spec_version": 3, "source_url": "u", "period_end": "2026-09-30", "registrant_name": "Wells Fargo & Company"}]]

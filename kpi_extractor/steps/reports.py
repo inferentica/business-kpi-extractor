@@ -39,6 +39,19 @@ def _row_named(document: Document, value: float, others: set[str]) -> str | None
 class ReportReading:
     """10-Qs and 10-Ks read from XBRL: their breakdowns and each segment's operating income."""
 
+    def _registrant(self, reports: list) -> tuple[str, str] | None:
+        """The newest stored report and the registrant its cover names ("Wells Fargo & Company"), if any."""
+        for ref in reversed(reports):
+            if ref.accession not in self.store.filings:
+                continue
+            try:
+                entity = self._xbrl(ref).entity_info or {}
+            except Exception:  # noqa: BLE001 - an unreadable cover names no one; the name stays as it was
+                return None
+            name = " ".join(str(entity.get("entity_name") or "").split())
+            return (ref.accession, name) if name else None
+        return None
+
     def _read_report(self, ref: FilingRef) -> FilingReading | None:
         if not self.force and not self._pending(ref):
             return None

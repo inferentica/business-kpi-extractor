@@ -208,6 +208,9 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             reading = self._read_report(ref)
             if reading is not None:
                 self.store.record_or_fail(reading)
+        # The newest report's cover names the registrant: Quotiva's legal name for the company comes from it.
+        if registrant := self._registrant(reports):
+            self.store.name_registrant(*registrant)
         releases = [ref for ref in sorted(with_first_year(listing.result(), self.since, self.profile.fiscal_year_end),
                                           key=lambda ref: ref.filed) if self._is_earnings_document(ref)]
         for ref in passed:
