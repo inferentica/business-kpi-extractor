@@ -349,3 +349,34 @@ def test_spans_printed_over_each_column_date_each():
                                      fiscal_year_end="1231", year_offset=0)
     found = {(r.fiscal_year, r.duration): next(l["value"] for l in r.lines if l["value"]) for r in readings}
     assert found == {("2017", "ytd"): 9117e6, ("2016", "ytd"): 8630e6, ("2017", "quarter"): 3192e6, ("2016", "quarter"): 2848e6}
+
+
+def test_slashed_dates_day_first_where_only_that_order_reads():
+    # Copel's 2009-10 ITRs: "30/06/2009 | 31/03/2009" (no dated columns until round 84), "01/04/2009 - 30/06/2009".
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.dates import column_periods
+    from statement_extractor.readers.printed.ranges import slashed_day_first
+    assert slashed_day_first("30/06/2009 31/03/2009") and not slashed_day_first("3/21/09 12/31/08")
+    assert not slashed_day_first("01/04/2003 a 6/30/2003")  # Copel's 2004 ITR, month first but its starts
+    assert not slashed_day_first("01/04/2009 01/01/2009")  # no order settled: month first, as before
+    body = lambda *labels: "".join(f"<tr><td>3.0{n}</td><td>{label}</td><td>2,139</td><td>4,217</td><td>2,020</td>"
+                                   f"<td>4,010</td></tr>" for n, label in enumerate(labels, 1))
+    head = ("<tr><td>CODE</td><td>DESCRIPTION</td><td></td><td></td><td></td><td>Consolidated</td></tr>"
+            "<tr><td></td><td></td><td>01/04/2009</td><td>01/01/2009</td><td>01/04/2008</td><td>01/01/2008</td></tr>"
+            "<tr><td></td><td></td><td>- 30/06/2009</td><td>- 30/06/2009</td><td>- 30/06/2008</td><td>- 30/06/2008</td></tr>")
+    table = parse_html("<p>Statement of Operations – Second Quarter Variations For the quarters ended on June 30, 2009 and "
+                       "2008 (In thousands of reais )</p><table>" + head + body(
+                           "Gross revenues from sales and/or services", "Net revenues from sales and/or services",
+                           "Operating income", "Net income for the period") + "</table>")[0]
+    periods = column_periods("income", [table], "1231", date(2009, 6, 30))
+    assert sorted((p.start, p.end) for p in periods.values()) == [
+        (date(2008, 1, 1), date(2008, 6, 30)), (date(2008, 4, 1), date(2008, 6, 30)),
+        (date(2009, 1, 1), date(2009, 6, 30)), (date(2009, 4, 1), date(2009, 6, 30))]
+    head = ("<tr><td>CODE</td><td>DESCRIPTION</td><td>Parent Company</td><td></td><td>Consolidated</td><td></td></tr>"
+            "<tr><td></td><td></td><td>30/06/2009</td><td>31/03/2009</td><td>30/06/2009</td><td>31/03/2009</td></tr>")
+    rows = "".join(f"<tr><td>{code}</td><td>{label}</td><td>9,914</td><td>9,851</td><td>13,315</td><td>13,188</td></tr>"
+                   for code, label in (("1", "TOTAL ASSETS"), ("1.01", "Current assets"), ("1.02", "Noncurrent assets")))
+    table = parse_html("<p>Balance Sheet - Assets As of June 30, 2009 and March 31, 2009 (In thousands of reais )</p><table>"
+                       + head + rows + "</table>")[0]
+    periods = column_periods("balance", [table], "1231", date(2009, 6, 30))
+    assert sorted(p.end for p in periods.values()) == [date(2009, 3, 31), date(2009, 3, 31), date(2009, 6, 30), date(2009, 6, 30)]

@@ -15,10 +15,35 @@ def _year(year: int) -> int:
     return year + (2000 if year < 50 else 1900) if year < 100 else year
 
 
-def numeric_date(match: re.Match) -> date | None:  # month first, "3/31/2005" or "3/31/05"
-    month, day_of, year = (int(part) for part in match.groups())
+def numeric_date(match: re.Match, day_first: bool = False) -> date | None:  # "3/31/2005", "3/31/05"; Copel's "30/06/2009"
+    month, day_of, year = (int(match.group(index)) for index in ((2, 1, 3) if day_first else (1, 2, 3)))
     try:
         return date(_year(year), month, day_of)
+    except ValueError:
+        return None
+
+
+def slashed_day_first(text: str) -> bool:
+    """Slashed dates read day first only where one can only be read so and none only month first: Copel's 2009 ITRs
+    print "30/06/2009 | 31/03/2009", its 2004 ITR "01/04/2003 a 6/30/2003", PepsiCo "3/21/09"."""
+    dates = [(int(first), int(second)) for first, second in re.findall(r"\b(\d{1,2})/(\d{1,2})/(?:\d{4}|\d{2})\b", text)]
+    return any(first > 12 for first, _second in dates) and not any(second > 12 for _first, second in dates)
+
+
+def off_title(kind: str, end: date, dated_in_title: dict) -> bool:
+    """A flow's figure-dated column whose end is not the title's for its year: Copel's Q1 2010 ITR prints "31/12/2009"
+    over the first quarter of 2009 under "As of March 31, 2010 and March 31, 2009". Left out, never dated either way."""
+    named = dated_in_title.get(str(end.year))
+    if kind == "balance" or named is None:
+        return False
+    stated = _named_day(*named, end.year)
+    return stated is not None and stated != end
+
+
+def _named_day(month: str, day: str, year: int) -> date | None:
+    number = next((index for index, name in enumerate(calendar.month_abbr) if name and name.lower() == month[:3].lower()), None)
+    try:
+        return date(year, number, int(day)) if number else None
     except ValueError:
         return None
 

@@ -199,10 +199,11 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
 
 
 def _notes_named(table: Table) -> bool:
-    """Whether a "Note" column heading is printed in the table's rows above its first figures."""
+    """Whether a "Note" column heading is printed in the table's rows above its first figures: Copel's 2009-10 ITRs
+    head it "N." over "no."."""
     for row in table.rows:
         if row.figures:
             return False
-        if re.search(r"\bnotes?\b", row.label, re.I):
+        if re.search(r"\bnotes?\b", row.label, re.I) or re.search(r"\bN[.º°](?:\s|$)", row.label):
             return True
     return False

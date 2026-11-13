@@ -10,9 +10,9 @@ import lxml.html
 
 from ...domain.basis import currencies_named, is_currency_word
 from .audited import audit_reports, audited_names
-from .cells import _cells, _spanned
-from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_header_figures,
-                              is_subheader, number)
+from .cells import _cells, _spanned, dotted_thousands
+from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_column_word,
+                              is_header_figures, is_subheader, number)
 
 
 def _row(cells: list[Cell]) -> Row | None:
@@ -106,7 +106,9 @@ def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
         elif not seen_figures:
             texts = " ".join(cell.text for cell in cells)
             quarters = [cell.text for cell in cells if cell.text.strip()][1 if cells and cells[0].text.strip() else 0:]
-            if COLUMN_TITLE.search(texts) or len(quarters) >= 2 and all(QUARTER_CELL.match(text) for text in quarters):
+            quarters = [NOTE_MARK.sub("", text) for text in quarters]  # Copel's "1Q09 (1) | 4Q08 (2) | 1Q08 (3) | Var.% (1/2)"
+            if COLUMN_TITLE.search(texts) or sum(bool(QUARTER_CELL.match(text)) for text in quarters) >= 2 and all(
+                    QUARTER_CELL.match(text) or is_column_word(text) for text in quarters):
                 header.append([cell for cell in cells if cell.text])
             elif row.label:
                 rows.append(Row(label=row.label, level=row.level, cells=cells))
@@ -229,7 +231,7 @@ def parse_html(html: str | bytes) -> list[Table]:
                 continue
             # A row styled invisible sizes the columns and is never seen (Brookfield's 2011 annual report: a hidden first
             # row of "00000000" atop each statement, which read as figures and left the years below as a line).
-            lines = _spanned(tr for tr in element.iter("tr") if not _HIDDEN.search(tr.get("style") or ""))
+            lines = dotted_thousands(_spanned(tr for tr in element.iter("tr") if not _HIDDEN.search(tr.get("style") or "")))
             rows, header, seen_figures = _rows(lines)
             middle = _side_by_side(lines)
             if middle is not None:

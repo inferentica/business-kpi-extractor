@@ -21,8 +21,8 @@ _DOLLAR_UNIT = re.compile(r"(?:(?:US|C|CDN|NT|HK)?\$|£|€|¥)\s*" + _UNIT + r"
                           r"\b" + _UNIT + r"\s+of\s+(?:[A-Z.]+\s+|new\s+taiwan\s+|hong\s+kong\s+)?(?:dollars|euros?|pounds|yen|won|reais|francs|yuan|renminbi|pesos|rupees|soles|MxP)\b|"  # Televisa's "(Millions of Mexican Pesos)"
                           r"\(\s*" + _UNIT + r"\s*(?:,\s*except\b[^)]*)?\)", re.I)  # Brookfield's "(MILLIONS)"
 # Thousands written as zeros: Ross's "($000, except stores and per share data, unaudited)", Icahn's "(In $000s, except
-# unit amounts)" and "(In 000s ...)", "($000's)", "(000 omitted)".
-_ZEROS = re.compile(r"\(\s*(?:in\s+)?\$?\s*000(?:'?s)?(?:\s+omitted)?\s*[,)]|\bin\s+\$?\s*000'?s\b", re.I)
+# unit amounts)" and "(In 000s ...)", "($000's)", "(000 omitted)"; Copel's releases "R$'000" over their labels.
+_ZEROS = re.compile(r"\(\s*(?:in\s+)?\$?\s*000(?:'?s)?(?:\s+omitted)?\s*[,)]|\bin\s+\$?\s*000'?s\b|\bR\$\s*['’]\s*000\b", re.I)
 # Words that put a scale on share counts rather than money.
 _SHARES_IN = re.compile(r"\bshares?(?:\s+(?:amounts?|data|counts?|outstanding))?(?:\s*,)?(?:\s+which\s+are)?"
                         r"(?:\s+(?:reflected|stated|presented|expressed))?\s+(?:are\s+)?in\s+" + _UNIT + r"\b|"

@@ -2,6 +2,8 @@
 rowspan holds its columns in the rows below it too."""
 from __future__ import annotations
 
+import re
+
 from ..printed.tables import Cell, clean
 
 
@@ -48,3 +50,20 @@ def _spanned(trs) -> list[list[Cell]]:
     """Each row's cells, rowspans carried down."""
     held: dict[int, list[int]] = {}
     return [_cells(tr, held) for tr in trs]
+
+
+_DOTTED_MILLIONS = re.compile(r"^\(?\s*[-−–]?\s*\d{1,3}(?:\.\d{3}){2,}(?:,\d+)?\s*\)?$")  # "9.520.238": only thousands read so
+_COMMA_THOUSANDS = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*\d{1,3}(?:,\d{3})+(?:\.\d+)?\s*\)?$")
+_DOTTED_FIGURE = re.compile(r"^\(?\s*[-−–]?\s*\d{1,3}(?:\.\d{3})*(?:,\d+)?\s*\)?%?$")
+
+
+def dotted_thousands(lines: list[list[Cell]]) -> list[list[Cell]]:
+    """A table printing its thousands with dots and its decimals with commas, Brazil's way (Copel's Q3 2008 ITR:
+    "9.520.238" over "639.406"), in the readers' figures: "9,520,238", "639,406". Only where a figure of two dotted
+    groups shows the table's way and no figure prints commas for thousands."""
+    texts = [cell.text.strip() for cells in lines for cell in cells]
+    if not any(_DOTTED_MILLIONS.match(text) for text in texts) or any(_COMMA_THOUSANDS.match(text) for text in texts):
+        return lines
+    swap = str.maketrans(".,", ",.")
+    return [[Cell(cell.start, cell.span, cell.text.translate(swap)) if _DOTTED_FIGURE.match(cell.text.strip()) else cell
+             for cell in cells] for cells in lines]

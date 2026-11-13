@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from ...domain.periods import Period
 from .find import TITLE_PATTERNS
 from .ranges import (dates_in_order, spans_over, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric,
-                     own_month, paired_spans, counted_start)
+                     own_month, paired_spans, counted_start, slashed_day_first, off_title)
 from .tables import Table, figure_columns, header_text
 
 
@@ -139,7 +139,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     title_span = next((match for match in _SPAN.finditer(header_all) if _standard(match)), None) or _SPAN.search(title) or (
         _SPAN.search(over) if len({word.lower() for word in named_spans}) <= 1 else None)
     header_days = list(_MONTH_DAY.finditer(header_all))
-    day_first = _day_first(header_all)
+    day_first, slash_first = _day_first(header_all), slashed_day_first(header_all)
     # One day for each column, in order, when no column prints a day of its own.
     named = [m.group(0).lower() for m in header_days]
     # A column's own cell may hold its neighbour's day as well, where fixed-width text runs them together (Ross's
@@ -221,13 +221,13 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             continue
         numeric_all = list(_NUMERIC_DATE.finditer(above)) if numeric is not None else []
         if len(numeric_all) >= 2 and kind != "balance":  # "1/1/2005 to 3/31/2005" (Copel's CVM forms): first to last
-            opened, end = _numeric(numeric_all[0]), _numeric(numeric_all[-1])
+            opened, end = _numeric(numeric_all[0], slash_first), _numeric(numeric_all[-1], slash_first)
             periods.update({column: Period(end, opened)} if opened and end and opened < end else {})
             ranged.add(column)
             continue
         if (numeric is not None or dotted is not None) and not _MONTH_DAY.search(above):
             if numeric is not None:
-                month, day_of, year_of = (int(part) for part in numeric.groups())
+                month, day_of, year_of = (int(numeric.group(index)) for index in ((2, 1, 3) if slash_first else (1, 2, 3)))
             else:
                 first, second, year_of = (int(part) for part in dotted.groups())
                 day_of, month = (first, second) if day_first else (second, first)
@@ -257,7 +257,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         else:
             month, day_of = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
             end = date(int(year), month, min(day_of, calendar.monthrange(int(year), month)[1]))
-        if end is None:
+        if end is None or numeric is not None and off_title(kind, end, dated_in_title):
             continue
         if kind == "balance":
             periods[column] = Period(end)
