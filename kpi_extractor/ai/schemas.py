@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, ValidationError, field_validator, model_validator
 from typing import Literal
 import re
 
@@ -198,6 +198,9 @@ class TableLocator(BaseModel):
     first_label: str | None = None
     last_label: str | None = None
     scale_text: str | None = None
+    # A replayed table's rows as last quarter's reading keyed them (row label's key -> KPI key): PNC's "Other" row is its
+    # listed "Other Noninterest Income". Code's own evidence, never asked of the AI, so not in the schema.
+    _row_keys: dict[str, str] = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
     def _rows(self) -> "TableLocator":

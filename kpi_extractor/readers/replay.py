@@ -83,6 +83,9 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
         found = _replay_table(document, group, [locator for _key, locator in rows], quarter)
         if isinstance(found, str):
             return found
+        # Each row keyed as last quarter's reading keyed it, where its label does not name a listed KPI by itself.
+        found._row_keys = {member_key(locator["row_label"]): key.split(".", 1)[1] for key, locator in rows
+                           if locator.get("row_label")}
         table_locators.append(found)
     return Located(period_end=reported_period(document, expected).isoformat(), tables=table_locators, values=values)
 

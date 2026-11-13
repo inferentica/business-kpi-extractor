@@ -42,6 +42,12 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
     return matches[0] if len(matches) == 1 else None
 
 
+def kept_key(group: GroupSpec, locator, label: str) -> KpiSpec | None:
+    """The listed KPI a replayed table's row was last quarter, when its label alone names none (PNC's "Other")."""
+    key = getattr(locator, "_row_keys", {}).get(member_key(label))
+    return next((kpi for kpi in group.kpis if kpi.key == key and kpi.key != group.total_kpi), None)
+
+
 _SPACED_FOOTNOTE = re.compile(r"\s+\d{1,2}$")
 _TWO_SIDED = re.compile(r"\b(gains?|income|profits?|earnings)\s*(?:/|\band\b|\bor\b)?\s*\(?\s*(loss(?:es)?)\s*\)?", re.I)
 
