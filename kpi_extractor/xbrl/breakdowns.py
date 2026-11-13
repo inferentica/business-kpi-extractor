@@ -70,6 +70,9 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     # (axis, concept) → the one (axis, member) its facts are also tagged with (Alphabet's products, all "Google
     # Services"), so the year-ago and to-date figures are read from facts tagged the same way.
     fixed_for: dict[tuple[str, str], tuple[str, str]] = {}
+    # (axis, concept) → the fixed axis and its other members that complete the split (Netflix's DVD beside its Streaming
+    # regions), so the year-ago and to-date columns are completed the same way.
+    siblings_for: dict[tuple[str, str], tuple[str, set[str]]] = {}
     eliminations: dict[str, dict[str, float]] = {}
     # Reconciling items tagged on the consolidation axis beside one more axis (Qualcomm since 2025: "Nonreportable
     # segments" under All Other Segments, "Unallocated revenues" under a licensing dispute): concept → {dimensions: value}.
@@ -234,8 +237,18 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             members: dict[str, float] = {}
             for dimensions, value in items:
                 members.setdefault(dimensions[other], value)
+            # The fixed member's siblings tagged alone on its axis are the rest of revenue (Netflix's regions are its
+            # Streaming revenue, DVD the rest until 2023): joined only when the split then adds up and not before. A
+            # segment axis is left to _completed_by_segments (Alphabet's products under Google Services).
+            the_member = items[0][0][fixed]
+            siblings = {member: value for member, value in single.get((concept, fixed), {}).items() if member != the_member}
+            whole = total_for(concept, other)
+            if fixed not in _SEGMENT_AXES and siblings and not adds_up(members, whole) \
+                    and adds_up({**members, **siblings}, whole):
+                members = {**members, **siblings}
+                siblings_for[(other, concept)] = (fixed, set(siblings))
             candidates.setdefault(other, []).append((concept, members))
-            fixed_for.setdefault((other, concept), (fixed, items[0][0][fixed]))
+            fixed_for.setdefault((other, concept), (fixed, the_member))
             found = True
         # Products tagged under segments where the filer typed one segment wrong (AMD's FY2025 10-K files Gaming under a
         # "Gaming" segment, Client under "Client and Gaming"): the product lines alone, which _completed_by_segments
@@ -381,6 +394,10 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
 
         def frame_members(source: pd.DataFrame) -> dict[str, float]:
             rows = _single_axis_members(source, concept, axis, dimension_columns, fixed_for.get((axis, concept)), own_level)
+            if rows and (axis, concept) in siblings_for:
+                fixed_axis, extra = siblings_for[(axis, concept)]
+                alone = _single_axis_members(source, concept, fixed_axis, dimension_columns, None, own_level)
+                rows.update({member: value for member, value in alone.items() if member in extra})
             if consolidation and rows:
                 items = _consolidation_items(source, concept, dimension_columns)
                 rows.update({member: items[member] for member in consolidation if member in items})
