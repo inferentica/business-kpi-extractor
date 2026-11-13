@@ -481,3 +481,27 @@ def test_reconciling_items_are_read_line_by_line_not_as_their_total():
     members = {key: value for key, _label, value in group.members}
     assert members == {"qct": 9_469.0, "qtl": 1_319.0, "reconcilingitems": 143.0, "other": 48.0}
     assert group.reconciliation_error == pytest.approx(0)
+
+
+def test_regions_tagged_under_one_product_are_completed_by_that_axiss_other_members():
+    # Netflix's Q2 2021 10-Q: each region tagged "Streaming" (and Streaming never alone), DVD tagged alone on the same
+    # axis, and the U.S. alone on the regions' axis, rounded. The regions and DVD make up revenue; the U.S. figure, with
+    # two regions that contain it, must never be taken for the split (Q3 2022 added up that way by chance).
+    def fact(value, product=None, region=None):
+        return {"concept": "us-gaap:Revenues", "numeric_value": value, "period_type": "duration",
+                "period_start": "2021-04-01", "period_end": "2021-06-30", "unit_ref": "usd",
+                "dim_srt_ProductOrServiceAxis": product, "dim_srt_StatementGeographicalAxis": region}
+    rows = [fact(7_341_777e3),
+            fact(3_234_643e3, "nflx:StreamingMember", "nflx:UnitedStatesAndCanadaMember"),
+            fact(2_400_480e3, "nflx:StreamingMember", "nflx:EMEAMember"),
+            fact(860_882e3, "nflx:StreamingMember", "nflx:LatinAmericaMember"),
+            fact(799_480e3, "nflx:StreamingMember", "nflx:AsiaPacificMember"),
+            fact(46_292e3, "nflx:DVDMember"),
+            fact(3_000_000e3, None, "country:US")]
+    breakdowns = extract_breakdowns(pd.DataFrame(rows), {"document_period_end_date": "2021-06-30", "fiscal_period": "Q2",
+                                                          "fiscal_year": 2021}, "10-Q", lambda _q: None, {})
+    geography = next(group for group in breakdowns.groups if group.key == "geography")
+    assert {key: value for key, _name, value in geography.members} == {
+        "unitedstatesandcanada": 3_234_643e3, "emea": 2_400_480e3, "latinamerica": 860_882e3, "asiapacific": 799_480e3,
+        "dvd": 46_292e3}
+    assert geography.reconciliation_error == pytest.approx(0)

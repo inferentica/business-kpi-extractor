@@ -20,7 +20,7 @@ _DONE = {"processed", "needs_review", "skipped"}
 _MAX_ATTEMPTS = 3
 _READ_BY_AI = "read by AI"
 _NOT_REPORTED = "not reported: "
-_XBRL_READER = "xbrl reader 46"  # 46: each report keeps its accounting standard and currency
+_XBRL_READER = "xbrl reader 47"  # 47: a split tagged under one product member is completed by its axis's other members
 _UNANCHORED = {"total matches no figure the company reported in XBRL", "no total revenue to reconcile against"}
 
 def value_key(value: dict) -> tuple[str, str, str, str]:
