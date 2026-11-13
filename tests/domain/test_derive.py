@@ -257,3 +257,18 @@ def test_a_year_of_later_basis_quarters_takes_the_year_its_following_10k_restate
     derived = {(row["fiscal_year"], row["fiscal_period"], row["kpi_key"]): row for row in derive_periods(values)}
     assert derived[("2018", "Q4", "a")]["value"] == 15 and derived[("2018", "Q4", "b")]["value"] == 10
     assert derived[("2018", "Q4", "a")]["validation_status"] == "verified"
+
+
+
+def test_a_restated_year_adds_up_to_its_own_restated_total():
+    # Bank of America's 2019 10-K restates 2018 (lines add up to 91,630), first reported at 91,857.
+    def later(period, kpi, value, total):
+        return {**_value(period, kpi, value, year="2018"), "locator": {"year_ago": True, "total": total}}
+    values = [{**_value("FY", "a", 62, year="2018"), "locator": {"total": 101}},
+              {**_value("FY", "b", 39, year="2018"), "locator": {"total": 101}}]
+    for period, a, b in (("Q1", 14, 10), ("Q2", 15, 10), ("Q3", 16, 10)):
+        values += [later(period, "a", a, a + b), later(period, "b", b, a + b)]
+    values += [{**_value("FY", "a", 70, year="2019"), "locator": {"prior": 60, "prior_total": 100, "total": 110}},
+               {**_value("FY", "b", 40, year="2019"), "locator": {"prior": 40, "prior_total": 100, "total": 110}}]
+    derived = {(row["fiscal_year"], row["fiscal_period"], row["kpi_key"]): row for row in derive_periods(values)}
+    assert derived[("2018", "Q4", "a")]["value"] == 15 and derived[("2018", "Q4", "a")]["validation_status"] == "verified"
