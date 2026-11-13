@@ -30,9 +30,8 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
     log(f"{symbol}: {len(refs)} 6-Ks in the release window, {len(known & {ref.accession for ref in refs})} remembered empty")
     # The next releases download while one is read (pipeline/prefetch.py); those remembered empty are not fetched.
     for ref in ahead(refs, lambda ref: None if ref.accession in known else load_submission(ref.filing)):
-        quarter = label_period(Period(ref.period_end, ref.period_end - timedelta(days=90)), fiscal_year_end, year_offset)
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
-                  "release_quarter": list(quarter[:2]) if quarter else None, "period_end": ref.period_end.isoformat()}
+                  "release_quarter": _quarter(ref.period_end, fiscal_year_end, year_offset), "period_end": ref.period_end.isoformat()}
         if ref.accession in known:  # names no statement (pipeline/empty_releases.py): not fetched again
             empty.add(ref.accession)
             records.append({**record, "note": "release", "printed": [], "titled": [], "columns": 0,
@@ -43,6 +42,11 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
             titled: set = set()
             began = time.time()
             found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=ref.period_end, titled=titled)
+            latest = own_quarter(found, ref.period_end)
+            if latest is not None:
+                ref.period_end, titled = latest, set()
+                found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=latest, titled=titled)
+                record.update({"release_quarter": _quarter(latest, fiscal_year_end, year_offset), "period_end": latest.isoformat()})
             if phases is not None:  # reading, apart from waiting for the download (pipeline/company.py's phases)
                 phases["releases read"] = round(phases.get("releases read", 0.0) + time.time() - began, 1)
             if not found and not titled and not names_a_statement(ref.filing.attachments) and not any(
@@ -67,3 +71,18 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
     remember(folder, empty)
     return records, readings
 
+
+def _quarter(end: date, fiscal_year_end: str, year_offset: int) -> list | None:
+    quarter = label_period(Period(end, end - timedelta(days=90)), fiscal_year_end, year_offset)
+    return list(quarter[:2]) if quarter else None
+
+
+def own_quarter(found: list, period_end: date) -> date | None:
+    """The quarter a release filed after the next quarter closed is still its own: its latest interim period, when none
+    of its statements ends on the quarter before its filing and that period ended within the 200 days before. Copel's
+    Q1 2008 report, filed on 10 July 2008: its cash flow's "2008 | 2007" read as periods ending in June (round 87)."""
+    latest = max((reading.period_end for reading in found), default=None)
+    interim = any(reading.period_end == latest and reading.fiscal_period != "FY" for reading in found)
+    if interim and not any(reading.own for reading in found) and period_end - timedelta(days=200) <= latest < period_end:
+        return latest
+    return None

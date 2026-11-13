@@ -69,3 +69,10 @@ def test_a_releases_quarters_with_note_marks_and_its_rs_thousands():
     periods = column_periods("income", [table], "1231", date(2009, 3, 31))
     assert sorted((period.start, period.end) for period in periods.values()) == [
         (date(2008, 1, 1), date(2008, 3, 31)), (date(2008, 10, 1), date(2008, 12, 31)), (date(2009, 1, 1), date(2009, 3, 31))]
+
+
+def test_company_and_consolidated_side_by_side():
+    # Copel's 2003 quarterly information: "ASSETS  Company  Consolidated" over "2003 | 2002 | 2003 | 2002".
+    from statement_extractor.readers.printed.side_by_side import SIDE_BY_SIDE
+    assert SIDE_BY_SIDE.search("ASSETS Company Consolidated") and SIDE_BY_SIDE.search("Parent Company Consolidated")
+    assert not SIDE_BY_SIDE.search("the company consolidated its subsidiaries")

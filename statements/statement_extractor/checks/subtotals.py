@@ -26,20 +26,28 @@ def subtotals(printed) -> dict[int, int]:
     for index, (label, _level, value) in enumerate(printed):
         # A line of its own ("Retained earnings") is no subtotal because its figure happens to equal two lines above
         # it; one that sums three or more is (Lloyds' "Financial assets at amortised cost" after its four lines).
-        least = 1 if _ONE_LINE_GROUP.match(label) else 2 if _SUBTOTAL_LABEL.search(label) or _repeats_its_heading(printed, index) \
+        # An unlabelled total of a heading's only line is that block's too (Copel's 2004 "Redemption of judicial deposits
+        # and escrows 25,000" under "Decrease in long-term receivables", then "25,000").
+        one_line = not label and index >= 2 and printed[index - 2][2] is None and printed[index - 1][2] == value
+        least = 1 if _ONE_LINE_GROUP.match(label) or one_line else 2 if _SUBTOTAL_LABEL.search(label) or _repeats_its_heading(printed, index) \
             or _totals_its_others(printed, index) or _names_its_lines(printed, index) else 3
         if value is None:
             continue
-        sums, position, total = [], index - 1, 0.0
+        sums, position, total, headed = [], index - 1, 0.0, False
         while position >= 0 and len(sums) < 30:  # Copel sums 13 current assets
             earlier_label, _earlier_level, earlier_value = printed[position]
             if earlier_value is None:
-                if sums and _SPANS_HEADINGS.search(label):
-                    position -= 1
-                    continue  # a subtotal over several headed blocks (TSMC's other comprehensive income for the year)
+                # A subtotal over several headed blocks (TSMC's other comprehensive income for the year); the heading of
+                # a block it sums (Copel's 2003 "Property, plant and equipment" over its unlabelled net figure, then
+                # "Investments"); a heading ending in a colon within an unlabelled subtotal's lines (Copel's 2004
+                # "Disposals:" among its adjustments to net income).
+                if sums and (_SPANS_HEADINGS.search(label) or headed or not label and earlier_label.endswith(":")):
+                    position, headed = position - 1, False
+                    continue
                 break
             total += -abs(earlier_value) if re.match(r"^less\b", earlier_label, re.I) else earlier_value
             sums.append((position, total))
+            headed = position in starts
             position = block_start(starts, position) - 1
         for count, (start, running) in enumerate(sums, 1):
             # A line no label marks as a subtotal must sum exactly (Apple's "Other" 32 is not 45 - 12 + 0 = 33).

@@ -66,7 +66,8 @@ EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’´]?
 # BCB Bancorp's 2008 10-Qs: "Cash and cash equivalents-begininng" (so spelled) and "Cash and cash equivalents-ending".
 # Mexican FRS (FEMSA's 20-Fs to 2011): "Initial cash and cash equivalents", "Total ending balance of cash and cash
 # equivalents, net"; never its "Initial cash" before the discontinued operations' share is taken off.
-OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(beginning|opening)\b.*\bcash\b|"
+# Copel's 2004 quarterly information: "Opening balance" and "Closing balance" under the change in cash.
+OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(beginning|opening)\b.*\bcash\b|^opening\s+balance$|"
                      r"^initial\s+cash\s+and\s+cash\s+equivalents\b|^initial\s+balance,?\s+net\b|"
                      r"^initial\s+balance\s+of\s+cash\b", re.I)  # Coca-Cola FEMSA's FY2011 20-F
 # The opening after restricted cash is taken off (Coca-Cola FEMSA's 20-Fs to 2011): "Initial cash and cash equivalents
@@ -76,7 +77,7 @@ NET_OPENING = re.compile(r"^initial\s+balance,?\s+net\b", re.I)
 GROSS_CLOSING = re.compile(r"^ending\s+balance$", re.I)
 
 
-CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(total\s+)?(ending|closing)\b.*\bcash\b", re.I)
+CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(total\s+)?(ending|closing)\b.*\bcash\b|^closing\s+balance$", re.I)
 
 
 # Not Brookfield's "Net change in non-cash working capital balances", nor an exchange line ("Effects of exchange rate
@@ -111,6 +112,7 @@ NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+pr
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+and\s+comprehensive\s+(income|earnings)(\s+\(loss\))?$|"
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
+                         r"^income\s+\(loss\)\s+after\s+taxes$|"  # Copel's 2003 quarterly information
                          r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^profit(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"
                         # UK GAAP (Lloyds TSB): "Profit for the period attributable to shareholders", before dividends.
                         r"^profit\s+for\s+the\s+(year|period|half-year)\s+attributable\s+to\s+(equity\s+)?shareholders$|"

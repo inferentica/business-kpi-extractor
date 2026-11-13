@@ -130,3 +130,24 @@ def test_a_lines_parts_printed_under_it_at_its_level():
     from statement_extractor.checks.printed import _without_parts
     lines = [("Revenue", 0, 100), ("Cost of sales", 0, 60), ("Gross profit", 0, 40)]
     assert _without_parts(lines, same_level=True) == lines
+
+
+def test_copels_2003_and_2004_layouts_add_up():
+    # A block's heading above its unlabelled net figure; colon headings inside an unlabelled subtotal; a one-line
+    # block's unlabelled total (Copel's quarterly information, rejected until round 87).
+    assets = lines(("Investments", 524_504)) + [("Property, plant and equipment", 0, None)] + lines(
+        ("In service", 5_436_581), ("Construction in progress", 503_726), ("(-) Special liabilities", -641_845),
+        ("", 5_298_462), ("", 5_822_966))
+    assert subtotals(assets)[len(assets) - 1] == 0
+    flows = lines(("Net income for the period", 297_716)) + [("Expenses (income) not affecting cash:", 0, None)] + lines(
+        ("Depreciation and amortization", 227_539), ("Equity in results of investees", -25_269)) + [
+        ("Provisions in long-term liabilities:", 0, None)] + lines(("Post-employment benefits", 88_916), ("", 291_186)) + [
+        ("Decrease in long-term receivables", 0, None)] + lines(("Redemption of judicial deposits and escrows", 25_000),
+                                                                 ("", 25_000), ("Total operating activities", 613_902))
+    assert total_check(flows).result == "pass"
+
+
+def test_copels_net_income_and_cash_balances_by_their_words():
+    from statement_extractor.domain.printed_labels import CLOSING, NET_INCOME, OPENING
+    assert NET_INCOME.search("Income (loss) after taxes") and OPENING.search("Opening balance") and CLOSING.search("Closing balance")
+    assert not NET_INCOME.search("Income after taxes on the sale")

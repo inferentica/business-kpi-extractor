@@ -29,3 +29,12 @@ def test_no_proof_no_scale():
     balance = reading("balance", ("Total", 966_144_480.0))
     assert proven_scales([balance], [unproven], []) == {}
     assert proven_scales([balance], [], []) == {}
+
+
+def test_a_balance_sheet_proven_by_its_filings_cash_flow():
+    # Copel's Q1 2004 report: the CVM form's balance sheet states no scale; its cash flow, "(In thousands of reais)",
+    # closes at 345,337 on the same day.
+    balance = reading("balance", ("Cash", 345_337.0), ("Total assets", 9_221_326.0))
+    flows = reading("cash_flow", ("Net income (loss) for the quarter", 89_711_000.0), ("Closing balance", 345_337_000.0),
+                    duration="ytd")
+    assert proven_scales([balance], [], [flows]) == {"balance": 1000.0}
