@@ -214,14 +214,18 @@ class CompanyStore:
         self._send(filings=[carried])
         self._filings[carried["accession"]] = {**self._filings[carried["accession"]], "spec_version": carried["spec_version"]}
 
-    def name_registrant(self, accession: str, name: str) -> None:
+    def name_registrant(self, ref, name: str) -> None:
         """The registrant's name on a report's cover, kept with the filing as it is stored: Quotiva takes the company's
-        legal name from its newest report's (owner, 2026-11-13). Sent only when new or changed."""
-        previous = self._filings.get(accession)
+        legal name from its newest report's (owner, 2026-11-13). Sent only when new or changed, as a whole filing record:
+        a report read in an earlier run is held as the control plane lists it, without its form, date or role, and the
+        store refuses a filing without them (every company's second run failed on it)."""
+        previous = self._filings.get(ref.accession)
         if previous is None or previous.get("registrant_name") == name:
             return
-        self._send(filings=[{**previous, "registrant_name": name}])
-        self._filings[accession] = {**previous, "registrant_name": name}
+        filing = {**previous, "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(),
+                  "document_role": ref.role, "registrant_name": name}
+        self._send(filings=[filing])
+        self._filings[ref.accession] = filing
 
     def statements(self, accession: str, lines: list[dict]) -> None:
         self.control.call("store_statements", symbol=self.symbol, accession=accession, lines=lines)
