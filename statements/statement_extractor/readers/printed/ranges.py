@@ -200,3 +200,21 @@ def counted_start(end: date, days: int, weekly: bool = False) -> date:
         return end - timedelta(days=days - 1)
     month = end.month - max(1, round(days / 30.4)) + 1
     return date(end.year + (month - 1) // 12, (month - 1) % 12 + 1, 1)
+
+
+def without_repeats(table: Table, periods: dict) -> dict:
+    """Left out, columns under the same heading as an earlier column, dated the same, with other figures: a misprinted heading,
+    never that period again. Embraer's Q3 2011 cash flows head their nine months "Three months ended on" as well, beside
+    the quarter's own (read as the quarter twice until round 90). Not a parent's columns beside the group's."""
+    from .side_by_side import _side_by_side
+    if _side_by_side([table]):
+        return periods
+    dropped, seen = set(), {}
+    for column in sorted(periods):
+        heading = header_text(table, column[0])
+        if not re.search(r"\b(months|weeks|quarters?)\s+ended\b", heading, re.I):
+            continue  # a bare year over a currency and its translation (FEMSA's "2011" over dollars and pesos) is no misprint
+        earlier = seen.setdefault((periods[column], heading), column)
+        if earlier != column and any(row.figures.get(column[0]) != row.figures.get(earlier[0]) for row in table.rows if row.figures):
+            dropped.add(column)
+    return {column: period for column, period in periods.items() if column not in dropped}

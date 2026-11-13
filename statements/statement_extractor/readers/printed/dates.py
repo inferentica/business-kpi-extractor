@@ -16,7 +16,7 @@ from .tables import Table, figure_columns, header_text
 _MONTH = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
 
 _MONTH_DAY = re.compile(rf"\b({_MONTH}),?\s+(\d{{1,2}})\b", re.I)  # Petrobras: "December, 31"
-_DAY_MONTH_YEAR = re.compile(rf"\b(\d{{1,2}})\s+({_MONTH})\s+((?:19|20)\d{{2}})\d?\b", re.I)
+_DAY_MONTH_YEAR = re.compile(rf"\b(\d{{1,2}})\s+({_MONTH}),?\s+((?:19|20)\d{{2}})\d?\b", re.I)  # Embraer's "31 Mar, 2017"
 _DAY_MONTH = re.compile(rf"\b(\d{{1,2}})\s+((?:jan(?:uary)?|feb(?:ruary)?|march|april|june|july|aug(?:ust)?|sep(?:t(?:ember)?)?|"
                         rf"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b(?!\s+\d{{1,2}}\b)", re.I)
 _MONTH_YEAR_NOTE = re.compile(rf"\b({_MONTH})\s+((?:19|20)\d{{2}})\d\b", re.I)

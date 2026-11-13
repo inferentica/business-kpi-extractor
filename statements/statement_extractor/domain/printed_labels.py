@@ -115,7 +115,7 @@ NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+pr
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
                         r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
                          r"^income\s+\(loss\)\s+after\s+taxes$|"  # Copel's 2003 quarterly information
-                         r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^(\(loss\)\s+)?profit(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"; Lloyds 2011: "(Loss) profit …"
+                         r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^(\(loss\)\s+)?(profit|loss(es)?|income)(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"; Lloyds 2011: "(Loss) profit …"; Embraer: "Losses for the period"
                         # UK GAAP (Lloyds TSB): "Profit for the period attributable to shareholders", before dividends.
                         r"^profit\s+for\s+the\s+(year|period|half-year)\s+attributable\s+to\s+(equity\s+)?shareholders$|"
                         # Lloyds' quarterly updates since 2025: "Profit before tax", "Tax expense", "Profit after tax".

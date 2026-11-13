@@ -113,9 +113,12 @@ COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)
 
 
 def is_header_figures(row: Row) -> bool:
-    """A row whose only figures are years printed bare ("2007 | 2006 | 2005", no comma): a header, not figures."""
+    """A row whose only figures are years printed bare ("2007 | 2006 | 2005", no comma), or note marks (Embraer's "(1) |
+    (1) | (1)" over its column headings, "A S S E T S (2) (1)", read as -1s until round 90): a header, not figures. Rows
+    after a table's first figures are its lines whatever they print (parse.py)."""
     texts = {cell.start: cell.text for cell in row.cells}
-    return bool(row.figures) and all(YEAR_ONLY.match(texts.get(column, "").strip("()$ ")) for column in row.figures)
+    marks = all(re.fullmatch(r"\(\d{1,2}\)", texts.get(column, "").strip()) for column in row.figures)
+    return bool(row.figures) and (marks or all(YEAR_ONLY.match(texts.get(column, "").strip("()$ ")) for column in row.figures))
 
 
 def header_text(table: Table, column: int) -> str:

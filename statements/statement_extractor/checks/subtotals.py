@@ -49,11 +49,13 @@ def subtotals(printed) -> dict[int, int]:
             sums.append((position, total))
             headed = position in starts
             position = block_start(starts, position) - 1
-        for count, (start, running) in enumerate(sums, 1):
-            # A line no label marks as a subtotal must sum exactly (Apple's "Other" 32 is not 45 - 12 + 0 = 33).
-            if count >= least and close(running, value, count + 1 if least == 2 else 0):
-                starts[index] = start
-                break
+        # A line no label marks as a subtotal must sum exactly (Apple's "Other" 32 is not 45 - 12 + 0 = 33). Of the sums
+        # within rounding, the nearest: Embraer's June 2011 non-current assets close 0.5 short of the block without its
+        # "Trade accounts receivable 0.5", within the tolerance of ten lines (round 90).
+        fits = [(abs(running - value), count, start) for count, (start, running) in enumerate(sums, 1)
+                if count >= least and close(running, value, count + 1 if least == 2 else 0)]
+        if fits:
+            starts[index] = min(fits)[2]
         else:
             if least > 2:
                 continue

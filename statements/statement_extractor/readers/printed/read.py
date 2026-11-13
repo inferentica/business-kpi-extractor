@@ -21,6 +21,7 @@ from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA, PER_SHARE, SHARE_COUNT
 from .company_title import titled_company
 from .currency import column_currencies, reporting_currency, split_by_sign, translations
+from .ranges import without_repeats
 from .dates import column_periods
 from .find import TITLES, find_statements, two_columns, unlabelled_totals
 from .scales import line_scale, share_scale, statement_scale, states_two
@@ -55,7 +56,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
                                  -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
     read_periods: dict[tuple, set] = {}  # by kind and scope: Copel prints the parent's quarter, then the group's
     for kind, group in found:
-        periods = split_by_sign(group[0], column_periods(kind, group, fiscal_year_end, document_end))
+        periods = without_repeats(group[0], split_by_sign(group[0], column_periods(kind, group, fiscal_year_end, document_end)))
         notes.extend(titled_notes(kind, periods, document_end, fiscal_year_end, year_offset))
         # Another company's statement the filing carries has periods of its own (Heineken's in FEMSA's 20-Fs, its
         # fuller balance sheet read first; Coca-Cola FEMSA's release in FEMSA's, round 84): it never takes the company's.

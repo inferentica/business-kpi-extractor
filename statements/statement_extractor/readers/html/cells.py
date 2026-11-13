@@ -52,7 +52,8 @@ def _spanned(trs) -> list[list[Cell]]:
     return [_cells(tr, held) for tr in trs]
 
 
-_DOTTED_MILLIONS = re.compile(r"^\(?\s*[-−–]?\s*\d{1,3}(?:\.\d{3}){2,}(?:,\d+)?\s*\)?$")  # "9.520.238": only thousands read so
+# "9.520.238", "1.044,0" (Embraer's 2011 releases): only thousands and a decimal comma read so.
+_DOTTED_MILLIONS = re.compile(r"^\(?\s*[-−–]?\s*\d{1,3}(?:(?:\.\d{3}){2,}(?:,\d+)?|(?:\.\d{3})+,\d+)\s*\)?$")
 _COMMA_THOUSANDS = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*\d{1,3}(?:,\d{3})+(?:\.\d+)?\s*\)?$")
 _DOTTED_FIGURE = re.compile(r"^\(?\s*[-−–]?\s*\d{1,3}(?:\.\d{3})*(?:,\d+)?\s*\)?%?$")
 

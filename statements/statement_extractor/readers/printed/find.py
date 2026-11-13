@@ -42,12 +42,12 @@ _NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bcomparison\b.{0,120}?\bve
 _DISCONTINUED = re.compile(r"\b(?:statements?\s+of\s+(?:operations|income)|income\s+statements?)\s+of\s+(?:[\w-]+\s+){0,3}"
                            r"discontinued\s+operations\b", re.I)
 # Results restated by the company's own measures beside its statutory statements (Lloyds: "UNDERLYING BASIS CONSOLIDATED
-# INCOME STATEMENT", "INCOME STATEMENT - UNDERLYING BASIS"): only the statutory statement is the company's own.
-_UNDERLYING = re.compile(r"\bunderlying\s+basis\b|\bcombined\s+businesses\b", re.I)  # and Lloyds' 2010-12 "Combined businesses"
+# INCOME STATEMENT", 2010-12 "Combined businesses"; Embraer's 1Q20 "ADJUSTED NET INCOME (LOSS)"): never the company's own.
+_UNDERLYING = re.compile(r"\bunderlying\s+basis\b|\bcombined\s+businesses\b|\badjusted\s+net\s+income\b", re.I)
 
 
-# Volaris's 20-F: "the selected consolidated statements of operations data", its table's first row "CONSOLIDATED STATEMENTS OF OPERATIONS".
-_SELECTED_DATA = re.compile(r"\bselected\s+(?:consolidated\s+)?(?:financial|statements?|operating)\b|\bstatements?\s+of\s+\w+(?:\s+\w+)?\s+data\b", re.I)
+# Volaris's 20-F: "the selected consolidated statements of operations data"; Embraer's Q3 2018 "selected information".
+_SELECTED_DATA = re.compile(r"\bselected\s+(?:consolidated\s+)?(?:financial|statements?|operating|information)\b|\bstatements?\s+of\s+\w+(?:\s+\w+)?\s+data\b", re.I)
 # "quarterly" names quarterly-data tables, not the report's running header (Tennant's "Quarterly Report – Form 10-Q").
 _NOT_IN_RELEASE = re.compile(_NOT_STATEMENT.pattern.replace("summary|", "").replace("|quarterly(?!\\s+report)|", "|"), re.I)
 
@@ -56,8 +56,7 @@ _COMPREHENSIVE = re.compile(r"statements?\s+of\s+(consolidated\s+)?comprehensive
 TITLE_PATTERNS = [pattern for _kind, pattern in TITLES] + [_COMPREHENSIVE]  # where a title ends, for its dates
 
 
-# A link printed atop every page back to the index (TSMC's "Index to Financial Statements"), with a title after it: not
-# the index itself.
+# A link atop every page back to the index (TSMC's "Index to Financial Statements"), a title after it: not the index.
 _RUNNING_LINK = re.compile(r"\b(index\s+to\s+(consolidated\s+)?financial\s+statements|table\s+of\s+contents)\b(?=.{40,})", re.I | re.S)
 
 
@@ -122,8 +121,9 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         title_text = SIDE_BY_SIDE.sub(" ", title_text)
         if kind is None or not_statement.search(_RUNNING_LINK.sub(" ", title_text[-260:])) or \
                 not_statement.search(_RUNNING_LINK.sub(" ", heading)) or \
-                _DISCONTINUED.search(table.context[-600:]) or _UNDERLYING.search(
-                    _heading(table.context[-200:]) + " " + " ".join(cell.text for cells in table.header[:2] for cell in cells)) or len([r for r in table.rows if r.figures]) < 4:
+                _DISCONTINUED.search(table.context[-600:]) or _SELECTED_DATA.search(table.context[-400:]) or _UNDERLYING.search(
+                    _heading(table.context[-200:]) + " " + " ".join(cell.text for cells in table.header[:2] for cell in cells) + " " + leading) \
+                or len([r for r in table.rows if r.figures]) < 4:
             continue
         if any(_NOT_A_PERIOD.search(cell.text) for cells in table.header for cell in cells if cell.start > 0):
             continue
