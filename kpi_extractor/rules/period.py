@@ -4,6 +4,7 @@ the dates its header names, and the KPIs that are levels at a period's end."""
 from __future__ import annotations
 
 from datetime import date, timedelta
+import math
 import re
 
 from ..ai import KpiSpec
@@ -187,6 +188,16 @@ def header_contradicts(table: Table, row: int, col: int, expected: date, *also: 
     return None
 
 
+def release_unit(value: float, cell: float) -> float | None:
+    """The release's own unit (a power of ten) between a stored figure and its cell. A figure since restated differs
+    from its cell (Bank of America's Q4 2019 equities: $1,015 million stored, $1,018 million in that release), so the
+    ratio itself would scale every other cell of the row off its filing ($1,071 million read as $1,067.84 million)."""
+    if not value or not cell:
+        return None
+    unit = 10.0 ** round(math.log10(abs(value / cell)))
+    return unit if abs(value / cell / unit - 1) <= 0.1 else None
+
+
 def year_ago_value(table: Table, row: int, col: int, period_end: date | None, value: float) -> float | None:
     """The row's figure for the same period a year before, in the read figure's units: the one other cell under a
     column of the same length ("three months ended", "<second quarter>") whose header names the period a year earlier
@@ -197,7 +208,9 @@ def year_ago_value(table: Table, row: int, col: int, period_end: date | None, va
     own = parse_number(table.rows[row][col])
     if own is None or not own.value:
         return None
-    factor = value / own.value
+    factor = release_unit(value, own.value)
+    if factor is None:
+        return None
     length = column_header(table, row, col)
     own_years = column_dates(table, row, col)[1]
     target = period_end - timedelta(days=365)

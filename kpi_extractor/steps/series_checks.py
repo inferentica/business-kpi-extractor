@@ -12,6 +12,7 @@ from ..domain.derive import derive_periods, same_derivation
 from ..documents.document import Document, parse_number
 from ..quality.checks import JUMP_NOTE, count_jump, parts_add_up, reported_matches
 from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
+from ..rules.period import release_unit
 from ..rules.scale import _PER_UNIT
 from ..sources.base import FilingRef
 from .shared import (_rescaled, AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
@@ -64,8 +65,8 @@ def ties_out(value: dict, year_ago: float | None) -> bool:
     numbers = (value.get("locator") or {}).get("row_numbers") or []
     if year_ago is None or len(numbers) < 2 or not numbers[0]:
         return False
-    factor = float(value["value"]) / float(numbers[0])
-    return any(abs(float(n) * factor - year_ago) <= max(abs(year_ago) * 1e-4, 1e-9) for n in numbers[1:])
+    factor = release_unit(float(value["value"]), float(numbers[0]))
+    return factor is not None and any(abs(float(n) * factor - year_ago) <= max(abs(year_ago) * 1e-4, 1e-9) for n in numbers[1:])
 
 
 def _overlaps(rows: list[dict]) -> list[dict]:
@@ -235,14 +236,17 @@ class SeriesChecks:
             value = float(v["value"])
             if v["unit"] == "currency" and _significant(value) and reported(v, value, 1e-4) and whole(v):
                 settle(v, _EQUALS_XBRL)
-        # A restatement far from the figure it replaced was a column of another length (a year for a quarter): the
-        # figure is restored and goes back to review.
+        # A restatement far from the figure it replaced was a column of another length (a year for a quarter), and an
+        # amount with a fraction of a dollar was scaled off its cell by a restated figure: the figure is restored and
+        # goes back to review, where the next release is read for it again.
         for v in self.values.values():
             if v["method"] != "ai" or v["validation_status"] != "verified":
                 continue
             note = next((n for n in v.get("notes") or [] if n.startswith(_RESTATED_LATER)), None)
             match = re.search(r"\(was ([-\d.e+]+)\)", note or "")
-            if match and abs(float(v["value"]) - float(match.group(1))) > abs(float(match.group(1))) * MAX_RESTATEMENT:
+            if match and (abs(float(v["value"]) - float(match.group(1))) > abs(float(match.group(1))) * MAX_RESTATEMENT
+                          or v["unit"] == "currency" and abs(float(v["value"])) >= 1000
+                          and abs(float(v["value"]) - round(float(v["value"]))) > 1e-3):
                 settled[value_key(v)] = {**v, "value": float(match.group(1)), "validation_status": "needs_review",
                                          "notes": [n for n in v.get("notes") or [] if n != note]}
         # Parts proven alone by an earlier version of this rule, in breakdowns that do not add up, go back to review.
