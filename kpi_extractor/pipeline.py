@@ -20,6 +20,7 @@ from datetime import date, timedelta
 from .sources.archive import Archive
 from .ops.control import ControlError
 from .documents.document import Document
+from .domain.fiscal import with_first_year
 from .sources import source as filing_source
 from .sources.base import FilingRef, FilingSource
 from .steps.shared import RecordBuilding, _folder, list_parents, only_adds
@@ -181,7 +182,10 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.archive._listing()
         self.archive.label(self.symbol, self.profile.name)
         known_urls = {filing["accession"]: filing["source_url"] for filing in self.filings.values() if filing.get("source_url")}
-        reports = sorted(self.source.periodic_reports(company, self.reports_since, known_urls, self.archive), key=lambda ref: ref.filed)
+        # The window's reports, and the earlier 10-Qs of the first one's fiscal year: its year-ago columns reach that
+        # year, whose Q4 needs all three of its quarters (domain/fiscal.py, with_first_year).
+        listed = self.source.periodic_reports(company, self.reports_since - timedelta(days=300), known_urls, self.archive)
+        reports = sorted(with_first_year(listed, self.reports_since, self.profile.fiscal_year_end), key=lambda ref: ref.filed)
         pending = [ref for ref in reports if self.force or self._pending(ref)]
         for ref in reversed(reports):
             if ref not in pending and not self.archive.has(_folder(ref), "xbrl.json"):

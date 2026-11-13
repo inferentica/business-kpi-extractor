@@ -118,3 +118,22 @@ def offset_lead(samples: list[tuple[date, str, bool]], fiscal_year_end: str) -> 
     """How many votes the leading offset has over the next."""
     counts = sorted(_offset_votes(samples, fiscal_year_end).values(), reverse=True) + [0, 0]
     return counts[0] - counts[1]
+
+
+_ANNUAL_FORMS = ("10-K", "20-F", "40-F")
+
+
+def with_first_year(reports: list, since: date, fiscal_year_end: str | None) -> list:
+    """The periodic reports filed since `since`, and the earlier quarterly reports of the fiscal year the first of them
+    reports on. The window's reports give the year before through their year-ago columns (Amazon's Q2 2016 10-Q gives
+    Q2 2015, its 10-K FY2015), so that year's Q4, the year less three quarters, needs the quarter only the year's
+    first 10-Q gives (Q1 2016's, for Q1 2015). Only that one fiscal year: its reports' own year-ago quarters complete
+    it and reach no further. Reports carry their filing dates; each one's period is the quarter end before it."""
+    inside = [ref for ref in reports if ref.filed >= since]
+    if not inside or not fiscal_year_end:
+        return inside
+    first = min(inside, key=lambda ref: ref.filed)
+    year_end = fiscal_year_end_for(nominal_quarter_end_before(first.filed, fiscal_year_end), fiscal_year_end)
+    start = _nominal_year_end(year_end.year - 1, fiscal_year_end) + _YEAR_END_SLACK
+    return [ref for ref in reports if ref.filed >= since or (
+        ref.form not in _ANNUAL_FORMS and nominal_quarter_end_before(ref.filed, fiscal_year_end) > start)]
