@@ -54,6 +54,7 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
                 empty.add(ref.accession)
         except Exception as error:  # noqa: BLE001 - one unreadable release never stops the company
             record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"
+            log(f"{symbol}: 6-K {ref.filed} {record['note']}")  # in the job's log: round 93 lost every release unseen
             records.append(record)
             continue
         finally:

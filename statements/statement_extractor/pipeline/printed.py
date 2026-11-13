@@ -132,9 +132,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         if titled is not None:
             # Another company's statements print none of the company's: HBOS's 2008 accounts in Lloyds' June 2010 6-K. A
             # heading counts where no table of its statement was read; a read one's columns say what it prints.
-            kinds = {reading.statement for reading in readings} if others else {"income", "balance", "cash_flow"}
+            company_kinds = {reading.statement for reading in readings} if others else {"income", "balance", "cash_flow"}
             heads = {(kind,) for kind in headed_kinds(content) if kind not in {reading.statement for reading in readings}}
-            titled |= {title for title in printed_titles | heads if title[0] in kinds}
+            titled |= {title for title in printed_titles | heads if title[0] in company_kinds}
             if readings and not others and _INTERIM.search(content[:3_000_000]):
                 titled.add(("interim",))  # an interim report (IAS 34, CPC 21): the quarter must print its full set
         if signs is not None:
