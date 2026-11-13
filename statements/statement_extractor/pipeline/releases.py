@@ -21,10 +21,10 @@ from .printed import read_printed
 
 
 def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_offset: int, log=print,
-                  phases: dict | None = None):
+                  phases: dict | None = None, predecessors: list = ()):
     """(filing records, readings) of every release since `since`."""
     records, readings = [], []
-    refs = list_releases(company, since, lambda day: quarter_end_before(day, fiscal_year_end))
+    refs = list_releases(company, since, lambda day: quarter_end_before(day, fiscal_year_end), predecessors)
     folder = os.environ.get("STATEMENTS_ARCHIVE_CACHE")
     known, empty = remembered(folder), set()
     log(f"{symbol}: {len(refs)} 6-Ks in the release window, {len(known & {ref.accession for ref in refs})} remembered empty")

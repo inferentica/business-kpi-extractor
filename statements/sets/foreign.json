@@ -1,6 +1,6 @@
 {
   "since": "1993-01-01",
-  "note": "Phase 4 foreign filers. Canadian 40-F filers Brookfield Corporation (U.S. dollars) and Scotiabank (Canadian dollars), Canadian GAAP until 2011, then IFRS; and, since 2026-11-09 (gate widened), the 11 foreign filers of the Phase 9 sample: Alcon, Copel, GDS, Gildan (40-F), James Hardie, KEPCO, Lloyds, Petrobras, PicS, TIM and UBS. ASML and TSMC are in the pilot set.",
+  "note": "Phase 4 foreign filers. Canadian 40-F filers Brookfield Corporation (U.S. dollars) and Scotiabank (Canadian dollars), Canadian GAAP until 2011, then IFRS; and, since 2026-11-09 (gate widened), the 11 foreign filers of the Phase 9 sample: Alcon, Copel, GDS, Gildan (40-F), James Hardie, KEPCO, Lloyds, Petrobras, PicS, TIM and UBS. ASML and TSMC are in the pilot set. Embraer since 2026-11-13, back to its predecessor's first 20-F (sources/predecessors.py).",
   "symbols": [
     "BN",
     "BNS",
@@ -14,6 +14,7 @@
     "PBR",
     "PICS",
     "TIMB",
-    "UBS"
+    "UBS",
+    "EMBJ"
   ]
 }

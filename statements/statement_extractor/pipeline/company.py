@@ -27,6 +27,7 @@ from ..selection.signs import sign_ties
 from ..selection.summaries import choose_summaries, summary_coverage
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
 from ..sources.listing import filing_for, list_reports
+from ..sources.predecessors import predecessor_companies
 from ..sources.retry import with_network_retries
 from .prefetch import load_all
 from .printed import read_printed
@@ -42,7 +43,8 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     phases: dict[str, float] = {}  # seconds each part of the read took, kept in the summary (where a round's time goes)
     mark = time.time()
     profile, company = company_profile(symbol)
-    reports = sorted(list_reports(company, since), key=lambda ref: ref.filed, reverse=True)
+    predecessors = predecessor_companies(symbol)  # registrants its reporting passed from (Embraer's before 2006)
+    reports = sorted(list_reports(company, since, predecessors), key=lambda ref: ref.filed, reverse=True)
     mark = _phase(phases, "listing", mark)
     readings, filings, offset, summaries, regulator_reads = [], [], None, [], []
     # Every report's period is read from its submission, so they are downloaded first, four at a time
@@ -107,7 +109,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         gc.collect()
     mark = _phase(phases, "reports read", mark)
     if profile.foreign or any(ref.form in ("20-F", "40-F") for ref in reports):
-        records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log, phases)
+        records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log, phases, predecessors)
         filings.extend(records)
         readings.extend(found)
         archived_summaries: list[dict] = []
