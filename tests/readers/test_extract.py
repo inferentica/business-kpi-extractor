@@ -964,3 +964,26 @@ def test_a_quote_whose_sentence_opens_with_another_period_is_not_the_quarters():
     assert values == [] and "'for the full year', not the quarter's" in problems[0]
     values, problems = read("the average price per ad increased by 2% year-over-year", "2%")
     assert problems == [] and [item.value for item in values] == [2]
+
+
+def test_a_percent_is_never_read_from_an_amount_under_another_columns_percent_heading():
+    # Wells Fargo's Q3 2022 supplement: every table heads a "% Change from" column; Consumer Banking's "Total loans"
+    # ($335,644 million) was taken for allowance coverage, which is "Total loans" under "... as a percentage of:".
+    head = "<tr><td></td><td>Quarter ended</td><td></td><td>Sep 30, 2022 % Change from</td></tr>" \
+           "<tr><td>($ in millions)</td><td>Sep 30,2022</td><td>Jun 30,2022</td><td>Jun 30,2022</td></tr>"
+    html = (f"<table>{head}<tr><td>Auto</td><td>55,430</td><td>56,813</td><td>(2)</td></tr>"
+            "<tr><td>Total loans</td><td>$335,644</td><td>330,859</td><td>1</td></tr></table>"
+            f"<table>{head}<tr><td>Allowance for credit losses for loans</td><td>$13,225</td><td>12,884</td><td>3</td></tr>"
+            "<tr><td>Allowance for credit losses for loans as a percentage of:</td><td></td><td></td><td></td></tr>"
+            "<tr><td>Total loans</td><td>1.40</td><td>1.37</td><td></td></tr></table>")
+    document = parse_document(html, "https://example.com/wfc.htm")
+    amounts, ratios = list(document.tables)
+    spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "coverage", "label": "Allowance coverage", "unit": "percent"}]}]})
+    def read(table, row):
+        return read_values(document, spec, Located.model_validate({"period_end": "2022-09-30", "values": [
+            {"kpi": "ops.coverage", "table": table, "row": row, "col": 1, "row_label": "Total loans"}]}), "USD")
+    values, problems = read(amounts, 3)
+    assert values == [] and "is an amount, not a percentage" in problems[0]
+    values, problems = read(ratios, 4)
+    assert [item.value for item in values] == [1.40] and problems == []

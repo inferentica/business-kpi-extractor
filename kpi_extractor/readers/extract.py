@@ -15,7 +15,7 @@ from ..rules.scale import (  # noqa: F401 - re-exported for callers of extract
     _row_scale_words, _scale_quoted, _scale_word, _SCALE_WORDS_OF, SCALE_NOT_STATED, ScaleFrom, cell_amount_scale, cell_count_scale,
     number_scale, passage_amount_scale, passage_count_scale, reading_scale)
 from ..rules.table import (  # noqa: F401 - re-exported for callers of extract
-    _heading, _nearest_heading, _section_heading, earlier_twin)
+    _heading, _nearest_heading, _section_heading, earlier_twin, not_a_percent)
 from ..rules.wording import (  # noqa: F401 - re-exported for callers of extract
     _CAUSE, _COMPARED, _compares_to_a_small_change, _FALL, _FALL_WORD, _figure_forms,
     _FORWARD, _NUMBER, _PERIOD_LIST, _PLAIN_WORDS, explanation_supports, falls,
@@ -157,10 +157,8 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
             raise LocateError(f"no number in {locator.table} r{locator.row} c{locator.col}")
         if kpi.unit in ("currency", "count") and parsed.percent:
             raise LocateError(f"{text!r} is a percentage, not an amount")
-        header = " ".join(" ".join(row) for row in table.rows[:3])
-        if kpi.unit == "percent" and not parsed.percent and not re.search(
-                r"%|\bpercent", f"{' '.join(table.rows[locator.row])} {header} {_section_heading(table, locator.row)}", re.I):
-            raise LocateError(f"{text!r} is not a percentage")
+        if kpi.unit == "percent" and not parsed.percent and (why := not_a_percent(table, locator.row, locator.col, text)):
+            raise LocateError(why)
         value = parsed.value
         if parsed.scale_word is not None and kpi.unit in ("count", "currency"):
             scale_from = number_scale(parsed.scale_word)
