@@ -240,3 +240,20 @@ def test_a_q4_with_the_year_and_quarters_from_the_same_later_reports_stands():
         values += [{**_value(period, "a", a), "locator": {"year_ago": True}}, {**_value(period, "b", b), "locator": {"year_ago": True}}]
     derived = {(row["fiscal_period"], row["kpi_key"]): row for row in derive_periods(values)}
     assert derived[("Q4", "a")]["validation_status"] == "verified" and derived[("Q4", "a")]["value"] == 25
+
+
+def test_a_year_of_later_basis_quarters_takes_the_year_its_following_10k_restates():
+    # Bank of America's 2018: Q1-Q3 from its 2019 10-Qs' comparatives, the year from its own 2018 10-K. That year less
+    # those quarters mixes two bases, so the year as the 2019 10-K restates it is used.
+    def later(period, kpi, value, total):
+        return {**_value(period, kpi, value, year="2018"), "locator": {"year_ago": True, "total": total}}
+    values = [{**_value("FY", "a", 61, year="2018"), "locator": {"total": 100}},
+              {**_value("FY", "b", 39, year="2018"), "locator": {"total": 100}}]
+    for period, a, b in (("Q1", 14, 10), ("Q2", 15, 10), ("Q3", 16, 10)):
+        values += [later(period, "a", a, a + b), later(period, "b", b, a + b)]
+    # The 2019 10-K: 2019's own figures, 2018 restated beside them (a 60, b 40: the same 100).
+    values += [{**_value("FY", "a", 70, year="2019"), "locator": {"prior": 60, "total": 110}},
+               {**_value("FY", "b", 40, year="2019"), "locator": {"prior": 40, "total": 110}}]
+    derived = {(row["fiscal_year"], row["fiscal_period"], row["kpi_key"]): row for row in derive_periods(values)}
+    assert derived[("2018", "Q4", "a")]["value"] == 15 and derived[("2018", "Q4", "b")]["value"] == 10
+    assert derived[("2018", "Q4", "a")]["validation_status"] == "verified"
