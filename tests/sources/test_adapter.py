@@ -11,12 +11,12 @@ from kpi_extractor.sources import sec
 
 
 class Control:
-    def __init__(self, cik=None):
-        self.calls, self.cik = [], cik
+    def __init__(self, cik=None, filings=()):
+        self.calls, self.cik, self.filings = [], cik, list(filings)
 
     def call(self, operation, **payload):
         self.calls.append(operation if operation != "archive_list" else f"archive_list {payload['cik']}")
-        return {"cik": self.cik} if operation == "symbol_state" else {}
+        return {"cik": self.cik, "filings": self.filings} if operation == "symbol_state" else {}
 
 
 class FakeSource:
@@ -31,6 +31,11 @@ class FakeSource:
         self.asked.append("open_company")
         self.opened_with = archive
         return SourceCompany(CompanyProfile(symbol=symbol, cik=1, name="Example Co", fiscal_year_end="1231", foreign=False))
+
+    def open_filer(self, cik, profile, archive=None):
+        self.asked.append(f"open_filer {cik}")
+        return SourceCompany(CompanyProfile(symbol=profile.symbol, cik=cik, name="Example Co (old)", fiscal_year_end="1231",
+                                            foreign=False))
 
     def periodic_reports(self, company, since, known_urls=None, archive=None):
         self.asked.append("periodic_reports")
@@ -65,7 +70,7 @@ class FakeSource:
 
 def test_sec_implements_every_method_a_source_needs():
     wanted = {name for name, member in inspect.getmembers(FilingSource) if inspect.isfunction(member) and not name.startswith("_")}
-    assert wanted == {"open_company", "periodic_reports", "earnings_releases", "prospectus", "report_html", "exhibit_html",
+    assert wanted == {"open_company", "open_filer", "periodic_reports", "earnings_releases", "prospectus", "report_html", "exhibit_html",
                       "is_own_document", "classification_excerpt", "tagged_facts", "archive_tagged_facts"}
     for name in wanted:
         assert callable(getattr(source("sec"), name)), name
@@ -105,3 +110,27 @@ def test_the_registrys_cik_opens_the_archive_before_the_company(registered, list
     assert [call for call in control.calls if call.startswith("archive_list")] == listed
     assert (fake.opened_with.cik if fake.opened_with else None) == registered
     assert pipeline.archive.cik == 1
+
+
+def test_an_earlier_filers_filings_are_listed_with_its_own_archive():
+    # A reorganization gave the company a new filer (ExxonMobil Holdings took Exxon Mobil Corp's ticker): the filings
+    # stored from the old one name it, so it is listed too, through its own archive, and its filings can be re-read.
+    stored = [{"accession": "0000000009-25-000001", "status": "processed", "document_role": "periodic_report",
+               "source_url": "https://www.sec.gov/Archives/edgar/data/9/000000000925000001/q.htm"},
+              {"accession": "0000000001-26-000001", "status": "processed", "document_role": "periodic_report",
+               "source_url": "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/q.htm"}]
+    control, fake = Control(1, stored), FakeSource()
+    pipeline = SymbolPipeline(control, "EXCO", quarters=4, force=False, today=date(2026, 11, 8), log=lambda *_: None, source=fake)
+    pipeline.run()
+    assert "open_filer 9" in fake.asked and "open_filer 1" not in fake.asked
+    assert "archive_list 9" in control.calls and sorted(pipeline._archives) == [1, 9]
+    assert fake.asked.count("periodic_reports") == 2 and fake.asked.count("earnings_releases") == 2
+
+
+def test_an_earlier_filer_counts_only_until_the_current_one_files():
+    from kpi_extractor.pipeline import _before_first
+    ref = lambda accession, filed: FilingRef(accession, "10-Q", filed, "periodic_report", "u")
+    current = [ref("new-1", date(2026, 11, 2))]
+    earlier = [ref("old-1", date(2026, 5, 1)), ref("old-2", date(2026, 8, 3)), ref("old-3", date(2026, 11, 5)), ref("new-1", date(2026, 11, 2))]
+    assert [item.accession for item in _before_first(current, earlier)] == ["old-1", "old-2"]
+    assert [item.accession for item in _before_first([], earlier[:2])] == ["old-1", "old-2"]

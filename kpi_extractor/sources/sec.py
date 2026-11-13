@@ -2,6 +2,8 @@
 their documents and their XBRL. `SEC` is the adapter the pipeline uses; the functions below are its parts."""
 from __future__ import annotations
 
+from dataclasses import replace
+
 import os
 import html
 import re
@@ -145,6 +147,19 @@ def archived_company(symbol: str, archive) -> tuple[CompanyProfile, Company] | N
     except Exception as error:  # noqa: BLE001 - a list edgartools cannot read: SEC's instead
         archive.log(f"{symbol}: archived filing list unreadable ({str(error)[:200]}); listing filings from SEC")
         return None
+
+
+def earlier_filer(cik: int, archive=None):
+    """A company's earlier filer (Exxon Mobil Corp before ExxonMobil Holdings took its ticker), from its filing list
+    in the archive, of any age (it has stopped filing as the company), else from SEC."""
+    if archive is not None:
+        listing, _reason = archive.filing_list(max_age=None)
+        if listing is not None:
+            try:
+                return create_entity_from_submissions_json(listing, entity_type="company")
+            except Exception:  # noqa: BLE001 - a list edgartools cannot read: SEC's instead
+                pass
+    return _with_retries(lambda: Company(cik))
 
 
 def profile_of(symbol: str, company: Company) -> tuple[CompanyProfile, Company]:
@@ -406,6 +421,9 @@ class SecSource:
         opened = archived_company(symbol, archive) if archive is not None else None
         profile, company = opened or company_profile(symbol)
         return SourceCompany(profile, company)
+
+    def open_filer(self, cik: int, profile: CompanyProfile, archive=None) -> SourceCompany:
+        return SourceCompany(replace(profile, cik=cik), earlier_filer(cik, archive))
 
     def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,
                          archive=None) -> list[FilingRef]:

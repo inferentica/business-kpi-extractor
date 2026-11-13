@@ -170,7 +170,7 @@ class ReportReading:
         if not left:
             return records
         try:
-            document = parse_document(self.source.report_html(ref, self.archive), ref.source_url)
+            document = parse_document(self.source.report_html(ref, self._archive_of(ref)), ref.source_url)
         except Exception:  # noqa: BLE001 - the remainder keeps its worked-out name
             return records
         names: dict[int, str] = {}

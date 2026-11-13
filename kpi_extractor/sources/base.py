@@ -53,6 +53,9 @@ class FilingSource(Protocol):
     # With the company's archive (when its ID is known before the source is asked), from what is archived there.
     def open_company(self, symbol: str, archive=None) -> SourceCompany: ...
 
+    # A filer the company's earlier filings came from (its ID changed in a reorganization), with that filer's archive.
+    def open_filer(self, cik: int, profile: CompanyProfile, archive=None) -> SourceCompany: ...
+
     def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,
                          archive=None) -> list[FilingRef]: ...
 

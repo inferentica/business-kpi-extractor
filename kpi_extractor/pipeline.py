@@ -11,6 +11,7 @@ AI decides and points; code reads and proves. Every AI answer is checked before 
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -112,6 +113,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self._dead: set[str] | None = None  # groups not read this run (see _readable)
         self._newest_release: date | None = None
         self.archive: Archive | None = None
+        self._archives: dict[int, Archive] = {}  # each filer's archive by its ID: the current one's and earlier ones'
         self._exhibits: dict[str, Future] = {}
         # Downloads and XBRL parsing start ahead of the filing being worked on.
         self._prefetch = ThreadPoolExecutor(max_workers=3)
@@ -181,14 +183,18 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.archive = Archive(self.control, self.symbol, self.profile.cik, self.log)
             self.archive._listing()
         self.archive.label(self.symbol, self.profile.name)
+        self._archives = {self.profile.cik: self.archive}
+        earlier = self._earlier_filers()
         known_urls = {filing["accession"]: filing["source_url"] for filing in self.filings.values() if filing.get("source_url")}
         # The window's reports, and the earlier 10-Qs of the first one's fiscal year: its year-ago columns reach that
         # year, whose Q4 needs all three of its quarters (domain/fiscal.py, with_first_year).
         listed = self.source.periodic_reports(company, self.reports_since - timedelta(days=300), known_urls, self.archive)
+        listed = listed + _before_first(listed, [ref for filer, archive in earlier for ref in self.source.periodic_reports(
+            filer, self.reports_since - timedelta(days=300), known_urls, archive)])
         reports = sorted(with_first_year(listed, self.reports_since, self.profile.fiscal_year_end), key=lambda ref: ref.filed)
         pending = [ref for ref in reports if self.force or self._pending(ref)]
         for ref in reversed(reports):
-            if ref not in pending and not self.archive.has(_folder(ref), "xbrl.json"):
+            if ref not in pending and not self._archive_of(ref).has(_folder(ref), "xbrl.json"):
                 # Read before the archive existed: stored now, once, without parsing it.
                 self._archiving.append(self._prefetch.submit(self._archive_xbrl, ref))
         # The newest first (it gives the fiscal year's offset), then the rest a few ahead of the one being read: all at
@@ -198,8 +204,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         # The earnings releases are listed while the reports are read: the listing waits only on SEC and the archive.
         passed: list[FilingRef] = []
         # From the window's first fiscal year's Q1, as the reports (domain/fiscal.py, with_first_year).
-        listing = self._prefetch.submit(self.source.earnings_releases, company, self.since - timedelta(days=300), self.archive,
-                                        passed, known_urls)
+        listing = self._prefetch.submit(self._earnings_releases, company, earlier, self.since - timedelta(days=300), passed,
+                                        known_urls)
         self.offset = self._year_offset(reports)
         for ref in reports:
             later = [other for other in pending if other.filed > ref.filed or (other.filed == ref.filed and other is not ref)]
@@ -318,6 +324,36 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         except Exception as error:  # noqa: BLE001
             self.log(f"{self.symbol}: {what} not stored ({type(error).__name__}: {error})"[:300])
 
+    def _earlier_filers(self) -> list:
+        """The filers the company's stored filings came from besides its current one: a reorganization gives the company a
+        new filer (ExxonMobil Holdings took Exxon Mobil Corp's ticker in 2026), and its history stays with the old. Each
+        is listed with its own archive, so its filings are still re-read; one that cannot be opened is left out."""
+        ciks = sorted({int(match.group(1)) for filing in self.filings.values()
+                       if (match := _FILER.search(filing.get("source_url") or ""))} - {self.profile.cik})
+        filers = []
+        for cik in ciks:
+            archive = Archive(self.control, self.symbol, cik, self.log)
+            archive._listing()  # once, before the download threads start
+            try:
+                filers.append((self.source.open_filer(cik, self.profile, archive), archive))
+            except Exception as error:  # noqa: BLE001 - the current filer is read without it
+                self.log(f"{self.symbol}: earlier filer {cik} not listed ({type(error).__name__}: {str(error)[:200]})")
+                continue
+            self._archives[cik] = archive
+            self.log(f"{self.symbol}: earlier filer {cik} listed with the current one ({self.profile.cik})")
+        return filers
+
+    def _earnings_releases(self, company, earlier: list, since: date, passed: list, known_urls: dict) -> list[FilingRef]:
+        """The current filer's releases, then each earlier filer's from before the current one's first."""
+        listed = self.source.earnings_releases(company, since, self.archive, passed, known_urls)
+        return listed + _before_first(listed, [ref for filer, archive in earlier
+                                               for ref in self.source.earnings_releases(filer, since, archive, None, known_urls)])
+
+    def _archive_of(self, ref: FilingRef) -> Archive:
+        """The archive of the filer that filed it (an earlier filer's filings sit under its own ID)."""
+        cik = getattr(ref.filing, "cik", None)
+        return self._archives.get(int(cik), self.archive) if cik else self.archive
+
     def _store_prospectus_breakdowns(self, ref: FilingRef) -> None:
         reading, renamed = self._read_prospectus_breakdowns(ref)
         if reading is None:
@@ -327,3 +363,14 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.store.write(self._join_prospectus_names(renamed))
         except Exception as error:  # noqa: BLE001 - the history is extra
             self.log(f"{self.symbol}: prospectus breakdowns not stored ({type(error).__name__}: {error})"[:300])
+
+
+_FILER = re.compile(r"/edgar/data/(\d+)/")
+
+
+def _before_first(current: list[FilingRef], earlier: list[FilingRef]) -> list[FilingRef]:
+    """An earlier filer's filings from before the current filer's first: after it, the old filer files only for itself
+    (a subsidiary's debt reports), not as the company. Never one the current filer lists too."""
+    first = min((ref.filed for ref in current), default=None)
+    listed = {ref.accession for ref in current}
+    return [ref for ref in earlier if ref.accession not in listed and (first is None or ref.filed < first)]
