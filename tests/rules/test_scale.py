@@ -43,6 +43,15 @@ def test_a_price_keeps_its_units_and_a_readers_scale_alone_is_held():
     assert cell_amount_scale(document(bare), bare, 1, 1, "Net revenue", reader(), 55) == (None, [])
 
 
+def test_a_price_whose_row_states_its_unit_keeps_it_under_a_document_in_millions():
+    # Exxon's benchmarks ("Brent ($/b) 74.35") in a release whose earnings tables are "in millions": a price, never scaled.
+    table = Table(id="T1", context="", rows=[["", "2Q18"], ["Brent ($/b)", "74.35"], ["Henry Hub ($/mbtu)", "2.80"]])
+    heading = TextBlock(id="B1", text="Earnings (millions of dollars)")
+    for row, value in ((1, 74.35), (2, 2.80)):
+        own, notes = cell_amount_scale(document(table, heading), table, row, 1, "Brent", reader(), value)
+        assert (own.factor, own.source, notes) == (1.0, "row", [])
+
+
 def test_a_count_takes_no_table_caption():
     table = Table(id="T1", context="(in millions, except employee data)", rows=[["", "Q3"], ["Employees", "12,400"],
                                                                                  ["Paid memberships (in millions)", "301"]])

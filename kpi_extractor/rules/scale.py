@@ -35,7 +35,10 @@ SCALE_WORDS = {"thousands": 1e3, "millions": 1e6, "billions": 1e9, "trillions": 
 
 
 # A row priced per unit ("Starlink consumer ARPU ($ per month)") in a table "in millions (except where noted)" is in units.
-_PER_UNIT = re.compile(r"\([^()]*\bper\s+(?:month|year|quarter|day|user|subscriber|member|customer|share|unit|system)\b[^()]*\)", re.I)
+# A row stating its amount per unit: "(per share)", "($ per month)", or a price's own unit, Exxon's "Brent ($/b)",
+# "Henry Hub ($/mbtu)", "Natural Gas ($/kcf)" (a "($ in millions)" caption names no unit after the slash).
+_PER_UNIT = re.compile(r"\([^()]*\bper\s+(?:month|year|quarter|day|user|subscriber|member|customer|share|unit|system)\b[^()]*\)"
+                       r"|\(\s*(?:US)?[$€£¥]\s*/\s*[A-Za-z]+\s*\)", re.I)
 
 
 def _preceding_scale(text: str, at: int) -> float | None:

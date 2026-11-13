@@ -179,12 +179,14 @@ def _places(text: str, own: bool = False) -> set[str]:
 
 
 def _place_not_named(label: str, table: Table, row: int, col: int) -> str | None:
-    """The place a metric's name gives that its row, its section headings, its column and its table's caption all
-    leave unnamed, if any."""
+    """The place a metric's name gives that its row, its section headings, its section's title, its column and its
+    table's caption all leave unnamed, if any. The title reaches past the section's other rows: Exxon's "Natural Gas
+    ($/kcf)" sits under "Crude ($/b)", both under "United States ExxonMobil"."""
     places = _places(label, own=True)
     if not places:
         return None
-    around = " ".join([" ".join(table.rows[row]) if row < len(table.rows) else "", _section_heading(table, row),
+    title = next((text for index, text in reversed(_section_titles(table)) if index < row), "")
+    around = " ".join([" ".join(table.rows[row]) if row < len(table.rows) else "", _section_heading(table, row), title,
                        " ".join(_heading(header, col) for header in table.rows[:row][:6] if col < len(header)),
                        table.context[-200:]])
     named = _places(around)

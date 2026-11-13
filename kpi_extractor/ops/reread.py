@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 from ..readers.trace import untraced
 from ..rules.identity import PLACE_NOT_NAMED
+from ..rules.scale import _PER_UNIT
 from ..steps.release_flow import SCALE_OUTLIER
 
 # Holds a figure's size alone once raised, which a figure the filing confirms no longer stays under (2026-11-10).
@@ -54,6 +55,18 @@ def _audit_held(value: dict) -> bool:
             and any(str(note).startswith(_AUDIT_HOLDS) for note in value.get("notes") or []))
 
 
+def _unit_price_row(value: dict) -> bool:
+    """A price whose row states its unit (Exxon's "Brent ($/b)") read with a scale or held, before such a row kept its
+    units (2026-11-13: $74.35 was served as 0.000074); or a figure held for a place its section's title names."""
+    locator = value.get("locator") or {}
+    if value.get("validation_status") == "rejected" or value.get("owner_decision"):
+        return False
+    if _PER_UNIT.search(str(locator.get("row_label") or "")):
+        factor = (locator.get("scale_from") or {}).get("factor")
+        return factor not in (None, 1) or value.get("validation_status") == "needs_review"
+    return _place_held(value)
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -69,6 +82,8 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
                     "counted as named (Coca-Cola's EMEA row reads Europe, Middle East & Africa)", _place_held),
     "audit-holds": ("figures the wave 2 audit held: two listed metrics read from one cell (Exxon's \"Worldwide\" rows), "
                     "a percent read from an amounts row (Wells Fargo's allowance coverage)", _audit_held),
+    "unit-price-rows": ("prices whose row states its unit (Exxon's \"Brent ($/b)\") read with a scale or held, and figures "
+                        "held for a place their section's title names", _unit_price_row),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }
