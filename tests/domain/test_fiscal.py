@@ -142,3 +142,14 @@ def test_the_window_reads_the_earlier_reports_of_its_first_fiscal_year():
         [date(2016, 1, 27), date(2016, 4, 27), date(2016, 7, 27)]
     # No fiscal calendar known: the window as it was.
     assert [item.filed for item in with_first_year(reports, date(2016, 5, 15), None)] == [date(2016, 7, 29), date(2016, 10, 28)]
+
+
+def test_the_release_window_also_starts_at_its_first_fiscal_years_q1():
+    # Releases carry their own period: a window opening on the Q2 2016 release reads the Q1 2016 one too, not Q4 2015's.
+    from types import SimpleNamespace
+    from kpi_extractor.domain.fiscal import with_first_year
+    release = lambda filed, end: SimpleNamespace(form="8-K", filed=filed, period_end=end)
+    releases = [release(date(2016, 1, 28), date(2015, 12, 31)), release(date(2016, 4, 28), date(2016, 3, 31)),
+                release(date(2016, 7, 28), date(2016, 6, 30)), release(date(2016, 10, 27), date(2016, 9, 30))]
+    kept = with_first_year(releases, date(2016, 5, 15), "1231")
+    assert [item.period_end for item in kept] == [date(2016, 3, 31), date(2016, 6, 30), date(2016, 9, 30)]
