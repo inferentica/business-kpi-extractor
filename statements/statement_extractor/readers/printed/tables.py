@@ -210,3 +210,15 @@ def _notes_named(table: Table) -> bool:
         if re.search(r"\bnotes?\b", row.label, re.I) or re.search(r"\bN[.º°](?:\s|$)", row.label):
             return True
     return False
+
+
+# A heading after a statement's lines that opens other figures in the same table: FEMSA's 2010 releases run on into
+# "EBITDA & CAPEX" and "FINANCIAL RATIOS" (liquidity 1.53 read as 1,530,000 until round 92).
+_AFTER_STATEMENT = re.compile(r"^(ebitda\b.*|financial\s+ratios|key\s+ratios)$", re.I)
+
+
+def statement_rows(rows: list[Row]) -> list[Row]:
+    """A table's rows up to a heading of other figures after the statement's own."""
+    end = next((index for index, row in enumerate(rows) if not row.figures and _AFTER_STATEMENT.match(row.label.strip())
+                and any(earlier.figures for earlier in rows[:index])), len(rows))
+    return rows[:end]

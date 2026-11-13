@@ -27,7 +27,7 @@ from .find import TITLES, find_statements, two_columns, unlabelled_totals
 from .scales import line_scale, share_scale, statement_scale, states_two
 from .scope import statement_scope
 from .side_by_side import column_scopes
-from .tables import Table, figure_columns
+from .tables import Table, figure_columns, statement_rows
 from .titled import titled_notes
 
 
@@ -192,7 +192,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
     for table, column, columns in layout:
         base = min((row.level for row in table.rows if row.label), default=0)
         last_heading = None
-        for row in table.rows:
+        for row in statement_rows(table.rows):
             if not row.label and not row.figures:
                 continue
             # A heading wrapped onto a second line: Apple's "Shares used in computing earnings (loss)" / "per common

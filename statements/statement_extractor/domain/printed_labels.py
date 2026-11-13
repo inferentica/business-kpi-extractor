@@ -6,7 +6,7 @@ import re
 
 
 # ASUR's "Earning per American Depositary Share (in U.S. Dollars) 7.1108", read at its statement's thousands until round 79.
-PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+)?share|per\s+ads|per\s+american\s+depositary\s+(share|receipt)|"
+PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+|series\s+\W?\w+\W?\s*)?share|per\s+ads|per\s+american\s+depositary\s+(share|receipt)|"
                        r"^(basic|diluted)\b|earnings?\s+per|\beps\b", re.I)
 
 
@@ -15,7 +15,8 @@ PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+)?share|per\s+ads|per\s+ame
 OPERATING_DATA = re.compile(r"\((?:in\s+)?(?:millions?|thousands?)\s+(?:of\s+)?(?:unit\s+cases|transactions)\)|\bper\s+unit\s+case\b", re.I)
 
 
-SHARE_COUNT = re.compile(r"\bshares\b|weighted[-\s]average", re.I)
+# Not money about shares: FEMSA's 2010 "Income from the exchange of shares with Heineken, net of taxes".
+SHARE_COUNT = re.compile(r"^(?!(?:income|gain|loss|profit|proceeds|net\s+income)\b).*?(?:\bshares\b|weighted[-\s]average)", re.I)
 
 
 # Lines a statement's checks and later eras pair by: the concept XBRL gives the same line.
@@ -113,7 +114,7 @@ NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+pr
                         # Canadian GAAP from 2007, no other comprehensive income: Gildan's "Net earnings and comprehensive income".
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+and\s+comprehensive\s+(income|earnings)(\s+\(loss\))?$|"
                         # Salesforce 2009: "Consolidated net income", then "Net income attributable to salesforce.com".
-                        r"^consolidated\s+net\s+(income|earnings)(\s+\(loss\))?$|"
+                        r"^(consolidated\s+net|net\s+consolidated)\s+(income|earnings)(\s+\(loss\))?$|"  # FEMSA 2010: "Net consolidated income"
                          r"^income\s+\(loss\)\s+after\s+taxes$|"  # Copel's 2003 quarterly information
                          r"^net\s+income\s+attributable\s+to\s+(shareholders|stockholders)\s+of\s+the\s+parent|^(\(loss\)\s+)?(profit|loss(es)?|income)(\s*\(loss\)|\s*/\s*\(loss\))?\s+for\s+the\s+(year|period)$|"  # KEPCO: "Profit (loss) for the period"; Lloyds 2011: "(Loss) profit …"; Embraer: "Losses for the period"
                         # UK GAAP (Lloyds TSB): "Profit for the period attributable to shareholders", before dividends.
