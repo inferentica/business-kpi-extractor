@@ -18,7 +18,7 @@ from datetime import date, timedelta
 from ...checks.printed import balance_check, cash_check, income_check, total_check
 from ...domain.model import Reading
 from ...domain.periods import label_period
-from ...domain.printed_labels import CASH_HEADING, KNOWN, PER_SHARE, SHARE_COUNT
+from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA, PER_SHARE, SHARE_COUNT
 from .company_title import titled_company
 from .currency import column_currencies, reporting_currency, split_by_sign, translations
 from .dates import column_periods
@@ -58,8 +58,8 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         periods = split_by_sign(group[0], column_periods(kind, group, fiscal_year_end, document_end))
         notes.extend(titled_notes(kind, periods, document_end, fiscal_year_end, year_offset))
         # Another company's statement the filing carries has periods of its own (Heineken's in FEMSA's 20-Fs, its
-        # fuller balance sheet read first): it never takes the company's.
-        seen = (kind, statement_scope(kind, group, form, found), group[0].audited_of)
+        # fuller balance sheet read first; Coca-Cola FEMSA's release in FEMSA's, round 84): it never takes the company's.
+        seen = (kind, statement_scope(kind, group, form, found), group[0].audited_of, group[0].release_of)
         if seen in read_periods:
             # A statement printed again gives only the periods it prints of its own: Chase's 1995 10-Qs print the three
             # months and the six months as two income statements; TSMC's releases print the quarters and the year.
@@ -209,7 +209,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                     _close_section(printed, section, section_total)
                     section, section_total = (opened.group(1).lower() if opened else None), None
             value = _figure(row, column, columns) if row.figures else None
-            if row.figures and value is None:
+            if row.figures and (value is None or OPERATING_DATA.search(row.label)):
                 continue
             if value is not None and _YEAR_ROW_LABEL.search(row.label) and any(
                     figure == int(figure) and abs(figure - period.end.year) <= 1 for figure in row.figures.values()):

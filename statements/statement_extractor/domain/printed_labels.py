@@ -10,6 +10,11 @@ PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+)?share|per\s+ads|per\s+ame
                        r"^(basic|diluted)\b|earnings?\s+per|\beps\b", re.I)
 
 
+# Operating data a release prints atop its income statement, in units of its own (Coca-Cola FEMSA's "Volume (million
+# unit cases)", "Transactions (million transactions)", "Average price per unit case"): no line of the statement.
+OPERATING_DATA = re.compile(r"\((?:in\s+)?(?:millions?|thousands?)\s+(?:of\s+)?(?:unit\s+cases|transactions)\)|\bper\s+unit\s+case\b", re.I)
+
+
 SHARE_COUNT = re.compile(r"\bshares\b|weighted[-\s]average", re.I)
 
 

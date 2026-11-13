@@ -241,8 +241,18 @@ def _release_bases(readings) -> None:
     # closest is 2009's on Chilean GAAP.
     home = {reading.fiscal_year: reading.basis for reading in readings
             if reading.own and reading.source in REGULATOR_SOURCES and reading.fiscal_period == "FY" and reading.basis}
+    # First the quarter's own report, filed nearest the release: Sabesp's 2010 releases are on Brazilian GAAP like its
+    # 2010 quarterly information, though its FY2010 20-F restated those quarters on IFRS (round 84).
+    stated = [reading for reading in readings if reading.own and reading.form == "6-K" and reading.basis]
+    quarters = {}  # each release by its own period: the basis its quarter's own report states
+    for own in (reading for reading in readings if reading.own and reading.form == "6-K" and reading.basis is None):
+        same = [other for other in stated if other.period_end == own.period_end and abs((other.filed - own.filed).days) <= 183]
+        if same and own.accession not in quarters:
+            quarters[own.accession] = min(same, key=lambda other: abs((other.filed - own.filed).days)).basis
     for reading in readings:
-        if reading.form == "6-K" and reading.basis is None and (annual or reading.fiscal_year in home):
+        if reading.form == "6-K" and reading.basis is None and reading.accession in quarters:
+            reading.basis = quarters[reading.accession]
+        elif reading.form == "6-K" and reading.basis is None and (annual or reading.fiscal_year in home):
             # Else the nearest year's: TSMC's 1997-99 quarters, before its first 20-F we hold (FY2000, ROC GAAP).
             nearest = min(annual, key=lambda year: abs(int(year) - int(reading.fiscal_year))) if annual else None
             reading.basis = annual.get(reading.fiscal_year) or home.get(reading.fiscal_year) or annual[nearest]

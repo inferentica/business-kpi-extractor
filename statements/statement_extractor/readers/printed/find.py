@@ -28,8 +28,9 @@ _NOT_STATEMENT = re.compile(r"selected|summari[sz]ed|\bcomparison\b.{0,120}?\bve
                             r"guarantor|pro[\s-]+forma|supplemental|segment|summary|five-year|index\s+to|unaudited\s+quarterly|"
                             r"statements?\s+of\s+\w+\s+data|percentage\s+of|average\s+balance|balance\s+sheet\s+analysis|"
                             r"(income\s+statements?|balance\s+sheets?|cash\s+flows?(\s+statements?)?)\s+data\b|"
-                            # Chase's 1998 reconciliation of reported results to an operating basis, headed "INCOME STATEMENT".
-                            r"operating\s+basis|reported\s+results|"
+                            # Chase's 1998 reconciliation of reported results to an operating basis, headed "INCOME STATEMENT";
+                            # Coca-Cola FEMSA's "Comparable Income Statement" (no acquisitions, constant currency).
+                            r"operating\s+basis|reported\s+results|comparable\s+(?:income|results|basis)|"
                             # A foreign filer's reconciliation to U.S. GAAP (TSMC: "reconciliation of the significant
                             # balance sheet accounts to the amounts determined under U.S. GAAP"), its rows "As reported".
                             r"reconciliation\s+of|amounts\s+determined\s+under|(under|to|with)\s+u\.?\s?s\.?\s+gaap", re.I)
