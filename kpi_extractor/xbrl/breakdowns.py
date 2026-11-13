@@ -8,6 +8,7 @@ import re
 
 from .labels import _as_date, _axis_name, _fiscal_year, _member_labels, _snake, _title, drop_declared_parents, humanize, local_name
 from .members import _by_key, _PRODUCT_OR_SERVICE, _two_partitions, drop_overlaps, member_key, remove_subtotals, subtotal_tree
+from .frames import _plain_total, _single_axis_members
 from .rounding import refined_rest as _refined_rest
 from .model import _CONSOLIDATION_NAMES, _IGNORED_AXES, _NEUTRAL_MEMBERS, _PART_AXES, _RECONCILING, _SEGMENT_AXES, _STANDARD_AXES, _UNALLOCATED, MAX_RECONCILIATION_ERROR, MAX_UNALLOCATED, REVENUE_CONCEPTS, XbrlBreakdowns, XbrlCandidate, XbrlGroup
 
@@ -197,6 +198,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
                 joined[(concept, axis)] = sources
                 joined_totals[(concept, axis)] = consolidated
         candidates.setdefault(axis, []).append((concept, members))
+    with_siblings: set[int] = set()  # splits completed with a fixed member's siblings (by identity)
     for (concept, axes), items in paired.items():
         found = False
         # Consolidated lines tagged under one segment that add up exactly to its figure (KKR's fees since 2021: Fees
@@ -249,6 +251,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
                 if adds_up({**members, **siblings}, whole) or exact:
                     members = {**members, **(exact or siblings)}
                     siblings_for[(other, concept)] = (fixed, set(siblings))
+                    with_siblings.add(id(members))
             candidates.setdefault(other, []).append((concept, members))
             fixed_for.setdefault((other, concept), (fixed, the_member))
             found = True
@@ -282,14 +285,19 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
 
     def score(candidate: tuple[str, dict[str, float]], axis: str = ""):
         concept, members = candidate
+        own = id(members) not in with_siblings
         members = reconciled(axis, concept, members)
         total = total_for(concept, axis)
         leaves = drop_overlaps(remove_subtotals(members, total), total)
         reconciles = bool(total) and abs(sum(leaves.values()) - total) <= abs(total) * MAX_RECONCILIATION_ERROR
+        # A split joined with a fixed member's siblings comes after one that adds up as tagged: Adobe's subscription
+        # revenue by segment, with Product and Services joined, beat its three segments for having five lines.
         # Lines with a figure: a line tagged at zero (KKR's Principal Activities fees) is no part of the split.
-        return (reconciles, sum(1 for value in leaves.values() if value), concept in totals)
+        return (reconciles, own, sum(1 for value in leaves.values() if value), concept in totals)
 
     best_by_axis = {axis: max(options, key=lambda option, axis=axis: score(option, axis)) for axis, options in candidates.items()}
+    for key in [key for key in siblings_for if id((best_by_axis.get(key[0]) or ("", {}))[1]) not in with_siblings]:
+        del siblings_for[key]  # the siblings complete only the split they joined, never one tagged alone
 
     def leaf_sum(axis: str, concept: str, members: dict[str, float]) -> float:
         total = total_for(concept, axis)
@@ -565,36 +573,3 @@ def _plain_revenue_figures(facts: pd.DataFrame, period_end, annual: bool, label:
         name = own if isinstance(own, str) and own.strip() else label(str(fact["concept"])) or humanize(str(fact["concept"]))
         figures.append((float(fact["numeric_value"]), name.strip()))
     return figures
-
-
-def _single_axis_members(frame: pd.DataFrame, concept: str, axis: str, dimension_columns: list[str],
-                         fixed: tuple[str, str] | None = None, segment_level: bool | None = None) -> dict[str, float]:
-    """Members of one axis for one concept, from facts tagged with that axis alone, or with it and the one member of
-    another axis its period's facts all carry (fixed), the axis alone first (Exxon's 9M 2022 sales: $305,511 million
-    alone, $19 million for Corporate and Financing); only the consolidated facts (segment_level False), only the
-    segments' own (True), or both (None)."""
-    members: dict[str, float] = {}
-    shares: set[str] = set()  # members known so far only with the fixed member
-    for _, fact in frame[frame["concept"] == concept].iterrows():
-        dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
-        kept = {a: m for a, m in dimensions.items() if (a, local_name(m)) not in _NEUTRAL_MEMBERS}
-        if (segment_level is not None and (len(kept) != len(dimensions)) != segment_level) or axis not in kept:
-            continue
-        member = kept[axis]
-        if len(kept) == 1 and (member not in members or member in shares):
-            members[member] = float(fact["numeric_value"])
-            shares.discard(member)
-        elif fixed and len(kept) == 2 and kept.get(fixed[0]) == fixed[1] and member not in members:
-            members[member] = float(fact["numeric_value"])
-            shares.add(member)
-    return members
-
-
-def _plain_total(frame: pd.DataFrame, concept: str, dimension_columns: list[str], segment_level: bool | None = False) -> float | None:
-    """The concept's figure with no axis but, for the segments' own measure, "operating segments"."""
-    rows = frame[frame["concept"] == concept]
-    for _, fact in rows.iterrows():
-        dimensions = {_axis_name(column): str(fact[column]) for column in dimension_columns if pd.notna(fact[column])}
-        if all((a, local_name(m)) in _NEUTRAL_MEMBERS for a, m in dimensions.items()) and bool(dimensions) == bool(segment_level):
-            return float(fact["numeric_value"])
-    return None
