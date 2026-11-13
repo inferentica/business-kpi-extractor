@@ -24,8 +24,8 @@ def test_release_quarters_are_counted_from_the_first_releases_year():
                                                                             ("balance", "2003", "Q1", "instant"),
                                                                             ("cash_flow", "2003", "Q1", "quarter")}
     found = release_coverage(filings, kept, parent={("income", "2002", "Q1", "quarter")})
-    # 2002: four incomes, three balance sheets and three cash flows; 2003 Q1: three.
-    assert (found["quarters_expected"], found["quarters_kept"], found["quarters_parent_only"]) == (13, 7, 1)
+    # 2002: four incomes, the six and nine months' (IAS 34), three balance sheets and three cash flows; 2003 Q1: three.
+    assert (found["quarters_expected"], found["quarters_kept"], found["quarters_parent_only"]) == (15, 7, 1)
     assert "2002 Q1 balance" in found["quarters_missing"]
 
 
@@ -54,8 +54,9 @@ def test_a_quarter_counts_only_the_statements_its_releases_print():
                {"form": "6-K", "release_quarter": ["2011", "Q4"], "titled": [["income"]], "notes": []}]
     kept = {("balance", "2011", "Q2", "instant"), ("cash_flow", "2011", "Q2", "ytd")}
     found = release_coverage(filings, kept)
-    assert (found["quarters_expected"], found["quarters_kept"]) == (6, 2)
-    assert found["quarters_missing"] == ["2011 Q3 income", "2011 Q3 balance", "2011 Q3 cash_flow", "2011 Q4 income"]
+    assert (found["quarters_expected"], found["quarters_kept"]) == (8, 2)
+    assert found["quarters_missing"] == ["2011 Q2 income ytd", "2011 Q3 income", "2011 Q3 income ytd", "2011 Q3 balance",
+                                         "2011 Q3 cash_flow", "2011 Q4 income"]
     assert found["quarters_unprinted_list"] == ["2011 Q1 income", "2011 Q1 balance", "2011 Q1 cash_flow", "2011 Q2 income"]
 
 
@@ -108,3 +109,18 @@ def test_a_year_end_release_printing_the_year_does_not_print_the_fourth_quarter(
                 "titled": [["income", "2011", "FY", "year"], ["income"]]}]
     found = release_coverage(filings, set())
     assert found["quarters_unprinted_list"] == ["2011 Q4 income"]  # Q1-Q3 have no release on file and count in full
+
+
+def test_an_interim_report_expects_its_full_set_and_a_year_to_date_follows_from_its_quarters():
+    from statement_extractor.quality.coverage import release_coverage
+    # IAS 34 (decision of 2026-11-13): an interim report prints the quarter's and the year to date's income, its balance
+    # sheet and the year to date's cash flows, whatever its tables were read as; a results release only what it prints.
+    filings = [{"form": "6-K", "release_quarter": ["2024", "Q2"], "notes": [],
+                "titled": [["interim"], ["income", "2024", "Q2", "quarter"], ["balance", "2024", "Q2", "instant"]]}]
+    found = release_coverage(filings, set())
+    assert found["quarters_missing"][-4:] == ["2024 Q2 income", "2024 Q2 income ytd", "2024 Q2 balance", "2024 Q2 cash_flow"]
+    release = [{**filings[0], "titled": filings[0]["titled"][1:]}]
+    assert "2024 Q2 cash_flow" not in release_coverage(release, set())["quarters_missing"]
+    kept = {("income", "2024", "Q1", "quarter"), ("income", "2024", "Q2", "quarter")}
+    bases = {key: {"IFRS"} for key in kept}
+    assert "2024 Q2 income ytd" not in release_coverage(release, kept, bases=bases)["quarters_missing"]

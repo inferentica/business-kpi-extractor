@@ -1,6 +1,7 @@
 """What a company's read covers: the periods each filing should give, which were kept, and the run's summary."""
 from __future__ import annotations
 
+from ..domain.basis import ifrs_family
 from ..selection.vintage import mixed_vintage_q4s
 
 
@@ -29,9 +30,14 @@ def own_period(own: list, form: str) -> dict:
     return {"fiscal_year": ordered[0].fiscal_year, "fiscal_period": "FY" if annual else ordered[0].fiscal_period}
 
 
-def _derivable(year: str, number: int, kept: set, bases: dict) -> bool:
+def _derivable(year: str, number: int, kept: set, bases: dict, duration: str = "quarter") -> bool:
     """A quarter's income by difference, from two periods kept on one basis: Q2 from the six months less Q1, Q3 from
-    the nine months less the six, Q4 from the year less the nine (TSMC's reviewed reports print the year to date only)."""
+    the nine months less the six, Q4 from the year less the nine (TSMC's reviewed reports print the year to date only).
+    A year to date by sum: the six months from Q1 and Q2, the nine from the six and Q3."""
+    if duration == "ytd":
+        before = ("Q1", "quarter") if number == 2 else ("Q2", "ytd")
+        keys = [("income", year, f"Q{number}", "quarter"), ("income", year, *before)]
+        return all(key in kept for key in keys) and bool(set.intersection(*(set(bases.get(key) or ()) for key in keys)))
     later = {2: ("Q2", "ytd"), 3: ("Q3", "ytd"), 4: ("FY", "year")}[number]
     earlier = {2: ("Q1", "quarter"), 3: ("Q2", "ytd"), 4: ("Q3", "ytd")}[number]
     keys = [("income", year, *later), ("income", year, *earlier)]
@@ -84,30 +90,37 @@ def release_coverage(filings, kept: set, parent: set = frozenset(), bases: dict 
             if str(year) not in released and str(year) not in reported or (str(year), quarter) in gap:
                 not_filing += 1
                 continue
+            # What an interim report must print (IAS 34, Regulation S-X Article 10; decision of 2026-11-13): the
+            # quarter's income and, from the second quarter, the year to date's; its balance sheet; cash flows for the
+            # year to date. A quarter whose filings include such a report expects them all; a results release or a
+            # trading update only what it prints.
             wanted = [("income", [(quarter, "quarter")])]
+            if 1 < number < 4:
+                wanted.append(("income", [(quarter, "ytd")]))
             if number < 4:
                 wanted.append(("balance", [(quarter, "instant")]))
-                wanted.append(("cash_flow", [(quarter, "quarter"), (quarter, "ytd")]))
+                wanted.append(("cash_flow", [(quarter, "quarter" if number == 1 else "ytd")]))
             titles = printed.get((str(year), quarter), set())
+            interim = ("interim",) in titles
             for statement, keys in wanted:
                 served = [(statement, str(year), period, duration) for period, duration in keys]
                 # Dated evidence of what the quarter's releases print decides over a heading alone: a year-end
                 # release prints the year, so its fourth quarter's three months count only if a table dates them.
                 dated = any(len(title) > 1 and title[0] == statement for title in titles)
-                shown = (str(year), quarter) in unknown or (str(year), quarter) not in printed or \
+                shown = interim or (str(year), quarter) in unknown or (str(year), quarter) not in printed or \
                     (statement,) in titles and not dated or any(key in titles for key in served)
                 if any(key in kept for key in served):
                     expected += 1
                     found += 1
                     parent_only += all(key in parent or key not in kept for key in served)
-                elif statement == "income" and number > 1 and _derivable(str(year), number, kept, bases or {}):
+                elif statement == "income" and number > 1 and _derivable(str(year), number, kept, bases or {}, keys[0][1]):
                     expected += 1
                     derivable += 1
                 elif shown:
                     expected += 1
-                    missing.append(f"{year} {quarter} {statement}")
+                    missing.append(f"{year} {quarter} {statement}" + (" ytd" if keys[0][1] == "ytd" and statement == "income" else ""))
                 else:
-                    unprinted.append(f"{year} {quarter} {statement}")
+                    unprinted.append(f"{year} {quarter} {statement}" + (" ytd" if keys[0][1] == "ytd" and statement == "income" else ""))
     return {"quarters_expected": expected, "quarters_kept": found, "quarters_derivable": derivable,
             "quarters_parent_only": parent_only,
             "quarters_missing": missing[:40], "quarters_unprinted": len(unprinted), "quarters_not_filing": not_filing,
@@ -194,7 +207,7 @@ def summarise(symbol, profile, since, filings, readings, chosen, seconds) -> dic
         **release_coverage(filings, kept, {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"])
                                            for item in chosen if item.get("scope") == "parent"},
                            {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"]):
-                            {item.get("basis"), *(other["basis"] for other in item.get("other_bases", []))}
+                            {ifrs_family(item.get("basis")), *(ifrs_family(other["basis"]) for other in item.get("other_bases", []))}
                             for item in chosen if item["status"] == "kept"}),
         "ai_calls": AI_CALLS, "cost_cny": 0.0, "seconds": round(seconds),
     }

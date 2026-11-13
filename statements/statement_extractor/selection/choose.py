@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from ..domain.basis import ifrs_family
 from ..domain.model import REGULATOR_SOURCES, Reading
 from .lines import line_keys
 from .signs import settle_signs
@@ -61,7 +62,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         aside = {id(reading) for reading in set_aside}
         eligible = [reading for reading in kept if id(reading) not in aside] or kept
         winner = max(eligible, key=lambda item: (item.scope == "consolidated", _rank(item), not _coded(item),
-                                             item.form != "6-K" or annual is None or item.basis == annual, item.filed,
+                                             item.form != "6-K" or annual is None or ifrs_family(item.basis) == ifrs_family(annual), item.filed,
                                              item.own, item.source == "xbrl")) if eligible else None
         record = {
             "statement": key[0], "fiscal_year": key[1], "fiscal_period": key[2], "duration": key[3],

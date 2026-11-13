@@ -28,6 +28,7 @@ from ..selection.summaries import choose_summaries, summary_coverage
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
 from ..sources.listing import filing_for, list_reports
 from ..sources.predecessors import predecessor_companies
+from .standards import use_standard_labels
 from ..sources.retry import with_network_retries
 from .prefetch import load_all
 from .printed import read_printed
@@ -38,6 +39,7 @@ from .releases import read_releases
 
 def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     configure_identity()
+    use_standard_labels()  # the IFRS and US GAAP taxonomies' titles and key lines (pipeline/standards.py)
     out.mkdir(parents=True, exist_ok=True)
     started = time.time()
     phases: dict[str, float] = {}  # seconds each part of the read took, kept in the summary (where a round's time goes)

@@ -12,6 +12,16 @@ import re
 
 US_GAAP, IFRS, TAIWAN_IFRS, ROC_GAAP, CANADIAN_GAAP, DUTCH_GAAP = (
     "US GAAP", "IFRS", "Taiwan-IFRS", "ROC GAAP", "Canadian GAAP", "Dutch GAAP")
+# National adoptions of IFRS, labelled apart from IFRS as issued by the IASB where the filing names them (decision of
+# 2026-11-13): Korea's K-IFRS, Brazil's CPC pronouncements. One family with IFRS (ifrs_family).
+K_IFRS, CPC_IFRS = "K-IFRS", "IFRS (CPC)"
+_IASB = re.compile(r"\bIASB\b|International\s+Accounting\s+Standards\s+Board", re.I)
+
+
+def ifrs_family(basis: str | None) -> str | None:
+    """IFRS for IFRS as issued and its national adoptions read alike (K-IFRS, CPC); Taiwan-IFRS stays apart (its
+    statements differ from TSMC's IFRS 20-F by right)."""
+    return IFRS if basis in (IFRS, K_IFRS, CPC_IFRS) else basis
 MEXICAN_FRS, MEXICAN_GAAP, CHILEAN_GAAP, BRAZILIAN_GAAP, KOREAN_GAAP, UK_GAAP = (
     "Mexican FRS", "Mexican GAAP", "Chilean GAAP", "Brazilian GAAP", "Korean GAAP", "UK GAAP")
 
@@ -64,6 +74,13 @@ _NAMES = (
     # CEMEX's 2016 opinion: "International Reporting Standards as issued by the International Accounting Standards Board".
     # Gerdau's 2010 releases: "the international accounting practices issued by the International Accounting Standards
     # Board (IASB) and the accounting practices adopted in Brazil".
+    # Korea's adoption: "Korean International Financial Reporting Standards", "K-IFRS" (KEPCO's 20-Fs, OpenDART).
+    (K_IFRS, r"\bKorean\s+(?:International\s+Financial\s+Reporting\s+Standards|IFRSs?)\b|\bK-IFRSs?\b"),
+    # Brazil's: IFRS or IAS 34 beside the CPC's pronouncements ("CPC 21 (R1) and IAS 34"), unless the words say IFRS as
+    # issued by the IASB too (_named).
+    (CPC_IFRS, r"(?:\bCPC\b|Accounting\s+Pronouncements\s+Committee|Comit[eê]\s+de\s+Pronunciamentos)[^.;]{0,160}?"
+               r"(?:\bIFRSs?\b|\bIAS\s*\d+\b|International\s+Financial\s+Reporting)|(?:\bIFRSs?\b|\bIAS\s*\d+\b|International\s+"
+               r"Financial\s+Reporting\s+Standards)[^.;]{0,160}?(?:\bCPC\b|Accounting\s+Pronouncements\s+Committee)"),
     (IFRS, r"International\s+(?:Financial\s+)?Reporting\s+Standards|\bIFRSs?\b|\bIAS\s*34\b|"
            r"international\s+accounting\s+(?:practices|standards)\s+issued\s+by\s+the\s+International\s+Accounting\s+Standards\s+Board"),
 )
@@ -103,6 +120,8 @@ def _named(text: str) -> str | None:
     if match is None:
         return None
     index = int(next(name for name, value in match.groupdict().items() if value is not None)[1:])
+    if _NAMES[index][0] == CPC_IFRS and _IASB.search(text[max(0, match.start() - 160):match.end() + 160]):
+        return IFRS  # IFRS as issued by the IASB and the CPC's pronouncements both: IFRS
     return _NAMES[index][0]
 
 

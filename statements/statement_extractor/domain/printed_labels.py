@@ -5,6 +5,25 @@ from __future__ import annotations
 import re
 
 
+class Widened:
+    """A pattern our rules word, which the standards' own labels can widen (pipeline/standards.py): it searches and
+    matches as the pattern, and as any label given, printed whole (key lines) or within a title's words."""
+
+    def __init__(self, pattern: re.Pattern):
+        self.rules, self.compiled = pattern, pattern
+
+    def widen(self, labels, whole: bool = True) -> None:
+        from .standard_labels import phrase
+        if not labels:
+            return
+        either = "|".join(phrase(text) for text in sorted(labels, key=len, reverse=True))
+        self.compiled = re.compile(f"(?:{self.rules.pattern})|" + (f"^(?:{either})$" if whole else rf"(?<!\w)(?:{either})(?!\w)"),
+                                   self.rules.flags)
+
+    def __getattr__(self, name):
+        return getattr(self.compiled, name)
+
+
 # ASUR's "Earning per American Depositary Share (in U.S. Dollars) 7.1108", read at its statement's thousands until round 79.
 PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+|series\s+\W?\w+\W?\s*)?share|per\s+ads|per\s+american\s+depositary\s+(share|receipt)|"
                        r"^(basic|diluted)\b|earnings?\s+per|\beps\b", re.I)
@@ -40,15 +59,15 @@ KNOWN = (
 
 
 # TIM's 6-Ks print the total on the heading itself: "Assets 55,706,609", then its lines (only rows with figures count).
-ASSETS = re.compile(r"^(total\s+)?assets$", re.I)
+ASSETS = Widened(re.compile(r"^(total\s+)?assets$", re.I))
 
 
 # AMD 2009: "Total liabilities and stockholders' equity (deficit)".
 # KBR 2007: "Total liabilities, minority interest and shareholders' equity and accumulated other comprehensive loss".
-LIABILITIES_AND_EQUITY = re.compile(r"^(total\s+liabilities.*|liabilities\s+and\s+(stockholders|shareholders)['’´]?\s+)\b(equity|investment|deficit|capital)(\s*\(deficit\))?"
+LIABILITIES_AND_EQUITY = Widened(re.compile(r"^(total\s+liabilities.*|liabilities\s+and\s+(stockholders|shareholders)['’´]?\s+)\b(equity|investment|deficit|capital)(\s*\(deficit\))?"
                                     r"(\s+and\s+accumulated\s+other\s+comprehensive\s+(income|loss|\(loss\)\s+income))?$|"
                                     # KEPCO: "Total Shareholders' Equity and Liabilities"; PicS's "TOTAL EQUITY AND LIABILITIES"
-                                    r"^total\s+((stockholders|shareholders)['’´]?\s+)?equity\s+and\s+liabilities$", re.I)
+                                    r"^total\s+((stockholders|shareholders)['’´]?\s+)?equity\s+and\s+liabilities$", re.I))
 
 
 LIABILITIES = re.compile(r"^total\s+liabilities$", re.I)
@@ -68,9 +87,9 @@ EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’´]?
 # Mexican FRS (FEMSA's 20-Fs to 2011): "Initial cash and cash equivalents", "Total ending balance of cash and cash
 # equivalents, net"; never its "Initial cash" before the discontinued operations' share is taken off.
 # Copel's 2004 quarterly information: "Opening balance" and "Closing balance" under the change in cash.
-OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(beginning|opening)\b.*\bcash\b|^opening\s+balance$|"
+OPENING = Widened(re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(beginning|opening)\b.*\bcash\b|^opening\s+balance$|"
                      r"^initial\s+cash\s+and\s+cash\s+equivalents\b|^initial\s+balance,?\s+net\b|"
-                     r"^initial\s+balance\s+of\s+cash\b", re.I)  # Coca-Cola FEMSA's FY2011 20-F
+                     r"^initial\s+balance\s+of\s+cash\b", re.I))  # Coca-Cola FEMSA's FY2011 20-F
 # The opening after restricted cash is taken off (Coca-Cola FEMSA's 20-Fs to 2011): "Initial cash and cash equivalents
 # 6,192", "Initial restricted cash (391)", "Initial balance, net 5,801".
 NET_OPENING = re.compile(r"^initial\s+balance,?\s+net\b", re.I)
@@ -80,7 +99,7 @@ GROSS_CLOSING = re.compile(r"^ending\s+balance$", re.I)
 BEFORE_FINANCING = re.compile(r"^net\s+cash\s+(?:inflow|outflow)[^:]*\bbefore\s+financing$", re.I)
 
 
-CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(total\s+)?(ending|closing)\b.*\bcash\b|^closing\s+balance$", re.I)
+CLOSING = Widened(re.compile(r"\bcash\b.*\b(end|ending)\b|^(total\s+)?(ending|closing)\b.*\bcash\b|^closing\s+balance$", re.I))
 
 
 # Not Brookfield's "Net change in non-cash working capital balances", nor an exchange line ("Effects of exchange rate
@@ -101,13 +120,13 @@ SECTIONS = re.compile(r"(operating|investing|financing)\s+activities(\s+(from|of
 
 # Goldman Sachs: "Pre-tax earnings".
 # Scotiabank: "Income before the undernoted" (the taxes and minority interest printed under it).
-PRETAX = re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax|^pre-?\s?tax\s+(earnings|income|profit)\b|"
+PRETAX = Widened(re.compile(r"before\b.{0,50}?\b(income\s+)?tax(es|ation)?\b|^profit\s+before\s+tax|^pre-?\s?tax\s+(earnings|income|profit)\b|"
                     r"^income\s+before\s+the\s+undernoted\b",
-                    re.I)
+                    re.I))
 
 
 # Kroger 2009: "Net earnings including noncontrolling interests", then the parent's share.
-NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+profit(\s*/\s*\(loss\)|\s+\(loss\))?$|"
+NET_INCOME = Widened(re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+profit(\s*/\s*\(loss\)|\s+\(loss\))?$|"
                         # IFRS: TIM's "Net profit for the period", Petrobras's "Net income for the period"
                         r"^net\s+(income|profit|earnings|loss)(\s*/\s*\(loss\)|\s+\(loss\))?\s+for\s+the\s+(period|year|quarter)$|^net\s+\((loss|income)\)\s*/?\s*(income|earnings|loss)$|^net\s+income\s+\(loss\)\s+attributable\s+to\b|"
                         r"^net\s+(income|earnings)(\s+\(loss\))?\s+including\s+non-?controlling\s+interests?$|"
@@ -120,7 +139,7 @@ NET_INCOME = re.compile(r"^net\s+(income|earnings|loss)(\s+\(loss\))?$|^net\s+pr
                         # UK GAAP (Lloyds TSB): "Profit for the period attributable to shareholders", before dividends.
                         r"^profit\s+for\s+the\s+(year|period|half-year)\s+attributable\s+to\s+(equity\s+)?shareholders$|"
                         # Lloyds' quarterly updates since 2025: "Profit before tax", "Tax expense", "Profit after tax".
-                        r"^(net\s+)?profit\s+(\(loss\)\s+)?after\s+tax(ation)?$", re.I)
+                        r"^(net\s+)?profit\s+(\(loss\)\s+)?after\s+tax(ation)?$", re.I))
 
 
 TOTAL = re.compile(r"^total\b", re.I)

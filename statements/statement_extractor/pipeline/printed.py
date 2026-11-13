@@ -3,6 +3,8 @@ periodic report, the furnished exhibits (EX-99) for a results release, in HTML (
 (about 1993-2000). Each document's basis is the one it states; its EX-27 schedules check what it prints."""
 from __future__ import annotations
 
+import re
+
 from datetime import date
 
 from ..checks.schedules import parse_schedule, schedule_check
@@ -28,6 +30,9 @@ from .unstated_scale import with_proven_scale
 
 _ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
 
+# A document that is an interim report under IAS 34 (or Brazil's CPC 21, its ITR): quality/coverage.py expects its set.
+_INTERIM = re.compile(r"\bIAS\s*34\b|\bCPC\s*21\b|\binterim\s+financial\s+report(?:ing)?\b|\b(?:condensed\s+)?(?:consolidated\s+)?"
+                      r"interim\s+(?:condensed\s+)?(?:consolidated\s+)?financial\s+statements\b|\bquarterly\s+information\s*\(?ITR\b", re.I)
 _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anything far larger is no statement
 
 
@@ -130,6 +135,8 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
             kinds = {reading.statement for reading in readings} if others else {"income", "balance", "cash_flow"}
             heads = {(kind,) for kind in headed_kinds(content) if kind not in {reading.statement for reading in readings}}
             titled |= {title for title in printed_titles | heads if title[0] in kinds}
+            if readings and not others and _INTERIM.search(content[:3_000_000]):
+                titled.add(("interim",))  # an interim report (IAS 34, CPC 21): the quarter must print its full set
         if signs is not None:
             parse = {"html": parse_html, "text": parse_text, "positioned": parse_text, "slides": parse_slides}[printed]
             for key, figures in printed_figures(parse(content)).items():

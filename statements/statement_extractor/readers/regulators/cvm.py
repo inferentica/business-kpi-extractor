@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import date
 
 from ...checks.coded import cvm_checks
+from ...domain.basis import CPC_IFRS
 from ...domain.model import Reading
 from ...domain.periods import Period, label_period
 
@@ -55,7 +56,7 @@ def cvm_readings(form: str, rows: dict[str, list[dict]], fiscal_year_end: str, y
             period_end=period.end, period_start=period.start, currency=_CURRENCIES.get(lines[0]["MOEDA"].upper()),
             accession=f"CVM-{form}-{filing['ID_DOC']}-v{version}", form=form,
             filed=date.fromisoformat(filing["DT_RECEB"][:10]),
-            own=order.upper().startswith("ÚLTIMO") and end == refer, source="cvm", basis="IFRS",
+            own=order.upper().startswith("ÚLTIMO") and end == refer, source="cvm", basis=CPC_IFRS,
             scope="consolidated" if scope == "con" else "parent",
             lines=[{"line": index, "concept": _KEY_CONCEPTS.get((statement, row["CD_CONTA"]), f"cvm_{row['CD_CONTA']}"),
                     "code": row["CD_CONTA"], "label": row["DS_CONTA"], "fixed": row.get("ST_CONTA_FIXA") == "S",

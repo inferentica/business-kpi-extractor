@@ -1,5 +1,5 @@
-from statement_extractor.domain.basis import (BRAZILIAN_GAAP, CHILEAN_GAAP, IFRS, KOREAN_GAAP, MEXICAN_FRS, MEXICAN_GAAP,
-                                              UK_GAAP, US_GAAP, stated_basis)
+from statement_extractor.domain.basis import (BRAZILIAN_GAAP, CHILEAN_GAAP, CPC_IFRS, IFRS, K_IFRS, KOREAN_GAAP, MEXICAN_FRS,
+                                              MEXICAN_GAAP, UK_GAAP, US_GAAP, ifrs_family, stated_basis)
 
 _FAIRLY = "In our opinion, the consolidated financial statements present fairly, in all material respects, the financial position "
 
@@ -28,8 +28,15 @@ def test_brazilian_practices_and_ifrs_together_are_ifrs():
                         "Reporting Standards (IFRS) issued by the IASB.") == IFRS
 
 
-def test_korean_ifrs_is_ifrs():
-    assert stated_basis(_FAIRLY + "in accordance with Korean International Financial Reporting Standards.") == IFRS
+def test_national_adoptions_of_ifrs_keep_their_names():
+    # Decision of 2026-11-13: K-IFRS and Brazil's CPC apart from IFRS as issued by the IASB, one family with it.
+    assert stated_basis(_FAIRLY + "in accordance with Korean International Financial Reporting Standards.") == K_IFRS
+    assert stated_basis(_FAIRLY + "in accordance with International Financial Reporting Standards as issued by the "
+                        "International Accounting Standards Board.") == IFRS
+    assert stated_basis("<p>Prepared in accordance with CPC 21 (R1) and IAS 34.</p>") == CPC_IFRS
+    assert stated_basis("<p>Prepared in accordance with IFRS as issued by the IASB and the accounting practices adopted in "
+                        "Brazil, the pronouncements of the Accounting Pronouncements Committee (CPC).</p>") == IFRS
+    assert {ifrs_family(basis) for basis in (IFRS, K_IFRS, CPC_IFRS)} == {IFRS} and ifrs_family("Taiwan-IFRS") == "Taiwan-IFRS"
 
 
 def test_us_gaap_in_its_other_wording():
@@ -99,7 +106,7 @@ def test_a_brazilian_quarterly_reviews_cvm_standards():
                         "it be stated in accordance with the standards issued by the Brazilian Securities Commission (CVM) "
                         "applicable to the preparation of Quarterly Information, including CVM Instruction 469/08.</p>") == BRAZILIAN_GAAP
     assert stated_basis("<p>Prepared in accordance with CPC 21 and IAS 34 and the standards issued by the Brazilian Securities "
-                        "Commission (CVM).</p>") == IFRS
+                        "Commission (CVM).</p>") == CPC_IFRS
 
 
 def test_the_groups_opinion_decides_over_the_parents_own():

@@ -6,21 +6,21 @@ import re
 from dataclasses import replace
 
 from ...domain.basis import currencies_named
-from ...domain.printed_labels import (ASSETS, BARE_TOTAL, BEFORE_FINANCING, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES,
+from ...domain.printed_labels import (ASSETS, BARE_TOTAL, BEFORE_FINANCING, Widened, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES,
                                       LIABILITIES_AND_EQUITY, NET_INCOME, PRETAX, SECTIONS, EQUITY_SECTION)
 from .side_by_side import SIDE_BY_SIDE
 from .tables import Table, figure_columns, number
 
 
 TITLES = (
-    ("income", re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?(operations|income|earnings)(\s+and\s+comprehensive\s+income)?|(?<!comprehensive )income\s+statements?|"
+    ("income", Widened(re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?(operations|income|earnings)(\s+and\s+comprehensive\s+income)?|(?<!comprehensive )income\s+statements?|"
                           r"statements?\s+of\s+(consolidated\s+)?profit\s+or\s+loss(\s+and\s+(other\s+)?comprehensive\s+income)?|"
                           # UK GAAP (Lloyds TSB to 2004): "CONSOLIDATED PROFIT AND LOSS ACCOUNT".
-                          r"profit\s+and\s+loss\s+accounts?)\b", re.I)),
-    ("balance", re.compile(r"\b(consolidated\s+)?((?<!off-)(?<!off )(?<!on-)(?<!on )balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?financial\s+(position|condition))\b", re.I)),
+                          r"profit\s+and\s+loss\s+accounts?)\b", re.I))),
+    ("balance", Widened(re.compile(r"\b(consolidated\s+)?((?<!off-)(?<!off )(?<!on-)(?<!on )balance\s+sheets?|statements?\s+of\s+(consolidated\s+)?financial\s+(position|condition))\b", re.I))),
     # Never an "off-balance sheet" or "on-balance sheet" (UBS's credit-risk notes, round 88). Morgan Stanley: "Consolidated
     # Cash Flow Statements".
-    ("cash_flow", re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?cash\s+flows?|cash\s+flows?\s+statements?)\b", re.I)),
+    ("cash_flow", Widened(re.compile(r"\b(consolidated\s+)?(statements?\s+of\s+(consolidated\s+)?cash\s+flows?|cash\s+flows?\s+statements?)\b", re.I))),
 )
 
 

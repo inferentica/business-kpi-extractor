@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import date
 
 from ...checks.coded import tagged_checks
+from ...domain.basis import K_IFRS
 from ...domain.model import Reading
 from ...domain.periods import Period, label_period
 
@@ -93,7 +94,7 @@ def dart_readings(rows: list[dict], year: int, report: str, scope: str, fiscal_y
                 period_end=end, period_start=start, currency=lines[0].get("currency") or "KRW",
                 accession=f"DART-{receipt}", form=_FORMS[report],
                 filed=date(int(receipt[:4]), int(receipt[4:6]), int(receipt[6:8])),
-                own=own, source="dart", basis="IFRS", scope="consolidated" if scope == "CFS" else "parent",
+                own=own, source="dart", basis=K_IFRS, scope="consolidated" if scope == "CFS" else "parent",
                 lines=[{"line": index, "concept": _concept(row["account_id"]), "code": row["account_id"],
                         "label": row["account_nm"], "level": 0, "is_heading": value is None, "value": value}
                        for index, (row, value) in enumerate(values)],
