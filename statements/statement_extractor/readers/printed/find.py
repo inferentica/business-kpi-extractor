@@ -140,8 +140,11 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
                     break  # a small table of its own, not a spacer
                 continue  # an empty spacer table between a statement's pages (TSMC's cash flows)
             later_title = later.context[-200:]
-            if len(figure_columns(later)) != len(figure_columns(table)):
-                break  # a table of another shape: not this statement's next page
+            positions = lambda one: {position for column in figure_columns(one) for position in column}  # noqa: E731
+            if len(figure_columns(later)) != len(figure_columns(table)) and positions(later) != positions(table):
+                # A table of another shape: not this statement's next page. The same figure positions are its page,
+                # however a heading groups them (Coca-Cola FEMSA's "2011" over its dollars and pesos on the first only).
+                break
             other = next((name for name, pattern in TITLES if _titled(pattern, later_title)), None)
             if (other is not None and other != kind or _OTHER_STATEMENT.search(later_title)) and "continued" not in later_title.lower():
                 break

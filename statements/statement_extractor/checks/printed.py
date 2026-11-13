@@ -6,17 +6,14 @@ from __future__ import annotations
 import re
 
 from ..domain.model import FAIL, NONE, PASS, Check
-from ..domain.printed_labels import (ASSETS, BARE_TOTAL, CHANGE, CLOSING, DATED_CASH, EFFECT, EQUITY, EXCHANGE, LIABILITIES,
-                                     LIABILITIES_AND_EQUITY, NET_INCOME, OPENING, PRETAX, SECTION_KINDS, SECTION_HEADS, SECTIONS, EQUITY_SECTION, TOTAL)
+from ..domain.printed_labels import (ASSETS, BARE_TOTAL, EQUITY, EQUITY_SECTION, LIABILITIES, LIABILITIES_AND_EQUITY, NET_INCOME,
+                                     PRETAX, TOTAL)
+from .match import first_match  # noqa: F401 - other checks import it from here
 from .subtotals import block_start, subtotals
 from .tolerance import close
 
 
-def first_match(figures, pattern, after: int = -1) -> tuple[int, float] | None:
-    for index, (label, _level, value) in enumerate(figures):
-        if index > after and pattern.search(label):
-            return index, value
-    return None
+from .cash import cash_check  # noqa: E402,F401 - the cash check, in its own module
 
 
 def balance_check(figures) -> Check:
@@ -39,57 +36,6 @@ def balance_check(figures) -> Check:
             return Check("balance", PASS)
         return Check("balance", FAIL, f"assets {assets[1]:,.1f} vs liabilities {liabilities[1]:,.1f} + equity {equity[1]:,.1f}")
     return Check("balance", NONE, "no total assets and total liabilities and equity")
-
-
-# Cash moved into or out of assets held for sale (Brookfield): it adjusts the change like the exchange effect.
-_HELD_FOR_SALE = re.compile(r"\bcash\b.*\bheld\s+for\s+sale\b|\bheld\s+for\s+sale\b.*\bcash\b", re.I)
-
-
-def cash_check(figures) -> Check:
-    opening, closing = first_match(figures, OPENING), first_match(figures, CLOSING)
-    dated = [(index, value) for index, (label, _level, value) in enumerate(figures) if DATED_CASH.search(label)]
-    if (not opening or not closing) and len(dated) >= 2:
-        opening, closing = dated[0], dated[-1]
-    if not opening or not closing:
-        return Check("cash", NONE, "no opening and closing cash")
-    # Every beginning balance opens the period (TSMC: cash held for sale at the beginning of the year, then cash).
-    openings = [value for label, _level, value in figures if OPENING.search(label)]
-    if len(openings) > 1:
-        opening = (opening[0], sum(openings))
-    kinds = {match.group(2).lower() for label, _level, _value in figures if (match := SECTION_KINDS.search(label))}  # operat, invest, financ
-    kinds |= {match.group(1).lower() for label, _level, _value in figures if (match := SECTION_HEADS.match(label))}
-    if len(kinds) < 3:
-        return Check("cash", NONE, "not every section of the statement was read: " + ", ".join(sorted(kinds) or ["none"]))
-    changes = [value for label, _level, value in figures if CHANGE.search(label) and not OPENING.search(label)
-               and not CLOSING.search(label) and not _HELD_FOR_SALE.search(label)]
-    effects = [value for label, _level, value in figures if EXCHANGE.search(label) or EFFECT.match(label)
-               or _HELD_FOR_SALE.search(label)]
-    # Any other line printed between the change in cash and the opening balance adjusts it too (Kroger 2008: "cash
-    # from consolidated variable interest entity").
-    first_change = next((index for index, (label, _level, _value) in enumerate(figures) if CHANGE.search(label)
-                         and not OPENING.search(label) and not CLOSING.search(label)), None)
-    if first_change is not None and first_change < opening[0]:
-        effects += [value for label, _level, value in figures[first_change + 1:opening[0]]
-                    if value is not None and not (EXCHANGE.search(label) or EFFECT.match(label) or CHANGE.search(label))]
-    placed = [(index, value) for index, (label, _level, value) in enumerate(figures)
-              if SECTIONS.search(label) and re.search(r"^net|^cash|^total", label, re.I)]
-    sections = [value for _index, value in placed]
-    candidates = list(changes)
-    candidates += [change + effect for change in changes for effect in effects]
-    candidates += [change + sum(effects) for change in changes if len(effects) > 1]
-    if len(sections) >= 3:
-        candidates += [sum(sections[:3]), sum(sections[:3]) + sum(effects[:1])]
-        # The effect of exchange rates on cash printed after the sections, not an operating adjustment of the same
-        # words before them (Gildan's 2001 "Foreign exchange loss (gain)" among its adjustments to net earnings).
-        after = [value for index, (label, _level, value) in enumerate(figures) if index > placed[2][0] and value is not None
-                 and (EXCHANGE.search(label) or EFFECT.match(label))]
-        candidates += [sum(sections[:3]) + sum(after)]
-    for change in candidates:
-        if close(opening[1] + change, closing[1], 3):
-            return Check("cash", PASS)
-    if not candidates:
-        return Check("cash", NONE, "no change in cash")
-    return Check("cash", FAIL, f"opening {opening[1]:,.1f} + change {candidates[0]:,.1f} vs closing {closing[1]:,.1f}")
 
 
 # Lines that are never a total's parts: Volaris's "Passenger revenues" over "Fare revenues" and "Other passenger

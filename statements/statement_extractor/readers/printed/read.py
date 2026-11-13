@@ -93,6 +93,11 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         for table in group[1:]:
             own = column_periods(kind, [table], fiscal_year_end, document_end)
             columns = sorted(own) if own else [c for c in figure_columns(table)][:len(dated)]
+            # A page split as the first was, by the signs its title defined there: FEMSA's continued cash flows head
+            # "2010" over the dollars and the pesos again, with no sign beside them (round 81).
+            singles = {position for column in dated if len(column) == 1 for position in column}
+            columns = sorted({(position,) for column in columns for position in column} if len(columns) != len(dated) and all(
+                len(column) == 1 or set(column) <= singles for column in columns) else columns)
             if len(columns) != len(dated):
                 notes.append(f"{kind}: a continuation table's columns do not line up")
                 break

@@ -59,17 +59,27 @@ EQUITY = re.compile(r"^total\s+((stockholders|shareholders|shareowners)['’´]?
 
 # Stock Yards: "Beginning cash and cash equivalents", "Ending cash and cash equivalents".
 # BCB Bancorp's 2008 10-Qs: "Cash and cash equivalents-begininng" (so spelled) and "Cash and cash equivalents-ending".
-OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(beginning|opening)\b.*\bcash\b", re.I)
+# Mexican FRS (FEMSA's 20-Fs to 2011): "Initial cash and cash equivalents", "Total ending balance of cash and cash
+# equivalents, net"; never its "Initial cash" before the discontinued operations' share is taken off.
+OPENING = re.compile(r"\bcash\b.*\b(beginning|begininng|beginnng|start)\b|^(beginning|opening)\b.*\bcash\b|"
+                     r"^initial\s+cash\s+and\s+cash\s+equivalents\b|^initial\s+balance,?\s+net\b|"
+                     r"^initial\s+balance\s+of\s+cash\b", re.I)  # Coca-Cola FEMSA's FY2011 20-F
+# The opening after restricted cash is taken off (Coca-Cola FEMSA's 20-Fs to 2011): "Initial cash and cash equivalents
+# 6,192", "Initial restricted cash (391)", "Initial balance, net 5,801".
+NET_OPENING = re.compile(r"^initial\s+balance,?\s+net\b", re.I)
+# FEMSA's "Ending balance" before the discontinued operations' cash is taken off ("Total ending balance … net").
+GROSS_CLOSING = re.compile(r"^ending\s+balance$", re.I)
 
 
-CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(ending|closing)\b.*\bcash\b", re.I)
+CLOSING = re.compile(r"\bcash\b.*\b(end|ending)\b|^(total\s+)?(ending|closing)\b.*\bcash\b", re.I)
 
 
 # Not Brookfield's "Net change in non-cash working capital balances", nor an exchange line ("Effects of exchange rate
 # differences on cash"); UBS's "Net cash flow from / (used in) operating, investing and financing activities" is one.
 CHANGE = re.compile(r"\b(increase|decrease|change).*(?<!non-)(?<!non\s)\bcash\b|(?<!non-)\bcash\b.*\b(increase|decrease)|"
                     r"^total\s+cash\s+(generated|provided|used)|"
-                    r"^net\s+cash\s+flows?\b.*\boperating,\s+investing,?\s+and\s+financing\s+activities$", re.I)
+                    r"^net\s+cash\s+flows?\b.*\boperating,\s+investing,?\s+and\s+financing\s+activities$|"
+                    r"^net\s+cash\s+flows?$", re.I)  # Mexican FRS (FEMSA's 20-Fs to 2011)
 
 
 EXCHANGE = re.compile(r"exchange\s+rate|foreign\s+currency|currency\s+translation|foreign\s+exchange", re.I)  # Brookfield: "Foreign exchange revaluation"
