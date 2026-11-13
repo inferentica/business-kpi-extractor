@@ -30,7 +30,7 @@ from ..rules.period import (  # noqa: F401 - re-exported for callers of extract
     column_dates, column_duration_problem, column_header, header_contradicts, quarter_for_trailing_kpi)
 from ..rules.identity import (  # noqa: F401 - re-exported for callers of extract
     _combined_line, _FOOTNOTE, _identity, _label_words, _listed_kpi, _NOT_THE_PLACE,
-    _PLACE, _place_not_named, _places, _plain_label, _row_label, _row_named_twice,
+    _PLACE, _measure_not_named, _place_not_named, _places, _plain_label, _row_label, _row_named_twice,
     _SPACED_FOOTNOTE, _SUB_ROW, _tail, _TOTAL_LABEL, _TWIN_REACH, labels_agree,
     PLACE_NOT_NAMED, row_key, ROW_NAMED_TWICE)
 
@@ -106,6 +106,8 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
                 raise LocateError(f"{locator.table} c{locator.col} is a currency's column, not the count's")
             value, currency, notes, scale_from = _read(document, locator, kpi, default_currency)
             if locator.table is not None and locator.table in document.tables and group.kind == "metric":
+                if other := _measure_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
+                    raise LocateError(other)
                 if unnamed := _place_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
                     notes.append(f"{PLACE_NOT_NAMED}: {unnamed}")
             # Any group's row: Auna's eliminations are a line of its revenue by segment.
