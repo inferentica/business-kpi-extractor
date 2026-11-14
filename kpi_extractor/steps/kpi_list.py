@@ -178,10 +178,9 @@ class KpiListUpkeep:
             texts = []
             for _tag, source in pages[:_PICTURE_EXCERPT_PAGES]:
                 try:
-                    reply = self.control.ocr(self.symbol, "text_recognition", source.rsplit("/", 1)[-1], _fetch_page(source))
+                    texts.append(self._page_ocr("text_recognition", source.rsplit("/", 1)[-1], _fetch_page(source)))
                 except Exception:  # noqa: BLE001 - classified on its cover, as before
                     continue
-                texts.append(" ".join(page.get("text") or "" for page in reply.get("pages") or []))
             if texts:
                 return re.sub(r"<｜[^｜]*｜>|\s+", " ", " ".join(texts)).strip()[:chars]
         return ""

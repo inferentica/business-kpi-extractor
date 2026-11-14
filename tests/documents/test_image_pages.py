@@ -72,9 +72,11 @@ def test_an_exhibit_of_pictures_is_read_through_the_control_planes_ocr_and_untou
         return {"pages": [{"text": "" if purpose == "rich_layout_recognition" else "Volume 1,089.8 MM UC"}]}
     raw = '<html><body><p>Exhibit 99.1</p><img src="kof_001.jpg"><img src="kof_002.jpg"></body></html>'
     reader = SimpleNamespace(symbol="KOF", log=lambda message: None, control=SimpleNamespace(ocr=ocr))
+    reader._page_ocr = lambda purpose, name, data: loading.FilingLoading._page_ocr(reader, purpose, name, data)
     read = loading.FilingLoading._pictures_read(reader, raw, "https://www.sec.gov/x/kof.htm")
     assert read.count("1,089.8") == 2 and "Exhibit 99.1" in read and "<img" not in read
-    assert calls == ["rich_layout_recognition", "text_recognition"] * 2
+    # Both pictures are the same bytes here: each mode reads them once, however often they are asked for.
+    assert calls == ["rich_layout_recognition", "text_recognition"]
     plain = SimpleNamespace(symbol="KOF", log=lambda message: None, control=SimpleNamespace())  # code reads: no OCR
     assert loading.FilingLoading._pictures_read(plain, raw, "https://www.sec.gov/x/kof.htm") == raw
 
@@ -82,7 +84,7 @@ def test_an_exhibit_of_pictures_is_read_through_the_control_planes_ocr_and_untou
 def _classifier(monkeypatch, previous=None, answer="earnings_release"):
     from kpi_extractor.steps import kpi_list, loading
 
-    monkeypatch.setattr(loading, "_fetch_page", lambda link: b"page")
+    monkeypatch.setattr(loading, "_fetch_page", lambda link: link.encode())  # each page its own picture
     monkeypatch.setattr(kpi_list, "classify_by_rules", lambda excerpt: None)  # the AI decides, and is shown the pages
     deck = '<html><body><p>Commission File Number 001-36908</p><img src="abev_001.jpg"><img src="abev_002.jpg"></body></html>'
     exhibit = SimpleNamespace(url="https://www.sec.gov/x/abev.htm", document_type="6-K", document="abev.htm")
@@ -95,6 +97,7 @@ def _classifier(monkeypatch, previous=None, answer="earnings_release"):
         store=SimpleNamespace(record=recorded.append),
         _ask=lambda prompt, *a, **k: asked.append(prompt) or SimpleNamespace(kind=answer))
     reader._picture_excerpt = lambda ref: kpi_list.KpiListUpkeep._picture_excerpt(reader, ref)
+    reader._page_ocr = lambda purpose, name, data: loading.FilingLoading._page_ocr(reader, purpose, name, data)
     ref = SimpleNamespace(confirmed=False, accession="acc", exhibits=[exhibit])
     return kpi_list.KpiListUpkeep._is_earnings_document(reader, ref), asked, recorded, ocr
 
