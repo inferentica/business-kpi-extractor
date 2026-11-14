@@ -27,7 +27,7 @@ from ..selection.period_dates import align_dates
 from ..selection.signs import sign_ties
 from ..selection.summaries import choose_summaries, summary_coverage
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
-from ..sources.listing import filing_for, list_reports
+from ..sources.listing import filing_for, list_reports, list_xbrl_sixks
 from ..sources.predecessors import predecessor_companies
 from .standards import use_standard_labels
 from ..sources.retry import with_network_retries
@@ -47,7 +47,10 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     mark = time.time()
     profile, company = company_profile(symbol)
     predecessors = predecessor_companies(symbol)  # registrants its reporting passed from (Embraer's before 2006)
-    reports = sorted(list_reports(company, since, predecessors), key=lambda ref: ref.filed, reverse=True)
+    reports = list_reports(company, since, predecessors)
+    if profile.foreign or any(ref.form in ("20-F", "40-F") for ref in reports):
+        reports += list_xbrl_sixks(company, since, predecessors)  # read from their XBRL like a 10-Q
+    reports = sorted(reports, key=lambda ref: ref.filed, reverse=True)
     mark = _phase(phases, "listing", mark)
     readings, filings, offset, summaries, regulator_reads = [], [], None, [], []
     # Every report's period is read from its submission, so they are downloaded first, four at a time
@@ -64,7 +67,15 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
             xbrl = with_network_retries(lambda: (load_submission(ref.filing), ref.filing.xbrl())[1])
         except Exception as error:  # noqa: BLE001 - one unreadable filing never stops the company
             record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"
+            if ref.form == "6-K":
+                xbrl = None  # EDGAR's flag without an instance (2016-17); the release reader reads its pages
+            else:
+                filings.append(record)
+                continue
+        if xbrl is None and ref.form == "6-K":
+            record.setdefault("note", "no XBRL")
             filings.append(record)
+            ref.filing = None
             continue
         if xbrl is None:
             found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0, summaries=summaries)

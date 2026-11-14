@@ -175,3 +175,12 @@ def test_a_release_is_served_before_mexicos_coded_template_of_the_same_period():
     assert chosen["source_accession"] == "press"
     [alone] = choose([coded])
     assert alone["source_accession"] == "coded"  # where nothing else prints the statement
+
+
+def test_a_six_ks_xbrl_stands_with_the_secs_reports_and_above_a_later_release():
+    tagged = reading("interim", date(2025, 8, 26), 100, own=True, period="Q2", duration="ytd")
+    tagged.form = "6-K"
+    release = reading("release", date(2025, 9, 1), 100, own=True, period="Q2", duration="ytd")
+    release.form, release.source = "6-K", "html"
+    [chosen] = choose([tagged, release])
+    assert chosen["source_accession"] == "interim"

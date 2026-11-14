@@ -25,3 +25,11 @@ def test_a_predecessors_filings_count_until_the_company_files_its_own():
                                                              lambda day: quarter_end_before(day, "1231"), [before])]
     assert "0000947871-08-000006" not in releases and "0000947871-03-000004" in releases  # nothing after the company's first
     assert [report.accession for report in list_reports(embraer, date(1993, 1, 1))] == ["0001292814-06-000002"]
+
+
+def test_six_ks_carrying_xbrl_are_listed_as_six_ks_their_amendments_too():
+    company = _Company([("a", "6-K", date(2024, 8, 29)), ("b", "6-K/A", date(2025, 8, 26)), ("c", "6-K", date(2025, 9, 1))])
+    company.filings[0].is_xbrl = company.filings[1].is_xbrl = True  # Petrobras's interim statements; "c" a notice
+    from statement_extractor.sources.listing import list_xbrl_sixks
+    found = list_xbrl_sixks(company, date(2020, 1, 1))
+    assert [(report.accession, report.form) for report in found] == [("a", "6-K"), ("b", "6-K")]

@@ -104,7 +104,9 @@ def _rank(reading: Reading) -> int:
     annual form is its witness."""
     if reading.source in REGULATORS:
         return 1 if reading.fiscal_period == "FY" else 2
-    return 0 if reading.form == "6-K" else 2
+    # A 6-K's XBRL is the statement the filer tagged and filed with the SEC (an interim update under Form 20-F Item
+    # 8.A.5, revised statements): it stands with the SEC's reports; a 6-K's printed release stays below them.
+    return 0 if reading.form == "6-K" and reading.source != "xbrl" else 2
 
 
 def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:

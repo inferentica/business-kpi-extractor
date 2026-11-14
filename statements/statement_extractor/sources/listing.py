@@ -35,6 +35,20 @@ def list_reports(company, since: date, predecessors: list = ()) -> list[Report]:
     return sorted(reports, key=lambda report: report.filed)
 
 
+def list_xbrl_sixks(company, since: date, predecessors: list = ()) -> list[Report]:
+    """A foreign filer's 6-Ks (and 6-K/As) that EDGAR flags as carrying XBRL, filed on or after `since`: the nine-month
+    interim updates a 20-F filer furnishes under Item 8.A.5 and revised statements (Petrobras's and Vale's interim
+    statements, Suzano's quarters, UBS's half-years), read from their XBRL like a 10-Q. Each is recorded as a 6-K, an
+    amendment too: Petrobras furnishes its interim statements as 6-K/A beside the press release."""
+    found = []
+    for one, before in _registrants(company, predecessors):
+        filings = _with_retries(lambda: one.get_filings(form=["6-K", "6-K/A"], filing_date=f"{since.isoformat()}:"))
+        found += [Report(str(filing.accession_no), "6-K", filing.filing_date, filing)
+                  for filing in filings if getattr(filing, "is_xbrl", False) and str(filing.form) in ("6-K", "6-K/A")
+                  and (before is None or filing.filing_date < before)]
+    return sorted(found, key=lambda report: report.filed)
+
+
 def _registrants(company, predecessors: list) -> list[tuple]:
     """The company, then each predecessor with the day its reporting passed on: the next registrant's first filing."""
     if not predecessors:
