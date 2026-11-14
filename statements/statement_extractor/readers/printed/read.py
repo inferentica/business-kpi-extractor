@@ -53,9 +53,9 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     notes: list[str] = []
     found = [(kind, group) for kind, group in find_statements(all_tables, release=form == "6-K")
              if titled_company(kind, group[0]) not in left_out]  # another company's (pipeline/printed.py)
-    # Printed more than once: the group's (TSMC's 2008 6-Ks), a titled one (Brookfield's, not its MD&A's), the fullest.
+    # Printed more than once: the group's (TSMC's 2008 6-Ks), the fullest; read again without another company's, titled first.
     found.sort(key=lambda item: (statement_scope(item[0], item[1], form, found) != "consolidated",
-                                 titled_company(item[0], item[1][0]) is None,
+                                 bool(left_out) and titled_company(item[0], item[1][0]) is None,
                                  -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
     read_periods: dict[tuple, set] = {}  # by kind and scope: Copel prints the parent's quarter, then the group's
     for kind, group in found:

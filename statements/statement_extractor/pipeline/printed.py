@@ -131,9 +131,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                                   left_out=frozenset(others))
             except Exception:  # noqa: BLE001 - the first reading stands
                 again = []
-            held = {(reading.key, reading.scope) for reading in readings}
-            readings += [reading for reading in again if reading.titled not in others and reading.audited_of not in others
-                         and (reading.key, reading.scope) not in held]
+            again = [reading for reading in again if reading.titled not in others and reading.audited_of not in others]
+            replaced = {(reading.key, reading.scope) for reading in again}
+            readings = [reading for reading in readings if (reading.key, reading.scope) not in replaced] + again
         issuers = _other_issuers(readings, ref, cover)
         if issuers:
             # Another issuer's release furnished in the company's 6-K (FEMSA's carry Coca-Cola FEMSA's): its statements.
