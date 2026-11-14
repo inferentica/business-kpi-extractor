@@ -73,11 +73,13 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
     fiscal quarter: a column headed with a quarter's name must name it."""
     tables: dict[str, list[tuple[str, dict]]] = {}
     values: list[Locator] = []
-    # A group is replayed as a whole table only when it was read as one: a reading that took a row or two whole beside
-    # rows read one by one (Wells Fargo's "Lease income") replays row by row, each row where it was.
-    mixed = {key.split(".", 1)[0] for key, locator in last.items() if not locator.get("whole_table")}
+    # A group is replayed as a whole table when most of its rows were read as one (a row or two beside it read alone, as
+    # JPMorgan's and PNC's are, still replay where they were); a reading that took only a row or two whole beside rows
+    # read one by one (Wells Fargo's "Lease income") replays row by row, each row where it was.
+    whole = Counter(key.split(".", 1)[0] for key, locator in last.items() if locator.get("whole_table"))
+    alone = Counter(key.split(".", 1)[0] for key, locator in last.items() if not locator.get("whole_table"))
     for key, locator in last.items():
-        if locator.get("whole_table") and key.split(".", 1)[0] not in mixed:
+        if locator.get("whole_table") and whole[key.split(".", 1)[0]] > alone[key.split(".", 1)[0]]:
             tables.setdefault(key.split(".", 1)[0], []).append((key, locator))
             continue
         found = _replay_value(document, key, locator, quarter, alone=len(last) == 1)
