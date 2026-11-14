@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 
+from ..rules.numbers import same_figure
+
 SHADOW, LIVE, DEMOTED = "shadow", "live", "demoted"
 SPOT_CHECK_EVERY = 10
 
@@ -19,8 +21,6 @@ def spot_checked(accession: str) -> bool:
     return int(hashlib.sha1(accession.encode()).hexdigest(), 16) % SPOT_CHECK_EVERY == 0
 
 
-def same_figure(left: float, right: float) -> bool:
-    return abs(left - right) <= 1e-9 * max(1.0, abs(left), abs(right))
 
 
 def evidence(kind: str, mode: str, accession: str, key: str, rule_item, ai_item) -> dict:

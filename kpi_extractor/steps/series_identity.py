@@ -7,7 +7,8 @@ from itertools import permutations
 from ..domain.derive import balancing
 from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
-from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _QUARTER_HEADER, _annual_header, _days, _is_jump, _same,
+from ..quality.reasons import ANNUAL_REFILED, LABELS_CONTRADICTED, has, without
+from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _QUARTER_HEADER, _annual_header, _days, _same,
                      _year_ago_cells)
 
 def _quarter_column(value: dict) -> bool:
@@ -75,10 +76,10 @@ class SeriesIdentity:
             if v["method"] == "ai" and v["fiscal_period"] == "Q4" and (v["source_accession"], v["fiscal_year"]) in misfiled \
                     and not _quarter_column(v):
                 # A jump flagged while the year was mistaken for a quarter says nothing about the year.
-                notes = [note for note in (v.get("notes") or []) if not _is_jump(note)]
+                notes = without(v.get("notes"), "jump")
                 status = "verified" if v["validation_status"] == "needs_review" and not notes else v["validation_status"]
                 moved.append({**v, "fiscal_period": "FY", "validation_status": status,
-                              "notes": [*notes, "full-year figures, re-filed from Q4"]})
+                              "notes": [*notes, ANNUAL_REFILED]})
                 moved.append({**v, "validation_status": "rejected", "notes": ["full-year figures filed as Q4; see FY"]})
         self.log(f"{self.symbol}: re-filed {len(misfiled)} annual report(s) stored as Q4")
         return moved
@@ -89,9 +90,9 @@ class SeriesIdentity:
         back = []
         for v in list(self.values.values()):
             if v["method"] != "ai" or v["fiscal_period"] != "FY" or v["validation_status"] == "rejected" \
-                    or "full-year figures, re-filed from Q4" not in (v.get("notes") or []) or not _quarter_column(v):
+                    or not has(v.get("notes"), "annual_refiled") or not _quarter_column(v):
                 continue
-            notes = [note for note in v.get("notes") or [] if note != "full-year figures, re-filed from Q4"]
+            notes = without(v.get("notes"), "annual_refiled")
             back.append({**v, "fiscal_period": "Q4", "validation_status": "verified", "notes": notes})
             back.append({**v, "validation_status": "rejected", "notes": ["a quarter's figure, moved back to Q4"]})
         if back:
@@ -331,11 +332,10 @@ class SeriesIdentity:
         they are flagged, so swapped names are never served. Years go newest first: a relabelled year's own comparatives
         are the evidence for the year before (AMD's 2024 10-Qs restate 2023 with the same wrong tags): so its rows are handed
         back year by year, each written before the next year is judged."""
-        held = "member labels contradict later filings"
         done: set[tuple[str, str]] = set()
         for _round in range(6):
             rows = [v for v in self.values.values() if v["method"] == "xbrl" and (
-                v["validation_status"] == "verified" or held in (v.get("notes") or []))]
+                v["validation_status"] == "verified" or has(v.get("notes"), "labels_contradicted"))]
             by_period: dict[tuple[str, str, str], dict[str, dict]] = {}
             for v in rows:
                 by_period.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), {})[v["kpi_key"]] = v
@@ -348,7 +348,7 @@ class SeriesIdentity:
                     restated.setdefault((v["group_key"], end), {})[v["kpi_key"]] = float(prior)
             contradicted = {item: quarters for item, quarters in self._contradicted_years(by_period, restated).items()
                             if item not in done}
-            flagged = {(v["group_key"], v["fiscal_year"]) for v in rows if held in (v.get("notes") or [])
+            flagged = {(v["group_key"], v["fiscal_year"]) for v in rows if has(v.get("notes"), "labels_contradicted")
                        and v["fiscal_period"] != "FY" and (v["group_key"], v["fiscal_year"]) not in done}
             for group, year in flagged - set(contradicted):
                 quarters = [q for q in (by_period.get((group, year, p)) for p in ("Q1", "Q2", "Q3")) if q]
@@ -395,15 +395,16 @@ class SeriesIdentity:
                     for key, row in quarter.items():
                         true = fits[0][key]
                         label = next((q[true]["kpi_label"] for q in quarters if true in q), true)
-                        notes = [note for note in (row.get("notes") or []) if note != held]
+                        notes = without(row.get("notes"), "labels_contradicted")
                         changes.append({**row, "kpi_key": true, "kpi_label": label, "validation_status": "verified",
                                         "notes": [*notes, *([] if true == key else ["member labels corrected from later filings"])]})
             elif len(fits) == 1:
-                changes += [{**row, "validation_status": "verified", "notes": [n for n in row.get("notes") or [] if n != held]}
-                            for quarter in quarters for row in quarter.values() if held in (row.get("notes") or [])]
+                changes += [{**row, "validation_status": "verified", "notes": without(row.get("notes"), "labels_contradicted")}
+                            for quarter in quarters for row in quarter.values() if has(row.get("notes"), "labels_contradicted")]
             elif not any(all(_same(float(q[k]["value"]), x) for k, x in found.items()) for q, found in evidence):
                 changes += [{**row, "validation_status": "needs_review",
-                             "notes": [*(row.get("notes") or []), *([] if held in (row.get("notes") or []) else [held])]}
+                             "notes": [*(row.get("notes") or []), *([] if has(row.get("notes"), "labels_contradicted")
+                                                                    else [LABELS_CONTRADICTED])]}
                             for quarter in quarters for row in quarter.values()]
             if changes:
                 yield changes

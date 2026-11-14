@@ -4,15 +4,11 @@ before the rule (Palantir's Q2 2022 TCV, Visa's Q3 2021 cross-border growth) set
 from __future__ import annotations
 
 from ..quality.stated import stated_in_filing
-from .shared import _is_jump
-
-STATED = "stated in its filing"
-# Notes that say nothing against the figure itself: an earlier review's or a check's mark.
-_ASIDE = ("confirmed by review", "settled by the checks", "checked against ")
+from ..quality.reasons import ASIDES, STATED, only
 
 
 def held_for_jumps_only(notes: list[str]) -> bool:
-    return any(_is_jump(note) for note in notes) and all(_is_jump(note) or note.startswith(_ASIDE) for note in notes)
+    return only(notes, ["jump"], ignoring=ASIDES)
 
 
 class StatedFigures:

@@ -12,6 +12,7 @@ from ..readers.extract import _listed_kpi
 from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from ..documents.image_pages import picture_pages
+from ..quality.reasons import OUTSIDE_REPORTED_PERIODS, has, without
 from ..rules.classify import classify_by_rules
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
@@ -19,7 +20,6 @@ from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds
 
 # The audit retires a KPI only after this many quarters without a figure for it.
 RETIRE_AFTER = 3
-OUTSIDE_REPORTED_PERIODS = "outside the KPI's reported periods"
 
 # The quarters a refresh or a scheduled run covers; Read filings reaches further (40).
 REFRESH_QUARTERS = 20
@@ -328,11 +328,11 @@ class KpiListUpkeep:
                               for group in spec.groups for kpi in group.kpis if kpi.since or kpi.until}
         # A period the owner opened again (a window widened or cleared): what was set aside for it comes back to review.
         back = [value for value in self.values.values() if value["validation_status"] == "rejected"
-                and OUTSIDE_REPORTED_PERIODS in (value.get("notes") or []) and not value.get("owner_decision")
+                and has(value.get("notes"), "outside_periods") and not value.get("owner_decision")
                 and self.store._in_window({**value, "validation_status": "verified"})]
         if back:
             self.store.write([{**value, "validation_status": "needs_review",
-                               "notes": [note for note in value["notes"] if note != OUTSIDE_REPORTED_PERIODS]} for value in back])
+                               "notes": without(value["notes"], "outside_periods")} for value in back])
             self.log(f"{self.symbol}: {len(back)} readings back to review: their KPI's reported periods now include them")
         if not self.store.windows:
             return

@@ -8,17 +8,14 @@ with the figure served before (CompanyStore.reread_disagreements), so a re-read 
 Add a selector with the rule change it serves; a learned rule's demotion will name the figures it read."""
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 
+from ..quality.reasons import has
 from ..readers.trace import untraced
-from ..rules.identity import PLACE_NOT_NAMED
 from ..rules.scale import _PER_UNIT
-from ..steps.release_flow import SCALE_OUTLIER
 
 # Holds a figure's size alone once raised, which a figure the filing confirms no longer stays under (2026-11-10).
-_SIZE_HOLD = re.compile(r"^changed [\d.]+x in a quarter$|likely part of the table$|^total far above the quarter before"
-                        r"|^" + re.escape(SCALE_OUTLIER))
+_SIZE_HOLDS = ("ratio_jump", "part_of_table", "far_above_quarter", "scale_outlier")
 
 
 def _untraced(value: dict) -> bool:
@@ -27,32 +24,31 @@ def _untraced(value: dict) -> bool:
 
 def _size_held(value: dict) -> bool:
     return (value.get("method") == "ai" and value.get("validation_status") == "needs_review" and not value.get("owner_decision")
-            and any(_SIZE_HOLD.search(note or "") for note in value.get("notes") or []))
+            and has(value.get("notes"), *_SIZE_HOLDS))
 
 
 def _repeat_held(value: dict) -> bool:
     return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
-            and any(str(note).startswith("the same figure as ") and str(note).endswith(": check the column")
-                    for note in value.get("notes") or []))
+            and has(value.get("notes"), "same_as_earlier"))
 
 
 def _sum_held(value: dict) -> bool:
     return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
-            and any(str(note).startswith(("parts differ from the total", "lines differ from ")) for note in value.get("notes") or []))
+            and has(value.get("notes"), "parts_differ", "lines_differ"))
 
 
 def _place_held(value: dict) -> bool:
     return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
-            and any(str(note).startswith(PLACE_NOT_NAMED) for note in value.get("notes") or []))
+            and has(value.get("notes"), "place_not_named"))
 
 
-# Notes the wave 2 audit's repairs held figures with (2026-11-13): read again once PRs 48 and 52 refuse what misread them.
-_AUDIT_HOLDS = ("read from the same table cell as another listed metric", "a percent read from an amounts row")
+# Holds the wave 2 audit's repairs set (2026-11-13): read again once PRs 48 and 52 refuse what misread them.
+_AUDIT_HOLDS = ("shared_cell", "percent_from_amounts")
 
 
 def _audit_held(value: dict) -> bool:
     return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
-            and any(str(note).startswith(_AUDIT_HOLDS) for note in value.get("notes") or []))
+            and has(value.get("notes"), *_AUDIT_HOLDS))
 
 
 def _unit_price_row(value: dict) -> bool:

@@ -4,6 +4,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
+from ..quality.reasons import EXPLAINED, SCALE_OUTLIER, note_with
 from ..quality.stated import FILING_SCALES
 from .. import ai
 from ..ai import Spec
@@ -30,7 +31,6 @@ _RELEASE_READER = "release reader 5"
 # by a scale the document did not state.
 _SCALE_GAP = 1e4
 _REVENUE_GAP = 1e5
-SCALE_OUTLIER = "amount far from its other periods or from revenue: a scale not stated"
 _GROUPS_NOT_READ = "groups not read: "
 # Why the AI found no value for each unreported KPI (Locate's reason codes), and what sent a reading to a second reader.
 _MISSING_WHY = "missing reasons: "
@@ -115,7 +115,8 @@ def _reader5_rejects(value: dict) -> bool:
     quote, value_text = clean(str(locator.get("quote") or "")), clean(str(locator.get("value_text") or ""))
     if quote and value_text and value_text in quote and forward_looking(quote[:quote.find(value_text)]):
         return True
-    explained = next((note.removeprefix("change explained: ") for note in value.get("notes") or [] if note.startswith("change explained: ")), None)
+    explained = note_with(value.get("notes"), "explained")
+    explained = explained.removeprefix(EXPLAINED) if explained is not None else None
     return explained is not None and not explanation_supports(clean(explained), str(value.get("kpi_label") or ""),
                                                               float(value.get("value") or 0), strict=False)
 
@@ -458,7 +459,7 @@ class ReleaseFlow:
                         quote, v["kpi_label"], float(v["value"]), _previous_of(v.get("notes") or [], float(v["value"]))):
                     call = self._call_of(answer)
                     cleared.append({**v, "validation_status": "verified",
-                                    "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"change explained: {quote[:200]}"],
+                                    "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"{EXPLAINED}{quote[:200]}"],
                                     **({"locator": {**(v.get("locator") or {}), "explain_call": call}} if call else {})})
         return cleared
 
