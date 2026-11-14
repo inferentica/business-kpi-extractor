@@ -14,7 +14,9 @@ from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
 from ..readers.quoted_rows import row_line
-from ..readers.row_finder import shows_figure
+from ..readers.row_finder import shows_figure, table_from_rows
+from ..rules.identity import sideless_key
+from ..xbrl import member_key
 from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, chosen_by_number, comparable_header,
                               missing_since, replay, reported_period, stated_total)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
@@ -116,9 +118,7 @@ class ReplayReading:
                 # A row the nearest reading lacked because it showed a dash that quarter (Wells Fargo's "Net gains from
                 # debt securities") was read within the year: looked for at that place, and left out where this filing
                 # gives it no figure either. With no such reading the AI looks for it, as before.
-                earlier = {key: value["locator"] for key in unlooked if (value := history.get(key)) and value.get("locator")
-                           and value["validation_status"] == "verified" and value["fiscal_period"] != "FY"
-                           and value["period_end"] >= oldest}
+                earlier = {key: place for key in unlooked if (place := self._verified_place(key, expected, source, oldest))}
                 if earlier.keys() != unlooked:
                     missed("a listed KPI not looked for yet")
                     continue
@@ -237,6 +237,18 @@ class ReplayReading:
         self.result.replay_outcomes["replayed as the year"] = self.result.replay_outcomes.get("replayed as the year", 0) + 1
         return items, kept, done
 
+    def _verified_place(self, key: str, before: date, source: str, oldest: str) -> dict | None:
+        """Where a KPI was last read and verified in a quarter of this kind of document since `oldest`: the nearest
+        reading may hold it for review (Wells Fargo's "Other"), and its place is still the one to look at."""
+        group, kpi = key.split(".", 1)
+        found = [value for value in self.values.values() if value["method"] == "ai" and value["kpi_key"] == kpi
+                 and value["group_key"] == AI_GROUP_PREFIX + group and value["validation_status"] == "verified"
+                 and value["fiscal_period"] != "FY" and oldest <= value["period_end"] < before.isoformat()
+                 and value.get("locator") and not placed_elsewhere(value)
+                 and _source_template((self.filings.get(value.get("source_accession") or "") or {}).get("source_url")
+                                      or value.get("source_url") or "") == source]
+        return max(found, key=lambda value: value["period_end"])["locator"] if found else None
+
     def _replay_part(self, document: Document, part: Spec, locators: dict[str, dict], expected: date,
                      currency: str | None, annual: bool = False) -> tuple[Located, list[ReadValue]] | str:
         """One group, or one KPI, replayed and checked: its reading and values, or why it does not stand. A year's
@@ -250,9 +262,13 @@ class ReplayReading:
         # A breakdown read part by part takes the total the filing states for its parts (totals are never stored).
         group = part.groups[0]
         if group.kind == "revenue_breakdown" and group.total_kpi and not located.tables \
-                and not any(value.kpi == f"{group.key}.{group.total_kpi}" for value in located.values) \
-                and (total := stated_total(document, located.values, f"{group.key}.{group.total_kpi}")):
-            located.values.append(total)
+                and not any(value.kpi == f"{group.key}.{group.total_kpi}" for value in located.values):
+            if total := stated_total(document, located.values, f"{group.key}.{group.total_kpi}"):
+                located.values.append(total)
+            elif table := table_from_rows(document, group.key, located.values):
+                table._row_keys = {label_key(locator["row_label"]): key.split(".", 1)[1] for key, locator in locators.items()
+                                   if locator.get("row_label") for label_key in (sideless_key, member_key)}
+                located.tables, located.values = [table], []
         return self._checked(document, part, located, expected, currency, annual=annual)
 
     def _stored_year_ago(self, expected: date) -> dict[str, float]:

@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 from typing import Callable
 
+from ..ai import Locator, TableLocator
 from ..documents.document import Document, Table, parse_number
 from ..rules.identity import sideless_key
 from ..xbrl import member_key
@@ -47,3 +48,29 @@ def shows_figure(document: Document, locator: dict) -> bool:
         if row is not None and parse_number(table.cell(row, int(col)) or "") is not None:
             return True
     return False
+
+
+_TOTAL = re.compile(r"\btotal\b", re.I)
+
+
+def table_from_rows(document: Document, group: str, parts: list[Locator]) -> TableLocator | None:
+    """A breakdown read row by row whose rows do not add up to a total the table states, read as its whole table: from
+    its first row down to the first row named a total that every figure between adds up to, to the unit (Wells Fargo's
+    noninterest income, whose "Lease income" row is not on the list: its listed rows add up to no figure in the table).
+    None unless every row was read from one table and column and that total is found."""
+    if len(parts) < 2 or len({(part.table, part.col) for part in parts}) != 1 or any(part.row is None for part in parts):
+        return None
+    table, col = document.tables.get(parts[0].table or ""), parts[0].col
+    if table is None or col is None:
+        return None
+    first, last = min(part.row for part in parts), max(part.row for part in parts)
+    figures = [parse_number(table.cell(index, col) or "") for index in range(len(table.rows))]
+    for row in range(last + 1, len(table.rows)):
+        figure = figures[row]
+        if figure is None:
+            continue
+        whole = sum(item.value for item in figures[first:row] if item is not None)
+        if _TOTAL.search(_row_label(table.rows[row], col)) and abs(figure.value - whole) <= 0.5:
+            return TableLocator(group=group, table=table.id, col=col, first_row=first, last_row=row - 1, total_row=row,
+                                scale=parts[0].scale, scale_text=parts[0].scale_text)
+    return None
