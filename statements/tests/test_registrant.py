@@ -147,3 +147,15 @@ def test_the_companys_name_under_another_legal_form_is_another_entity():
     cover = "Commission File Number 001-41563 Brookfield Asset Management Ltd. (Translation of Registrant's name"
     assert _others(["BROOKFIELD ASSET MANAGEMENT ULC", "BROOKFIELD ASSET MANAGEMENT LTD."], names, cover) == [
         "BROOKFIELD ASSET MANAGEMENT ULC"]
+
+
+def test_another_company_under_the_companys_own_name_is_told_apart_from_an_acquired_one():
+    from statement_extractor.pipeline.company_names import same_name_others
+    printed._NAMES["0"] = ["Brookfield Asset Management Ltd."]
+
+    class Ref:
+        filing = _Filing
+
+    assert same_name_others(["BROOKFIELD ASSET MANAGEMENT ULC"], Ref, "Brookfield Asset Management Ltd. (Translation")
+    printed._NAMES["0"] = ["GILDAN ACTIVEWEAR INC."]
+    assert not same_name_others(["GOLD TOE MORETZ HOLDINGS CORP."], Ref, "GILDAN ACTIVEWEAR INC. (Translation")

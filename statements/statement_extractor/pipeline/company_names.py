@@ -131,6 +131,13 @@ def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
     return sorted(others)
 
 
+def same_name_others(others: list[str], ref, cover: str | None) -> bool:
+    """Whether another company the statements name carries the company's own name (Brookfield Asset Management ULC
+    beside Brookfield Asset Management Ltd.): an untitled statement beside it may be either's."""
+    own = set().union(*(_named(name) for name in _company_names(ref.filing)), _registrant_words(cover))
+    return any(_named(name) & own for name in others)
+
+
 def _other_issuers(readings: list, ref, cover: str | None) -> list[str]:
     """Issuers whose release opening, in a release, came before the readings, and whose names share no word with the
     company's names or its cover's registrant: Coca-Cola FEMSA in FEMSA's 6-Ks, Brookfield under "BAM" its own."""

@@ -25,7 +25,8 @@ from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.documents import PRINTED_DOCUMENTS, release_documents
-from .company_names import _NAMES, _cover_text, _other_companies, _other_issuers, another_registrant  # noqa: F401
+from .company_names import (_NAMES, _cover_text, _other_companies, _other_issuers, another_registrant,  # noqa: F401
+                            same_name_others)
 from .unstated_scale import with_proven_scale
 
 _ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
@@ -133,7 +134,9 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
                 again = []
             again = [reading for reading in again if reading.titled not in others and reading.audited_of not in others]
             replaced = {(reading.key, reading.scope) for reading in again}
-            readings = [reading for reading in readings if (reading.key, reading.scope) not in replaced] + again
+            untitled = same_name_others(others, ref, names_cover)  # then an untitled statement may be either's
+            readings = [reading for reading in readings if (reading.key, reading.scope) not in replaced
+                        and not (untitled and not reading.titled)] + again
         issuers = _other_issuers(readings, ref, cover)
         if issuers:
             # Another issuer's release furnished in the company's 6-K (FEMSA's carry Coca-Cola FEMSA's): its statements.
