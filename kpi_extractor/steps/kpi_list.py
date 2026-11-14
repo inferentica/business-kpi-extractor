@@ -11,6 +11,7 @@ from ..ops.control import ControlError
 from ..readers.extract import _listed_kpi
 from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
+from ..documents.image_pages import picture_pages
 from ..rules.classify import classify_by_rules
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
@@ -25,6 +26,9 @@ REFRESH_QUARTERS = 20
 _NOT_EARNINGS = "classified as not an earnings document"
 _CLASSIFIED_PAST_COVER = "classified past the cover 2"  # 2: covers written with &nbsp; too
 _BY_RULES = "classified by rules"
+# Classified with any page pictures it has read (documents/image_pages.py): a deck of pictures had only its cover to show.
+_CLASSIFIED_PICTURES = "classified with its page pictures read"
+_PICTURE_EXCERPT_PAGES = 2
 
 def keep_current_groups(proposed: Spec, current: Spec) -> Spec:
     """A re-proposed list never silently drops a group the current list tracks (TSMC's platform and geography once
@@ -137,10 +141,14 @@ class KpiListUpkeep:
             return True
         previous = self.filings.get(ref.accession)
         own = any(self.source.is_own_document(exhibit) for exhibit in ref.exhibits)
-        if previous and not (own and _NOT_EARNINGS in (previous.get("notes") or [])
-                             and _CLASSIFIED_PAST_COVER not in (previous.get("notes") or [])):
-            return _NOT_EARNINGS not in (previous.get("notes") or [])
-        excerpt = self.source.classification_excerpt(ref)
+        notes = (previous or {}).get("notes") or []
+        # A deck of pictures classified on its cover alone (Ambev's results presentation) is classified again with them.
+        pictures = self._picture_excerpt(ref) if not previous or (_NOT_EARNINGS in notes and _CLASSIFIED_PICTURES not in notes) else ""
+        if previous and not pictures and not (own and _NOT_EARNINGS in notes and _CLASSIFIED_PAST_COVER not in notes):
+            if _NOT_EARNINGS in notes and _CLASSIFIED_PICTURES not in notes:  # looked at for pictures once: none
+                self.store.record(FilingReading(ref, "skipped", notes=[*notes, _CLASSIFIED_PICTURES]))
+            return _NOT_EARNINGS not in notes
+        excerpt = self.source.classification_excerpt(ref) + (f"\n\nIts page pictures, as OCR reads them:\n{pictures}" if pictures else "")
         # Titles that say plainly what the filing is need no AI; the AI decides only when they say both or neither.
         kind = classify_by_rules(excerpt)
         if kind is None:
@@ -154,9 +162,29 @@ class KpiListUpkeep:
             by_rules = [_BY_RULES]
         if kind == "other":
             self.store.record(FilingReading(ref, "skipped", notes=[
-                _NOT_EARNINGS, *([_CLASSIFIED_PAST_COVER] if own else []), *by_rules]))
+                _NOT_EARNINGS, *([_CLASSIFIED_PAST_COVER] if own else []), _CLASSIFIED_PICTURES, *by_rules]))
             return False
         return True
+
+    def _picture_excerpt(self, ref: FilingRef, chars: int = 1_500) -> str:
+        """The opening page pictures of an exhibit that is only pictures, as DeepSeek's OCR reads them: what the classifier
+        is shown in place of text it does not have. No figure is taken from it."""
+        if not callable(getattr(self.control, "ocr", None)):
+            return ""
+        from .loading import _fetch_page
+
+        for exhibit in ref.exhibits[:4]:
+            pages = picture_pages(self.source.exhibit_html(exhibit) or "", exhibit.url)
+            texts = []
+            for _tag, source in pages[:_PICTURE_EXCERPT_PAGES]:
+                try:
+                    reply = self.control.ocr(self.symbol, "text_recognition", source.rsplit("/", 1)[-1], _fetch_page(source))
+                except Exception:  # noqa: BLE001 - classified on its cover, as before
+                    continue
+                texts.append(" ".join(page.get("text") or "" for page in reply.get("pages") or []))
+            if texts:
+                return re.sub(r"<｜[^｜]*｜>|\s+", " ", " ".join(texts)).strip()[:chars]
+        return ""
 
     def _spec(self, row: dict | None, releases: list[FilingRef]) -> tuple[Spec | None, int, bool]:
         # A list the owner edited (Quotiva Review) is kept as edited, even on a forced run.
