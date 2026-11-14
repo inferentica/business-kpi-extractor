@@ -67,10 +67,12 @@ def asked_of(last: dict[str, dict], spec) -> dict[str, dict]:
             if key in listed or (locator.get("whole_table") and key.split(".", 1)[0] in groups)}
 
 
-def replay(document: Document, last: dict[str, dict], expected: date, quarter: int | None = None) -> Located | str:
+def replay(document: Document, last: dict[str, dict], expected: date, quarter: int | None = None,
+           as_table: bool | None = None) -> Located | str:
     """A reading built from last quarter's locators, or, when any of them cannot be found again, why not (counted in the
     run summary, so the reasons code most often fails on show where it should learn next). `quarter` is the filing's
-    fiscal quarter: a column headed with a quarter's name must name it."""
+    fiscal quarter: a column headed with a quarter's name must name it. `as_table` overrides how a group read partly
+    whole is replayed (True: its whole rows as a table; False: every row alone)."""
     tables: dict[str, list[tuple[str, dict]]] = {}
     values: list[Locator] = []
     # A group is replayed as a whole table when most of its rows were read as one (a row or two beside it read alone, as
@@ -79,7 +81,7 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
     whole = Counter(key.split(".", 1)[0] for key, locator in last.items() if locator.get("whole_table"))
     alone = Counter(key.split(".", 1)[0] for key, locator in last.items() if not locator.get("whole_table"))
     for key, locator in last.items():
-        if locator.get("whole_table") and whole[key.split(".", 1)[0]] > alone[key.split(".", 1)[0]]:
+        if locator.get("whole_table") and (whole[key.split(".", 1)[0]] > alone[key.split(".", 1)[0]] if as_table is None else as_table):
             tables.setdefault(key.split(".", 1)[0], []).append((key, locator))
             continue
         found = _replay_value(document, key, locator, quarter, alone=len(last) == 1)
@@ -589,3 +591,10 @@ def current_column(table: Table, first_data_row: int, col: int) -> bool:
     if not column and len(every) == 1:
         return True  # one year over the whole table (Mastercard's "For the 3 Months ended June 30, 2023"): no other period's column
     return bool(column) and max(column) == max(every)
+
+
+def mostly_whole(last: dict[str, dict]) -> bool | None:
+    """How replay takes a reading with rows read whole beside rows read alone (True: as a table), or None when the
+    reading is not mixed."""
+    whole = sum(1 for locator in last.values() if locator.get("whole_table"))
+    return None if whole in (0, len(last)) else whole > len(last) - whole

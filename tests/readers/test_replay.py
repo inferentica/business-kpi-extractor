@@ -1083,3 +1083,11 @@ def test_a_whole_table_reading_with_a_row_read_alone_still_replays_as_its_table(
             "noninterest.trading": place(3, "Net gains from trading activities", **whole), "noninterest.other": place(6, "Other")}
     located = replay(document, last, date(2023, 3, 31), quarter=1)
     assert not isinstance(located, str) and len(located.tables) == 1 and [value.kpi for value in located.values] == ["noninterest.other"]
+
+
+def test_a_mixed_reading_is_tried_the_way_most_rows_were_read_first():
+    from kpi_extractor.readers.replay import mostly_whole
+    whole, alone = {"whole_table": True}, {}
+    assert mostly_whole({"g.a": whole, "g.b": whole, "g.c": alone}) is True
+    assert mostly_whole({"g.a": whole, "g.b": alone, "g.c": alone}) is False
+    assert mostly_whole({"g.a": whole, "g.b": whole}) is None and mostly_whole({"g.a": alone}) is None
