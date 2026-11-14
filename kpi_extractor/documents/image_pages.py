@@ -20,24 +20,34 @@ UNCONFIRMED = "[unconfirmed]"
 # A figure as printed: "1,148", "(357)", "-30", "12.5%", "$0.93", "R$3.8". Digits glued to letters ("3Q26", "FY25")
 # are labels, never figures.
 _FIGURE = re.compile(r"(?<![A-Za-z\d.,])\d{1,3}(?:[,.]\d{3})+(?:[.,]\d+)?(?![A-Za-z\d])|(?<![A-Za-z\d.,])\d+(?:[.,]\d+)?(?![A-Za-z\d])")
-_IMG = re.compile(r"<img\b[^>]*?\bsrc\s*=\s*[\"']?([^\"' >]+)", re.I)
+_IMG = re.compile(r"<img\b[^>]*?\bsrc\s*=\s*[\"']?([^\"' >]+)[^>]*>", re.I)
 _BLOCK = re.compile(r"<｜ref｜>(\w+)<｜/ref｜><｜box｜>\[\[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\]\]<｜/box｜>")
 _TOKEN = re.compile(r"<｜[^｜]*｜>")
-# An exhibit is read as pictures when its text gives fewer figures than this, beside at least two page images.
-_MAX_TEXT_FIGURES = 12
-_MIN_IMAGES = 2
+# A picture is a page when the text after it, up to the next picture, gives fewer figures than this: ASML's and Wells
+# Fargo's slides keep their words beneath each picture, and a chart set in a release (Coca-Cola FEMSA's) sits among its
+# paragraphs. An exhibit is read as pictures from two such pages that are most of its pictures: ASML's and TSMC's decks,
+# their slides worded, have picture-only dividers and pie slides that the chart reader reads by their picture and its
+# hidden title, and are left as they are.
+_MAX_FIGURES_BENEATH = 3
+_MIN_PAGES = 2
 # A block's region is widened by this share of the page on each side: the two models draw their boxes differently.
 _MARGIN = 15
 
 
-def image_sources(raw_html: str, url: str) -> list[str]:
-    """The page images of an exhibit that is only pictures, in reading order, as absolute links; none when its text
-    carries figures of its own (ASML's and Wells Fargo's slides keep their words beneath each picture)."""
-    text = html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"(?is)<(script|style).*?</\1>", " ", raw_html)))
-    sources = [urljoin(url, src) for src in _IMG.findall(raw_html)]
-    if len(sources) < _MIN_IMAGES or len(_FIGURE.findall(text)) >= _MAX_TEXT_FIGURES:
-        return []
-    return sources
+def _text(fragment: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"(?is)<(script|style).*?</\1>", " ", fragment)))
+
+
+def picture_pages(raw_html: str, url: str) -> list[tuple[str, str]]:
+    """The pictures of an exhibit that are its pages, with no words of their own beneath them (Ambev's deck: 34 page
+    pictures under a 6-K cover whose dates and file numbers are its only figures), each as its tag and absolute link."""
+    found = list(_IMG.finditer(raw_html))
+    pages = []
+    for index, match in enumerate(found):
+        beneath = raw_html[match.end():found[index + 1].start() if index + 1 < len(found) else len(raw_html)]
+        if len(_FIGURE.findall(_text(beneath))) < _MAX_FIGURES_BENEATH:
+            pages.append((match.group(0), urljoin(url, match.group(1))))
+    return pages if len(pages) >= _MIN_PAGES and len(pages) * 2 > len(found) else []
 
 
 def _digits(figure: str) -> str:
@@ -109,10 +119,11 @@ def agreed_page(deepseek: str, words: list[tuple[float, float, float, float, str
 
 def read_image_pages(sources: list[str], fetch: Callable[[str], bytes], deepseek: Callable[[str, bytes], tuple[str, bool]],
                      local: Callable[[bytes], list], size_of: Callable[[bytes], tuple[int, int]],
-                     min_side: int = 400) -> tuple[str, dict]:
-    """The exhibit as HTML of agreed figures, one section per page, and what was kept: `deepseek` reads a page (its text,
-    and whether it gave regions), `local` gives RapidOCR's words. A page DeepSeek returns empty is left out."""
-    sections, totals = [], Counter()
+                     min_side: int = 400) -> tuple[dict[str, str], dict]:
+    """Each page picture as HTML of agreed figures (by its link), and what was kept: `deepseek` reads a page (its text,
+    and whether it gave regions), `local` gives RapidOCR's words. A logo, an icon, or a page DeepSeek returns empty is
+    left out."""
+    pages, totals = {}, Counter()
     for number, source in enumerate(sources, 1):
         data = fetch(source)
         if min(size_of(data)) < min_side:
@@ -126,5 +137,5 @@ def read_image_pages(sources: list[str], fetch: Callable[[str], bytes], deepseek
         totals["pages"] += 1
         totals["figures kept"] += kept
         totals["figures masked"] += masked
-        sections.append(f'<div class="ocr-page" data-page="{number}" data-image="{html.escape(source)}">{page}</div>')
-    return "<html><body>" + "\n".join(sections) + "</body></html>", dict(totals)
+        pages[source] = f'<div class="ocr-page" data-page="{number}" data-image="{html.escape(source)}">{page}</div>'
+    return pages, dict(totals)
