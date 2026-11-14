@@ -32,6 +32,8 @@ _MAX_FIGURES_BENEATH = 3
 _MIN_PAGES = 2
 # A block's region is widened by this share of the page on each side: the two models draw their boxes differently.
 _MARGIN = 15
+# Pages read at once: well under DeepSeek's 15 recognitions in progress per account and SEC's request rate.
+_WORKERS = 4
 
 
 def _text(fragment: str) -> str:
@@ -119,23 +121,38 @@ def agreed_page(deepseek: str, words: list[tuple[float, float, float, float, str
 
 def read_image_pages(sources: list[str], fetch: Callable[[str], bytes], deepseek: Callable[[str, bytes], tuple[str, bool]],
                      local: Callable[[bytes], list], size_of: Callable[[bytes], tuple[int, int]],
-                     min_side: int = 400) -> tuple[dict[str, str], dict]:
+                     min_side: int = 400, workers: int = _WORKERS) -> tuple[dict[str, str], dict]:
     """Each page picture as HTML of agreed figures (by its link), and what was kept: `deepseek` reads a page (its text,
     and whether it gave regions), `local` gives RapidOCR's words. A logo, an icon, or a page DeepSeek returns empty is
-    left out."""
-    pages, totals = {}, Counter()
-    for number, source in enumerate(sources, 1):
+    left out. Pages are read a few at a time (a 33-page deck took five minutes one by one)."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    one_at_a_time = threading.Lock()  # the local model is one shared instance, and works the CPU either way
+
+    def read(numbered: tuple[int, str]) -> tuple[str, str | None, tuple[int, int] | None]:
+        number, source = numbered
         data = fetch(source)
         if min(size_of(data)) < min_side:
-            continue  # a logo, an icon or a bullet, not a page
+            return source, None, None  # a logo, an icon or a bullet, not a page
         text, _regions = deepseek(source.rsplit("/", 1)[-1], data)
         if not text.strip():
-            totals["empty pages"] += 1
-            continue
-        words = [(w.x0, w.y0, w.x1, w.y1, w.text) for w in local(data)]
+            return source, "", None
+        with one_at_a_time:
+            words = [(w.x0, w.y0, w.x1, w.y1, w.text) for w in local(data)]
         page, kept, masked = agreed_page(text, words, size_of(data))
-        totals["pages"] += 1
-        totals["figures kept"] += kept
-        totals["figures masked"] += masked
-        pages[source] = f'<div class="ocr-page" data-page="{number}" data-image="{html.escape(source)}">{page}</div>'
+        return source, f'<div class="ocr-page" data-page="{number}" data-image="{html.escape(source)}">{page}</div>', (kept, masked)
+
+    pages, totals = {}, Counter()
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        for source, page, counts in pool.map(read, enumerate(sources, 1)):
+            if page is None:
+                continue
+            if counts is None:
+                totals["empty pages"] += 1
+                continue
+            totals["pages"] += 1
+            totals["figures kept"] += counts[0]
+            totals["figures masked"] += counts[1]
+            pages[source] = page
     return pages, dict(totals)
