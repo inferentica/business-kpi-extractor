@@ -36,9 +36,11 @@ SCALE_WORDS = {"thousands": 1e3, "millions": 1e6, "billions": 1e9, "trillions": 
 
 # A row priced per unit ("Starlink consumer ARPU ($ per month)") in a table "in millions (except where noted)" is in units.
 # A row stating its amount per unit: "(per share)", "($ per month)", or a price's own unit, Exxon's "Brent ($/b)",
-# "Henry Hub ($/mbtu)", "Natural Gas ($/kcf)" (a "($ in millions)" caption names no unit after the slash).
+# "Henry Hub ($/mbtu)", "Natural Gas ($/kcf)" (a "($ in millions)" caption names no unit after the slash), or a row naming
+# its currency alone: American Express's "Average proprietary basic Card Member spending (dollars)" $6,110 in a table
+# "(Millions, except percentages and where indicated)" was read as $6.1 billion ("(dollars in millions)" is a caption).
 _PER_UNIT = re.compile(r"\([^()]*\bper\s+(?:month|year|quarter|day|user|subscriber|member|customer|share|unit|system)\b[^()]*\)"
-                       r"|\(\s*(?:US)?[$€£¥]\s*/\s*[A-Za-z]+\s*\)", re.I)
+                       r"|\(\s*(?:US)?[$€£¥]\s*/\s*[A-Za-z]+\s*\)|\(\s*(?:in\s+)?(?:U\.?S\.?\s+)?(?:dollars|euros|pounds|yen)\s*\)", re.I)
 
 
 def _preceding_scale(text: str, at: int) -> float | None:
