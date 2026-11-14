@@ -210,3 +210,21 @@ def test_a_later_six_k_restating_a_tagged_period_wins():
     assert chosen["source_accession"] == "restated"
     [chosen] = choose([tagged, older])
     assert chosen["source_accession"] == "tagged"
+
+
+def test_a_later_release_never_passes_a_20f_or_a_tagged_6k_on_another_basis():
+    year = reading("20-F", date(2019, 4, 1), 100, own=True)
+    year.form, year.basis = "20-F", "IFRS"
+    tagged = reading("tagged", date(2018, 8, 20), 100, own=False)
+    tagged.form, tagged.basis = "6-K", "IFRS"
+    release = reading("release", date(2020, 2, 1), 99, own=False)
+    release.form, release.source, release.basis = "6-K", "html", "IFRS"
+    [chosen] = choose([year, tagged, release])
+    assert chosen["source_accession"] == "20-F"
+    # TSMC's H1 2021: tagged on IFRS in its 6-K; its later releases print Taiwan-IFRS.
+    interim = reading("ifrs", date(2021, 10, 18), 277, own=False, period="Q2", duration="ytd")
+    interim.form, interim.basis = "6-K", "IFRS"
+    taiwan = reading("tifrs", date(2022, 8, 12), 274, own=False, period="Q2", duration="ytd")
+    taiwan.form, taiwan.source, taiwan.basis = "6-K", "html", "Taiwan-IFRS"
+    [chosen] = choose([interim, taiwan])
+    assert chosen["source_accession"] == "ifrs"

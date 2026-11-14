@@ -61,15 +61,18 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         set_aside = contradicted(kept)
         aside = {id(reading) for reading in set_aside}
         eligible = [reading for reading in kept if id(reading) not in aside] or kept
-        # A 6-K presenting the period after the newest one tagged in XBRL stands with it: the newest presentation wins
-        # (UBS's Q2 2017 restated in dollars in 2019, beside its original 6-K tagged in francs).
-        tagged = max((item.filed for item in eligible if item.form == "6-K" and item.source == "xbrl"
-                      and _rank(item, annual) == 2), default=None)
-        rank = lambda item: 2 if (tagged is not None and item.form == "6-K" and item.filed > tagged  # noqa: E731
-                                  and item.source not in REGULATORS) else _rank(item, annual)
-        winner = max(eligible, key=lambda item: (item.scope == "consolidated", rank(item), not _coded(item),
-                                             item.form != "6-K" or annual is None or ifrs_family(item.basis) == ifrs_family(annual), item.filed,
-                                             item.own, item.source == "xbrl")) if eligible else None
+        best = lambda item: (item.scope == "consolidated", _rank(item, annual), not _coded(item),  # noqa: E731
+                             item.form != "6-K" or annual is None or ifrs_family(item.basis) == ifrs_family(annual),
+                             item.filed, item.own, item.source == "xbrl")
+        winner = max(eligible, key=best) if eligible else None
+        if winner is not None and winner.form == "6-K" and winner.source == "xbrl":
+            # A 6-K presenting the period after the tagged one that won it restates it: the newest presentation wins
+            # (UBS's Q2 2017 restated in dollars in 2019, beside its original 6-K tagged in francs). Only over the
+            # tagged 6-K: a release never passes a 20-F or a regulator's form this way.
+            later = [item for item in eligible if item.form == "6-K" and item.source != "xbrl"
+                     and item.source not in REGULATORS and item.filed > winner.filed
+                     and ifrs_family(item.basis) == ifrs_family(winner.basis)]  # TSMC's Taiwan-IFRS releases do not
+            winner = max(later, key=best) if later else winner
         record = {
             "statement": key[0], "fiscal_year": key[1], "fiscal_period": key[2], "duration": key[3],
             "period_end": max(reading.period_end for reading in group).isoformat(),
