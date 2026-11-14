@@ -15,6 +15,7 @@ on:
           - trial
           - classify
           - code-reads
+          - ocr-probe
       symbols:
         description: For a trial - comma-separated tickers to read as new companies (nothing is stored); for code-reads, the companies whose releases code reads again with no AI
         required: false
@@ -118,7 +119,7 @@ jobs:
       - run: uv pip install .
       - name: Wait for DeepSeek off-peak prices
         # a push or the schedule waits too (an unset input equals false); code reads make no AI call, so never wait
-        if: (github.event_name != 'workflow_dispatch' || inputs.offpeak) && inputs.suite != 'code-reads'
+        if: (github.event_name != 'workflow_dispatch' || inputs.offpeak) && inputs.suite != 'code-reads' && inputs.suite != 'ocr-probe'
         run: python -m kpi_extractor.ops.offpeak
       - name: Read releases with code alone (no AI)
         if: inputs.suite == 'code-reads'
@@ -131,6 +132,9 @@ jobs:
           python -m kpi_extractor.evals.code_reads --symbols "$SYMBOLS" --quarters "$QUARTERS" --order arrival || status=1
           python -m kpi_extractor.evals.code_reads --symbols "$SYMBOLS" --quarters "$QUARTERS" --order backfill || status=1
           exit $status
+      - name: Read hard pages with both OCRs (DeepSeek's and the local model)
+        if: inputs.suite == 'ocr-probe'
+        run: python -m kpi_extractor.evals.ocr_probe --manifest evals/ocr_probe.json
       - name: Score the Classify rules (no AI)
         if: inputs.suite == 'classify'
         run: python -m kpi_extractor.evals.classify_eval
@@ -157,7 +161,7 @@ jobs:
           if [ -n "$LISTS_FROM" ]; then LISTS="--lists-from $(find lists-from -name trial.json | head -1)"; fi
           python -m kpi_extractor.evals.trial --symbols "$SYMBOLS" --quarters "$QUARTERS" $LISTS
       - name: Score against the golden set
-        if: inputs.suite != 'prompts' && inputs.suite != 'trial' && inputs.suite != 'classify' && inputs.suite != 'code-reads'
+        if: inputs.suite != 'prompts' && inputs.suite != 'trial' && inputs.suite != 'classify' && inputs.suite != 'code-reads' && inputs.suite != 'ocr-probe'
         env:
           QUARTERS: ${{ inputs.quarters || '6' }}
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}

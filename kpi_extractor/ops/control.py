@@ -81,6 +81,17 @@ class ControlPlane:
             time.sleep(5)
         return ""
 
+    def ocr(self, symbol: str, purpose: str, filename: str, data: bytes) -> dict:
+        """DeepSeek's OCR of a page or document (text_recognition or rich_layout_recognition): its pages, each with
+        its text and regions' boxes, the call's id, time and cost in yuan. Under test against the local OCR model."""
+        import base64
+
+        response = self.call("ocr", timeout=390, attempts=2, symbol=symbol, purpose=purpose, filename=filename,
+                             file=base64.b64encode(data).decode())
+        if response.get("error"):
+            raise ControlError(f"ocr failed: {str(response['error'])[:300]}")
+        return response
+
     def _oidc_token(self) -> str:
         if self._token and time.monotonic() < self._token[1]:
             return self._token[0]
