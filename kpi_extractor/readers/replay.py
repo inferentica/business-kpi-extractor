@@ -13,7 +13,7 @@ from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from .anchor import anchor_words
 from .extract import _row_label, column_header
 from .quoted_rows import _SLOT, replay_row_line, row_line
-from .row_finder import row_finder
+from .row_finder import row_finder, shows_figure
 from ..rules.identity import sideless_key
 from ..rules.period import DEEP_HEADER_ROWS
 from ..xbrl import member_key
@@ -185,7 +185,7 @@ def missing_since(last: dict[str, dict], keys: set[str], group: str, whole: bool
     """Whether a reading of a group lacks a figure the reference quarter had (a key the current list no longer has,
     from a reading under an older list, is not missing: it is not asked for; nor is a row the filing no longer has)."""
     return any(key.split(".", 1)[0] == group and key not in keys and (whole or key in listed) and not row_gone(document, locator)
-               for key, locator in last.items())
+               and shows_figure(document, locator) for key, locator in last.items())  # a dash this quarter is no figure
 
 
 def _replay_table(document: Document, group: str, parts: list[dict], quarter: int | None = None) -> TableLocator | str:

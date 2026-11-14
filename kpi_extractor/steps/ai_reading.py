@@ -179,8 +179,11 @@ class AiReading:
             validate_groups(trial, self._previous(expected))
             if not all(item.status == "verified" for item in trial):
                 continue
-            if all(self._same_place_as_last(item, expected, document, before := stored.get(f"{group.key}.{item.kpi.key}"))
-                   or self._year_ago_cell_matches(item, document, before) for item in parts):
+            # A row the list lacks, new in a whole table whose rows add up to its stated total (Wells Fargo's "Lease
+            # income"), stands beside rows that are confirmed, as in a year's reading (_confirmed_years).
+            new = {item.kpi.key for item in parts if whole and any(i.is_total for i in items) and f"{group.key}.{item.kpi.key}" not in listed}
+            if all(item.kpi.key in new or self._same_place_as_last(item, expected, document, before := stored.get(f"{group.key}.{item.kpi.key}"))
+                   or self._year_ago_cell_matches(item, document, before) for item in parts) and len(new) < len(parts):
                 confirmed.add(group.key)
         return confirmed
 
