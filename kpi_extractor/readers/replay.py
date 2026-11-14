@@ -13,7 +13,7 @@ from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from .anchor import anchor_words
 from .extract import _row_label, column_header
 from .quoted_rows import _SLOT, replay_row_line, row_line
-from .row_finder import row_finder, shows_figure
+from .row_finder import row_finder, shows_dash, shows_figure
 from ..rules.identity import sideless_key
 from ..rules.period import DEEP_HEADER_ROWS
 from ..xbrl import member_key
@@ -75,9 +75,8 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
     whole is replayed (True: its whole rows as a table; False: every row alone)."""
     tables: dict[str, list[tuple[str, dict]]] = {}
     values: list[Locator] = []
-    # A group is replayed as a whole table when most of its rows were read as one (a row or two beside it read alone, as
-    # JPMorgan's and PNC's are, still replay where they were); a reading that took only a row or two whole beside rows
-    # read one by one (Wells Fargo's "Lease income") replays row by row, each row where it was.
+    # A group read partly whole replays the way most of its rows were read (JPMorgan's tables as tables, Wells Fargo's
+    # "Lease income" beside single rows row by row), unless `as_table` says otherwise.
     whole = Counter(key.split(".", 1)[0] for key, locator in last.items() if locator.get("whole_table"))
     alone = Counter(key.split(".", 1)[0] for key, locator in last.items() if not locator.get("whole_table"))
     for key, locator in last.items():
@@ -85,9 +84,10 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
             tables.setdefault(key.split(".", 1)[0], []).append((key, locator))
             continue
         found = _replay_value(document, key, locator, quarter, alone=len(last) == 1)
-        if isinstance(found, str):
+        if isinstance(found, str) and not (len(last) > 1 and shows_dash(document, locator)):  # a dash: nothing reported
             return found
-        values.append(found)
+        if not isinstance(found, str):
+            values.append(found)
     table_locators = []
     for group, rows in tables.items():
         found = _replay_table(document, group, [locator for _key, locator in rows], quarter)
