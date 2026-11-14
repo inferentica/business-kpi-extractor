@@ -10,25 +10,24 @@ import gc
 import json
 import re
 import time
-from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
 from ..checks.across import cash_against_balances
 from ..checks.arelle import Checks, arelle_summary, enabled as arelle_cache
-from ..domain.basis import BARE_DOLLARS, BARE_PESOS, same_kind
 from ..domain.calendar import ANNUAL_FORMS, year_end_for
 from ..domain.model import REGULATOR_SOURCES
 from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period, summarise
 from ..readers.xbrl.read import read_filing
-from ..selection.choose import _reporting_currencies, choose
+from ..selection.choose import choose
 from ..selection.period_dates import align_dates
 from ..selection.signs import sign_ties
 from ..selection.summaries import choose_summaries, summary_coverage
 from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
 from ..sources.listing import filing_for, list_reports, list_xbrl_sixks
 from ..sources.predecessors import predecessor_companies
+from .currencies import settle_currencies
 from .standards import use_standard_labels
 from ..sources.retry import with_network_retries
 from .prefetch import load_all
@@ -146,8 +145,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
                                          printed_signs))
     _release_bases(readings)
-    _filing_currencies(readings)
-    _bare_currencies(readings)
+    settle_currencies(readings)  # pipeline/currencies.py
     readings = align_dates(readings)
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
     mark = _phase(phases, "second looks", mark)
@@ -219,41 +217,6 @@ def _period_end(ref) -> date | None:
     except Exception:  # noqa: BLE001
         return None
     return None if end is not None and (ref.filed - end).days < 7 else end
-
-
-def _filing_currencies(readings) -> None:
-    """A printed statement that states no currency is in the currency its own filing's XBRL gives the same statement
-    (Brookfield's 40-Fs: their tags are in U.S. dollars, their printed pages name none)."""
-    tagged = {(reading.accession, reading.statement): reading.currency for reading in readings
-              if reading.source == "xbrl" and reading.currency}
-    for reading in readings:
-        if reading.source == "xbrl":
-            continue
-        own = tagged.get((reading.accession, reading.statement))
-        if reading.currency is None or reading.currency in (BARE_DOLLARS, BARE_PESOS) and same_kind(reading.currency, own):
-            reading.currency = own or reading.currency
-
-
-def _bare_currencies(readings) -> None:
-    """A statement printing only "$" or "pesos" is in the company's own reporting currency of that kind that year
-    (Alcon's "($ millions)" in US dollars, Scotiabank's in Canadian dollars, GAP's "thousands of pesos" in Mexican
-    pesos); a year whose annual reports give no single one of that kind leaves it without."""
-    by_year = _reporting_currencies(readings)
-    marked = [(reading, reading.currency) for reading in readings if reading.currency in (BARE_DOLLARS, BARE_PESOS)]
-    for reading, marker in marked:
-        kinds = [currency for currency in by_year.get(reading.fiscal_year, set()) if same_kind(marker, currency)]
-        reading.currency = kinds[0] if len(kinds) == 1 else None
-    # A statement's columns share its one "$": Brookfield's Q2 2001 release prints 2001 beside 2000, and 2000 is in
-    # Canadian dollars (its 2002 annual report, the one presenting it), so 2001 is too, though 2003's report in US
-    # dollars leaves the year itself undecided.
-    decided: dict[tuple, set] = defaultdict(set)
-    for reading, marker in marked:
-        if reading.currency:
-            decided[(reading.accession, reading.statement, marker)].add(reading.currency)
-    for reading, marker in marked:
-        found = decided.get((reading.accession, reading.statement, marker), set())
-        if reading.currency is None and len(found) == 1:
-            reading.currency = next(iter(found))
 
 
 def _release_bases(readings) -> None:

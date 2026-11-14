@@ -3,7 +3,7 @@ from datetime import date
 
 from statement_extractor.domain.basis import BARE_DOLLARS, BARE_PESOS, bare_currency, currencies_named
 from statement_extractor.domain.model import Check, Reading
-from statement_extractor.pipeline.company import _bare_currencies
+from statement_extractor.pipeline.currencies import _bare_currencies
 from statement_extractor.pipeline.printed import _decided
 
 
@@ -174,3 +174,22 @@ def test_a_title_in_the_tables_first_rows_defines_its_signs_and_its_caption_no_h
                                      fiscal_year_end="1231", year_offset=0)
     assert {(r.fiscal_year, r.currency, r.lines[0]["value"]) for r in readings if r.lines and r.lines[0]["value"]} == {
         ("2011", "MXN", 124_066e6), ("2010", "MXN", 102_988e6)}
+
+
+def test_a_statement_naming_no_currency_takes_its_filings_other_statements():
+    from statement_extractor.pipeline.currencies import _sibling_currencies
+    from statement_extractor.domain.basis import stated_currency
+
+    def reading(statement, currency, accession="q3"):
+        return Reading(statement=statement, duration="quarter", fiscal_year="2008", fiscal_period="Q3",
+                       period_end=date(2008, 9, 30), period_start=None, currency=currency, accession=accession,
+                       form="6-K", filed=date(2008, 11, 10), own=True, source="html")
+
+    annual = reading("balance", "BRL", "20-F")
+    annual.form, annual.fiscal_period = "20-F", "FY"
+    found = [annual, reading("balance", "BRL"), reading("income", None), reading("cash_flow", None)]
+    _sibling_currencies(found)
+    assert [item.currency for item in found] == ["BRL"] * 4
+    # GDS's notes: "The condensed consolidated financial statements are presented in Renminbi ("RMB")".
+    assert stated_currency('statements are presented in Renminbi ("RMB")') is None
+    assert stated_currency('The condensed consolidated financial statements are presented in Renminbi ("RMB")') == "CNY"

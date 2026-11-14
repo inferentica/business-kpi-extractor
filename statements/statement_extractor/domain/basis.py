@@ -269,10 +269,11 @@ def is_currency_word(text: str) -> bool:
 
 
 # How a document states the currency of all its figures: Brookfield's "All currency amounts are in United States
-# dollars unless otherwise stated", "the U.S. dollar is the company's reporting currency".
+# dollars unless otherwise stated", "the U.S. dollar is the company's reporting currency", GDS's "The condensed
+# consolidated financial statements are presented in Renminbi".
 _STATED_CURRENCY = re.compile(
     r"\ball\s+(?:currency\s+|dollar\s+|monetary\s+)?(?:amounts|figures)\s+(?:are\s+)?(?:expressed\s+|presented\s+|stated\s+|shown\s+)?"
-    r"in\s+(.{0,50})|\b(?:presentation|reporting)\s+currency\s+(?:is|of)\s+(?:the\s+)?(.{0,40})|"
+    r"in\s+(.{0,50})|\bfinancial\s+statements\s+are\s+(?:presented|expressed|stated)\s+in\s+(.{0,40})|\b(?:presentation|reporting)\s+currency\s+(?:is|of)\s+(?:the\s+)?(.{0,40})|"
     r"([A-Za-z.\s]{0,30}?)\s+is\s+the\s+(?:company|bank|group|corporation)\S*\s+(?:presentation|reporting)\s+currency", re.I)
 
 

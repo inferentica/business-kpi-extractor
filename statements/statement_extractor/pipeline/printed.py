@@ -35,6 +35,7 @@ _ASSET_BACKED = ("EX-33", "EX-34", "EX-35")
 _INTERIM = re.compile(r"\bIAS\s*34\b|\bCPC\s*21\b|\binterim\s+financial\s+report(?:ing)?\b|\b(?:condensed\s+)?(?:consolidated\s+)?"
                       r"interim\s+(?:condensed\s+)?(?:consolidated\s+)?financial\s+statements\b|\bquarterly\s+information\s*\(?ITR\b", re.I)
 _MAX_BYTES = 20_000_000  # a furnished quarterly report runs to a few MB; anything far larger is no statement
+_MAX_ANNUAL_BYTES = 40_000_000  # a bank's annual report runs larger: UBS's 20-Fs of 2015-17 are 28-36 MB
 
 
 def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None = None,
@@ -86,7 +87,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         extension = str(attachment.extension or "").lower()
         content = attachment.content
         content = content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content or "")
-        if len(content) > _MAX_BYTES:
+        if len(content) > (_MAX_ANNUAL_BYTES if ref.form.upper().startswith(ANNUAL_FORMS) else _MAX_BYTES):
             notes.append(f"{attachment.document}: too large to read")
             continue
         printed = "html" if extension in (".htm", ".html") or "<tr" in content[:200_000].lower() else "text"
