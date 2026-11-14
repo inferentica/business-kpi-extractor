@@ -42,9 +42,21 @@ def _listed_kpi(group: GroupSpec, label: str) -> KpiSpec | None:
     return matches[0] if len(matches) == 1 else None
 
 
+_SIDE = re.compile(r"\s*\((?:gains?|losses?)\)", re.I)
+_SIDE_WORD = re.compile(r"\b(?:gains?|losses?)\b", re.I)
+
+
+def sideless_key(label: str) -> str:
+    """A table row's identity from one quarter to the next, the side of a gain or loss left out: a company names the
+    side its figure fell on (Wells Fargo's "Net gains (losses) from trading activities", then "Net gains from trading
+    activities", "Net losses from equity securities"). Used only where no row has the exact label."""
+    return member_key(_SIDE_WORD.sub("gl", _SIDE.sub("", label)))
+
+
 def kept_key(group: GroupSpec, locator, label: str) -> KpiSpec | None:
     """The listed KPI a replayed table's row was last quarter, when its label alone names none (PNC's "Other")."""
-    key = getattr(locator, "_row_keys", {}).get(member_key(label))
+    keys = getattr(locator, "_row_keys", {})
+    key = keys.get(member_key(label)) or keys.get(sideless_key(label))
     return next((kpi for kpi in group.kpis if kpi.key == key and kpi.key != group.total_kpi), None)
 
 

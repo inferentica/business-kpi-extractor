@@ -13,6 +13,8 @@ from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from .anchor import anchor_words
 from .extract import _row_label, column_header
 from .quoted_rows import _SLOT, replay_row_line, row_line
+from .row_finder import row_finder
+from ..rules.identity import sideless_key
 from ..rules.period import DEEP_HEADER_ROWS
 from ..xbrl import member_key
 
@@ -45,7 +47,8 @@ def _same_place(now: dict, before: dict) -> bool:
     if "quote" in now and "quote" in before:
         return _template(now["quote"]) == _template(before["quote"])
     if "row_label" in now and "row_label" in before:
-        return clean(now["row_label"]).lower() == clean(before["row_label"]).lower() and bool(now["row_label"])
+        return bool(now["row_label"]) and (clean(now["row_label"]).lower() == clean(before["row_label"]).lower()
+                                           or sideless_key(now["row_label"]) == sideless_key(before["row_label"]))
     return False
 
 
@@ -84,8 +87,8 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
         if isinstance(found, str):
             return found
         # Each row keyed as last quarter's reading keyed it, where its label does not name a listed KPI by itself.
-        found._row_keys = {member_key(locator["row_label"]): key.split(".", 1)[1] for key, locator in rows
-                           if locator.get("row_label")}
+        found._row_keys = {label_key(locator["row_label"]): key.split(".", 1)[1] for key, locator in rows
+                           if locator.get("row_label") for label_key in (sideless_key, member_key)}
         table_locators.append(found)
     return Located(period_end=reported_period(document, expected).isoformat(), tables=table_locators, values=values)
 
@@ -115,6 +118,10 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
     for table in _tables_by_preference(document, locator.get("table")):
         rows = [index for index, row in enumerate(table.rows)
                 if clean(_row_label(row, col)).lower() == label and parse_number(table.cell(index, col))]
+        if not rows:  # renamed for the side its figure fell on ("Net gains (losses) from …", then "Net gains from …")
+            rows = [index for index, row in enumerate(table.rows)
+                    if sideless_key(_row_label(row, col)) == sideless_key(label) and parse_number(table.cell(index, col))][:2]
+            rows = rows if len(rows) == 1 else []
         if len(rows) > 1 and locator.get("row") in rows and _same_span_above(table, int(locator["row"]), col):
             # A label the table repeats once per section (Mastercard's "Worldwide" under each card program, then again
             # for six months): the row where it sat last quarter, while no row above it opens another period's section.
@@ -159,7 +166,7 @@ def row_gone(document: Document, locator: dict) -> bool:
     if not label:
         return False
     keys, text = _labels_of(document)
-    return member_key(label) not in keys and label.lower() not in text
+    return member_key(label) not in keys and sideless_key(label) not in keys and label.lower() not in text
 
 
 def _labels_of(document: Document) -> tuple[set[str], str]:
@@ -167,7 +174,8 @@ def _labels_of(document: Document) -> tuple[set[str], str]:
     hundred tables: scanning them for each row took a document's replay from 120 ms to 300 ms at the 90th percentile)."""
     cached = getattr(document, "_labels_cache", None)
     if cached is None:
-        keys = {member_key(cell) for table in document.tables.values() for row in table.rows for cell in row[:3] if cell}
+        keys = {key(cell) for table in document.tables.values() for row in table.rows for cell in row[:3] if cell
+                for key in (member_key, sideless_key)}
         cached = (keys, "\n".join(block.text.lower() for block in document.blocks.values()))
         object.__setattr__(document, "_labels_cache", cached)
     return cached
@@ -188,19 +196,18 @@ def _replay_table(document: Document, group: str, parts: list[dict], quarter: in
     misses = []  # why each table that has the rows does not give them, last quarter's first
     # A row the filing no longer has anywhere is gone, not unread (TSMC dropped its 10-nanometer row in 2024): the rest
     # are replayed, and still stand only where they add up to the total.
-    wanted = {member_key(part["row_label"]) for part in parts if not row_gone(document, part)}
+    wanted = {part["row_label"] for part in parts if not row_gone(document, part)}
     if len(wanted) < 2:
         return "table rows not found"
     total_label = first["total_row_label"]
     for table in _tables_by_preference(document, first.get("table")):
-        rows: dict[str, int] = {}
-        for index, row in enumerate(table.rows):
-            if parse_number(table.cell(index, col)) is not None:
-                rows.setdefault(member_key(_row_label(row, col)), index)
-        total_row = rows.get(member_key(total_label)) if total_label else None
-        if not wanted <= rows.keys() or (total_label and total_row is None):
+        # A row with a figure, or a dash for none this quarter (Wells Fargo's "Net gains from debt securities"): it is
+        # still the table's row, and the rest of the table is read.
+        at = row_finder(table, col)
+        total_row = at(total_label) if total_label else None
+        indexes = [at(label) for label in wanted]
+        if None in indexes or (total_label and total_row is None):
             continue
-        indexes = [rows[key] for key in wanted]
         first_row, last_row = min(indexes), max(indexes)
         if total_row is not None and total_row > last_row:
             last_row = total_row - 1  # rows added since last quarter (a new node) sit above the total

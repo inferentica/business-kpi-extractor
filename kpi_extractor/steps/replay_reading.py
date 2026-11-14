@@ -14,6 +14,7 @@ from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
 from ..readers.quoted_rows import row_line
+from ..readers.row_finder import shows_figure
 from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, chosen_by_number, comparable_header,
                               missing_since, replay, reported_period, stated_total)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
@@ -112,8 +113,19 @@ class ReplayReading:
                     for key, locator in mine.items() if key in listed and key not in yearly]
                 missed("a listed KPI not looked for yet", len(unlooked))
             elif unlooked and not any(locator.get("whole_table") for locator in mine.values()):
-                missed("a listed KPI not looked for yet")
-                continue
+                # A row the nearest reading lacked because it showed a dash that quarter (Wells Fargo's "Net gains from
+                # debt securities") was read within the year: looked for at that place, and left out where this filing
+                # gives it no figure either. With no such reading the AI looks for it, as before.
+                earlier = {key: value["locator"] for key in unlooked if (value := history.get(key)) and value.get("locator")
+                           and value["validation_status"] == "verified" and value["fiscal_period"] != "FY"
+                           and value["period_end"] >= oldest}
+                if earlier.keys() != unlooked:
+                    missed("a listed KPI not looked for yet")
+                    continue
+                found = {key: locator for key, locator in earlier.items() if shows_figure(document, locator)}
+                last.update(found)  # this document's places (self._local.places), where its figures are confirmed
+                mine = {**mine, **found}
+                parts = [(mine, Spec.model_validate({"groups": [group.model_dump()]}), group.key)]
             else:
                 parts = [(mine, Spec.model_validate({"groups": [group.model_dump()]}), group.key)]
             for locators, part, key in parts:

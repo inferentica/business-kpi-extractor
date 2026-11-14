@@ -927,3 +927,86 @@ def test_one_of_several_tables_is_the_one_whose_year_ago_cell_holds_the_stored_f
     # Tables with no year-ago cell (Coca-Cola's changes): nothing contradicts last quarter's table, so it stands.
     shows_year_ago.clear()
     assert choose(1_200)[1][0].value == 1_337
+
+
+def _noninterest(trading: str, debt: str, equity: str = "Net gains (losses) from equity securities",
+                 figures: tuple = (1_148, 1_033, 1_342, -357, 233)) -> str:
+    # Wells Fargo's supplement, its noninterest income: rows named for the side their figure fell on, a dash for none.
+    deposit, card, gains, losses, other = figures
+    total = deposit + card + gains + losses + other + (int(debt) if debt.isdigit() else 0)
+    cell = lambda n: f"({-n:,})" if n < 0 else f"{n:,}"
+    return f"""<table><tr><td>(in millions)</td><td>Mar 31,2023</td><td>Dec 31,2022</td></tr>
+<tr><td>Deposit-related fees</td><td>{cell(deposit)}</td><td>1,178</td></tr><tr><td>Card fees</td><td>{cell(card)}</td><td>1,095</td></tr>
+<tr><td>{trading}</td><td>{cell(gains)}</td><td>552</td></tr><tr><td>Net gains from debt securities</td><td>{debt}</td><td>—</td></tr>
+<tr><td>{equity}</td><td>{cell(losses)}</td><td>(733)</td></tr><tr><td>Other</td><td>{cell(other)}</td><td>818</td></tr>
+<tr><td>Total noninterest income</td><td>{cell(total)}</td><td>2,910</td></tr></table>"""
+
+
+NONINTEREST = Spec.model_validate({"groups": [{"key": "noninterest", "label": "Noninterest Income by Type", "kind": "revenue_breakdown",
+    "total_kpi": "total", "kpis": [{"key": "deposit", "label": "Deposit-Related Fees", "unit": "currency"},
+    {"key": "card", "label": "Card Fees", "unit": "currency"}, {"key": "trading", "label": "Trading Gains", "unit": "currency"},
+    {"key": "debt", "label": "Debt Securities Gains", "unit": "currency"}, {"key": "equity", "label": "Equity Securities Gains", "unit": "currency"},
+    {"key": "other", "label": "Other", "unit": "currency"}, {"key": "total", "label": "Total Noninterest Income", "unit": "currency"}]}]})
+
+
+def test_a_row_renamed_for_the_side_its_figure_fell_on_is_still_last_quarters_row():
+    # Last quarter "Net gains (losses) from trading activities"; this quarter "Net gains from trading activities", and
+    # "Net losses from equity securities". A dash on debt securities leaves that row without a figure, not the table.
+    from kpi_extractor.readers.replay import _replay_value
+    from kpi_extractor.rules.identity import sideless_key
+    assert sideless_key("Net gains (losses) from trading activities") == sideless_key("Net gains from trading activities") \
+        == sideless_key("Net losses from trading activities")
+    document = parse_document(_noninterest("Net gains from trading activities", "—", "Net losses from equity securities"), URL.format(n=8))
+    table = next(iter(document.tables))
+    place = lambda row, label: {"table": table, "row": row, "col": 1, "row_label": label, "whole_table": True, "scale": 1e6,
+                                "header": R_column_header(document.tables[table], 1, 1), "total_row_label": "Total noninterest income"}
+    last = {"noninterest.deposit": place(1, "Deposit-related fees"), "noninterest.card": place(2, "Card fees"),
+            "noninterest.trading": place(3, "Net gains (losses) from trading activities"),
+            "noninterest.debt": place(4, "Net gains from debt securities"),
+            "noninterest.equity": place(5, "Net gains (losses) from equity securities"), "noninterest.other": place(6, "Other")}
+    located = replay(document, last, date(2023, 3, 31), quarter=1)
+    values, _problems = read_values(document, NONINTEREST, located, "USD")
+    assert {value.kpi.key: value.value for value in values if not value.is_total} == {
+        "deposit": 1148e6, "card": 1033e6, "trading": 1342e6, "equity": -357e6, "other": 233e6}
+    # One row at a time, the same: the renamed row is found where only one row has its sign-free label.
+    one = _replay_value(document, "noninterest.trading", {"table": table, "row": 3, "col": 1, "scale": 1e6,
+                        "row_label": "Net gains (losses) from trading activities", "header": R_column_header(document.tables[table], 1, 1)})
+    assert not isinstance(one, str) and one.row == 3
+
+
+def test_a_gain_and_a_loss_row_side_by_side_are_never_taken_for_each_other():
+    from kpi_extractor.readers.row_finder import row_finder
+    table = Table("T0", "", [["", "2023"], ["Gains on sales of loans", "12"], ["Losses on sales of loans", "(4)"]])
+    at = row_finder(table, 1)
+    assert at("Gains on sales of loans") == 1 and at("Losses on sales of loans") == 2
+    assert at("Gains (losses) on sales of loans") is None  # two rows answer to it: neither is assumed
+
+
+def test_a_row_last_read_before_a_dash_quarter_is_looked_for_again_without_the_ai():
+    # Wells Fargo's Q1 2023 reading lacked debt securities (a dash that quarter); Q2 held the whole group back for a
+    # listed KPI "not looked for yet". Its Q4 2022 place is looked at again: read where it gives a figure, left out
+    # where it shows a dash again, and either way the group is replayed by code.
+    def rows(document, period_end, keys):
+        table = next(iter(document.tables))
+        located = ai.Located.model_validate({"period_end": period_end, "values": [
+            {"kpi": f"noninterest.{key}", "table": table, "row": row, "col": 1}
+            for key, row in keys.items()] + [{"kpi": "noninterest.total", "table": table, "row": 7, "col": 1}]})
+        items, problems = read_values(document, NONINTEREST, located, "USD")
+        assert problems == []
+        quarter = {"2022-12-31": ("2022", "Q4", "q0"), "2023-03-31": ("2023", "Q1", "q1")}[period_end]
+        return [{"group_key": f"kpi_{item.group.key}", "kpi_key": item.kpi.key, "fiscal_year": quarter[0], "fiscal_period": quarter[1],
+                 "period_end": period_end, "method": "ai", "validation_status": "verified", "value": item.value,
+                 "locator": item.locator, "group_label": item.group.label, "kpi_label": item.kpi.label,
+                 "source_url": URL.format(n=1), "source_accession": quarter[2]} for item in items if not item.is_total]
+    shown = parse_document(_noninterest("Net gains (losses) from trading activities", "6", figures=(1_178, 1_095, 552, -733, 818)), URL.format(n=1))
+    dash = parse_document(_noninterest("Net gains from trading activities", "—"), URL.format(n=1))
+    every = {"deposit": 1, "card": 2, "trading": 3, "equity": 5, "other": 6}
+    history = rows(shown, "2022-12-31", {**every, "debt": 4}) + rows(dash, "2023-03-31", every)
+    for now, debt in (("9", 9e6), ("—", None)):
+        document = parse_document(_noninterest("Net gains from trading activities", now, figures=(1_180, 1_050, 1_400, -300, 240)), URL.format(n=2))
+        control = NoAi()
+        pipeline = _pipeline(control, history)
+        pipeline.profile = SimpleNamespace(name="Wells Fargo", fiscal_year_end="1231", foreign=False)
+        read, _problems, _ = pipeline._read(lambda: "prompt", document, NONINTEREST, date(2023, 6, 30), version=1)
+        assert control.calls == [] and pipeline.result.replay_outcomes == {"replayed": 1}
+        assert {item.kpi.key: item.value for item in read if not item.is_total}.get("debt") == debt
