@@ -6,7 +6,7 @@ from concurrent.futures import Future
 from datetime import date
 
 from ..documents.document import Document, parse_document
-from ..documents.image_pages import image_sources, read_image_pages
+from ..documents.image_pages import picture_pages, read_image_pages
 from ..domain.fiscal import learn_year_offset, offset_lead
 from ..readers.trace import untraced
 from ..sources.base import FilingRef
@@ -114,8 +114,8 @@ class FilingLoading:
         """An exhibit whose pages are only pictures, as the figures two OCR models read alike (documents/image_pages.py);
         any other exhibit, or a run with no OCR (code reads, dry runs), as it is."""
         text = raw.decode("utf-8", "ignore") if isinstance(raw, bytes) else raw
-        sources = image_sources(text, url)
-        if not sources or not callable(getattr(self.control, "ocr", None)):
+        pictures = picture_pages(text, url)
+        if not pictures or not callable(getattr(self.control, "ocr", None)):
             return raw
         from ..readers.charts import ocr_words  # heavy; loaded only for picture pages
 
@@ -128,10 +128,15 @@ class FilingLoading:
                     return found, purpose == "rich_layout_recognition"
             return "", False
 
-        html_text, totals = read_image_pages(sources[:_MAX_PICTURE_PAGES], _fetch_page, deepseek,
-                                             lambda data: ocr_words(data, (0, 0), 2), _picture_size, _MIN_PAGE_PIXELS)
+        pictures = pictures[:_MAX_PICTURE_PAGES]
+        pages, totals = read_image_pages([source for _tag, source in pictures], _fetch_page, deepseek,
+                                         lambda data: ocr_words(data, (0, 0), 2), _picture_size, _MIN_PAGE_PIXELS)
         self.log(f"{self.symbol}: picture pages of {url.rsplit('/', 1)[-1]} read by two OCR models: {totals}")
-        return html_text if totals.get("pages") else raw
+        # Each page's agreed text stands where its picture stood, so the exhibit's own words keep their order.
+        for tag, source in pictures:
+            if source in pages:
+                text = text.replace(tag, pages[source], 1)
+        return text if pages else raw
 
 
 # A deck of picture pages is read to this many pages (Itaú's quarterly book runs to 494 pictures).
