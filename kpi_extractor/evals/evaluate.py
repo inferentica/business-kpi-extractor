@@ -77,6 +77,9 @@ class EvalControl:
     def ai(self, *args, **kwargs) -> str:
         return self.plane.ai(*args, **kwargs)
 
+    def ocr(self, *args, **kwargs) -> dict:
+        return self.plane.ocr(*args, **kwargs)
+
 
 def evaluate_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolResult, list[dict], dict | None]:
     """One company in its own process; what it would have stored comes back with its result."""

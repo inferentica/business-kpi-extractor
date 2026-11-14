@@ -6,6 +6,7 @@ from concurrent.futures import Future
 from datetime import date
 
 from ..documents.document import Document, parse_document
+from ..documents.image_pages import image_sources, read_image_pages
 from ..domain.fiscal import learn_year_offset, offset_lead
 from ..readers.trace import untraced
 from ..sources.base import FilingRef
@@ -99,7 +100,7 @@ class FilingLoading:
                 raw = self._waiting(self._exhibit(exhibit).result)
                 if raw is None:
                     continue
-                part = parse_document(raw, exhibit.url, prefix=f"{string.ascii_uppercase[index]}_")
+                part = parse_document(self._pictures_read(raw, exhibit.url), exhibit.url, prefix=f"{string.ascii_uppercase[index]}_")
                 if combined is None:
                     combined = part
                 else:
@@ -108,3 +109,46 @@ class FilingLoading:
                 raise ValueError("no readable exhibit")
             self._documents[key] = combined
         return self._documents[key]
+
+    def _pictures_read(self, raw: bytes | str, url: str) -> bytes | str:
+        """An exhibit whose pages are only pictures, as the figures two OCR models read alike (documents/image_pages.py);
+        any other exhibit, or a run with no OCR (code reads, dry runs), as it is."""
+        text = raw.decode("utf-8", "ignore") if isinstance(raw, bytes) else raw
+        sources = image_sources(text, url)
+        if not sources or not callable(getattr(self.control, "ocr", None)):
+            return raw
+        from ..readers.charts import ocr_words  # heavy; loaded only for picture pages
+
+        def deepseek(name: str, data: bytes) -> tuple[str, bool]:
+            # A page DeepSeek returns empty in one mode came back in the other in the probe; regions only in the first.
+            for purpose in ("rich_layout_recognition", "text_recognition"):
+                pages = self.control.ocr(self.symbol, purpose, name, data).get("pages") or []
+                found = "".join(page.get("text") or "" for page in pages)
+                if found.strip():
+                    return found, purpose == "rich_layout_recognition"
+            return "", False
+
+        html_text, totals = read_image_pages(sources[:_MAX_PICTURE_PAGES], _fetch_page, deepseek,
+                                             lambda data: ocr_words(data, (0, 0), 2), _picture_size, _MIN_PAGE_PIXELS)
+        self.log(f"{self.symbol}: picture pages of {url.rsplit('/', 1)[-1]} read by two OCR models: {totals}")
+        return html_text if totals.get("pages") else raw
+
+
+# A deck of picture pages is read to this many pages (Itaú's quarterly book runs to 494 pictures).
+_MAX_PICTURE_PAGES = 60
+# Pictures smaller than this are logos, icons and bullets, never a page.
+_MIN_PAGE_PIXELS = 400
+
+
+def _fetch_page(link: str) -> bytes:
+    from .chart_slides import _fetch_image
+
+    return _fetch_image(link)
+
+
+def _picture_size(data: bytes) -> tuple[int, int]:
+    import io
+
+    from PIL import Image
+
+    return Image.open(io.BytesIO(data)).size
