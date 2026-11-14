@@ -42,13 +42,15 @@ def _number(raw) -> float | None:
 
 
 def run(url: str, cache: str) -> dict:
-    from arelle import XbrlConst
+    from arelle import ValidateXbrlCalcs, XbrlConst
     from arelle.api.Session import Session
     from arelle.logging.handlers.StructuredMessageLogHandler import StructuredMessageLogHandler
     from arelle.RuntimeOptions import RuntimeOptions
 
     started = time.time()
-    options = RuntimeOptions(entrypointFile=url, calcs="c11r", validate=True, keepOpen=True, cacheDirectory=cache,
+    # Loaded without validating the taxonomies themselves (a third of Arelle's time on a filing), then only the
+    # calculation check: the same inconsistencies as a full validation's.
+    options = RuntimeOptions(entrypointFile=url, validate=False, keepOpen=True, cacheDirectory=cache,
                              httpUserAgent=os.environ.get("SEC_USER_AGENT", "TradeTracker admin@inferentica.com"))
     handler = StructuredMessageLogHandler()
     with Session() as session:
@@ -68,17 +70,17 @@ def run(url: str, cache: str) -> dict:
             facts.append([_concept(fact.qname), start, end, bool(fact.context.qnameDims), value,
                           fact.decimals if fact.decimals not in (None, "INF") else None])
         calc = []
-        for record in handler.logRecordBuffer:
-            if not str(getattr(record, "messageCode", "")).startswith("calc11e:inconsistentCalculation"):
+        ValidateXbrlCalcs.init()
+        for found in ValidateXbrlCalcs.validate(model, ValidateXbrlCalcs.ValidateCalcsMode.ROUND_TO_NEAREST):
+            if not str(found.codes).startswith("calc11e:inconsistentCalculation"):
                 continue
-            args = record.args if isinstance(record.args, dict) else {}
-            context = model.contexts.get(str(args.get("contextID", "")))
-            if context is None or " - Statement - " not in str(args.get("linkroleDefinition", "")):
+            context = model.contexts.get(str(found.args.get("contextID", "")))
+            if context is None or " - Statement - " not in str(found.args.get("linkroleDefinition", "")):
                 continue  # a note's or schedule's sum, not one of the statements' (EDGAR's role definitions)
             start, end = _when(context)
-            calc.append([str(args.get("concept", "")).replace(":", "_", 1), start, end, bool(context.qnameDims),
-                         str(args.get("reportedSum", "")), str(args.get("computedSum", "")),
-                         str(args.get("linkrole", ""))])
+            calc.append([str(found.args.get("concept", "")).replace(":", "_", 1), start, end, bool(context.qnameDims),
+                         str(found.args.get("reportedSum", "")), str(found.args.get("computedSum", "")),
+                         str(found.args.get("linkrole", ""))])
         sums = sorted({_concept(relation.fromModelObject.qname)
                        for arcrole in XbrlConst.summationItems
                        for relation in model.relationshipSet(arcrole).modelRelationships

@@ -30,16 +30,24 @@ def load_facts(xbrl):
     return None if facts is None or getattr(facts, "empty", True) else facts
 
 
-def consolidated_figures(facts) -> set[tuple[str, str]]:
-    """(concept, period) of every figure tagged for the company as a whole. A line whose figure for a period exists only
-    for a part of it (JPM's memo of consolidated VIEs' assets and liabilities, "included in the line items above") is
-    not a line of that period's statement: counted as one, it is counted twice."""
+def consolidated_figures(facts) -> dict[tuple[str, str], dict[float, str | None]]:
+    """(concept, period) of every figure tagged for the company as a whole, with its values (and their decimals). A line
+    whose figure for a period exists only for a part of it (JPM's memo of consolidated VIEs' assets and liabilities,
+    "included in the line items above") is not a line of that period's statement: counted as one, it is counted twice.
+    A line edgartools fills from a part's fact while the company's own is tagged too takes the company's (Omega's Q3
+    2012 acquisition costs: $483,000 for the company, $500,000 in a note on one deal)."""
     if facts is None or "is_dimensioned" not in facts or "period_key" not in facts:
-        return set()
+        return {}
     plain = facts[facts["is_dimensioned"] != True]  # noqa: E712 - pandas mask
+    values = plain["numeric_value"] if "numeric_value" in plain else [None] * len(plain)
+    places = plain["decimals"] if "decimals" in plain else [None] * len(plain)
+    figures: dict[tuple[str, str], dict[float, str | None]] = {}
     # Period keys as the rows carry them, without the line breaks some filings' keys hold (Omega's 10-Ks of 2015-18).
-    return {(str(concept).replace(":", "_", 1), re.sub(r"\s+", "", str(key)))
-            for concept, key in zip(plain["concept"], plain["period_key"])}
+    for concept, key, value, place in zip(plain["concept"], plain["period_key"], values, places):
+        found = figures.setdefault((str(concept).replace(":", "_", 1), re.sub(r"\s+", "", str(key))), {})
+        if (amount := number(value)) is not None:
+            found.setdefault(amount, None if place is None else str(place))
+    return figures
 
 
 class ReportingCurrency:

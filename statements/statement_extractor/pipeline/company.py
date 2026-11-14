@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 
 from ..checks.across import cash_against_balances
-from ..checks.arelle import ARELLE_BUDGET, arelle_summary, check_filing, enabled as arelle_cache
+from ..checks.arelle import Checks, arelle_summary, enabled as arelle_cache
 from ..domain.basis import BARE_DOLLARS, BARE_PESOS, same_kind
 from ..domain.calendar import ANNUAL_FORMS, year_end_for
 from ..domain.model import REGULATOR_SOURCES
@@ -56,6 +56,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     mark = _phase(phases, "reports download", mark)
     annual_ends = [end for ref in reports if ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None]
     year_ends = {ref.accession: year_end_for(_period_end(ref), annual_ends, profile.fiscal_year_end) for ref in reports}
+    arelle = Checks(cache) if (cache := arelle_cache()) else None
     for ref in reports:
         fiscal_year_end = year_ends[ref.accession]
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False}
@@ -104,10 +105,8 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
                        **own_period(own, ref.form),
                        "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
                        "columns": len(found), "notes": notes})
-        if (cache := arelle_cache()) and found and phases.get("arelle", 0.0) < ARELLE_BUDGET:
-            checked = time.time()  # Arelle's second reading of the filing, a check only (checks/arelle.py)
-            record["arelle"] = check_filing(ref.filing, found, cache)
-            phases["arelle"] = round(phases.get("arelle", 0.0) + time.time() - checked, 1)
+        if arelle and found:
+            arelle.submit(ref.filing, found, record)  # Arelle's second reading of the filing, a check only
         filings.append(record)
         readings.extend(found)
         log(f"{symbol}: {ref.form} {ref.filed} {len(found)} columns, own {[f'{s}/{d}:{st}' for s, d, st in record['own']]}")
@@ -115,6 +114,9 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         ref.filing = None
         gc.collect()
     mark = _phase(phases, "reports read", mark)
+    if arelle:
+        arelle.finish()
+        mark = _phase(phases, "arelle", mark)  # the wait for Arelle after the reader's last filing
     if profile.foreign or any(ref.form in ("20-F", "40-F") for ref in reports):
         records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log, phases, predecessors)
         filings.extend(records)

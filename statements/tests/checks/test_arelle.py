@@ -3,7 +3,7 @@ them: no Arelle or network needed."""
 from datetime import date
 from types import SimpleNamespace
 
-from statement_extractor.checks.arelle import Facts, check_filing, compare, instance_url
+from statement_extractor.checks.arelle import Checks, Facts, check_filing, compare, instance_url
 from statement_extractor.domain.model import Reading
 
 
@@ -94,3 +94,28 @@ def test_a_filing_arelle_cannot_read_leaves_its_readings_unchecked(monkeypatch):
     record = check_filing(filing, [reading], "cache")
     assert record["error"].startswith("timed out") and reading.arelle is None
     assert reading.status == "unproven"  # Arelle never decides a status
+
+
+def test_an_opening_balance_tagged_on_the_periods_first_day_matches():
+    # Visteon's fresh start: the successor's opening cash tagged at 2010-10-01, the day its period starts.
+    flows = _reading("cash_flow", date(2010, 10, 1), date(2010, 12, 31), [
+        _line("us-gaap_CashAndCashEquivalentsAtCarryingValue", 866e6), _line("us-gaap_CashAndCashEquivalentsAtCarryingValue", 905e6)])
+    facts = Facts({"facts": [["us-gaap_CashAndCashEquivalentsAtCarryingValue", None, "2010-10-01", False, 866e6, "-6"],
+                             ["us-gaap_CashAndCashEquivalentsAtCarryingValue", None, "2010-12-31", False, 905e6, "-6"]]})
+    assert compare(flows, facts)["facts"] == "pass"
+
+
+def test_filings_past_the_companys_budget_are_left_unchecked(monkeypatch):
+    import statement_extractor.checks.arelle as arelle
+    monkeypatch.setattr(arelle, "run_arelle", lambda url, cache, timeout=300: {"facts": [], "seconds": 1.0})
+    checks = Checks("cache")
+    filing = SimpleNamespace(attachments=SimpleNamespace(data_files=[_attachment("x.xml", "EX-101.INS")]))
+    first, late = {}, {}
+    checks.submit(filing, [_reading("balance", None, date(2025, 12, 31), [_line("us-gaap_Assets", 1.0)])], first)
+    checks.finish()
+    checks = Checks("cache")
+    checks.deadline = 1.0  # long past
+    checks.submit(filing, [_reading("balance", None, date(2025, 12, 31), [_line("us-gaap_Assets", 1.0)])], late)
+    checks.finish()
+    assert "error" not in first["arelle"] and first["arelle"]["url"].endswith("x.xml")
+    assert late["arelle"]["error"].startswith("over")

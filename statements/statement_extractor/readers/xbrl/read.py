@@ -81,7 +81,7 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
 
 
 def _read_column(name: str, rows: list[dict], period: Period, instants: dict[date, str], arcs, currency,
-                 consolidated: set[tuple[str, str]], labelled: tuple[str, str, str]) -> Reading | None:
+                 consolidated: dict[tuple[str, str], dict], labelled: tuple[str, str, str]) -> Reading | None:
     fiscal_year, fiscal_period, duration = labelled
     lines: list[dict] = []
     column = Column()
@@ -114,9 +114,13 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
                 # opening and closing balances of a flow statement are kept: a filer can tag the company's own balance
                 # under a stray dimension (Prudential's 2026 cash), and the cash roll-forward checks them anyway.
                 continue
+            places = (row.get("decimals") or {}).get(key)
+            own = consolidated.get((concept, key)) or {}
+            if len(own) == 1 and raw not in own and -raw not in own:
+                (raw, places), = own.items()  # the company's own figure, not a part's (facts.consolidated_figures)
             when = parse_period(key).end.isoformat()
             raw = currency.value(concept, when, raw)
-            figure = Figure(raw, decimals((row.get("decimals") or {}).get(key)))
+            figure = Figure(raw, decimals(places))
             sign = number((row.get("preferred_signs") or {}).get(key)) or 1.0
             value = raw * sign
             if period.start is not None and row.get("_balance") == "opening":

@@ -221,3 +221,27 @@ def test_a_balance_broken_down_in_a_flow_statement_opens_or_closes_with_its_line
     flows = next(r for r in readings if r.statement == "cash_flow" and r.own)
     assert [line["value"] for line in flows.lines if line.get("member")] == [1_000e6, 2_000e6]
     assert flows.status == "kept"
+
+
+def test_a_line_filled_from_a_parts_fact_takes_the_companys_own():
+    import pandas as pd
+    x = fake_xbrl()
+    facts = []
+    for statement in (x.statements.income_statement(), x.statements.balance_sheet(), x.statements.cash_flow_statement()):
+        for item in statement.rows:
+            for key, value in item["values"].items():
+                facts.append({"concept": item["concept"].replace("_", ":", 1), "period_key": key, "is_dimensioned": False,
+                              "numeric_value": value, "decimals": "-6"})
+    # Omega's Q3 2012: acquisition costs of $483,000 for the company, and $0.5 million in a note on one deal, which
+    # edgartools put on the statement's line.
+    x.statements.income_statement().rows.append(row("us-gaap_BusinessCombinationAcquisitionRelatedCosts", {FY09: 500e3}))
+    facts += [{"concept": "us-gaap:BusinessCombinationAcquisitionRelatedCosts", "period_key": FY09,
+               "is_dimensioned": False, "numeric_value": 483e3, "decimals": "-3"},
+              {"concept": "us-gaap:BusinessCombinationAcquisitionRelatedCosts", "period_key": FY09,
+               "is_dimensioned": True, "numeric_value": 500e3, "decimals": "-5"}]
+    x.facts = SimpleNamespace(to_dataframe=lambda: pd.DataFrame(facts))
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    income = next(r for r in readings if r.statement == "income" and r.own)
+    costs = next(line for line in income.lines if line["concept"] == "us-gaap_BusinessCombinationAcquisitionRelatedCosts")
+    assert costs["value"] == 483e3
+    assert next(line for line in income.lines if line["concept"] == "us-gaap_SalesRevenueNet")["value"] == 36_537e6

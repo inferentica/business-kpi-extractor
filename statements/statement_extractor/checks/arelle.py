@@ -13,16 +13,19 @@ from __future__ import annotations
 
 import json
 import os
-from collections import Counter
-from pathlib import Path
 import subprocess
 import sys
+import time
+from collections import Counter
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import timedelta
+from pathlib import Path
 
 from ..domain.model import FAIL, NONE, PASS
 
 TIMEOUT = 300  # seconds for one filing; one that takes longer is left unchecked
 ARELLE_BUDGET = 2700  # seconds of Arelle per company; filings after it are left unchecked
+WORKERS = 3  # filings Arelle reads at once, beside the reader (each in a process of its own)
 
 
 def instance_url(filing) -> str | None:
@@ -73,7 +76,10 @@ class Facts:
         keys = [(None, end)]
         if reading.period_start is not None:
             before = (reading.period_start - timedelta(days=1)).isoformat()
-            keys = [(reading.period_start.isoformat(), end), (None, end), (None, before)]  # opening and closing cash
+            # Opening and closing cash: a filer tags the opening balance on the day before the period or on its first
+            # day (Visteon's 2010 fresh start, Lloyds' 2017 restated cash).
+            keys = [(reading.period_start.isoformat(), end), (None, end), (None, before),
+                    (None, reading.period_start.isoformat())]
         return [value for start, stop in keys for value in self.values.get((_local(concept), start, stop, member), [])]
 
 
@@ -108,9 +114,10 @@ def compare(reading, facts: Facts) -> dict:
 def check_filing(filing, readings: list, cache: str) -> dict:
     """Arelle's verdicts on every column read from one filing, set on each reading's `arelle`; the filing's record."""
     url = instance_url(filing)
-    if not url:
-        return {"error": "no instance"}
-    result = run_arelle(url, cache)
+    return _verdicts(url, run_arelle(url, cache) if url else {"error": "no instance"}, readings)
+
+
+def _verdicts(url: str | None, result: dict, readings: list) -> dict:
     record = {"seconds": result.get("seconds"), "url": url}
     if "error" in result:
         record["error"] = result["error"]
@@ -121,6 +128,36 @@ def check_filing(filing, readings: list, cache: str) -> dict:
     record.update({"facts": len(result.get("facts", [])), "inconsistent": len(result.get("calc", [])),
                    "errors": result.get("errors", {})})
     return record
+
+
+class Checks:
+    """A company's filings through Arelle, WORKERS at a time while the reader goes on, within ARELLE_BUDGET seconds of
+    the first: a filing still waiting then is left unchecked."""
+
+    def __init__(self, cache: str):
+        self.cache = cache
+        self.pool = ThreadPoolExecutor(WORKERS)
+        self.pending: list[tuple[dict, Future]] = []
+        self.deadline: float | None = None
+
+    def submit(self, filing, readings: list, record: dict) -> None:
+        url = instance_url(filing)  # here, while the reader still holds the filing
+        self.deadline = self.deadline or time.time() + ARELLE_BUDGET
+        self.pending.append((record, self.pool.submit(self._check, url, readings)))
+
+    def _check(self, url: str | None, readings: list) -> dict:
+        left = (self.deadline or 0) - time.time()
+        if not url:
+            return _verdicts(url, {"error": "no instance"}, readings)
+        if left <= 0:
+            return _verdicts(url, {"error": "over the company's Arelle budget"}, readings)
+        return _verdicts(url, run_arelle(url, self.cache, int(min(TIMEOUT, max(left, 1)))), readings)
+
+    def finish(self) -> None:
+        """Each filing's record, once Arelle has read them all."""
+        for record, future in self.pending:
+            record["arelle"] = future.result()
+        self.pool.shutdown()
 
 
 def enabled() -> str | None:
