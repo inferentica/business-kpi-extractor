@@ -18382,7 +18382,24 @@
    "source_accession": "0001564590-22-029201",
    "era": "release",
    "checked": "printed twice",
-   "note": "own 6-K 0001564590-21-044132 and the later 6-K print the same figure"
+   "note": "own 6-K 0001564590-21-044132 and the later 6-K print the same figure",
+   "basis": "Taiwan-IFRS"
+  },
+  {
+   "symbol": "TSM",
+   "statement": "income",
+   "fiscal_year": "2021",
+   "fiscal_period": "Q2",
+   "duration": "ytd",
+   "concept": "ifrs-full_ProfitLoss",
+   "label": "Net income",
+   "value": 277143000000.0,
+   "scale": 1000000.0,
+   "source_accession": "0001193125-21-301021",
+   "era": "xbrl",
+   "checked": "printed row",
+   "basis": "IFRS",
+   "note": "6-K of 2021-10-18 with XBRL (Exhibit 99.1 prints 277,143 for the six months); the Taiwan-IFRS releases print 274,220"
   },
   {
    "symbol": "TSM",

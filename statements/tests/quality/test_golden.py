@@ -44,3 +44,20 @@ def test_the_golden_set_is_well_formed():
         assert entry["statement"] in ("income", "balance", "cash_flow")
         assert entry["duration"] in ("quarter", "ytd", "year", "instant")
         assert entry.get("absent") or isinstance(entry["value"], (int, float))
+
+
+def test_an_entry_on_another_basis_is_checked_against_that_basis_presentation(tmp_path):
+    # TSMC's H1 2021: served on IFRS from its 6-K XBRL, its Taiwan-IFRS releases kept beside it.
+    folder = tmp_path / "TSM"
+    folder.mkdir()
+    period = {"statement": "income", "fiscal_year": "2021", "fiscal_period": "Q2", "duration": "ytd", "status": "kept",
+              "basis": "IFRS", "lines": [line("ifrs-full_ProfitLoss", "Net income", 277_142.9e6)],
+              "other_bases": [{"basis": "Taiwan-IFRS", "lines": [line("tifrs_NetIncome", "NET INCOME", 274_220.465e6)]}]}
+    (folder / "chosen.json").write_text(json.dumps([period]))
+    base = {"symbol": "TSM", "statement": "income", "fiscal_year": "2021", "fiscal_period": "Q2", "duration": "ytd",
+            "scale": 1e6}
+    path = golden(tmp_path / "golden.json", [
+        {**base, "label": "^NET INCOME$", "value": 274_220.465e6, "era": "release", "basis": "Taiwan-IFRS"},
+        {**base, "concept": "ifrs-full_ProfitLoss", "label": "Net income", "value": 277_143e6, "era": "xbrl",
+         "basis": "IFRS"}])
+    assert [result["outcome"] for result in score([folder], path)["results"]] == ["correct", "correct"]

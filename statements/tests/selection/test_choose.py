@@ -177,10 +177,36 @@ def test_a_release_is_served_before_mexicos_coded_template_of_the_same_period():
     assert alone["source_accession"] == "coded"  # where nothing else prints the statement
 
 
-def test_a_six_ks_xbrl_stands_with_the_secs_reports_and_above_a_later_release():
+def test_a_six_ks_xbrl_wins_over_its_own_printed_pages_and_earlier_releases():
     tagged = reading("interim", date(2025, 8, 26), 100, own=True, period="Q2", duration="ytd")
     tagged.form = "6-K"
-    release = reading("release", date(2025, 9, 1), 100, own=True, period="Q2", duration="ytd")
+    release = reading("release", date(2025, 8, 26), 100, own=True, period="Q2", duration="ytd")
     release.form, release.source = "6-K", "html"
     [chosen] = choose([tagged, release])
     assert chosen["source_accession"] == "interim"
+
+
+def test_a_six_ks_xbrl_on_another_basis_than_the_years_annual_report_is_a_release():
+    # Petrobras's Q1 2011: its own 6-K tagged on US GAAP; the 2012 release restates it on IFRS, as its FY2011 20-F.
+    annual = reading("20-F", date(2012, 4, 30), 500, own=True)
+    annual.basis, annual.form, annual.fiscal_year = "IFRS", "20-F", "2011"
+    tagged = reading("own 6-K", date(2011, 6, 8), 100, own=True, period="Q1", duration="quarter")
+    tagged.form, tagged.basis, tagged.fiscal_year = "6-K", "US GAAP", "2011"
+    release = reading("2012 release", date(2012, 5, 17), 110, own=False, period="Q1", duration="quarter")
+    release.form, release.source, release.basis, release.fiscal_year = "6-K", "html", "IFRS", "2011"
+    quarter = next(item for item in choose([annual, tagged, release]) if item["fiscal_period"] == "Q1")
+    assert quarter["source_accession"] == "2012 release"
+
+
+def test_a_later_six_k_restating_a_tagged_period_wins():
+    # UBS's Q2 2017: its 6-K of July 2018 tagged in XBRL; its March 2019 6-K restates the quarter.
+    tagged = reading("tagged", date(2018, 7, 24), 100, own=True, period="Q2", duration="quarter")
+    tagged.form = "6-K"
+    restated = reading("restated", date(2019, 3, 18), 101, own=False, period="Q2", duration="quarter")
+    restated.form, restated.source = "6-K", "html"
+    older = reading("older", date(2018, 7, 20), 99, own=True, period="Q2", duration="quarter")
+    older.form, older.source = "6-K", "html"
+    [chosen] = choose([tagged, restated, older])
+    assert chosen["source_accession"] == "restated"
+    [chosen] = choose([tagged, older])
+    assert chosen["source_accession"] == "tagged"

@@ -61,7 +61,13 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         set_aside = contradicted(kept)
         aside = {id(reading) for reading in set_aside}
         eligible = [reading for reading in kept if id(reading) not in aside] or kept
-        winner = max(eligible, key=lambda item: (item.scope == "consolidated", _rank(item), not _coded(item),
+        # A 6-K presenting the period after the newest one tagged in XBRL stands with it: the newest presentation wins
+        # (UBS's Q2 2017 restated in dollars in 2019, beside its original 6-K tagged in francs).
+        tagged = max((item.filed for item in eligible if item.form == "6-K" and item.source == "xbrl"
+                      and _rank(item, annual) == 2), default=None)
+        rank = lambda item: 2 if (tagged is not None and item.form == "6-K" and item.filed > tagged  # noqa: E731
+                                  and item.source not in REGULATORS) else _rank(item, annual)
+        winner = max(eligible, key=lambda item: (item.scope == "consolidated", rank(item), not _coded(item),
                                              item.form != "6-K" or annual is None or ifrs_family(item.basis) == ifrs_family(annual), item.filed,
                                              item.own, item.source == "xbrl")) if eligible else None
         record = {
@@ -97,7 +103,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
 REGULATORS = REGULATOR_SOURCES  # home regulators' own data (pipeline/regulators.py)
 
 
-def _rank(reading: Reading) -> int:
+def _rank(reading: Reading, annual: str | None = None) -> int:
     """A report filed with the SEC, then a home regulator's form, then a release: a regulator's quarterly form is the
     reviewed statement a 6-K release translates (Copel's ITR, KEPCO's quarterly report), so it stands with the SEC's
     reports for a quarter; for a year the 20-F, the statement filed with the SEC, stays first and the regulator's
@@ -105,8 +111,13 @@ def _rank(reading: Reading) -> int:
     if reading.source in REGULATORS:
         return 1 if reading.fiscal_period == "FY" else 2
     # A 6-K's XBRL is the statement the filer tagged and filed with the SEC (an interim update under Form 20-F Item
-    # 8.A.5, revised statements): it stands with the SEC's reports; a 6-K's printed release stays below them.
-    return 0 if reading.form == "6-K" and reading.source != "xbrl" else 2
+    # 8.A.5, revised statements): it stands with the SEC's reports, on the basis of the year's annual report (`annual`);
+    # on another it is a release like the rest (Petrobras's 2011 quarters, tagged on US GAAP, restated on IFRS in the
+    # 2012 releases as in its FY2011 20-F). A 6-K's printed release stays below the SEC's reports.
+    if reading.form != "6-K":
+        return 2
+    tagged = reading.source == "xbrl" and (annual is None or ifrs_family(reading.basis) == ifrs_family(annual))
+    return 2 if tagged else 0
 
 
 def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:

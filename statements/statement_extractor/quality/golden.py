@@ -61,7 +61,13 @@ def score(folders: list[Path], golden: Path = GOLDEN) -> dict:
         if entry["symbol"] not in chosen:
             continue
         period = chosen[entry["symbol"]].get((entry["statement"], entry["fiscal_year"], entry["fiscal_period"], entry["duration"]))
-        line = _line(entry, period["lines"]) if period else None
+        lines = period["lines"] if period else None
+        if period and entry.get("basis") and period.get("basis") and period["basis"] != entry["basis"]:
+            # An entry printed on another basis than the one served is checked against that basis's presentation:
+            # TSMC's H1 2021 releases on Taiwan-IFRS, beside its IFRS 6-K XBRL that is served.
+            other = next((item for item in period.get("other_bases") or [] if item["basis"] == entry["basis"]), None)
+            lines = other["lines"] if other else None
+        line = _line(entry, lines) if lines else None
         if entry.get("absent"):
             outcome = "correct" if line is None else "wrong"
         elif line is None:
