@@ -18,7 +18,7 @@ from ..readers.row_finder import shows_figure, table_from_rows
 from ..rules.identity import sideless_key
 from ..xbrl import member_key
 from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, chosen_by_number, comparable_header,
-                              missing_since, replay, reported_period, stated_total)
+                              missing_since, mostly_whole, replay, reported_period, stated_total)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, validate_groups
 from ..readers.trace import placed_elsewhere, trace_replay
@@ -252,9 +252,19 @@ class ReplayReading:
     def _replay_part(self, document: Document, part: Spec, locators: dict[str, dict], expected: date,
                      currency: str | None, annual: bool = False) -> tuple[Located, list[ReadValue]] | str:
         """One group, or one KPI, replayed and checked: its reading and values, or why it does not stand. A year's
-        reading (annual) names no quarter its columns must name."""
+        reading (annual) names no quarter its columns must name. A reading with rows read whole beside rows read alone
+        is replayed the way most of its rows were read, and, if that does not stand, the other way: Wells Fargo's,
+        JPMorgan's and Morgan Stanley's readings each stand one way only, and every check holds either way."""
+        found = self._replay_once(document, part, locators, expected, currency, annual)
+        if isinstance(found, str) and (mostly := mostly_whole(locators)) is not None:
+            other = self._replay_once(document, part, locators, expected, currency, annual, as_table=not mostly)
+            found = found if isinstance(other, str) else other
+        return found
+
+    def _replay_once(self, document: Document, part: Spec, locators: dict[str, dict], expected: date,
+                     currency: str | None, annual: bool = False, as_table: bool | None = None) -> tuple[Located, list[ReadValue]] | str:
         _year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=getattr(self, "offset", 0))
-        located = replay(document, locators, expected, int(period[1]) if period.startswith("Q") and not annual else None)
+        located = replay(document, locators, expected, int(period[1]) if period.startswith("Q") and not annual else None, as_table)
         if isinstance(located, AmbiguousQuote) and len(locators) == 1:
             return self._one_of(document, part, next(iter(locators)), located, expected, currency, annual)
         if isinstance(located, str):
