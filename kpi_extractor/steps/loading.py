@@ -101,6 +101,7 @@ class FilingLoading:
                 if raw is None:
                     continue
                 part = parse_document(self._pictures_read(raw, exhibit.url), exhibit.url, prefix=f"{string.ascii_uppercase[index]}_")
+                part.single_reads = self.__dict__.get("_single_reads", {}).get(exhibit.url, {})
                 if combined is None:
                     combined = part
                 else:
@@ -111,7 +112,7 @@ class FilingLoading:
         return self._documents[key]
 
     def _pictures_read(self, raw: bytes | str, url: str) -> bytes | str:
-        """An exhibit whose pages are only pictures, as the figures two OCR models read alike (documents/image_pages.py);
+        """An exhibit whose pages are only pictures, as two OCR models read it (documents/image_pages.py);
         any other exhibit, or a run with no OCR (code reads, dry runs), as it is."""
         text = raw.decode("utf-8", "ignore") if isinstance(raw, bytes) else raw
         pictures = picture_pages(text, url)
@@ -128,8 +129,10 @@ class FilingLoading:
             return "", False
 
         pictures = pictures[:_MAX_PICTURE_PAGES]
-        pages, totals = read_image_pages([source for _tag, source in pictures], _fetch_page, deepseek,
-                                         lambda data: ocr_words(data, (0, 0), 2), _picture_size, _MIN_PAGE_PIXELS)
+        pages, single, totals = read_image_pages([source for _tag, source in pictures], _fetch_page, deepseek,
+                                                 lambda data: ocr_words(data, (0, 0), 2), _picture_size, _MIN_PAGE_PIXELS)
+        # Figures one model alone read: a value read from one is held until a check proves it (hold_single_reads).
+        self.__dict__.setdefault("_single_reads", {})[url] = single
         self.log(f"{self.symbol}: picture pages of {url.rsplit('/', 1)[-1]} read by two OCR models: {totals}")
         # Each page's agreed text stands where its picture stood, so the exhibit's own words keep their order.
         for tag, source in pictures:

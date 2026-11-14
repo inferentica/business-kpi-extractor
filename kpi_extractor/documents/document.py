@@ -102,6 +102,8 @@ class Document:
     # Each exhibit's own link by its id prefix ("B_" for the second): a figure read from JPMorgan's Financial Supplement
     # links to the supplement, not to the earnings release that comes first in the filing.
     part_urls: dict[str, str] = field(default_factory=dict)
+    # Figures on page pictures that one OCR model alone read (documents/image_pages.py): digits -> the model.
+    single_reads: dict[str, str] = field(default_factory=dict)
 
     def url_of(self, item_id: str | None) -> str:
         """The link of the exhibit holding a table or text block, by its id's prefix; the document's own link otherwise."""
@@ -198,6 +200,7 @@ class Document:
         self.blocks.update(other.blocks)
         self.order.extend(other.order)
         self.part_urls.update(other.part_urls)
+        self.single_reads.update(other.single_reads)
 
 
 @dataclass(frozen=True)

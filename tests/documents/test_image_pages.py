@@ -1,7 +1,8 @@
 from types import SimpleNamespace
 
 from kpi_extractor.documents.document import parse_document, parse_number
-from kpi_extractor.documents.image_pages import UNCONFIRMED, agreed_page, picture_pages, read_image_pages
+from kpi_extractor.documents.image_pages import (DEEPSEEK, LOCAL, ONE_READER, SUMS_TO_AGREED_TOTAL, agreed_page, hold_single_reads,
+                                                picture_pages, read_image_pages)
 
 BOX = "<｜ref｜>{kind}<｜/ref｜><｜box｜>[[{x0},{y0},{x1},{y1}]]<｜/box｜> {content}\n"
 
@@ -20,65 +21,67 @@ def test_a_page_picture_is_one_with_no_words_of_its_own_beneath_it():
     assert picture_pages(deck, "https://www.sec.gov/x/tsm.htm") == []
 
 
-def test_a_figure_stands_only_where_both_models_read_it_alike_in_its_region():
+def test_a_figure_both_models_read_alike_is_agreed_and_one_read_by_one_model_is_listed():
     # ASE's appendix (821 px wide): DeepSeek read 21,932,480 as 21,932,490; RapidOCR read it right. Bradesco's 1,574
-    # came back from RapidOCR as 1.574: a thousands group either way, kept as DeepSeek printed it.
+    # came back from RapidOCR as 1.574: a thousands group either way, agreed as DeepSeek printed it.
     deepseek = BOX.format(kind="table", x0=0, y0=0, x1=500, y1=500,
                           content="<table><tr><td>Net revenues</td><td>21,932,490</td><td>(1,574)</td><td>12.5%</td></tr></table>")
     deepseek += BOX.format(kind="image", x0=500, y0=500, x1=1000, y1=1000, content="")
     words = [(100, 100, 150, 110, "21,932,480"), (200, 100, 240, 110, "(1.574)"), (300, 100, 330, 110, "12.5%"),
-             (700, 700, 750, 710, "88.8")]  # a chart's label: DeepSeek gives no words there, so it never stands
-    page, kept, masked = agreed_page(deepseek, words, (1000, 1000))
-    assert (kept, masked) == (2, 1)
-    table = next(iter(parse_document(f"<html><body>{page}</body></html>", "https://x/y.htm").tables.values()))
-    assert table.rows[0][1] == UNCONFIRMED and parse_number(table.rows[0][1]) is None
-    assert parse_number(table.rows[0][2]).value == -1574 and parse_number(table.rows[0][3]).value == 12.5
+             (700, 700, 750, 710, "EBITDA 88.8")]  # a chart's lettering: DeepSeek gives no words there
+    page, kept, single = agreed_page(deepseek, words, (1000, 1000))
+    assert kept == 2 and single == {"21932490": DEEPSEEK, "888": LOCAL}
+    document = parse_document(f"<html><body>{page}</body></html>", "https://x/y.htm")
+    table = next(iter(document.tables.values()))
+    assert table.rows[0][1:] == ["21,932,490", "(1,574)", "12.5%"] and "EBITDA 88.8" in document.render()
 
 
-def test_a_figure_read_elsewhere_on_the_page_does_not_confirm_it():
+def test_a_figure_read_elsewhere_on_the_page_does_not_agree_with_it():
     deepseek = BOX.format(kind="text", x0=0, y0=0, x1=300, y1=100, content="Net income 3,155")
-    page, kept, masked = agreed_page(deepseek, [(800, 800, 850, 810, "3,155")], (1000, 1000))
-    assert (kept, masked) == (0, 1)
+    _page, kept, single = agreed_page(deepseek, [(800, 800, 850, 810, "3,155")], (1000, 1000))
+    assert kept == 0 and single == {"3155": DEEPSEEK}
 
 
 def test_swapped_separators_keep_the_reading_whose_separators_agree():
     # Alibaba's form: DeepSeek "19,901,959.514", RapidOCR "19,901,959,514".
     deepseek = BOX.format(kind="text", x0=0, y0=0, x1=1000, y1=1000, content="Balance 19,901,959.514")
-    page, kept, _ = agreed_page(deepseek, [(10, 10, 90, 20, "19,901,959,514")], (1000, 1000))
-    assert kept == 1 and "19,901,959,514" in page
+    page, kept, single = agreed_page(deepseek, [(10, 10, 90, 20, "19,901,959,514")], (1000, 1000))
+    assert kept == 1 and not single and "19,901,959,514" in page
 
 
-def test_logos_and_pages_deepseek_returns_empty_are_left_out():
+def test_logos_are_left_out_and_a_page_deepseek_returns_empty_stands_on_rapidocrs_words():
     sizes = {"logo": (120, 60), "p1": (1467, 825), "p2": (1467, 825)}
     texts = {"p1.jpg": "Volume +5.3%", "p2.jpg": ""}
-    pages, totals = read_image_pages(
+    pages, single, totals = read_image_pages(
         ["https://x/logo.jpg", "https://x/p1.jpg", "https://x/p2.jpg"], lambda link: link.rsplit("/", 1)[-1].split(".")[0].encode(),
         lambda name, data: (texts[name], False), lambda data: [SimpleNamespace(x0=1, y0=1, x1=9, y1=9, text="+5.3%")],
         lambda data: sizes[data.decode()])
-    assert totals == {"pages": 1, "figures kept": 1, "figures masked": 0, "empty pages": 1} and "+5.3%" in pages["https://x/p1.jpg"]
+    assert totals == {"pages": 2, "empty pages": 1, "figures agreed": 1, "figures one model read": 1}
+    assert "+5.3%" in pages["https://x/p1.jpg"] and "+5.3%" in pages["https://x/p2.jpg"] and single == {"53": LOCAL}
 
 
-def test_an_exhibit_of_pictures_is_read_through_the_control_planes_ocr_and_untouched_without_it(monkeypatch):
-    from kpi_extractor.readers import charts
-    from kpi_extractor.steps import loading
+def _value(group, key, value, cell, total=False):
+    from kpi_extractor.ai import GroupSpec, KpiSpec
+    return SimpleNamespace(group=group, kpi=KpiSpec(key=key, label=key, unit="currency"), value=value, is_total=total,
+                           status="verified", notes=[], locator={"table": "T0", "row": cell, "col": 1})
 
-    monkeypatch.setattr(loading, "_fetch_page", lambda link: b"page")
-    monkeypatch.setattr(loading, "_picture_size", lambda data: (1467, 825))
-    monkeypatch.setattr(charts, "ocr_words", lambda data, region=None, scale=3: [SimpleNamespace(x0=1, y0=1, x1=9, y1=9, text="1,089.8")])
-    calls = []
 
-    def ocr(symbol, purpose, name, data):
-        calls.append(purpose)  # layout first; the page came back empty there, so text-only is asked
-        return {"pages": [{"text": "" if purpose == "rich_layout_recognition" else "Volume 1,089.8 MM UC"}]}
-    raw = '<html><body><p>Exhibit 99.1</p><img src="kof_001.jpg"><img src="kof_002.jpg"></body></html>'
-    reader = SimpleNamespace(symbol="KOF", log=lambda message: None, control=SimpleNamespace(ocr=ocr))
-    reader._page_ocr = lambda purpose, name, data: loading.FilingLoading._page_ocr(reader, purpose, name, data)
-    read = loading.FilingLoading._pictures_read(reader, raw, "https://www.sec.gov/x/kof.htm")
-    assert read.count("1,089.8") == 2 and "Exhibit 99.1" in read and "<img" not in read
-    # Both pictures are the same bytes here: each mode reads them once, however often they are asked for.
-    assert calls == ["rich_layout_recognition", "text_recognition"]
-    plain = SimpleNamespace(symbol="KOF", log=lambda message: None, control=SimpleNamespace())  # code reads: no OCR
-    assert loading.FilingLoading._pictures_read(plain, raw, "https://www.sec.gov/x/kof.htm") == raw
+def test_a_value_one_model_alone_read_is_held_unless_its_breakdown_adds_up_to_a_total_both_read():
+    from kpi_extractor.ai import GroupSpec, KpiSpec
+    group = GroupSpec(key="bu", label="Revenue by Business Unit", kind="revenue_breakdown", total_kpi="total",
+                      kpis=[KpiSpec(key=k, label=k, unit="currency") for k in ("beer", "nab", "total")])
+    document = parse_document("<table><tr><td>Beer</td><td>10,138</td></tr><tr><td>NAB</td><td>2,213</td></tr>"
+                              "<tr><td>Total</td><td>12,351</td></tr></table>", "https://x/y.htm")
+    document.single_reads = {"2213": DEEPSEEK}
+    read = [_value(group, "beer", 10138e6, 0), _value(group, "nab", 2213e6, 1), _value(group, "total", 12351e6, 2, total=True)]
+    hold_single_reads(read, document)
+    assert [item.status for item in read] == ["verified"] * 3 and read[1].notes == [f"{ONE_READER} (DeepSeek); {SUMS_TO_AGREED_TOTAL}"]
+    # The total one model alone read proves nothing: the part is held, naming the model.
+    document.single_reads = {"2213": DEEPSEEK, "12351": LOCAL}
+    read = [_value(group, "beer", 10138e6, 0), _value(group, "nab", 2213e6, 1), _value(group, "total", 12351e6, 2, total=True)]
+    hold_single_reads(read, document)
+    assert read[1].status == "needs_review" and read[1].notes == [f"{ONE_READER} (DeepSeek)"]
+    assert read[2].status == "needs_review" and read[2].notes == [f"{ONE_READER} (RapidOCR)"]
 
 
 def _classifier(monkeypatch, previous=None, answer="earnings_release"):

@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from ..quality.stated import FILING_SCALES
 from .. import ai
 from ..ai import Spec
+from ..documents.image_pages import hold_single_reads
 from ..documents.document import Document, clean
 from ..quality.checks import check_period, date_order_findings, validate_groups
 from ..readers.extract import (_FOURTH_QUARTER, ReadValue, _stands_at_period_end, column_duration_problem, explanation_supports, falls,
@@ -194,6 +195,7 @@ class ReleaseFlow:
             self._flag_scale_outliers(read, period_end, annual=located.annual)
             self._mark_year_ago_agreement(read, document, period_end, annual=located.annual)
             self._flag_partial_tables(read, period_end, document)
+            hold_single_reads(read, document)  # a figure one OCR model alone read, until a check proves it
             self._explain_jumps(read, document, spec)
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
             verified = sum(1 for record in records if record["validation_status"] == "verified")
