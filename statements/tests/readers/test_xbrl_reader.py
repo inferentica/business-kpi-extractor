@@ -245,3 +245,17 @@ def test_a_line_filled_from_a_parts_fact_takes_the_companys_own():
     costs = next(line for line in income.lines if line["concept"] == "us-gaap_BusinessCombinationAcquisitionRelatedCosts")
     assert costs["value"] == 483e3
     assert next(line for line in income.lines if line["concept"] == "us-gaap_SalesRevenueNet")["value"] == 36_537e6
+
+
+def test_signs_keyed_by_periods_with_line_breaks_still_apply():
+    # Omega's 2015-18 filings: edgartools' period keys hold line breaks ("duration_\n2015-01-01\n_\n2015-09-30\n") for
+    # the figures, their decimals and their signs alike.
+    x = fake_xbrl()
+    wrap = lambda key: key.replace("_", "_\n").replace("_\n", "_\n", 1) + "\n"
+    for item in x.statements.cash_flow_statement().rows:
+        for field in ("values", "decimals", "preferred_signs"):
+            item[field] = {wrap(key): value for key, value in item[field].items()}
+    readings, _ = read_filing(x, accession="a", form="10-K", filed=date(2009, 10, 27), fiscal_year_end="0926", year_offset=0)
+    cash = next(r for r in readings if r.statement == "cash_flow" and r.own)
+    payment = next(line for line in cash.lines if line["concept"] == "us-gaap_PaymentsToAcquireProductiveAssets")
+    assert payment["value"] == -1_144e6 and cash.status == "kept"

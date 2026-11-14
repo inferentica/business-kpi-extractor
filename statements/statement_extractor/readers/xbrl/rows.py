@@ -67,12 +67,17 @@ def presented_rows(statement, shown: set[str] | None = None) -> list[dict]:
             continue
         if _STRUCTURAL_CONCEPT.search(concept):
             continue
-        if any(re.search(r"\s", key) for key in (row.get("values") or {})):
-            # Period keys with line breaks in them ("duration_\n2017-01-01\n_\n2017-12-31\n", Omega's 10-Ks of
-            # 2015-18): the same periods, which every lookup by a period's key would otherwise miss.
-            row = {**row, "values": {re.sub(r"\s+", "", key): value for key, value in row["values"].items()}}
+        # Period keys with line breaks in them ("duration_\n2017-01-01\n_\n2017-12-31\n", Omega's 10-Qs and 10-Ks of
+        # 2015-18): the same periods, which every lookup by a period's key would otherwise miss. Each field keyed by
+        # period: the figures, their decimals and their signs (Omega's payments, marked negative, read as positive).
+        row = {**row, **{field: {re.sub(r"\s+", "", str(key)): value for key, value in keyed.items()}
+                         for field, keyed in row.items() if isinstance(keyed, dict) and _period_keyed(keyed)}}
         rows.append(row)
     return rows
+
+
+def _period_keyed(field: dict) -> bool:
+    return any(str(key).lstrip().startswith(("duration_", "instant_")) for key in field)
 
 
 def _printed_member(row: dict, shown: set[str]) -> str | None:
