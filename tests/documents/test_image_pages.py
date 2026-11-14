@@ -77,3 +77,40 @@ def test_an_exhibit_of_pictures_is_read_through_the_control_planes_ocr_and_untou
     assert calls == ["rich_layout_recognition", "text_recognition"] * 2
     plain = SimpleNamespace(symbol="KOF", log=lambda message: None, control=SimpleNamespace())  # code reads: no OCR
     assert loading.FilingLoading._pictures_read(plain, raw, "https://www.sec.gov/x/kof.htm") == raw
+
+
+def _classifier(monkeypatch, previous=None, answer="earnings_release"):
+    from kpi_extractor.steps import kpi_list, loading
+
+    monkeypatch.setattr(loading, "_fetch_page", lambda link: b"page")
+    monkeypatch.setattr(kpi_list, "classify_by_rules", lambda excerpt: None)  # the AI decides, and is shown the pages
+    deck = '<html><body><p>Commission File Number 001-36908</p><img src="abev_001.jpg"><img src="abev_002.jpg"></body></html>'
+    exhibit = SimpleNamespace(url="https://www.sec.gov/x/abev.htm", document_type="6-K", document="abev.htm")
+    asked, recorded, ocr = [], [], []
+    reader = SimpleNamespace(
+        symbol="ABEV", company="Ambev", filings={"acc": previous} if previous else {},
+        source=SimpleNamespace(is_own_document=lambda e: True, exhibit_html=lambda e: deck,
+                               classification_excerpt=lambda ref: "Form 6-K: Commission File Number 001-36908"),
+        control=SimpleNamespace(ocr=lambda symbol, purpose, name, data: ocr.append(name) or {"pages": [{"text": "3Q26 Earnings Call Net revenue +7.6%"}]}),
+        store=SimpleNamespace(record=recorded.append),
+        _ask=lambda prompt, *a, **k: asked.append(prompt) or SimpleNamespace(kind=answer))
+    reader._picture_excerpt = lambda ref: kpi_list.KpiListUpkeep._picture_excerpt(reader, ref)
+    ref = SimpleNamespace(confirmed=False, accession="acc", exhibits=[exhibit])
+    return kpi_list.KpiListUpkeep._is_earnings_document(reader, ref), asked, recorded, ocr
+
+
+def test_a_deck_of_pictures_is_classified_with_its_opening_pages_read(monkeypatch):
+    # Ambev's results presentation: its 6-K's only words are the cover; the classifier skipped it as no release.
+    is_release, asked, _recorded, ocr = _classifier(monkeypatch)
+    assert is_release and ocr == ["abev_001.jpg", "abev_002.jpg"] and "3Q26 Earnings Call" in asked[0]
+
+
+def test_a_deck_skipped_on_its_cover_alone_is_classified_again_once(monkeypatch):
+    from kpi_extractor.steps.kpi_list import _CLASSIFIED_PAST_COVER, _CLASSIFIED_PICTURES, _NOT_EARNINGS
+
+    old = {"status": "skipped", "notes": [_NOT_EARNINGS, _CLASSIFIED_PAST_COVER]}
+    is_release, asked, _recorded, _ocr = _classifier(monkeypatch, previous=old)
+    assert is_release and asked
+    checked = {"status": "skipped", "notes": [_NOT_EARNINGS, _CLASSIFIED_PAST_COVER, _CLASSIFIED_PICTURES]}
+    is_release, asked, _recorded, ocr = _classifier(monkeypatch, previous=checked)
+    assert not is_release and not asked and not ocr
