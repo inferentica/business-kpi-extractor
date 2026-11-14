@@ -23,7 +23,7 @@ from pathlib import Path
 
 from ..domain.model import FAIL, NONE, PASS
 
-TIMEOUT = 300  # seconds for one filing; one that takes longer is left unchecked
+TIMEOUT = 120  # seconds for one try at a filing; a filing stalled twice is left unchecked
 ARELLE_BUDGET = 2700  # seconds of Arelle per company; filings after it are left unchecked
 WORKERS = 3  # filings Arelle reads at once, beside the reader (each in a process of its own)
 
@@ -73,14 +73,22 @@ class Facts:
 
     def candidates(self, concept: str, reading, member: bool) -> list[float]:
         end = reading.period_end.isoformat()
-        keys = [(None, end)]
-        if reading.period_start is not None:
-            before = (reading.period_start - timedelta(days=1)).isoformat()
-            # Opening and closing cash: a filer tags the opening balance on the day before the period or on its first
-            # day (Visteon's 2010 fresh start, Lloyds' 2017 restated cash).
-            keys = [(reading.period_start.isoformat(), end), (None, end), (None, before),
-                    (None, reading.period_start.isoformat())]
-        return [value for start, stop in keys for value in self.values.get((_local(concept), start, stop, member), [])]
+        if reading.period_start is None:
+            return self.values.get((_local(concept), None, end, member), [])
+        start = reading.period_start
+        # Opening and closing cash: a filer tags the opening balance on the day before the period, its first day
+        # (Visteon's 2010 fresh start) or its second (Visteon's 2009).
+        instants = [end] + [(start + timedelta(days=shift)).isoformat() for shift in (-1, 0, 1)]
+        keys = [(start.isoformat(), end)] + [(None, day) for day in instants]
+        return [value for begin, stop in keys for value in self.values.get((_local(concept), begin, stop, member), [])]
+
+    def member_balances(self, concept: str, reading) -> list[float]:
+        """A flow statement's balance tagged only under a member (Lloyds' 2017 opening cash as "previously stated",
+        Cemig's "restated"), which the reader keeps too (readers/xbrl/read.py)."""
+        if reading.period_start is None:
+            return []
+        days = [reading.period_end] + [reading.period_start + timedelta(days=shift) for shift in (-1, 0, 1)]
+        return [value for day in days for value in self.values.get((_local(concept), None, day.isoformat(), True), [])]
 
 
 def _same(left: float, right: float) -> bool:
@@ -96,6 +104,8 @@ def compare(reading, facts: Facts) -> dict:
             continue
         concepts.add(_local(line["concept"]))
         found = facts.candidates(line["concept"], reading, "member" in line)
+        if "member" not in line and not any(_same(line["value"], value) for value in found):
+            found = found + facts.member_balances(line["concept"], reading)
         if not found:
             missing += 1
         elif any(_same(line["value"], value) for value in found):
@@ -151,7 +161,11 @@ class Checks:
             return _verdicts(url, {"error": "no instance"}, readings)
         if left <= 0:
             return _verdicts(url, {"error": "over the company's Arelle budget"}, readings)
-        return _verdicts(url, run_arelle(url, self.cache, int(min(TIMEOUT, max(left, 1)))), readings)
+        result = run_arelle(url, self.cache, int(min(TIMEOUT, max(left, 1))))
+        left = self.deadline - time.time()
+        if str(result.get("error", "")).startswith("timed out") and left > 0:
+            result = run_arelle(url, self.cache, int(min(TIMEOUT, max(left, 1))))  # once more: a stalled download
+        return _verdicts(url, result, readings)
 
     def finish(self) -> None:
         """Each filing's record, once Arelle has read them all."""

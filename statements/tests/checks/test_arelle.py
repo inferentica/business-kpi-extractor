@@ -119,3 +119,28 @@ def test_filings_past_the_companys_budget_are_left_unchecked(monkeypatch):
     checks.finish()
     assert "error" not in first["arelle"] and first["arelle"]["url"].endswith("x.xml")
     assert late["arelle"]["error"].startswith("over")
+
+
+def test_an_opening_balance_tagged_only_under_a_member_matches():
+    # Lloyds' 2017 opening cash, tagged only as "previously stated"; the closing balance company-wide.
+    flows = _reading("cash_flow", date(2017, 1, 1), date(2017, 12, 31), [
+        _line("ifrs-full_CashAndCashEquivalents", 62_388e6), _line("ifrs-full_CashAndCashEquivalents", 58_708e6)])
+    facts = Facts({"facts": [["ifrs-full_CashAndCashEquivalents", None, "2016-12-31", True, 62_388e6, "-6"],
+                             ["ifrs-full_CashAndCashEquivalents", None, "2017-12-31", False, 58_708e6, "-6"]]})
+    assert compare(flows, facts)["facts"] == "pass"
+    balance = _reading("balance", None, date(2016, 12, 31), [_line("ifrs-full_CashAndCashEquivalents", 62_388e6)])
+    assert compare(balance, facts)["facts"] == "none"  # a balance sheet's line matches company-wide figures only
+
+
+def test_a_stalled_filing_is_tried_once_more(monkeypatch):
+    import statement_extractor.checks.arelle as arelle
+    tries = []
+    def run(url, cache, timeout=120):
+        tries.append(timeout)
+        return {"error": "timed out after 120 s"} if len(tries) == 1 else {"facts": [], "seconds": 3.0}
+    monkeypatch.setattr(arelle, "run_arelle", run)
+    checks, record = Checks("cache"), {}
+    filing = SimpleNamespace(attachments=SimpleNamespace(data_files=[_attachment("x.xml", "EX-101.INS")]))
+    checks.submit(filing, [_reading("balance", None, date(2025, 12, 31), [_line("us-gaap_Assets", 1.0)])], record)
+    checks.finish()
+    assert len(tries) == 2 and "error" not in record["arelle"]
