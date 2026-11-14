@@ -1,0 +1,484 @@
+{
+ "pages": [
+  {
+   "id": "ASML-presentation009",
+   "symbol": "ASML",
+   "sector": "Semiconductor equipment (NL)",
+   "accession": "000162828026065813",
+   "url": "https://www.sec.gov/Archives/edgar/data/937966/000162828026065813/a2026_10x14xpresentation009.jpg",
+   "file": "a2026_10x14xpresentation009.jpg"
+  },
+  {
+   "id": "ASML-presentation010",
+   "symbol": "ASML",
+   "sector": "Semiconductor equipment (NL)",
+   "accession": "000162828026065813",
+   "url": "https://www.sec.gov/Archives/edgar/data/937966/000162828026065813/a2026_10x14xpresentation010.jpg",
+   "file": "a2026_10x14xpresentation010.jpg"
+  },
+  {
+   "id": "ASML-presentation015",
+   "symbol": "ASML",
+   "sector": "Semiconductor equipment (NL)",
+   "accession": "000162828026065813",
+   "url": "https://www.sec.gov/Archives/edgar/data/937966/000162828026065813/a2026_10x14xpresentation015.jpg",
+   "file": "a2026_10x14xpresentation015.jpg"
+  },
+  {
+   "id": "TSM-presentatione004",
+   "symbol": "TSM",
+   "sector": "Semiconductor foundry (TW)",
+   "accession": "000104617926000726",
+   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617926000726/a3q26presentatione004.jpg",
+   "file": "a3q26presentatione004.jpg"
+  },
+  {
+   "id": "TSM-presentatione005",
+   "symbol": "TSM",
+   "sector": "Semiconductor foundry (TW)",
+   "accession": "000104617926000726",
+   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617926000726/a3q26presentatione005.jpg",
+   "file": "a3q26presentatione005.jpg"
+  },
+  {
+   "id": "TSM-presentatione006",
+   "symbol": "TSM",
+   "sector": "Semiconductor foundry (TW)",
+   "accession": "000104617926000726",
+   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617926000726/a3q26presentatione006.jpg",
+   "file": "a3q26presentatione006.jpg"
+  },
+  {
+   "id": "ASX-image008",
+   "symbol": "ASX",
+   "sector": "Semiconductor packaging (TW)",
+   "accession": "000095010326016323",
+   "url": "https://www.sec.gov/Archives/edgar/data/1122411/000095010326016323/image_008.jpg",
+   "file": "image_008.jpg"
+  },
+  {
+   "id": "ASX-image009",
+   "symbol": "ASX",
+   "sector": "Semiconductor packaging (TW)",
+   "accession": "000095010326016323",
+   "url": "https://www.sec.gov/Archives/edgar/data/1122411/000095010326016323/image_009.jpg",
+   "file": "image_009.jpg"
+  },
+  {
+   "id": "ASX-image015",
+   "symbol": "ASX",
+   "sector": "Semiconductor packaging (TW)",
+   "accession": "000095010326016323",
+   "url": "https://www.sec.gov/Archives/edgar/data/1122411/000095010326016323/image_015.jpg",
+   "file": "image_015.jpg"
+  },
+  {
+   "id": "WFC-pres007",
+   "symbol": "WFC",
+   "sector": "Bank (US)",
+   "accession": "000007297126000318",
+   "url": "https://www.sec.gov/Archives/edgar/data/72971/000007297126000318/ex993-wellsfargo3q26pres007.jpg",
+   "file": "ex993-wellsfargo3q26pres007.jpg"
+  },
+  {
+   "id": "WFC-pres008",
+   "symbol": "WFC",
+   "sector": "Bank (US)",
+   "accession": "000007297126000318",
+   "url": "https://www.sec.gov/Archives/edgar/data/72971/000007297126000318/ex993-wellsfargo3q26pres008.jpg",
+   "file": "ex993-wellsfargo3q26pres008.jpg"
+  },
+  {
+   "id": "WFC-pres012",
+   "symbol": "WFC",
+   "sector": "Bank (US)",
+   "accession": "000007297126000318",
+   "url": "https://www.sec.gov/Archives/edgar/data/72971/000007297126000318/ex993-wellsfargo3q26pres012.jpg",
+   "file": "ex993-wellsfargo3q26pres012.jpg"
+  },
+  {
+   "id": "BBD-003",
+   "symbol": "BBD",
+   "sector": "Bank (BR)",
+   "accession": "000129281426004994",
+   "url": "https://www.sec.gov/Archives/edgar/data/1160330/000129281426004994/bbdpr3q266k_003.jpg",
+   "file": "bbdpr3q266k_003.jpg"
+  },
+  {
+   "id": "BBD-007",
+   "symbol": "BBD",
+   "sector": "Bank (BR)",
+   "accession": "000129281426004994",
+   "url": "https://www.sec.gov/Archives/edgar/data/1160330/000129281426004994/bbdpr3q266k_007.jpg",
+   "file": "bbdpr3q266k_007.jpg"
+  },
+  {
+   "id": "NMR-g08p11",
+   "symbol": "NMR",
+   "sector": "Brokerage (JP)",
+   "accession": "000119312526442521",
+   "url": "https://www.sec.gov/Archives/edgar/data/1163653/000119312526442521/g522871g08p11.jpg",
+   "file": "g522871g08p11.jpg"
+  },
+  {
+   "id": "NMR-g15p18",
+   "symbol": "NMR",
+   "sector": "Brokerage (JP)",
+   "accession": "000119312526442521",
+   "url": "https://www.sec.gov/Archives/edgar/data/1163653/000119312526442521/g522871g15p18.jpg",
+   "file": "g522871g15p18.jpg"
+  },
+  {
+   "id": "MET-present005",
+   "symbol": "MET",
+   "sector": "Insurance (US)",
+   "accession": "000109921926000058",
+   "url": "https://www.sec.gov/Archives/edgar/data/1099219/000109921926000058/ex994earningscallpresent005.jpg",
+   "file": "ex994earningscallpresent005.jpg"
+  },
+  {
+   "id": "MET-present007",
+   "symbol": "MET",
+   "sector": "Insurance (US)",
+   "accession": "000109921926000058",
+   "url": "https://www.sec.gov/Archives/edgar/data/1099219/000109921926000058/ex994earningscallpresent007.jpg",
+   "file": "ex994earningscallpresent007.jpg"
+  },
+  {
+   "id": "MET-totalaum001",
+   "symbol": "MET",
+   "sector": "Insurance (US)",
+   "accession": "000109921926000058",
+   "url": "https://www.sec.gov/Archives/edgar/data/1099219/000109921926000058/ex993totalaum001.jpg",
+   "file": "ex993totalaum001.jpg"
+  },
+  {
+   "id": "ABEV-004",
+   "symbol": "ABEV",
+   "sector": "Beverages (BR)",
+   "accession": "000129281426005040",
+   "url": "https://www.sec.gov/Archives/edgar/data/1565025/000129281426005040/abev202610296k_004.jpg",
+   "file": "abev202610296k_004.jpg"
+  },
+  {
+   "id": "ABEV-007",
+   "symbol": "ABEV",
+   "sector": "Beverages (BR)",
+   "accession": "000129281426005040",
+   "url": "https://www.sec.gov/Archives/edgar/data/1565025/000129281426005040/abev202610296k_007.jpg",
+   "file": "abev202610296k_007.jpg"
+  },
+  {
+   "id": "ABEV-011",
+   "symbol": "ABEV",
+   "sector": "Beverages (BR)",
+   "accession": "000129281426005040",
+   "url": "https://www.sec.gov/Archives/edgar/data/1565025/000129281426005040/abev202610296k_011.jpg",
+   "file": "abev202610296k_011.jpg"
+  },
+  {
+   "id": "VALE-010",
+   "symbol": "VALE",
+   "sector": "Mining (BR)",
+   "accession": "000129281426005070",
+   "url": "https://www.sec.gov/Archives/edgar/data/917851/000129281426005070/vale202610306k_010.jpg",
+   "file": "vale202610306k_010.jpg"
+  },
+  {
+   "id": "VALE-011",
+   "symbol": "VALE",
+   "sector": "Mining (BR)",
+   "accession": "000129281426005070",
+   "url": "https://www.sec.gov/Archives/edgar/data/917851/000129281426005070/vale202610306k_011.jpg",
+   "file": "vale202610306k_011.jpg"
+  },
+  {
+   "id": "VALE-014",
+   "symbol": "VALE",
+   "sector": "Mining (BR)",
+   "accession": "000129281426005070",
+   "url": "https://www.sec.gov/Archives/edgar/data/917851/000129281426005070/vale202610306k_014.jpg",
+   "file": "vale202610306k_014.jpg"
+  },
+  {
+   "id": "KOF-image004",
+   "symbol": "KOF",
+   "sector": "Bottler (MX)",
+   "accession": "000129281426005006",
+   "url": "https://www.sec.gov/Archives/edgar/data/910631/000129281426005006/image_004.jpg",
+   "file": "image_004.jpg"
+  },
+  {
+   "id": "KOF-image010",
+   "symbol": "KOF",
+   "sector": "Bottler (MX)",
+   "accession": "000129281426005006",
+   "url": "https://www.sec.gov/Archives/edgar/data/910631/000129281426005006/image_010.jpg",
+   "file": "image_010.jpg"
+  },
+  {
+   "id": "RIO-results020",
+   "symbol": "RIO",
+   "sector": "Mining (UK/AU)",
+   "accession": "000086306426000041",
+   "url": "https://www.sec.gov/Archives/edgar/data/863064/000086306426000041/ex1prodresults020.jpg",
+   "file": "ex1prodresults020.jpg"
+  },
+  {
+   "id": "RIO-results024",
+   "symbol": "RIO",
+   "sector": "Mining (UK/AU)",
+   "accession": "000086306426000041",
+   "url": "https://www.sec.gov/Archives/edgar/data/863064/000086306426000041/ex1prodresults024.jpg",
+   "file": "ex1prodresults024.jpg"
+  },
+  {
+   "id": "PBR-image006",
+   "symbol": "PBR",
+   "sector": "Oil & gas (BR)",
+   "accession": "000129281426005256",
+   "url": "https://www.sec.gov/Archives/edgar/data/1119639/000129281426005256/image_006.jpg",
+   "file": "image_006.jpg"
+  },
+  {
+   "id": "PBR-image013",
+   "symbol": "PBR",
+   "sector": "Oil & gas (BR)",
+   "accession": "000129281426005256",
+   "url": "https://www.sec.gov/Archives/edgar/data/1119639/000129281426005256/image_013.jpg",
+   "file": "image_013.jpg"
+  },
+  {
+   "id": "PBR-image014",
+   "symbol": "PBR",
+   "sector": "Oil & gas (BR)",
+   "accession": "000129281426005256",
+   "url": "https://www.sec.gov/Archives/edgar/data/1119639/000129281426005256/image_014.jpg",
+   "file": "image_014.jpg"
+  },
+  {
+   "id": "GGB-img009",
+   "symbol": "GGB",
+   "sector": "Steel (BR)",
+   "accession": "000110465926118998",
+   "url": "https://www.sec.gov/Archives/edgar/data/1073404/000110465926118998/tm2628297d3_ex99-1img009.jpg",
+   "file": "tm2628297d3_ex99-1img009.jpg"
+  },
+  {
+   "id": "GGB-img013",
+   "symbol": "GGB",
+   "sector": "Steel (BR)",
+   "accession": "000110465926118998",
+   "url": "https://www.sec.gov/Archives/edgar/data/1073404/000110465926118998/tm2628297d3_ex99-1img013.jpg",
+   "file": "tm2628297d3_ex99-1img013.jpg"
+  },
+  {
+   "id": "GGB-img014",
+   "symbol": "GGB",
+   "sector": "Steel (BR)",
+   "accession": "000110465926118998",
+   "url": "https://www.sec.gov/Archives/edgar/data/1073404/000110465926118998/tm2628297d3_ex99-1img014.jpg",
+   "file": "tm2628297d3_ex99-1img014.jpg"
+  },
+  {
+   "id": "CX-p21g1",
+   "symbol": "CX",
+   "sector": "Cement (MX)",
+   "accession": "000119312526430975",
+   "url": "https://www.sec.gov/Archives/edgar/data/1076378/000119312526430975/g110472ex3p21g1.jpg",
+   "file": "g110472ex3p21g1.jpg"
+  },
+  {
+   "id": "CX-p25g1",
+   "symbol": "CX",
+   "sector": "Cement (MX)",
+   "accession": "000119312526430975",
+   "url": "https://www.sec.gov/Archives/edgar/data/1076378/000119312526430975/g110472ex3p25g1.jpg",
+   "file": "g110472ex3p25g1.jpg"
+  },
+  {
+   "id": "F-2026002",
+   "symbol": "F",
+   "sector": "Autos (US)",
+   "accession": "000003799626000190",
+   "url": "https://www.sec.gov/Archives/edgar/data/37996/000003799626000190/exhibit99tooctober282026002.jpg",
+   "file": "exhibit99tooctober282026002.jpg"
+  },
+  {
+   "id": "F-2026006",
+   "symbol": "F",
+   "sector": "Autos (US)",
+   "accession": "000003799626000190",
+   "url": "https://www.sec.gov/Archives/edgar/data/37996/000003799626000190/exhibit99tooctober282026006.jpg",
+   "file": "exhibit99tooctober282026006.jpg"
+  },
+  {
+   "id": "SONY-img004",
+   "symbol": "SONY",
+   "sector": "Electronics & media (JP)",
+   "accession": "000110465926122964",
+   "url": "https://www.sec.gov/Archives/edgar/data/313838/000110465926122964/tm2628525d5_6kimg004.jpg",
+   "file": "tm2628525d5_6kimg004.jpg"
+  },
+  {
+   "id": "SONY-img008",
+   "symbol": "SONY",
+   "sector": "Electronics & media (JP)",
+   "accession": "000110465926122964",
+   "url": "https://www.sec.gov/Archives/edgar/data/313838/000110465926122964/tm2628525d5_6kimg008.jpg",
+   "file": "tm2628525d5_6kimg008.jpg"
+  },
+  {
+   "id": "INFY-growthpercentage",
+   "symbol": "INFY",
+   "sector": "IT services (IN)",
+   "accession": "000106749126000042",
+   "url": "https://www.sec.gov/Archives/edgar/data/1067491/000106749126000042/growth-percentage.gif",
+   "file": "growth-percentage.gif"
+  },
+  {
+   "id": "BABA-img001",
+   "symbol": "BABA",
+   "sector": "E-commerce (CN)",
+   "accession": "000110465926122960",
+   "url": "https://www.sec.gov/Archives/edgar/data/1577552/000110465926122960/tm2629111d1_ex99-1img001.jpg",
+   "file": "tm2629111d1_ex99-1img001.jpg"
+  },
+  {
+   "id": "BABA-img002",
+   "symbol": "BABA",
+   "sector": "E-commerce (CN)",
+   "accession": "000110465926122960",
+   "url": "https://www.sec.gov/Archives/edgar/data/1577552/000110465926122960/tm2629111d1_ex99-1img002.jpg",
+   "file": "tm2629111d1_ex99-1img002.jpg"
+  },
+  {
+   "id": "TAK-report007",
+   "symbol": "TAK",
+   "sector": "Pharma (JP)",
+   "accession": "000139506426000280",
+   "url": "https://www.sec.gov/Archives/edgar/data/1395064/000139506426000280/a2026-cg_report007.jpg",
+   "file": "a2026-cg_report007.jpg"
+  },
+  {
+   "id": "AAL-presentation009",
+   "symbol": "AAL",
+   "sector": "Airline (US)",
+   "accession": "000000620126000064",
+   "url": "https://www.sec.gov/Archives/edgar/data/6201/000000620126000064/earningspresentation009.jpg",
+   "file": "earningspresentation009.jpg"
+  },
+  {
+   "id": "AAL-presentation010",
+   "symbol": "AAL",
+   "sector": "Airline (US)",
+   "accession": "000000620126000064",
+   "url": "https://www.sec.gov/Archives/edgar/data/6201/000000620126000064/earningspresentation010.jpg",
+   "file": "earningspresentation010.jpg"
+  },
+  {
+   "id": "AAL-presentation013",
+   "symbol": "AAL",
+   "sector": "Airline (US)",
+   "accession": "000000620126000064",
+   "url": "https://www.sec.gov/Archives/edgar/data/6201/000000620126000064/earningspresentation013.jpg",
+   "file": "earningspresentation013.jpg"
+  },
+  {
+   "id": "DE-d1004",
+   "symbol": "DE",
+   "sector": "Machinery (US)",
+   "accession": "000110465926098904",
+   "url": "https://www.sec.gov/Archives/edgar/data/315189/000110465926098904/de-20260820xex99d1004.jpg",
+   "file": "de-20260820xex99d1004.jpg"
+  },
+  {
+   "id": "DE-d2g003",
+   "symbol": "DE",
+   "sector": "Machinery (US)",
+   "accession": "000110465926098904",
+   "url": "https://www.sec.gov/Archives/edgar/data/315189/000110465926098904/de-20260820xex99d2g003.jpg",
+   "file": "de-20260820xex99d2g003.jpg"
+  },
+  {
+   "id": "DE-d2g006",
+   "symbol": "DE",
+   "sector": "Machinery (US)",
+   "accession": "000110465926098904",
+   "url": "https://www.sec.gov/Archives/edgar/data/315189/000110465926098904/de-20260820xex99d2g006.jpg",
+   "file": "de-20260820xex99d2g006.jpg"
+  },
+  {
+   "id": "PLD-1s13",
+   "symbol": "PLD",
+   "sector": "REIT (US)",
+   "accession": "000119312526422375",
+   "url": "https://www.sec.gov/Archives/edgar/data/1045609/000119312526422375/pld-ex99_1s13.jpg",
+   "file": "pld-ex99_1s13.jpg"
+  },
+  {
+   "id": "PLD-1s19",
+   "symbol": "PLD",
+   "sector": "REIT (US)",
+   "accession": "000119312526422375",
+   "url": "https://www.sec.gov/Archives/edgar/data/1045609/000119312526422375/pld-ex99_1s19.jpg",
+   "file": "pld-ex99_1s19.jpg"
+  },
+  {
+   "id": "PLD-1s3",
+   "symbol": "PLD",
+   "sector": "REIT (US)",
+   "accession": "000119312526422375",
+   "url": "https://www.sec.gov/Archives/edgar/data/1045609/000119312526422375/pld-ex99_1s3.jpg",
+   "file": "pld-ex99_1s3.jpg"
+  },
+  {
+   "id": "WMT-fy27003",
+   "symbol": "WMT",
+   "sector": "Retail (US)",
+   "accession": "000010416926000145",
+   "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416926000145/earningspresentationfy27003.jpg",
+   "file": "earningspresentationfy27003.jpg"
+  },
+  {
+   "id": "WMT-fy27013",
+   "symbol": "WMT",
+   "sector": "Retail (US)",
+   "accession": "000010416926000145",
+   "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416926000145/earningspresentationfy27013.jpg",
+   "file": "earningspresentationfy27013.jpg"
+  },
+  {
+   "id": "WMT-fy27014",
+   "symbol": "WMT",
+   "sector": "Retail (US)",
+   "accession": "000010416926000145",
+   "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416926000145/earningspresentationfy27014.jpg",
+   "file": "earningspresentationfy27014.jpg"
+  },
+  {
+   "id": "UNH-unh012",
+   "symbol": "UNH",
+   "sector": "Health care (US)",
+   "accession": "000073176626000255",
+   "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176626000255/earningsrelease3q26unh012.jpg",
+   "file": "earningsrelease3q26unh012.jpg"
+  },
+  {
+   "id": "UNH-unh014",
+   "symbol": "UNH",
+   "sector": "Health care (US)",
+   "accession": "000073176626000255",
+   "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176626000255/earningsrelease3q26unh014.jpg",
+   "file": "earningsrelease3q26unh014.jpg"
+  },
+  {
+   "id": "NEE-img003",
+   "symbol": "NEE",
+   "sector": "Utility (US)",
+   "accession": "000110465926107537",
+   "url": "https://www.sec.gov/Archives/edgar/data/753308/000110465926107537/tm2625368d1_ex99-2img003.jpg",
+   "file": "tm2625368d1_ex99-2img003.jpg"
+  }
+ ]
+}
