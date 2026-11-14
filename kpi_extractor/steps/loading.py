@@ -122,8 +122,7 @@ class FilingLoading:
         def deepseek(name: str, data: bytes) -> tuple[str, bool]:
             # A page DeepSeek returns empty in one mode came back in the other in the probe; regions only in the first.
             for purpose in ("rich_layout_recognition", "text_recognition"):
-                pages = self.control.ocr(self.symbol, purpose, name, data).get("pages") or []
-                found = "".join(page.get("text") or "" for page in pages)
+                found = self._page_ocr(purpose, name, data)
                 if found.strip():
                     return found, purpose == "rich_layout_recognition"
             return "", False
@@ -137,6 +136,19 @@ class FilingLoading:
             if source in pages:
                 text = text.replace(tag, pages[source], 1)
         return text if pages else raw
+
+
+    def _page_ocr(self, purpose: str, name: str, data: bytes) -> str:
+        """DeepSeek's reading of a page picture, once per run and purpose: the classifier's opening pages, a deck read for
+        the KPI list and again for its quarter, are one picture each."""
+        import hashlib
+
+        cache = self.__dict__.setdefault("_ocr_pages", {})
+        key = (purpose, hashlib.sha256(data).hexdigest())
+        if key not in cache:
+            pages = self.control.ocr(self.symbol, purpose, name, data).get("pages") or []
+            cache[key] = "".join(page.get("text") or "" for page in pages)
+        return cache[key]
 
 
 # A deck of picture pages is read to this many pages (Itaú's quarterly book runs to 494 pictures).
