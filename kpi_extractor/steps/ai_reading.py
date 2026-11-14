@@ -15,6 +15,7 @@ from ..readers.extract import (ReadValue, describe, explanation_supports, header
 from ..readers.replay import _same_place, _source_template, asked_of, missing_since
 from ..readers.trace import placed_elsewhere, stamp_call
 from ..rules.period import states_quarter
+from ..quality.reasons import is_, without
 from .replay_reading import in_full_groups, left_for_ai
 from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
                      _later_place, _same, _same_chain, _year_ago_cells)
@@ -345,7 +346,7 @@ class AiReading:
     def _explain_jumps(self, read: list[ReadValue], document: Document, spec: Spec) -> None:
         """Values flagged only for a sharp change get a reading by the reasoning reader; a real change backed by a quote stands."""
         flagged = [item for item in read if item.status == "needs_review"
-                   and item.notes and all(_is_jump(note) for note in item.notes if note != "confirmed by review")]
+                   and item.notes and all(is_(note, "jump") for note in without(item.notes, "reviewed"))]
         if not flagged:
             return
         lines = "\n".join(f"- {item.group.key}.{item.kpi.key} ({item.group.label} / {item.kpi.label}): now {item.value:g}"

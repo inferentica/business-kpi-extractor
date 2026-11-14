@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Callable, Iterable
 
+from ..rules.numbers import same_figure
+from .reasons import SHARED_CELL
 from .stated import stated_in_filing
 
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
@@ -36,8 +38,7 @@ def _significant(value: float) -> bool:
     return abs(value) >= 1e6 and len(digits) >= 3
 
 
-def _same(left: float, right: float) -> bool:
-    return abs(left - right) <= max(abs(left), abs(right)) * 1e-9
+_same = same_figure
 
 
 def _days(left: str, right: str) -> int:
@@ -166,9 +167,6 @@ def _lines_add_up(figures: list[Figure], **_context) -> list[Finding]:
     return found
 
 
-# The notes the jump checks below write. A jump is a sign of a misread, which a later filing stating the same figure
-# disproves: TSMC's 3-nanometer revenue went from NT$0.5 billion to NT$29 billion as the node ramped.
-JUMP_NOTE = re.compile(r"^(?:changed [\d.]+x|moved [+-]?[\d.,]+(?: points)?) in a quarter$")
 
 
 def count_jump(unit: str, before: float, now: float) -> str | None:
@@ -184,15 +182,24 @@ def _ratio_jump(before: float, now: float) -> str | None:
     return f"changed {ratio:.1f}x in a quarter" if ratio > MAX_RATIO_JUMP or ratio < 1 / MAX_RATIO_JUMP else None
 
 
-def _jump(figure: Figure, before: float | None) -> str | None:
+def jump(kind: str, unit: str, before: float | None, now: float) -> str | None:
+    """The one jump rule, for a reading and for stored quarters in date order alike: a share of a mix moving by more
+    than MAX_MIX_JUMP points, a small count by more than SMALL_COUNT_MOVE, any other positive amount or count by more
+    than MAX_RATIO_JUMP times. A percent that is not a share (a growth rate, a ratio) and a negative or zero figure
+    have no jump: Costco's digital comparable sales growing 28.4% then 64.5%, or Bank of America's other income at
+    -$78 million then -$491 million, says nothing about a misread."""
     if before is None:
         return None
-    if figure.kind == "mix":
-        return f"moved {figure.value - before:+.1f} points in a quarter" if abs(figure.value - before) > MAX_MIX_JUMP else None
-    if figure.unit == "percent" or before <= 0 or figure.value <= 0:
+    if kind == "mix":
+        return f"moved {now - before:+.1f} points in a quarter" if abs(now - before) > MAX_MIX_JUMP else None
+    if unit == "percent" or before <= 0 or now <= 0:
         return None
-    small = count_jump(figure.unit, before, figure.value)
-    return (small or None) if small is not None else _ratio_jump(before, figure.value)
+    small = count_jump(unit, before, now)
+    return (small or None) if small is not None else _ratio_jump(before, now)
+
+
+def _jump(figure: Figure, before: float | None) -> str | None:
+    return jump(figure.kind, figure.unit, before, figure.value)
 
 
 def _no_sharp_change(figures: list[Figure], previous: dict[str, float], **_context) -> list[Finding]:
@@ -209,11 +216,11 @@ def _no_sharp_change(figures: list[Figure], previous: dict[str, float], **_conte
         before = previous.get(f"{group}.{figure.key}")
         if breakdown and before is not None and previous_total and abs(before) < IMMATERIAL * abs(previous_total):
             continue
-        jump = _jump(figure, before)
+        moved = _jump(figure, before)
         # A figure is judged by its filing, not by how far it moved: one the filing states where it was read stands.
-        if jump and not stated_in_filing(figure.unit, figure.value, getattr(figure.source, "locator", None),
+        if moved and not stated_in_filing(figure.unit, figure.value, getattr(figure.source, "locator", None),
                                          getattr(figure.source, "notes", None), figure.label):
-            found.append(Finding("no_sharp_change", [figure], jump))
+            found.append(Finding("no_sharp_change", [figure], moved))
     return found
 
 
@@ -242,7 +249,6 @@ def _flag(items: Iterable, note: str) -> None:
         item.notes.append(note)
 
 
-SHARED_CELL = "read from the same table cell as another listed metric"
 
 
 def _shared_cells(values: list) -> None:
@@ -310,17 +316,6 @@ def immaterial_row(value: dict) -> bool:
     return value["group_kind"] == "revenue_breakdown" and bool(total) and abs(float(value["value"])) < IMMATERIAL * abs(float(total))
 
 
-def _row_jump(current: dict, before: float, now: float) -> str | None:
-    small = count_jump(current["unit"], before, now)
-    if current["unit"] == "percent":
-        return f"moved {now - before:+.1f} points in a quarter" if abs(now - before) > MAX_MIX_JUMP else None
-    if small is not None:
-        return small or None
-    if before and now / before > 0 and not 1 / MAX_RATIO_JUMP <= now / before <= MAX_RATIO_JUMP:
-        return f"changed {now / before:.1f}x in a quarter"
-    return None
-
-
 def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of: Callable[[dict], tuple],
                         methods: frozenset[str] | None = _READ) -> dict[tuple, str]:
     """Each verified quarterly figure against the quarter before it, in date order: a sharp change, or the same significant
@@ -337,10 +332,10 @@ def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of:
             if not judged(current) or _days(current["period_end"], previous["period_end"]) > _SERIES_GAP_DAYS:
                 continue
             before, now = float(previous["value"]), float(current["value"])
-            jump = _row_jump(current, before, now)
-            if jump and not immaterial_row(current) and not stated_in_filing(current["unit"], now, current.get("locator"),
+            moved = jump(current["group_kind"], current["unit"], before, now)
+            if moved and not immaterial_row(current) and not stated_in_filing(current["unit"], now, current.get("locator"),
                                                                               current.get("notes"), current.get("kpi_label")):
-                flagged[key_of(current)] = jump
+                flagged[key_of(current)] = moved
             elif (current["unit"] == "currency" and _significant(now) and _same(now, before) and not _row_shows(current, before, now)
                   and not states_one_period(current)):
                 flagged[key_of(current)] = "the same figure as the quarter before: check the column"

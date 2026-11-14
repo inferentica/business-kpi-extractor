@@ -9,9 +9,8 @@ import re
 
 from ..documents.document import parse_number
 from ..rules.wording import falls
-
-# A scale adopted to fit the series rather than stated by the filing: such a figure is not the filing's own statement.
-_SCALE_FROM_SERIES = "to match the series"
+from ..rules.numbers import same_figure
+from .reasons import has
 
 
 _WORD = re.compile(r"[a-z]{4,}")
@@ -28,8 +27,7 @@ def _names(row_label: str, label: str | None) -> bool:
     return bool(set(_WORD.findall(row_label.lower())) & set(_WORD.findall(label.lower())))
 
 
-def _same(left: float, right: float) -> bool:
-    return abs(left - right) <= 1e-9 * max(abs(left), abs(right), 1.0)
+_same = same_figure
 
 
 def stated_in_filing(unit: str, value: float, locator: dict | None, notes: list[str] | None = None,
@@ -42,7 +40,7 @@ def stated_in_filing(unit: str, value: float, locator: dict | None, notes: list[
       document scale, never the reader's word alone);
     - or the table cell it was read from holds the figure at the scale the table states, in a row whose own label names
       the KPI (the read cell is the first of the row's numbers, kept as printed)."""
-    if any(_SCALE_FROM_SERIES in note for note in notes or []):
+    if has(notes, "rescaled"):  # a scale adopted to fit the series is not the filing's own statement
         return False
     at = locator or {}
     quote, text = str(at.get("quote") or ""), str(at.get("value_text") or "")

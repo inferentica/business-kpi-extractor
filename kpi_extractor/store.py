@@ -9,6 +9,7 @@ from datetime import date
 from types import MappingProxyType
 
 from .ai import KpiSpec
+from .quality.reasons import REREAD_NOTE
 from .quality.stated import stated_in_filing
 from .sources import accepts_url
 from .sources.base import FilingRef
@@ -295,7 +296,6 @@ class CompanyStore:
             self._values[value_key(value)] = MappingProxyType(value)
 
 
-REREAD_NOTE = "a new reading of this filing differs from the figure served before:"
 
 
 def _rounded(value) -> float:

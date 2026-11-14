@@ -126,3 +126,21 @@ def test_a_cell_read_twice_counts_once():
     other = [dict(row) for row in rows]
     other[1]["source_accession"] = "Y"
     assert not parts_add_up(other)
+
+
+def test_one_jump_rule_for_a_reading_and_for_stored_quarters():
+    from kpi_extractor.quality.checks import date_order_findings, jump
+    assert jump("mix", "percent", 20.0, 55.0) == "moved +35.0 points in a quarter"
+    assert jump("metric", "currency", 100.0, 400.0) == "changed 4.0x in a quarter"
+    assert jump("metric", "count", 10.0, 40.0) == "moved +30 in a quarter"  # a small count moves by units
+    # A growth rate and a negative line have no jump: Costco's digital comparable sales, Bank of America's other income.
+    assert jump("metric", "percent", 28.4, 64.5) is None
+    assert jump("revenue_breakdown", "currency", -78e6, -491e6) is None
+
+    def row(value, end, unit="percent", kind="metric"):
+        return {"group_key": "kpi_operating", "kpi_key": "digital_comps", "group_kind": kind, "unit": unit, "method": "ai",
+                "validation_status": "verified", "fiscal_period": "Q3", "period_end": end, "value": value, "notes": []}
+    rows = [row(28.4, "2020-05-10"), row(64.5, "2020-08-30")]
+    assert date_order_findings(rows, None, lambda v: v["period_end"]) == {}
+    amounts = [row(100.0, "2020-05-10", "currency"), row(400.0, "2020-08-30", "currency")]
+    assert date_order_findings(amounts, None, lambda v: v["period_end"]) == {"2020-08-30": "changed 4.0x in a quarter"}

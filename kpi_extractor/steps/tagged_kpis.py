@@ -12,7 +12,8 @@ from ..domain.fiscal import fiscal_label
 from ..sources.base import FilingRef
 from ..readers.tagged_metrics import (agrees, concept_units, refines, fact_lines, learn_tag, learn_tags, quarter_facts,
                                       tag_from_locator, unit_fits, year_ago_facts)
-from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _UNANCHORED, _is_jump, _rounding, value_key
+from ..quality.reasons import UNANCHORED, without
+from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _rounding, value_key
 
 # Where the AI's tag picks are kept between runs, beside the XBRL row curations.
 TAG_PICKS = "xbrl_tags"
@@ -270,7 +271,7 @@ class TaggedKpiReading:
                         differ[tag] = differ.get(tag, 0) + 1
             tags[kpi.key] = [tag for tag, count in agree.items() if count >= 2 and count >= 2 * differ.get(tag, 0)]
         records = []
-        settled = {"another part of this breakdown needs review", "confirmed by review", "settled by the checks", *_UNANCHORED}
+        settled = ("other_part", "reviewed", "settled", *UNANCHORED)
         parents = {kpi.key: kpi.parent for kpi in group.kpis if kpi.parent}
 
         def tagged(quarter, kpi: str) -> float | None:
@@ -331,7 +332,7 @@ class TaggedKpiReading:
                 continue
             ref, end = quarters[quarter]
             for kpi, v in lines.items():
-                notes = [note for note in v.get("notes") or [] if note not in settled and not _is_jump(note)]
+                notes = without(v.get("notes"), *settled, "jump")
                 note = (f"the {ref.form}'s exact figure; the release gave {float(v['value']):,.15g}" if kpi in changed
                         else f"the {ref.form}'s exact figure; every line of the quarter is tagged")
                 record = {**v, "validation_status": "verified", "notes": [*notes, note],

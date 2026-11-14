@@ -7,6 +7,7 @@ from datetime import date
 from ..ai import Spec
 from ..sources.archive import filing_folder
 from ..quality.checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
+from ..quality.reasons import is_
 from ..documents.document import Document, clean, parse_number
 from ..readers.extract import column_header
 from ..rules.period import release_unit
@@ -22,7 +23,6 @@ _MAX_ATTEMPTS = 3
 _READ_BY_AI = "read by AI"
 _NOT_REPORTED = "not reported: "
 _XBRL_READER = "xbrl reader 50"  # 50: a split tagged alone beats one completed with a fixed member's siblings (Adobe)
-_UNANCHORED = {"total matches no figure the company reported in XBRL", "no total revenue to reconcile against"}
 
 def value_key(value: dict) -> tuple[str, str, str, str]:
     return value["group_key"], value["kpi_key"], value["fiscal_year"], value["fiscal_period"]
@@ -104,7 +104,7 @@ def _rounding(value: float) -> float:
 
 
 def _is_jump(note: str) -> bool:
-    return note.startswith(("changed ", "moved "))
+    return is_(note, "jump")
 
 
 def _document_text(document: Document) -> str:

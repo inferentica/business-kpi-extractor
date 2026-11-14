@@ -10,27 +10,21 @@ from datetime import date, timedelta
 from ..ai import Spec
 from ..domain.derive import derive_periods, same_derivation
 from ..documents.document import Document, parse_number
-from ..quality.checks import JUMP_NOTE, count_jump, parts_add_up, reported_matches
+from ..quality.checks import count_jump, parts_add_up, reported_matches
+from ..quality.reasons import (ADDS_TO_XBRL as _ADDS_TO_XBRL, ASIDES, CONFIRMED_LATER as _CONFIRMED_LATER, EQUALS_XBRL as _EQUALS_XBRL,
+                              GROUP_HOLDS, NO_REVENUE_NOTE, OTHER_PART_NOTE, PROOFS, RESTATED_LATER as _RESTATED_LATER, TIES_OUT, UNANCHORED,
+                              WITHIN_XBRL as _WITHIN_XBRL, has, is_, note_with, only, without)
 from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
 from ..rules.period import release_unit
 from ..rules.scale import _PER_UNIT
 from ..sources.base import FilingRef
-from .shared import (_rescaled, AI_GROUP_PREFIX, _UNANCHORED, _days, _is_jump, _rounding, _same_chain, _significant,
+from .shared import (_rescaled, AI_GROUP_PREFIX, _days, _rounding, _same_chain, _significant,
                      _year_ago_cells, held_for_later, list_parents, value_key)
 
 MAX_YEAR_RATIO = 3.0
-# Evidence that settles a flagged value without anyone looking at it; it outranks the check of a read total row.
-_EQUALS_XBRL = "equals a figure reported in XBRL"
-_ADDS_TO_XBRL = "parts add up to a figure reported in XBRL"
-_CONFIRMED_LATER = "confirmed by the next year's release"
-_RESTATED_LATER = "restated in the next year's release"
-_WITHIN_XBRL = "parts make up nearly all of a figure reported in XBRL"
-TIES_OUT = "its row gives last year's accepted figure for the quarter: it stands on its own"
-_PROOFS = (_EQUALS_XBRL, _ADDS_TO_XBRL, _CONFIRMED_LATER, _RESTATED_LATER, _WITHIN_XBRL, TIES_OUT)
 # A split of part of a reported line (Adobe's two customer groups: 99.5% of its subscription revenue, the rest its
 # advertising business's) covers at least this share of it.
 _MIN_COVERAGE = 0.99
-_EXACT_NOTE = re.compile(r"^the [\w-]+'s exact (?:figure|year less its three quarters);")
 # Restatements move a figure a little (a reclassification); a jump beyond this is a different column, not a restatement.
 MAX_RESTATEMENT = 0.10
 
@@ -49,14 +43,10 @@ _PERIOD_HEADER = re.compile(r"months?|weeks?|quarter|year|\bq[1-4]\b|\bfy\b|@", 
 
 def _proven(value: dict) -> bool:
     # A line replaced by its report's exact tagged figure (Adobe's customer groups) is a figure reported in XBRL.
-    return any(note.startswith(_PROOFS) or _EXACT_NOTE.match(note) for note in value.get("notes") or [])
+    return has(value.get("notes"), *PROOFS, "tagged_exact")
 
 
 
-# Holds a row gets from its group alone: the breakdown's sum, its total's anchor, or another row's hold.
-_GROUP_HOLDS = ("parts differ from the total by", "another part of this breakdown needs review",
-                "total matches no figure the company reported in XBRL", "no total revenue to reconcile against")
-_ASIDE = ("confirmed by review", "settled by the checks", "checked against ")
 
 
 def ties_out(value: dict, year_ago: float | None) -> bool:
@@ -100,9 +90,9 @@ def tied_rows(values: list[dict]) -> list[dict]:
     and a row held for itself (its scale, a jump, its period, a place, a twin row) keeps its hold; a jump only until the
     next year's release states the same figure. Oldest first, so a row cleared this way is last year's figure for the next."""
     def group_held_only(v: dict) -> bool:
-        own = [note for note in v.get("notes") or [] if not note.startswith((*_ASIDE, *_PROOFS)) and not _EXACT_NOTE.match(note)
-               and not (_CONFIRMED_LATER in v["notes"] and JUMP_NOTE.match(note))]  # a later filing's same figure: no misread
-        return all(note.startswith(_GROUP_HOLDS) for note in own)
+        own = [note for note in without(v.get("notes"), *ASIDES, *PROOFS, "tagged_exact")
+               if not (has(v["notes"], "confirmed_later") and is_(note, "jump"))]  # a later filing's same figure: no misread
+        return all(is_(note, *GROUP_HOLDS) for note in own)
 
     # Last year's figure counts when it is accepted, or held only for its group and read from another filing: two
     # filings then agree on the row (PNC's fee types, held every year because their total is no XBRL figure).
@@ -133,7 +123,7 @@ def tied_rows(values: list[dict]) -> list[dict]:
                          if g == v["group_key"] and k == v["kpi_key"] and annual == (v["fiscal_period"] == "FY")
                          and abs((end - timedelta(days=365) - date.fromisoformat(other_end[:10])).days) <= 12
                          and filing != v.get("source_accession")), None)
-        if ties_out(v, year_ago) or _CONFIRMED_LATER in (v.get("notes") or []):
+        if ties_out(v, year_ago) or has(v.get("notes"), "confirmed_later"):
             cleared = {**v, "validation_status": "verified", "notes": [*(v.get("notes") or []), TIES_OUT]}
             released.append(cleared)
             accepted[(v["group_key"], v["kpi_key"], v["fiscal_period"] == "FY", v["period_end"])] = (float(v["value"]), v.get("source_accession"))
@@ -242,7 +232,7 @@ class SeriesChecks:
         for v in self.values.values():
             if v["method"] != "ai" or v["validation_status"] != "verified":
                 continue
-            note = next((n for n in v.get("notes") or [] if n.startswith(_RESTATED_LATER)), None)
+            note = note_with(v.get("notes"), "restated_later")
             match = re.search(r"\(was ([-\d.e+]+)\)", note or "")
             if match and (abs(float(v["value"]) - float(match.group(1))) > abs(float(match.group(1))) * MAX_RESTATEMENT
                           or v["unit"] == "currency" and abs(float(v["value"])) >= 1000
@@ -253,9 +243,9 @@ class SeriesChecks:
         for rows in groups.values():
             if not whole(rows[0]):
                 for v in rows:
-                    if v["validation_status"] == "verified" and {_EQUALS_XBRL, _ADDS_TO_XBRL} & set(v.get("notes") or []):
-                        settled[value_key(v)] = {**v, "validation_status": "needs_review", "notes": [
-                            note for note in v.get("notes") or [] if note not in (_EQUALS_XBRL, _ADDS_TO_XBRL)]}
+                    if v["validation_status"] == "verified" and has(v.get("notes"), "equals_xbrl", "adds_to_xbrl"):
+                        settled[value_key(v)] = {**v, "validation_status": "needs_review",
+                                                 "notes": without(v.get("notes"), "equals_xbrl", "adds_to_xbrl")}
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
             # To the figures' own rounding: Unity's release gives its Q3 2024 lines to the million ($447 million in all),
@@ -270,7 +260,7 @@ class SeriesChecks:
         # rounding and nothing else is wrong with it.
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
-            if len(rows) < 2 or not waiting or any(not {n for n in v.get("notes") or [] if not _EXACT_NOTE.match(n)} <= _UNANCHORED
+            if len(rows) < 2 or not waiting or any(not all(is_(n, *UNANCHORED) for n in without(v.get("notes"), "tagged_exact"))
                                                    for v in waiting):
                 continue
             parts = [float(v["value"]) for v in rows]
@@ -296,9 +286,9 @@ class SeriesChecks:
         for v in self.values.values():
             if v["method"] != "ai" or v["group_kind"] != "revenue_breakdown" or v["validation_status"] == "rejected":
                 continue
-            note = next((n for n in v.get("notes") or [] if n.startswith(_RESTATED_LATER)), None)
+            note = note_with(v.get("notes"), "restated_later")
             match = re.search(r"\(was ([-\d.e+]+)\)", note or "")
-            if match and not all(any(n.startswith(_RESTATED_LATER) for n in o.get("notes") or []) for o in ai_parts(v)):
+            if match and not all(has(o.get("notes"), "restated_later") for o in ai_parts(v)):
                 settled[value_key(v)] = {**v, "value": float(match.group(1)), "validation_status": "needs_review",
                                          "notes": [n for n in v.get("notes") or [] if n != note]}
         by_accession = {ref.accession: ref for ref in releases}
@@ -338,7 +328,7 @@ class SeriesChecks:
         for period, items in restatements.items():
             restated = {value_key(row) for row, _figure, _checked in items}
             parts = ai_parts(items[0][0])
-            if all(value_key(o) in restated or _CONFIRMED_LATER in ((settled.get(value_key(o)) or o).get("notes") or [])
+            if all(value_key(o) in restated or has((settled.get(value_key(o)) or o).get("notes"), "confirmed_later")
                    for o in parts):
                 for row, figure, _checked in items:
                     settle(row, f"{_RESTATED_LATER} (was {float(row['value']):.15g})", value=figure)
@@ -353,13 +343,13 @@ class SeriesChecks:
             periods.setdefault(period_of(rows[0]), []).extend(rows)  # an owner's entry cites another filing of the quarter
         for rows in periods.values():
             period = [row for row in (settled.get(value_key(v)) or v for v in rows) if row["validation_status"] != "rejected"]
-            if not any(_CONFIRMED_LATER in (row.get("notes") or []) for row in period) or parts_add_up(period, parents):
+            if not any(has(row.get("notes"), "confirmed_later") for row in period) or parts_add_up(period, parents):
                 continue
             for row in period:
                 if row["validation_status"] == "verified" and not row.get("owner_decision"):
                     settled[value_key(row)] = {**row, "validation_status": "needs_review", "notes": (
-                        row.get("notes") or [] if _CONFIRMED_LATER in (row.get("notes") or [])
-                        else [*(row.get("notes") or []), "another part of this breakdown needs review"])}
+                        row.get("notes") or [] if has(row.get("notes"), "confirmed_later")
+                        else [*(row.get("notes") or []), OTHER_PART_NOTE])}
         # A breakdown or mix is proven whole or not at all: a part confirmed on its own, beside parts still flagged, stays
         # flagged with them (its confirmation note kept for when the rest is settled).
         for key, row in list(settled.items()):
@@ -398,7 +388,7 @@ class SeriesChecks:
             if v["method"] != "ai" or v["validation_status"] != "needs_review" or v["fiscal_period"] != "FY":
                 continue
             notes = v.get("notes") or []
-            if notes and all(_is_jump(note) and note.endswith("in a quarter") for note in notes):
+            if only(notes, ["jump"]):
                 key = f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}"
                 before = self._previous(date.fromisoformat(v["period_end"][:10]), annual=True).get(key)
                 siblings = by_filing.get((v.get("source_accession") or "", v["period_end"]), [])
@@ -415,7 +405,7 @@ class SeriesChecks:
                 total = sum(float(m["value"]) for m in members)
                 for m in members:
                     notes = m.get("notes") or []
-                    if (m["validation_status"] == "needs_review" and notes and all(_is_jump(note) for note in notes)
+                    if (m["validation_status"] == "needs_review" and only(notes, ["jump"])
                             and total and abs(float(m["value"])) < 0.01 * abs(total)):
                         cleared.append({**m, "validation_status": "verified", "notes": ["immaterial row; the total checks it"]})
             groups: dict[str, list[dict]] = {}
@@ -423,7 +413,7 @@ class SeriesChecks:
                 groups.setdefault(v["group_key"], []).append(v)
             for group_key, members in groups.items():
                 if not all(m["validation_status"] == "needs_review" and (m.get("locator") or {}).get("whole_table")
-                           and (m.get("notes") or []) == ["no total revenue to reconcile against"] for m in members):
+                           and (m.get("notes") or []) == [NO_REVENUE_NOTE] for m in members):
                     continue
                 parts = sum(float(m["value"]) for m in members)
                 anchors = [float(o["value"]) for o in rows if o["group_key"] != group_key and o["validation_status"] == "verified"]
@@ -471,13 +461,13 @@ class SeriesChecks:
                 continue  # no scale most figures share
             for index, (v, at) in enumerate(zip(rows, levels)):
                 if at == main and v["validation_status"] == "needs_review" and index and levels[index - 1] != main \
-                        and all(_is_jump(note) or note == "confirmed by review" for note in v.get("notes") or []):
+                        and all(is_(note, "jump", "reviewed") for note in v.get("notes") or []):
                     # Its jump was from the run before it.
                     records.append({**v, "validation_status": "verified", "notes": ["the figure before it was off its scale"]})
                 if at == main or v.get("owner_decision"):
                     continue
                 factor = 10 ** (3 * (main - at))
-                notes = [note for note in v.get("notes") or [] if not _is_jump(note) and note != "confirmed by review"]
+                notes = without(v.get("notes"), "jump", "reviewed")
                 records.append({**v, "value": round(float(v["value"]) * factor, 6), "locator": _rescaled(v.get("locator"), factor),
                                 "validation_status": "verified" if not notes else v["validation_status"],
                                 "notes": [*notes, f"read without its table's scale: {factor:g}× to match the series"]})
@@ -490,7 +480,7 @@ class SeriesChecks:
         - a small count's ratio jump (ASML's used systems sold, 10 to 3), flagged before small counts moved by units;
         - a breakdown's parts off their total (ASML's 2023 quarters, read twice over while two keys named each line),
           now that its parts add up to the release's stated total."""
-        aside = ("confirmed by review", "checked against ")
+        aside = ("reviewed", "checked")  # a check's own mark ("settled by the checks") is not set aside here
         cleared = []
         series: dict[tuple[str, str], list[dict]] = {}
         for v in self.values.values():
@@ -503,8 +493,7 @@ class SeriesChecks:
         for v in self.values.values():
             if v["method"] != "ai" or v["validation_status"] != "needs_review" or v["fiscal_period"] == "FY":
                 continue
-            reasons = [note for note in v.get("notes") or [] if not note.startswith(aside)]
-            if v["unit"] != "count" or not reasons or not all(note.startswith("changed ") for note in reasons):
+            if v["unit"] != "count" or not only(v.get("notes"), ["ratio_jump"], ignoring=aside):
                 continue
             before = max((o for o in series.get((v["group_key"], v["kpi_key"]), [])
                           if 0 < _days(v["period_end"], o["period_end"]) <= 120), key=lambda o: o["period_end"], default=None)
@@ -516,9 +505,7 @@ class SeriesChecks:
             stated = float((rows[0].get("locator") or {}).get("total") or 0)
             if not waiting or len(rows) < 2 or not stated or len(waiting) != len(rows):
                 continue
-            if not all([note for note in v.get("notes") or [] if not note.startswith(aside)]
-                       and all(note.startswith("parts differ from the total by") for note in v.get("notes") or []
-                               if not note.startswith(aside)) for v in waiting):
+            if not all(only(v.get("notes"), ["parts_differ"], ignoring=aside) for v in waiting):
                 continue
             parts = [float(v["value"]) for v in rows]
             if abs(sum(parts) - stated) <= abs(stated) * 0.001:
@@ -529,7 +516,6 @@ class SeriesChecks:
     def _release_held_breakdowns(self) -> list[dict]:
         """Parts flagged only because another part of their breakdown was, released once that part is cleared: TSMC's
         FY2024 nodes were held for 3nm's 3.5× ramp, which the year's reconciling table then confirmed."""
-        held = "another part of this breakdown needs review"
         groups: dict[tuple, list[dict]] = {}
         for v in self.values.values():
             if v["method"] == "ai" and v["group_kind"] != "metric" and v["validation_status"] != "rejected":
@@ -537,10 +523,8 @@ class SeriesChecks:
         released = []
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review"]
-            if waiting and all(set(v.get("notes") or []) <= {held, "confirmed by review"} and held in (v.get("notes") or [])
-                               for v in waiting):
-                released += [{**v, "validation_status": "verified",
-                              "notes": [note for note in (v.get("notes") or []) if note != held]} for v in waiting]
+            if waiting and all(only(v.get("notes"), ["other_part"], ignoring=["reviewed"]) for v in waiting):
+                released += [{**v, "validation_status": "verified", "notes": without(v.get("notes"), "other_part")} for v in waiting]
         return released
 
     def _reports_full_year(self, read: list[ReadValue], period_end: date) -> bool:
