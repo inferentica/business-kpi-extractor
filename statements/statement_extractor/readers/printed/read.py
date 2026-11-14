@@ -45,14 +45,17 @@ def _concept(label: str, kind: str) -> str:
 
 def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: date, document_end: date | None,
                 fiscal_year_end: str, year_offset: int, unstated_scale: float | None = None,
-                ) -> tuple[list[Reading], list[str]]:
+                left_out: frozenset = frozenset()) -> tuple[list[Reading], list[str]]:
     """Every statement column of a printed filing, checked; and notes on what it could not read. With
-    `unstated_scale`, a statement that states no scale is read in that one (pipeline/unstated_scale.py proves it)."""
+    `unstated_scale`, a statement that states no scale is read in that one (pipeline/unstated_scale.py proves it);
+    none titled for a company in `left_out` (Brookfield Asset Management ULC's in Brookfield Asset Management Ltd.'s)."""
     readings: list[Reading] = []
     notes: list[str] = []
-    found = find_statements(all_tables, release=form == "6-K")
-    # A statement printed more than once: the fullest table, the group's before the parent's alone (TSMC's 2008 6-Ks).
+    found = [(kind, group) for kind, group in find_statements(all_tables, release=form == "6-K")
+             if titled_company(kind, group[0]) not in left_out]  # another company's (pipeline/printed.py)
+    # Printed more than once: the group's (TSMC's 2008 6-Ks), a titled one (Brookfield's, not its MD&A's), the fullest.
     found.sort(key=lambda item: (statement_scope(item[0], item[1], form, found) != "consolidated",
+                                 titled_company(item[0], item[1][0]) is None,
                                  -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
     read_periods: dict[tuple, set] = {}  # by kind and scope: Copel prints the parent's quarter, then the group's
     for kind, group in found:

@@ -444,3 +444,25 @@ def test_an_underlying_basis_income_statement_is_no_statement():
                          ("STATUTORY CONSOLIDATED INCOME STATEMENT (UNAUDITED)", 1)):
         html = f"<p>Profit on an underlying basis was up. {title}</p>" + table
         assert len(find_statements(parse_html(html), release=True)) == found
+
+
+def test_a_title_ending_in_its_kind_after_consolidated_and_combined_names_its_company():
+    from statement_extractor.readers.printed.company_title import titled_company
+    from types import SimpleNamespace
+    table = SimpleNamespace(context="56 BROOKFIELD ASSET MANAGEMENT ULC CONDENSED CONSOLIDATED AND COMBINED BALANCE "
+                                    "SHEETS (UNAUDITED)")
+    assert titled_company("balance", table) == "BROOKFIELD ASSET MANAGEMENT ULC"
+    table = SimpleNamespace(context="45 BROOKFIELD ASSET MANAGEMENT LTD. CONDENSED CONSOLIDATED STATEMENT OF "
+                                    "COMPREHENSIVE INCOME (UNAUDITED)")
+    assert titled_company("income", table) == "BROOKFIELD ASSET MANAGEMENT LTD."
+
+
+def test_a_comprehensive_income_statement_without_taxes_is_an_income_statement():
+    from statement_extractor.readers.printed.comprehensive import profit_below_lines as _profit_below_lines
+    from types import SimpleNamespace
+    row = lambda label, figures=True: SimpleNamespace(label=label, figures={3: 1.0} if figures else {})  # noqa: E731
+    own = SimpleNamespace(rows=[row("Operating recoveries"), row("Compensation and benefits"), row("Total expenses"),
+                                row("Share of income from Brookfield Asset Management ULC"), row("Net income")])
+    assert _profit_below_lines(own)
+    other = SimpleNamespace(rows=[row("Net income"), row("Currency translation"), row("Comprehensive income")])
+    assert not _profit_below_lines(other)

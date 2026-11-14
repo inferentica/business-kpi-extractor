@@ -123,6 +123,17 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
         if others:
             readings = [reading for reading in readings if reading.titled not in others and reading.audited_of not in others]
             document_notes.append(f"another company's statements left out ({'; '.join(sorted(others))[:120]})")
+            # Read again without them: a fuller statement of another company's takes the periods the company's own
+            # prints too (readers/printed/read.py).
+            try:
+                again, _ = reader(content, accession=ref.accession, form=ref.form, filed=ref.filed,
+                                  document_end=document_end, fiscal_year_end=fiscal_year_end, year_offset=year_offset,
+                                  left_out=frozenset(others))
+            except Exception:  # noqa: BLE001 - the first reading stands
+                again = []
+            held = {(reading.key, reading.scope) for reading in readings}
+            readings += [reading for reading in again if reading.titled not in others and reading.audited_of not in others
+                         and (reading.key, reading.scope) not in held]
         issuers = _other_issuers(readings, ref, cover)
         if issuers:
             # Another issuer's release furnished in the company's 6-K (FEMSA's carry Coca-Cola FEMSA's): its statements.

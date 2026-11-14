@@ -139,3 +139,11 @@ def test_an_inline_xbrl_covers_names_come_after_its_hidden_header():
              "as specified in its charter) UNITED BREWERIES COMPANY, INC. (Translation of Registrant's name into English)</p>")
     document = SimpleNamespace(document_type="20-F", content="<html><body>" + header + cover + "</body></html>")
     assert _registrant_words(_cover_text([document], ("20-F",))) == {"COMPANIA", "CERVECERIAS", "UNIDAS", "UNITED", "BREWERIES"}
+
+
+def test_the_companys_name_under_another_legal_form_is_another_entity():
+    # Brookfield Asset Management Ltd.'s releases print the statements of the business it held a quarter of.
+    names = ["Brookfield Asset Management Ltd."]
+    cover = "Commission File Number 001-41563 Brookfield Asset Management Ltd. (Translation of Registrant's name"
+    assert _others(["BROOKFIELD ASSET MANAGEMENT ULC", "BROOKFIELD ASSET MANAGEMENT LTD."], names, cover) == [
+        "BROOKFIELD ASSET MANAGEMENT ULC"]

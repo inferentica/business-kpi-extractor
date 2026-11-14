@@ -100,6 +100,11 @@ _REGIONS = {"PHILIPPINES", "LATAM", "ESPANA", "SPAIN", "LATIN", "AMERICA", "AMER
             "COLOMBIA", "CHILE", "PERU", "BRASIL", "BRAZIL", "ARGENTINA", "CANADA", "USA", "PANAMA", "EGYPT", "INDIA"}
 
 
+# The company's own name under another legal form is another entity: Brookfield Asset Management ULC, the business
+# Brookfield Asset Management Ltd. held a quarter of until 2025, whose statements its releases print in full.
+_OTHER_FORMS = {"ULC"}
+
+
 def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
     """The names of other companies that a release's statement titles name: an acquired company's statements furnished
     with the company's report (Gildan's 6-K of June 2011 carries Gold Toe Moretz's, "GOLD TOE MORETZ HOLDINGS CORP. AND
@@ -120,7 +125,8 @@ def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
         words = _named(printed.removesuffix("’s"))
         if (len(words) >= 2 or (printed.endswith("’s") or printed in audited) and words) and (not words & own and not any(
                 SequenceMatcher(None, word, other).ratio() >= 0.85 for word in words for other in own)
-                or words & own and (words - own) & _REGIONS):
+                or words & own and (words - own) & _REGIONS
+                or words & own and words - own and words - own <= _OTHER_FORMS):
             others.append(printed)
     return sorted(others)
 

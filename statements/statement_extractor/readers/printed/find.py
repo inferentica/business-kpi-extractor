@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import replace
 
+from .comprehensive import income_in_one
 from ...domain.basis import currencies_named
 from ...domain.printed_labels import (ASSETS, BARE_TOTAL, BEFORE_FINANCING, Widened, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES,
                                       LIABILITIES_AND_EQUITY, NET_INCOME, PRETAX, SECTIONS, EQUITY_SECTION)
@@ -108,13 +109,12 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
         if kind is None and _GENERIC_TITLE.search(table.context[-250:]) and any(
                 _EARNINGS_HEAD.match(cell.text) for cells in table.header for cell in cells):
             kind = "income"  # Tennant's 1990s 10-Qs: "CONSOLIDATED STATEMENTS (UNAUDITED)", "EARNINGS (note 1)" over its columns
-        # Its profit before tax may be on the statement's second page (KEPCO's "Statements of Comprehensive Income
-        # (Loss), Continued").
+        # Its profit before tax may be on its second page (KEPCO's "Statements of Comprehensive Income (Loss), Continued").
         pages = [table] + [later for later in all_tables[position + 1:position + 2]
                            if re.search(r"\bcontinued\b", later.context[-200:], re.I) and _COMPREHENSIVE.search(later.context[-300:])]
         if kind is None and (_COMPREHENSIVE.search(title_text[-300:]) or _COMPREHENSIVE.search(table.context[-200:])) and \
-                any(row.figures and PRETAX.search(row.label) and _PROFIT_LINE.match(row.label) for page in pages for row in page.rows):
-            kind = "income"  # one statement of profit and other comprehensive income (TSMC's Taiwan-IFRS reports)
+                income_in_one(pages, PRETAX, _PROFIT_LINE):
+            kind = "income"  # profit and other comprehensive income in one (TSMC's Taiwan-IFRS; Brookfield's, untaxed)
         # The words before the table count too, though its own first rows extend the title text (UBS's "Comparison UBS
         # Group AG (consolidated) versus UBS AG (consolidated)", then "Income statement" as the table's first row).
         # A parent company's columns beside the group's are no parent-only statement (side_by_side.py).

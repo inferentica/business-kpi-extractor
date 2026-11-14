@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 
-from .find import TITLES
+from .find import _COMPREHENSIVE, TITLES
 from .tables import Table
 
 # "GOLD TOE MORETZ HOLDINGS CORP. AND SUBSIDIARIES CONSOLIDATED BALANCE SHEETS": the company a statement's title names.
@@ -19,8 +19,11 @@ def titled_company(kind: str, table: Table) -> str | None:
     name is cut off or runs into a page's other words."""
     text = table.context[-600:]
     title = None
-    for title in dict(TITLES)[kind].finditer(text):
-        pass
+    # An income statement titled as one of comprehensive income too (Brookfield Asset Management Ltd.'s).
+    for pattern in [dict(TITLES)[kind]] + ([_COMPREHENSIVE] if kind == "income" else []):
+        for found in pattern.finditer(text):
+            if title is None or found.start() > title.start():
+                title = found
     if title is None or title.start() < len(text) - 300:
         return None
     possessive = _POSSESSIVE.search(text[:title.start()])
@@ -35,7 +38,9 @@ def titled_company(kind: str, table: Table) -> str | None:
     if named is not None and title.start() - named.end() <= 80:
         before = text[:named.start()].split()
     else:
-        before = re.sub(r"(?i)\b(unaudited|condensed|interim)\s*$", "", text[:title.start()].rstrip()).split()
+        # The words of the title before its kind: "… ULC CONDENSED CONSOLIDATED AND COMBINED BALANCE SHEETS".
+        before = re.sub(r"(?i)(\b(unaudited|condensed|interim|consolidated|combined|and)\s*)+$", "",
+                        text[:title.start()].rstrip()).split()
         if not before or before[-1].upper().rstrip(",") not in _LEGAL_FORMS:
             return None
     words: list[str] = []
@@ -55,7 +60,8 @@ def titled_company(kind: str, table: Table) -> str | None:
 _POSSESSIVE = re.compile(r"\b([A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*){0,4})['’]s\s+(?:(?:summari[sz]ed|consolidated|condensed|"
                          r"interim|unaudited)\s+)*$")
 _OWN_WORDS = {"THE", "COMPANY", "COMPANY'S", "GROUP", "CORPORATION", "REGISTRANT", "ISSUER", "BANK", "PARENT", "OUR"}
-_LEGAL_FORMS = _ABBREVIATIONS | {"INC", "CORP", "CORPORATION", "LTD", "LIMITED", "PLC", "S.A", "AG", "N.V", "SA", "NV"}
+_LEGAL_FORMS = _ABBREVIATIONS | {"INC", "CORP", "CORPORATION", "LTD", "LIMITED", "PLC", "S.A", "AG", "N.V", "SA", "NV",
+                                 "ULC"}  # an unlimited liability company: Brookfield Asset Management ULC
 _PAGE_WORD = re.compile(r"^(F|FS|FS-R)-?\d+$|^(contents|index|statements?|page)$", re.I)
 
 
