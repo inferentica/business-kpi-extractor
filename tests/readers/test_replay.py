@@ -1091,3 +1091,16 @@ def test_a_mixed_reading_is_tried_the_way_most_rows_were_read_first():
     assert mostly_whole({"g.a": whole, "g.b": whole, "g.c": alone}) is True
     assert mostly_whole({"g.a": whole, "g.b": alone, "g.c": alone}) is False
     assert mostly_whole({"g.a": whole, "g.b": whole}) is None and mostly_whole({"g.a": alone}) is None
+
+
+def test_a_single_row_showing_a_dash_this_quarter_leaves_the_rest_of_the_group_to_replay():
+    # Wells Fargo's debt securities: "(25)" in its Q1 2024 supplement, read row by row with the rest; "—" in Q2.
+    document = parse_document(_noninterest("Net gains from trading activities", "—", figures=(1_249, 1_101, 1_442, 80, 320)), URL.format(n=6))
+    table = next(iter(document.tables))
+    header = R_column_header(document.tables[table], 1, 1)
+    place = lambda row, label: {"table": table, "row": row, "col": 1, "row_label": label, "header": header, "scale": 1e6}
+    last = {"noninterest.card": place(2, "Card fees"), "noninterest.debt": place(4, "Net gains from debt securities")}
+    located = replay(document, last, date(2023, 3, 31), quarter=1)
+    assert not isinstance(located, str) and [value.kpi for value in located.values] == ["noninterest.card"]
+    gone = {**last, "noninterest.lease": place(6, "Lease income")}  # a row with no dash and no label here still stops it
+    assert isinstance(replay(document, gone, date(2023, 3, 31), quarter=1), str)

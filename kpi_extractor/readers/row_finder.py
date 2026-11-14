@@ -74,3 +74,16 @@ def table_from_rows(document: Document, group: str, parts: list[Locator]) -> Tab
             return TableLocator(group=group, table=table.id, col=col, first_row=first, last_row=row - 1, total_row=row,
                                 scale=parts[0].scale, scale_text=parts[0].scale_text)
     return None
+
+
+def shows_dash(document: Document, locator: dict) -> bool:
+    """Whether an earlier quarter's row is in this filing with a dash for its figure, in its column (Wells Fargo's "Net
+    gains (losses) from debt securities", "(25)" in Q1 2024 and "—" in Q2): reported as nothing this quarter."""
+    label, col = locator.get("row_label"), locator.get("col")
+    if not label or col is None:
+        return False
+    for table in document.tables.values():
+        row = row_finder(table, int(col))(label)
+        if row is not None and NIL.match(table.cell(row, int(col)) or ""):
+            return True
+    return False
