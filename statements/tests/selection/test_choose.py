@@ -228,3 +228,22 @@ def test_a_later_release_never_passes_a_20f_or_a_tagged_6k_on_another_basis():
     taiwan.form, taiwan.source, taiwan.basis = "6-K", "html", "Taiwan-IFRS"
     [chosen] = choose([interim, taiwan])
     assert chosen["source_accession"] == "ifrs"
+
+
+def test_a_parents_summary_or_a_20fs_year_is_never_replaced_by_a_later_release():
+    # Lloyds' Q2 2020 balance sheet: tagged in its own 6-K; the 2021 half-year prints the parent's summary of it.
+    tagged = reading("tagged", date(2020, 7, 31), 872_994e6, own=True, period="Q2", duration="quarter")
+    tagged.form, tagged.scope = "6-K", "consolidated"
+    summary = reading("summary", date(2021, 7, 29), 872_994e6, own=False, period="Q2", duration="quarter")
+    summary.form, summary.source, summary.scope = "6-K", "html", "parent"
+    [chosen] = choose([tagged, summary])
+    assert chosen["source_accession"] == "tagged"
+    # Alcon's FY2025 balance sheet: its 20-F, a later 6-K tagged with it as a comparative, and a later release.
+    year = reading("20-F", date(2026, 2, 24), 1, own=True)
+    year.form = "20-F"
+    comparative = reading("tagged", date(2026, 8, 10), 1, own=False)
+    comparative.form = "6-K"
+    release = reading("release", date(2026, 11, 10), 1, own=False)
+    release.form, release.source = "6-K", "html"
+    [chosen] = choose([year, comparative, release])
+    assert chosen["source_accession"] == "20-F"  # for a year the 20-F stays first

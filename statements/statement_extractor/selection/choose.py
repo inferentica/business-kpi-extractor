@@ -67,12 +67,16 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         winner = max(eligible, key=best) if eligible else None
         if winner is not None and winner.form == "6-K" and winner.source == "xbrl":
             # A 6-K presenting the period after the tagged one that won it restates it: the newest presentation wins
-            # (UBS's Q2 2017 restated in dollars in 2019, beside its original 6-K tagged in francs). Only over the
-            # tagged 6-K: a release never passes a 20-F or a regulator's form this way.
-            later = [item for item in eligible if item.form == "6-K" and item.source != "xbrl"
-                     and item.source not in REGULATORS and item.filed > winner.filed
-                     and ifrs_family(item.basis) == ifrs_family(winner.basis)]  # TSMC's Taiwan-IFRS releases do not
-            winner = max(later, key=best) if later else winner
+            # (UBS's Q2 2017 restated in dollars in 2019, beside its original 6-K tagged in francs). Only where, tagged
+            # 6-Ks aside, a release is the period's best presentation anyway, on the tagged one's scope and basis: a
+            # release never passes a 20-F or a regulator's form this way, nor a parent's summary the group's statement
+            # (Lloyds' half-year balance sheets of 2020-22), nor a Taiwan-IFRS release TSMC's IFRS 6-K.
+            untagged = [item for item in eligible if not (item.form == "6-K" and item.source == "xbrl")]
+            later = max(untagged, key=best) if untagged else None
+            if later is not None and later.form == "6-K" and later.source not in REGULATORS and \
+                    later.filed > winner.filed and later.scope == winner.scope and \
+                    ifrs_family(later.basis) == ifrs_family(winner.basis):
+                winner = later
         record = {
             "statement": key[0], "fiscal_year": key[1], "fiscal_period": key[2], "duration": key[3],
             "period_end": max(reading.period_end for reading in group).isoformat(),
@@ -114,12 +118,14 @@ def _rank(reading: Reading, annual: str | None = None) -> int:
     if reading.source in REGULATORS:
         return 1 if reading.fiscal_period == "FY" else 2
     # A 6-K's XBRL is the statement the filer tagged and filed with the SEC (an interim update under Form 20-F Item
-    # 8.A.5, revised statements): it stands with the SEC's reports, on the basis of the year's annual report (`annual`);
-    # on another it is a release like the rest (Petrobras's 2011 quarters, tagged on US GAAP, restated on IFRS in the
-    # 2012 releases as in its FY2011 20-F). A 6-K's printed release stays below the SEC's reports.
+    # 8.A.5, revised statements): for a quarter it stands with the SEC's reports, on the basis of the year's annual
+    # report (`annual`); on another it is a release like the rest (Petrobras's 2011 quarters, tagged on US GAAP,
+    # restated on IFRS in the 2012 releases as in its FY2011 20-F). For a year the 20-F stays first, as over a
+    # regulator's annual form: Lloyds' 2018 half-year tags its 1 January 2018 balance sheet as of 31 December 2016.
     if reading.form != "6-K":
         return 2
-    tagged = reading.source == "xbrl" and (annual is None or ifrs_family(reading.basis) == ifrs_family(annual))
+    tagged = reading.source == "xbrl" and reading.fiscal_period != "FY" and (
+        annual is None or ifrs_family(reading.basis) == ifrs_family(annual))
     return 2 if tagged else 0
 
 
