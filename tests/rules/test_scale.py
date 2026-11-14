@@ -52,6 +52,17 @@ def test_a_price_whose_row_states_its_unit_keeps_it_under_a_document_in_millions
         assert (own.factor, own.source, notes) == (1.0, "row", [])
 
 
+def test_a_row_naming_its_currency_alone_is_in_units_under_a_table_in_millions():
+    # American Express's "Average proprietary basic Card Member spending (dollars)" $6,110: never $6.1 billion.
+    table = Table(id="T1", context="(Millions, except percentages and where indicated)",
+                  rows=[["", "Q3'24"], ["Average proprietary basic Card Member spending (dollars)", "6,110"],
+                        ["Network volumes (billions)", "464.0"], ["Total revenues net of interest expense", "16,635"]])
+    doc = document(table)
+    own, _notes = cell_amount_scale(doc, table, 1, 1, "Average Proprietary Basic Card Member Spending", reader(), 6110)
+    assert (own.factor, own.source) == (1.0, "row")
+    assert cell_amount_scale(doc, table, 3, 1, "Total revenues", reader(), 16635)[0].factor == 1e6
+
+
 def test_a_count_takes_no_table_caption():
     table = Table(id="T1", context="(in millions, except employee data)", rows=[["", "Q3"], ["Employees", "12,400"],
                                                                                  ["Paid memberships (in millions)", "301"]])
