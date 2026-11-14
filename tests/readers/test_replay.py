@@ -1055,3 +1055,18 @@ def test_a_row_showing_a_dash_is_not_missing_from_this_quarters_reading():
     listed = {"noninterest.debt", "noninterest.card"}
     assert not missing_since(last, {"noninterest.card"}, "noninterest", False, listed, document)
     assert missing_since(last, {"noninterest.debt"}, "noninterest", False, listed, document)  # card fees show a figure
+
+
+def test_a_reading_with_a_row_taken_whole_beside_single_rows_replays_row_by_row():
+    # Wells Fargo's Q4 2023 reading: "Lease income" taken from a whole-table reading, the listed rows one by one. As a
+    # whole table, one row stood for it, and no table was found ("table rows not found").
+    document = parse_document(_noninterest("Net gains from trading activities", "9", figures=(1_180, 1_050, 1_400, -300, 240), lease=351),
+                              URL.format(n=4))
+    table = next(iter(document.tables))
+    header = R_column_header(document.tables[table], 1, 1)
+    place = lambda row, label, **more: {"table": table, "row": row, "col": 1, "row_label": label, "header": header, "scale": 1e6, **more}
+    last = {"noninterest.deposit": place(1, "Deposit-related fees"), "noninterest.card": place(2, "Card fees"),
+            "noninterest.leaseincome": place(6, "Lease income", whole_table=True, total_row_label="Total noninterest income")}
+    located = replay(document, last, date(2023, 3, 31), quarter=1)
+    assert not isinstance(located, str) and located.tables == []
+    assert {value.kpi: value.row for value in located.values} == {"noninterest.deposit": 1, "noninterest.card": 2, "noninterest.leaseincome": 6}
