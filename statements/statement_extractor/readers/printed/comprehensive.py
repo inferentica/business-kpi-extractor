@@ -9,13 +9,19 @@ import re
 _NET_PROFIT = re.compile(r"^\(?net\s+(income|profit|earnings|loss|\(loss\))\b", re.I)
 
 
+_PROFIT_WORDS = re.compile(r"\b(profit|income|loss|earnings)\b", re.I)
+_UNDER = re.compile(r"\bunder\b|\bas\s+(?:reported|issued)\b", re.I)
+
+
 def profit_below_lines(table) -> bool:
-    """A net income line after three lines with figures of its own."""
-    above = 0
-    for row in table.rows:
-        if row.figures and _NET_PROFIT.match(row.label):
-            return above >= 3
-        above += bool(row.figures)
+    """A net income line after three lines with figures of its own, the first of them no profit line: a note
+    reconciling two standards opens with a profit and reaches one "under" the other (POSCO's IFRS and K-IFRS)."""
+    lines = [row for row in table.rows if row.figures]
+    if not lines or _PROFIT_WORDS.search(lines[0].label):
+        return False
+    for above, row in enumerate(lines):
+        if _NET_PROFIT.match(row.label):
+            return above >= 3 and not _UNDER.search(row.label)
     return False
 
 

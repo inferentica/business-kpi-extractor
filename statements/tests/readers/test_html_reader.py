@@ -466,3 +466,12 @@ def test_a_comprehensive_income_statement_without_taxes_is_an_income_statement()
     assert _profit_below_lines(own)
     other = SimpleNamespace(rows=[row("Net income"), row("Currency translation"), row("Comprehensive income")])
     assert not _profit_below_lines(other)
+
+
+def test_a_note_reconciling_two_standards_is_no_income_statement():
+    from statement_extractor.readers.printed.comprehensive import profit_below_lines
+    from types import SimpleNamespace
+    row = lambda label: SimpleNamespace(label=label, figures={3: 1.0})  # noqa: E731
+    note = SimpleNamespace(rows=[row("Operating profit under IFRS as issued by the IASB"), row("Impairment loss"),
+                                 row("Donations"), row("Others"), row("Net income (loss) under IFRS as issued by the IASB")])
+    assert not profit_below_lines(note)
