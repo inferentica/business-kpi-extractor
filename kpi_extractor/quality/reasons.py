@@ -72,6 +72,7 @@ _REASONS = (
     Reason("place_not_named", HOLD, PLACE_NOT_NAMED, "start"),
     Reason("row_named_twice", HOLD, ROW_NAMED_TWICE, "start"),
     Reason("shared_cell", HOLD, SHARED_CELL, "start"),
+    Reason("segment_page", HOLD, SEGMENT_TABLE, "start"),
     Reason("percent_from_amounts", HOLD, "a percent read from an amounts row", "start"),
     Reason("part_of_table", HOLD, r"likely part of the table$", "pattern"),
     Reason("far_above_quarter", HOLD, "total far above the quarter before", "start"),
