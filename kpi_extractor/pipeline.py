@@ -119,6 +119,11 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self._prefetch = ThreadPoolExecutor(max_workers=3)
         self._documents: dict[str, Document] = {}
         self._prompt_documents: dict[str, str] = {}
+        # Locate's own document: the tables where each KPI sat last (steps.ai_reading._locate_document), the whole one
+        # for a document whose first reading missed a KPI; and what each document's reading was last sent.
+        self._narrowed: dict[str, str] = {}
+        self._whole_documents: set[str] = set()
+        self._sent_documents: dict[str, str] = {}
         self._curations: dict[tuple, list[str]] = {}
                 # A Refresh waits for a run already working on the company instead of being skipped.
         self.wait_for_lock = wait_for_lock
