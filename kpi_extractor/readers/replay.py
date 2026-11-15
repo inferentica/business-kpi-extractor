@@ -120,7 +120,7 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
     col = locator.get("col")
     if not label or col is None:
         return "row not recorded"
-    matches, misses = [], []  # misses: why each table that has the label does not give the value, last quarter's first
+    matches, misses, by_period = [], [], []  # misses: why each table with the label gives no value, last quarter's first
     for table in _tables_by_preference(document, locator.get("table")):
         rows = [index for index, row in enumerate(table.rows)
                 if clean(_row_label(row, col)).lower() == label and parse_number(table.cell(index, col))]
@@ -138,10 +138,13 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
         if len(rows) > 1:
             misses.append("row label found more than once")
         elif rows and (held or moved is not None):
-            matches.append((table.id, rows[0], col if held else moved))  # the column its header names, if not last quarter's
+            (matches if held else by_period).append((table.id, rows[0], col if held else moved))
         elif rows:
             misses.append("column header changed" if newest and "header" in locator else "column not the newest period"
                           if not newest else "column header not recorded")
+    # A column found by the period its header names counts only where no table holds the figure in last quarter's column:
+    # otherwise each table repeating the row (Truist's fee lines on two pages) would make the figure ambiguous.
+    matches = matches or by_period
     if not matches:
         return misses[0] if misses else "row label not found"
     figures = {parse_number(document.tables[table_id].cell(row, at)).value for table_id, row, at in matches}

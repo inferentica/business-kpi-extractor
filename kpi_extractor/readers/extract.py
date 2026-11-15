@@ -49,8 +49,10 @@ class ReadValue:
     locator: dict
     notes: list[str] = field(default_factory=list)
     status: str = "verified"
-    # The breakdown's total row: its reconciliation target, never stored as a part.
-    is_total: bool = False
+    is_total: bool = False  # the breakdown's total row: its reconciliation target, never stored as a part
+
+    def __post_init__(self) -> None:  # no scale float noise: BNY's "$2.01" trillion was 2,009,999,999,999.9998
+        self.value = float(f"{self.value:.15g}")
 
 
 def read_values(document: Document, spec: Spec, located: Located, default_currency: str | None) -> tuple[list[ReadValue], list[str]]:
