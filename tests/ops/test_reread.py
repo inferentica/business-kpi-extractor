@@ -142,3 +142,14 @@ def test_figures_read_at_a_scale_the_ai_disputed_are_read_again():
     picks = SELECTORS["scale-disputed"][1]
     assert picks({"validation_status": "verified", "notes": ["table declares scale 1e+06, AI said 1e+09"]})
     assert not picks({"validation_status": "verified", "notes": ["scale quoted: 'in billions' over the table's 1e+06"]})
+
+
+def test_segment_pages_picks_company_metrics_held_for_a_segments_page():
+    values = {
+        "HELD": {"source_accession": "HELD", "validation_status": "needs_review",
+                 "notes": ["read from a table headed for one segment: securities services"]},
+        "DECIDED": {"source_accession": "DECIDED", "validation_status": "needs_review", "owner_decision": "accepted",
+                    "notes": ["read from a table headed for one segment: securities services"]},
+        "OTHER": {"source_accession": "OTHER", "validation_status": "needs_review", "notes": ["sharp change"]},
+    }
+    assert picked_filings("segment-pages", values) == {"HELD"}

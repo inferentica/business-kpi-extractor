@@ -12,6 +12,7 @@ from ..ai import GroupSpec, Located, Spec
 from ..documents.document import Document, clean, parse_number
 from ..readers.period_column import names_period
 from ..rules.numbers import same_figure
+from ..rules.segment_tables import company_segments, names_segment, segment_page_of
 from ..rules.period import release_unit
 from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
@@ -190,7 +191,12 @@ class ReplayReading:
             quarter = int(fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)[1][1])
         except Exception:  # noqa: BLE001 - an unreadable release, or no fiscal quarter, confirms nothing
             return False
+        names = company_segments(list(getattr(self, "values", {}).values()))
         for table in document.tables.values():
+            if item.group.kind == "metric" and (segment := segment_page_of(document, table, label, names,
+                                                                          item.value / float(item.locator.get("scale") or 1))) \
+                    and not names_segment(segment, item.kpi.label, item.group.label):
+                continue  # a segment's page repeats the company's labels with the segment's figures
             for row, cells in enumerate(table.rows):
                 if not cells or (clean(cells[0]).lower() != clean(label).lower() and sideless_key(cells[0]) != sideless_key(label)):
                     continue

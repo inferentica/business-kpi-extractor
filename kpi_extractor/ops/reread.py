@@ -84,6 +84,13 @@ def _scale_disputed(value: dict) -> bool:
             and any(str(note).startswith("table declares scale ") for note in value.get("notes") or []))
 
 
+def _segment_page_held(value: dict) -> bool:
+    """A company-wide metric held for having been read from a segment's page whose label the company's table prints
+    with other figures (BNY's average loans from its Securities Services page, 2026-11-15): read again, so the company's
+    own row is read."""
+    return value.get("validation_status") == "needs_review" and not value.get("owner_decision") and has(value.get("notes"), "segment_page")
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -107,6 +114,7 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
                        _reread_differs),
     "scale-disputed": ("figures read at their table's scale where the AI gave another, read again after a scale rule fix",
                        _scale_disputed),
+    "segment-pages": ("company-wide metrics held for having been read from a segment's page", _segment_page_held),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }

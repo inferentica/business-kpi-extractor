@@ -39,6 +39,7 @@ class Reason:
 SCALE_OUTLIER = "amount far from its other periods or from revenue: a scale not stated"
 REREAD_NOTE = "a new reading of this filing differs from the figure served before:"
 SHARED_CELL = "read from the same table cell as another listed metric"
+SEGMENT_TABLE = "read from a table headed for one segment"
 OUTSIDE_REPORTED_PERIODS = "outside the KPI's reported periods"
 ANNUAL_REFILED = "full-year figures, re-filed from Q4"
 LABELS_CONTRADICTED = "member labels contradict later filings"
@@ -71,6 +72,7 @@ _REASONS = (
     Reason("place_not_named", HOLD, PLACE_NOT_NAMED, "start"),
     Reason("row_named_twice", HOLD, ROW_NAMED_TWICE, "start"),
     Reason("shared_cell", HOLD, SHARED_CELL, "start"),
+    Reason("segment_page", HOLD, SEGMENT_TABLE, "start"),
     Reason("percent_from_amounts", HOLD, "a percent read from an amounts row", "start"),
     Reason("part_of_table", HOLD, r"likely part of the table$", "pattern"),
     Reason("far_above_quarter", HOLD, "total far above the quarter before", "start"),
