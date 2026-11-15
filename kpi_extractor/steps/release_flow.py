@@ -371,16 +371,18 @@ class ReleaseFlow:
             if self._read_and_record_release(ref, spec, version):
                 done.add(ref.accession)
 
-        def chain(quarter_refs: list[FilingRef]) -> None:
+        def chain(quarter_refs: list[FilingRef], lead: bool = False) -> None:
             for ref in quarter_refs:
                 with self._state:
                     self._local.holding = True
                     self._local.chained = True  # history lookups see this chain's own earlier quarters only
+                    self._local.lead = lead  # a lead quarter sees every quarter read before it
                     try:
                         read(ref)
                     finally:
                         self._local.holding = False
                         self._local.chained = False
+                        self._local.lead = False
 
         if len(pending) <= 2:
             for ref in refs:
@@ -389,8 +391,14 @@ class ReleaseFlow:
             chains: dict[int, list[FilingRef]] = {}
             for ref in sorted(refs, key=lambda ref: ref.period_end or date.min):
                 chains.setdefault(_chain_of(ref.period_end or date.min), []).append(ref)
+            # A chain's first quarter has no quarter of its own before it, and read side by side it would be read with
+            # no reference at all: the first year of a backfill is read in date order first, each quarter after the
+            # quarter before it (a supplement's layout drifts less over a quarter than over a year; read newest first, a
+            # year later, it drifted enough for guided readings to take other columns, PR 95). Then the chains go on.
+            leads = sorted((quarter_refs.pop(0) for quarter_refs in chains.values()), key=lambda ref: ref.period_end or date.min)
+            chain(leads, lead=True)
             with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
-                list(pool.map(chain, chains.values()))
+                list(pool.map(chain, [quarter_refs for quarter_refs in chains.values() if quarter_refs]))
             self.store.write(self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
                                                      | {key for key in before if self.values[key].get("source_accession") in done}))
         return [ref for ref in refs if ref.accession in done]
