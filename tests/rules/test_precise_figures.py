@@ -103,3 +103,30 @@ def test_the_reading_step_reads_the_full_figure_through_the_cells_checks():
     assert item.locator["rounded_from"] == {"table": "B_T2", "row": 4, "col": 1, "figure": "$2.2"}
     assert item.notes[-1] == "the full figure, printed rounded elsewhere: $2.2"
     assert item.locator["replayed_from"] == "0001390777-26-000071" and item.locator["row_label"] == "Total AUM"
+
+
+SUMMARY = Table("A_T1", "(Dollars in billions)", [["", "Second Quarter 2026"], ["Selected balances", ""], ["Deposits", "405"]])
+SUMMARY_READING = {"table": "A_T1", "row": 2, "col": 1, "row_label": "Deposits"}
+
+
+def test_a_period_end_figure_never_takes_an_average_under_a_title_case_heading():
+    # The re-check's probe: the average's heading is set in title case above the table, not in capitals.
+    average = Table("A_T9", "Net interest income rose. Average Balance Sheet Data (Dollars in millions)",
+                    [["", "Second Quarter 2026"], ["Deposits", "$404,869"]])
+    assert precise_cell(document(SUMMARY, average), SUMMARY_READING, 405e9, "Total Deposits", date(2026, 6, 30), 2, []) is None
+
+
+def test_a_label_qualified_in_parentheses_is_another_measure():
+    narrower = Table("A_T9", "(Dollars in millions)", [["", "Second Quarter 2026"], ["Deposits (excluding brokered)", "$404,869"]])
+    assert precise_cell(document(SUMMARY, narrower), SUMMARY_READING, 405e9, "Total Deposits", date(2026, 6, 30), 2, []) is None
+    # Units, footnote marks, preliminary notes and the label's own initials qualify nothing.
+    same = Table("A_T9", "(Dollars in millions)", [["", "Second Quarter 2026"], ["Deposits (in millions) (a)", "$404,869"]])
+    assert precise_cell(document(SUMMARY, same), SUMMARY_READING, 405e9, "Total Deposits", date(2026, 6, 30), 2, [])[:3] == ("A_T9", 1, 1)
+
+
+def test_a_quarter_name_must_carry_this_fiscal_year():
+    # A fiscal year named for its end: Q1 FY2025 ends 30 September 2024, so "1Q24" is the year before's quarter.
+    reading = {"table": "A_T1", "row": 1, "col": 1, "row_label": "Deposits"}
+    rounded = Table("A_T1", "(Dollars in billions)", [["", "Sep 30, 2024"], ["Deposits", "405"]])
+    last_year = Table("A_T9", "(Dollars in millions)", [["", "1Q24", "1Q25"], ["Deposits", "$404,869", ""]])
+    assert precise_cell(document(rounded, last_year), reading, 405e9, "Deposits", date(2024, 9, 30), 1, [], fiscal_year=2025) is None
