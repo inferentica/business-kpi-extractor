@@ -20,7 +20,7 @@ from ..xbrl import member_key
 from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, chosen_by_number, comparable_header,
                               missing_since, mostly_whole, replay, reported_period, stated_total)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
-from ..quality.checks import check_period, validate_groups
+from ..quality.checks import check_period, states_one_period, validate_groups
 from ..readers.trace import placed_elsewhere, trace_replay
 from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same,
                      _same_chain, _year_ago_cells)
@@ -165,12 +165,17 @@ class ReplayReading:
         return earlier
 
     @staticmethod
-    def _repeats(item: ReadValue, document: Document | None, earlier: list[float]) -> bool:
+    def _repeats(item: ReadValue, document: Document | None, earlier: list[float], period_end: date | None = None) -> bool:
         """Whether a figure is the same number as one of its KPI's recent figures (_earlier_values), a sign another
         period's column was read in place of this one's; unless its row shows that number again in another column
         headed for the same length of period, so the filing states the two periods alike (JPMorgan's lending fees,
-        1,828 in both 2Q24 and 2Q23)."""
+        1,828 in both 2Q24 and 2Q23), or its source states only its own period, so no other period's figure was there
+        to read (Apollo's fee-generating credit AUM, $135 billion in Q3 2025 and Q3 2026, from a chart of the quarter
+        alone). The stored figures' date-order check has the same exemption (quality.checks.states_one_period): before
+        it, such a figure went to a second reader only to stand anyway."""
         if item.kpi.unit not in ("currency", "count") or not any(_same(item.value, value) for value in earlier):
+            return False
+        if period_end is not None and states_one_period({"locator": item.locator, "period_end": period_end.isoformat()}):
             return False
         return document is None or not any(_same(cell, item.value) for cell in _year_ago_cells(document, item.locator, item.value))
 
