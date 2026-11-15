@@ -14,6 +14,8 @@ from ..readers.extract import (ReadValue, describe, header_contradicts, locator_
 from ..readers.replay import _same_place, _source_template, asked_of, missing_since
 from ..readers.trace import placed_elsewhere, stamp_call
 from ..rules.period import states_quarter
+from ..quality.reasons import SEGMENT_TABLE
+from ..rules.segment_tables import cell_figure, company_segments, names_segment, segment_page_of
 from .replay_reading import in_full_groups, left_for_ai
 from ..quality.stated import _names
 from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _identity_text, _rounding, xbrl_figures,
@@ -401,19 +403,25 @@ class AiReading:
         self._prompt_documents[key] = text
         return text
 
-    @staticmethod
-    def _drop_wrong_columns(read: list[ReadValue], problems: list[str], document: Document, located: Located,
+    def _drop_wrong_columns(self, read: list[ReadValue], problems: list[str], document: Document, located: Located,
                             expected: date) -> tuple[list[ReadValue], list[str]]:
         """Values whose column header names another period (the year-ago column of a "2026 | 2025" table, which
-        column_header's blanked dates make look identical) are dropped before any check, so a second reader or the
-        review reads them again. The quarter's end is the filing's own, or the reading's when its period checks."""
+        column_header's blanked dates make look identical), and company-wide metrics read from a table headed for one
+        segment (rules.segment_tables), are dropped before any check, so a second reader or the review reads them again.
+        The quarter's end is the filing's own, or the reading's when its period checks."""
         ends = [date.fromisoformat(located.period_end[:10])] if located.period_end and not check_period(located, expected) else []
         kept, problems = [], list(problems)
+        names = company_segments(list(getattr(self, "values", {}).values()))
         for item in read:
             table = document.tables.get(str(item.locator.get("table")))
             row, col = item.locator.get("row"), item.locator.get("col")
             why = header_contradicts(table, int(row), int(col), expected, *ends) if table is not None and row is not None \
                 and col is not None else None
+            if not why and table is not None and item.group.kind == "metric" and row is not None \
+                    and (segment := segment_page_of(document, table, str(item.locator.get("row_label") or ""), names,
+                                                 cell_figure(table, int(row), col))) \
+                    and not names_segment(segment, item.kpi.label, item.group.label):
+                why = f"{SEGMENT_TABLE}: {segment}"
             if why:
                 problems.append(f"{item.group.key}.{item.kpi.key}: {why}")
             else:
