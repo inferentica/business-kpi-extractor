@@ -9,7 +9,9 @@ value, never guessed. Each derived quarter names both filings it came from. A qu
 replaced."""
 from __future__ import annotations
 
+from ..domain.model import REGULATOR_SOURCES as REGULATORS
 from ..domain.printed_labels import PER_SHARE, SHARE_COUNT
+from .identity import _same
 
 
 def _key(statement: str, line: dict, keys: dict) -> tuple:
@@ -31,6 +33,48 @@ def _additive(line: dict) -> bool:
     return not (PER_SHARE.search(label) or SHARE_COUNT.search(label))
 
 
+def _agree(left, right, keys: dict) -> bool:
+    """Two presentations of one period that print every line they share alike (at the coarser rounding)."""
+    mine, theirs = _keyed(left, keys), _keyed(right, keys)
+    return all(_same(mine[key][0]["value"], theirs[key][0]["value"]) for key in mine.keys() & theirs.keys()
+               if _additive(mine[key][0]))
+
+
+def _recasts(whole, nine, earlier: list, keys: dict) -> bool:
+    """Whether the year's report presents the year before it otherwise than it stood when the nine months were filed."""
+    mine = [other for other in earlier if other.accession == whole.accession]
+    known = [other for other in earlier if other.filed <= nine.filed and other.basis == whole.basis]
+    return bool(mine and known) and not _agree(mine[0], max(known, key=lambda reading: reading.filed), keys)
+
+
+def _pair(nines: list, years: list, keys: dict, earlier: list = ()):
+    """The newest nine months that pair with a year of its vintage: the first annual report after it, filed within
+    200 days (the same reporting cycle: Morgan Stanley's 2008 year as its 2011 10-K restates it is not its 2009
+    10-Q's), its period opening on the nine months' first day and closing a quarter after them (RPM's 'nine months'
+    read off a three-month column is none), from the same kind of source (Andina's 6-K year beside the CMF's form), with no restatement between them."""
+    for nine in sorted(nines, key=lambda reading: reading.filed, reverse=True):
+        after = [whole for whole in years if whole.filed > nine.filed and whole.basis == nine.basis
+                 and whole.currency == nine.currency and (whole.source in REGULATORS) == (nine.source in REGULATORS)]
+        if not after:
+            continue
+        whole = min(after, key=lambda reading: reading.filed)
+        quarter = (whole.period_end - nine.period_end).days
+        if (whole.filed - nine.filed).days > 200 or not 60 <= quarter <= 105 or (
+                nine.period_start and whole.period_start and nine.period_start != whole.period_start):
+            continue
+        # No restatement between them: the year as last presented before the nine months were filed agrees with the
+        # pair's (Vertex's 2002 year restated in March 2004 for a sale, its nine months last printed in November 2003:
+        # its own 10-Q and 10-K, the year as first reported, pair instead).
+        before = [other for other in years if other.filed <= nine.filed and other.basis == whole.basis]
+        if before and not _agree(whole, max(before, key=lambda reading: reading.filed), keys):
+            continue
+        # Nor a year's report recasting the years before it after the nine months were filed (a business sold and
+        # shown as discontinued in the 10-K): its earlier year disagrees with that year as presented before.
+        if not _recasts(whole, nine, earlier, keys):
+            return nine, whole
+    return None
+
+
 def derive_fourth_quarters(chosen: list[dict], readings: list, keys: dict) -> list[dict]:
     """Derived fourth quarters, for each income statement and cash flow year whose quarter no filing states."""
     served = {(item["statement"], item["fiscal_year"], item["fiscal_period"], item["duration"]): item for item in chosen}
@@ -45,12 +89,12 @@ def derive_fourth_quarters(chosen: list[dict], readings: list, keys: dict) -> li
                  and reading.basis == item.get("basis") and reading.currency == item.get("currency")]
         if not nines:
             continue
-        nine = max(nines, key=lambda reading: reading.filed)
-        years = [reading for reading in kept if reading.key == (statement, year, "FY", "year") and reading.filed > nine.filed
-                 and reading.basis == nine.basis and reading.currency == nine.currency]
-        if not years:
-            continue
-        whole = min(years, key=lambda reading: reading.filed)
+        prior = str(int(year) - 1) if year.isdigit() else ""
+        pair = _pair(nines, [reading for reading in kept if reading.key == (statement, year, "FY", "year")], keys,
+                     [reading for reading in kept if reading.key == (statement, prior, "FY", "year")])
+        if pair is None:
+            continue  # no year and nine months of one vintage: left underived rather than mixed
+        nine, whole = pair
         part, own = _keyed(nine, keys), _keyed(whole, keys)
         lines = []
         for position, line in enumerate(whole.lines):

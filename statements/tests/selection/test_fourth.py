@@ -37,3 +37,17 @@ def test_a_cash_flows_fourth_quarter_opens_on_the_nine_months_closing_cash():
                "period_end": "2019-09-28", "basis": "US GAAP", "currency": "USD", "lines": year.lines}]
     [q4] = derive_fourth_quarters(chosen, [nine, year], {})
     assert [line["value"] for line in q4["lines"]] == [50e9, 14e9, 48e9]
+
+
+def test_a_year_recast_after_the_nine_months_or_a_misdated_nine_months_derives_nothing():
+    # Vertex's 2002: the year as its 2004 10-K restates it for a sale, the nine months last printed before that.
+    own_year = reading("k-2003", date(2003, 3, 1), "FY", "year", "income", [("us-gaap_Revenues", "Revenues", 160e6)])
+    nine = reading("q3-2003", date(2003, 11, 1), "Q3", "ytd", "income", [("us-gaap_Revenues", "Revenues", 117e6)])
+    restated = reading("k-2004", date(2004, 3, 1), "FY", "year", "income", [("us-gaap_Revenues", "Revenues", 95e6)])
+    chosen = [{"statement": "income", "fiscal_year": "2019", "fiscal_period": "FY", "duration": "year", "status": "kept",
+               "period_end": "2019-09-28", "basis": "US GAAP", "currency": "USD", "lines": restated.lines}]
+    assert derive_fourth_quarters(chosen, [own_year, nine, restated], {}) == []
+    # a "nine months" read off a three-month column (RPM's): it does not open the year
+    three = reading("q3", date(2019, 7, 31), "Q3", "ytd", "income", [("us-gaap_Revenues", "Revenues", 60e9)])
+    three.period_start, own_year.period_start = date(2019, 3, 31), date(2018, 9, 30)
+    assert derive_fourth_quarters(chosen, [three, own_year], {}) == []
