@@ -107,3 +107,12 @@ def test_a_demoted_rule_is_not_used_and_its_figures_are_re_read():
     values = {1: {"source_accession": "BY-RULE", "validation_status": "verified", "locator": {"rule": "anchor-phrase"}},
               2: {"source_accession": "BY-AI", "validation_status": "verified", "locator": {"ai_call": "c1"}}}
     assert picked_filings("rule-anchor-phrase", values) == {"BY-RULE"}
+
+
+def test_a_figure_with_no_leading_zero_is_found_whole():
+    document = Document(source_url="x")
+    document.blocks["B1"] = TextBlock(id="B1", text="The net charge-off ratio was .49 percent in the second quarter.")
+    document.order.append("B1")
+    last = {"quote": "The net charge-off ratio was 0.52 percent in the first quarter", "value_text": "0.52 percent"}
+    locator, _anchor = anchor_locator(document, "operating.nco", last)
+    assert locator.value_text == ".49 percent"

@@ -13,7 +13,7 @@ from ..documents.document import Document, clean
 KIND = "anchor-phrase"
 _WORD = re.compile(r"[A-Za-z]+")
 # A figure as releases write it: an optional currency, the number, an optional scale or percent.
-_FIGURE = (r"(?:US\$|NT\$|[$€£¥])?\s?\(?\d(?:[\d,]*\d)?(?:\.\d+)?\)?"
+_FIGURE = (r"(?:US\$|NT\$|[$€£¥])?\s?\(?(?:\d(?:[\d,]*\d)?(?:\.\d+)?|\.\d+)\)?"
            r"(?:\s?(?:%|percent|trillion|billion|million|thousand|bn|mn)\b|%)?")
 
 
@@ -36,7 +36,7 @@ def anchor_locator(document: Document, key: str, last: dict) -> tuple[Locator, s
         words = anchor_words(quote, value_text, count)
         if not words:
             continue
-        pattern = re.compile(r"\b" + r"[^A-Za-z0-9]{1,6}".join(map(re.escape, words)) + r"[^A-Za-z0-9$€£¥(]{0,4}(" + _FIGURE + ")",
+        pattern = re.compile(r"\b" + r"[^A-Za-z0-9]{1,6}".join(map(re.escape, words)) + r"(?:[^A-Za-z0-9$€£¥(.]|\.(?!\d)){0,4}(" + _FIGURE + ")",
                              re.I)
         found = [(block_id, match) for block_id, block in document.blocks.items() for match in pattern.finditer(block.text)]
         if len(found) == 1:

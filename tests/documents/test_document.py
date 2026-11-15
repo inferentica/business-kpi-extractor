@@ -192,3 +192,11 @@ def test_a_document_marked_in_dollars_reads_as_dollars():
     mixed = rows + "".join(f"<tr><td>Euro {i}</td><td>€{i},000</td></tr>" for i in range(6))
     assert parse_document(f"<table>{mixed}</table>", "https://example.com/ex99.htm").marked_currency() is None
     assert parse_document("<table><tr><td>A</td><td>$ 5</td></tr></table>", "https://example.com/ex99.htm").marked_currency() is None
+
+
+def test_a_fraction_printed_with_no_leading_zero_keeps_its_point():
+    # U.S. Bancorp's net charge-off ratio column prints ".51": read as 51, it was served as 51% for most quarters.
+    from kpi_extractor.documents.document import parse_number
+    assert parse_number(".51").value == 0.51 and parse_number(".51%").percent
+    assert parse_number("(.12)").value == -0.12 and parse_number("-.25").value == -0.25 and parse_number("$.75").value == 0.75
+    assert parse_number("No.5").value == 5.0 and parse_number("1,234.5").value == 1234.5
