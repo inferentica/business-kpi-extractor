@@ -21,7 +21,7 @@ from ..readers.quoted_rows import row_line
 from ..readers.row_finder import shows_figure, table_from_rows
 from ..rules.identity import sideless_key
 from ..xbrl import member_key
-from ..readers.replay import (AmbiguousQuote, _same_place, _source_template, chosen_by_number, comparable_header,
+from ..readers.replay import (LABEL_CUT, AmbiguousQuote, _same_place, _source_template, chosen_by_number, comparable_header,
                               missing_since, mostly_whole, replay, reported_period, stated_total)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, states_one_period, validate_groups
@@ -198,7 +198,8 @@ class ReplayReading:
                     and not names_segment(segment, item.kpi.label, item.group.label):
                 continue  # a segment's page repeats the company's labels with the segment's figures
             for row, cells in enumerate(table.rows):
-                if not cells or (clean(cells[0]).lower() != clean(label).lower() and sideless_key(cells[0]) != sideless_key(label)):
+                if not cells or (clean(cells[0]).lower() != clean(label).lower() and sideless_key(cells[0]) != sideless_key(label)
+                                 and not (len(clean(label)) >= LABEL_CUT - 2 and clean(cells[0]).lower().startswith(clean(label).lower()))):
                     continue
                 for col in range(1, len(cells)):
                     cell = parse_number(table.cell(row, col))
