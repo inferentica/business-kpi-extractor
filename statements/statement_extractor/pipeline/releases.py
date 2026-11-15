@@ -33,8 +33,9 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
     stored = {}
     for ref in refs:
         context = {"fiscal_year_end": fiscal_year_end, "offset": year_offset, "quarter_end": ref.period_end.isoformat()}
-        if units is not None and ref.accession not in known:
-            stored[ref.accession] = (units.reuse(unit_id("release", ref.accession), context), context)
+        # A unit first, remembered empty or not: what the runner's cache remembers differs from run to run.
+        unit = units.reuse(unit_id("release", ref.accession), context) if units is not None else None
+        stored[ref.accession] = (unit, context)
     # The next releases download while one is read (pipeline/prefetch.py); those remembered empty or read before are
     # not fetched.
     for ref in ahead(refs, lambda ref: None if ref.accession in known or (stored.get(ref.accession) or (None,))[0]
@@ -52,8 +53,9 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
                   "release_quarter": _quarter(ref.period_end, fiscal_year_end, year_offset), "period_end": ref.period_end.isoformat()}
         if ref.accession in known:  # names no statement (pipeline/empty_releases.py): not fetched again
             empty.add(ref.accession)
-            records.append({**record, "note": "release", "printed": [], "titled": [], "columns": 0,
-                            "notes": ["names no statement (remembered)"], "own": [], **own_period([], ref.form)})
+            records.append(_kept(units, ref, context, {
+                **record, "note": "release", "printed": [], "titled": [], "columns": 0,
+                "notes": ["names no statement (remembered)"], "own": [], **own_period([], ref.form)}, [], True))
             continue
         try:
             with_network_retries(lambda: load_submission(ref.filing))

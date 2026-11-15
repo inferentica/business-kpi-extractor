@@ -76,7 +76,7 @@ class Units:
         self.stored = {entry["id"]: entry for entry in index}
         self.dropped = self._newest(drop_newest)
         self.index: list[dict] = []
-        self.counts = {"reused": 0, "read": 0, "changed context": 0, "new": 0}
+        self.counts = {"reused": 0, "read": 0, "read again": 0, "new": 0}
 
     def _newest(self, count: int) -> set[str]:
         """The units of the `count` newest filings, set aside as if never read (the incremental round's test)."""
@@ -98,7 +98,7 @@ class Units:
             return None
         if entry["version"] != self.version or not entry.get("complete", True) or \
                 _canonical(entry["context"]) != _canonical(context):
-            self.counts["changed context"] += 1
+            self.counts["read again"] += 1  # another context or reader, or unfinished (unreadable, Arelle's budget)
             return None
         unit = json.loads(gzip.decompress((self.previous / f"{id}.json.gz").read_bytes()))
         self.counts["reused"] += 1

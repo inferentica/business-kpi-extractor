@@ -41,7 +41,7 @@ def test_a_unit_is_reused_in_the_same_context_only(tmp_path):
     assert second.reuse(id, {"fiscal_year_end": "0928", "offset": 0}) is None  # another year end: read again
     again = second.reuse(id, {"offset": 0, "fiscal_year_end": "0927"})  # key order does not matter
     assert readings_of(again) == [_reading()]
-    assert second.finish()["reused"] == 1 and second.counts["changed context"] == 1
+    assert second.finish()["reused"] == 1 and second.counts["read again"] == 1
     # The reused unit is written again, so the next read has it too.
     assert (tmp_path / "two" / "units" / f"{id}.json.gz").exists()
 
