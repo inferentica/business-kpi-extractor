@@ -16,6 +16,7 @@ from collections import Counter, defaultdict
 from ..domain.basis import ifrs_family
 
 _PRINTED = "printed_"
+_STANDARD = ("us-gaap_", "ifrs-full_")
 _PLAIN = {"and", "of", "the", "in", "net", "total", "to", "from", "for", "on", "at", "by", "other", "others", "less", "note", "notes",
           "with", "year", "period", "respectively", "shares", "share", "value", "par"}
 
@@ -164,7 +165,10 @@ def line_identity(readings: list) -> dict[tuple, str]:
         members = groups.members[root]
         tagged = [node for node in members if not node[1].startswith(_PRINTED)]
         named = [node for node in members if words.get(node)]  # never a plain "Others" where a named key exists
-        pick = max(tagged or named or members, key=lambda node: newest.get(node, ""))
+        # The newest name; of two as new (a CVM code and a US GAAP tag from one day), a standard taxonomy's, then the
+        # first by name: a set's order changes with every process's string hashing, and a key must not.
+        pick = max(tagged or named or members, key=lambda node: (newest.get(node, ""), node[1].startswith(_STANDARD),
+                                                                   [-ord(letter) for letter in node[1]]))
         for node in members:
             keys[node] = pick[1]
     # Opening and closing cash: one concept for both, as tagged statements give them (KO's "Balance at end of year").
