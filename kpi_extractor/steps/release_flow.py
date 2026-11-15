@@ -355,9 +355,8 @@ class ReleaseFlow:
             self._state.acquire()
 
     def _process_releases(self, refs: list[FilingRef], spec: Spec, version: int) -> list[FilingRef]:
-        """Reads releases in four chains, one per fiscal quarter (every Q1 oldest to newest, every Q2, ...; newest to
-        oldest in a backfill), the chains side by side. Each read then has the same quarter a year earlier (later) already
-        read in this run: the reference for
+        """Reads releases in four chains, one per fiscal quarter (every Q1 oldest to newest, every Q2, ...), the chains
+        side by side. Each read then has the same quarter a year earlier already read in this run: the reference for
         where each KPI sits, and the year-ago figure its column must match. Readings stored by an earlier run for a
         filing this run is still to re-read are never a reference. Afterwards the quarters just read are checked against
         each other in date order, as reading them one by one would have."""
@@ -367,12 +366,6 @@ class ReleaseFlow:
         pending = [ref for ref in refs if self._reread_due(ref.accession)] if getattr(self, "reread", None) else [
             ref for ref in refs if self.force or self._pending(ref) or (self.filings.get(ref.accession) or {}).get("spec_version") != version]
         done: set[str] = set()
-        # A backfill (every pending release older than any stored reading: an onboarding stores none) reads each chain
-        # newest first, so each older quarter has the same quarter a year later already read: its places for replay,
-        # whose columns code finds by their periods, and its year-ago column to confirm it (p4-finhistory).
-        stored = [value["period_end"] for value in self.values.values() if value["method"] == "ai" and value["validation_status"] != "rejected"]
-        ends = [ref.period_end.isoformat() for ref in pending if ref.period_end]
-        backward = bool(ends) and (not stored or max(ends) < min(stored))
 
         def read(ref: FilingRef) -> None:
             if self._read_and_record_release(ref, spec, version):
@@ -382,20 +375,19 @@ class ReleaseFlow:
             for ref in quarter_refs:
                 with self._state:
                     self._local.holding = True
-                    self._local.chained = True  # history lookups see this chain's quarters already read only
-                    self._local.backward = backward
+                    self._local.chained = True  # history lookups see this chain's own earlier quarters only
                     try:
                         read(ref)
                     finally:
                         self._local.holding = False
-                        self._local.chained = self._local.backward = False
+                        self._local.chained = False
 
         if len(pending) <= 2:
             for ref in refs:
                 read(ref)
         else:
             chains: dict[int, list[FilingRef]] = {}
-            for ref in sorted(refs, key=lambda ref: ref.period_end or date.min, reverse=backward):
+            for ref in sorted(refs, key=lambda ref: ref.period_end or date.min):
                 chains.setdefault(_chain_of(ref.period_end or date.min), []).append(ref)
             with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
                 list(pool.map(chain, chains.values()))
