@@ -31,6 +31,7 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
     # The next releases download while one is read (pipeline/prefetch.py); those remembered empty are not fetched.
     for ref in ahead(refs, lambda ref: None if ref.accession in known else load_submission(ref.filing)):
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
+                  "accepted": ref.accepted,
                   "release_quarter": _quarter(ref.period_end, fiscal_year_end, year_offset), "period_end": ref.period_end.isoformat()}
         if ref.accession in known:  # names no statement (pipeline/empty_releases.py): not fetched again
             empty.add(ref.accession)

@@ -12,6 +12,7 @@ from ..quality.golden import report_text, score
 from ..quality.report import report
 from .company import read_company
 from .handcheck import write_rows
+from .store import store
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,7 +27,14 @@ def main(argv: list[str] | None = None) -> int:
     rows = commands.add_parser("rows", help="Raw printed rows for hand checks of sampled served lines")
     rows.add_argument("samples")
     rows.add_argument("--out", required=True)
+    stored = commands.add_parser("store", help="Write one company's read to Quotiva (main's statements workflow only)")
+    stored.add_argument("folder")
+    stored.add_argument("--dry-run", action="store_true", help="Check against what Quotiva serves; write nothing")
+    stored.add_argument("--allow-withdraw", action="store_true", help="Let it withdraw many periods at once")
     args = parser.parse_args(argv)
+    if args.command == "store":
+        print(json.dumps(store(Path(args.folder), args.dry_run, args.allow_withdraw)))
+        return 0
     if args.command == "rows":
         write_rows(Path(args.samples), Path(args.out))
         return 0

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timezone
 
 REPORT_FORMS = ("10-K", "10-K405", "10-KT", "10-KSB", "10-Q", "10-QSB", "20-F", "40-F")
 _WAITS = (5, 20, 60)  # seconds before each further try after a failed listing
@@ -21,6 +21,16 @@ class Report:
     filed: date
     filing: object = field(default=None, repr=False)
     period_end: date | None = None  # a release's quarter end (a report's comes from its filing)
+    accepted: str | None = None  # EDGAR's acceptance time, UTC: when the filing became public (available_from)
+
+
+def accepted_at(filing) -> str | None:
+    """A listed filing's EDGAR acceptance time in UTC (the listing's own; its header gives the same moment in Eastern
+    time: Apple's FY2024 10-K at 10:01:36 UTC, 06:01:36 EDT)."""
+    when = getattr(filing, "acceptance_datetime", None)
+    if not isinstance(when, datetime):
+        return None
+    return (when if when.tzinfo else when.replace(tzinfo=timezone.utc)).astimezone(timezone.utc).isoformat()
 
 
 def list_reports(company, since: date, predecessors: list = ()) -> list[Report]:
@@ -30,7 +40,8 @@ def list_reports(company, since: date, predecessors: list = ()) -> list[Report]:
     for one, before in _registrants(company, predecessors):
         filings = _with_retries(lambda: one.get_filings(form=list(REPORT_FORMS), filing_date=f"{since.isoformat()}:",
                                                         amendments=False))
-        reports += [Report(str(filing.accession_no), str(filing.form), filing.filing_date, filing)
+        reports += [Report(str(filing.accession_no), str(filing.form), filing.filing_date, filing,
+                           accepted=accepted_at(filing))
                     for filing in filings if str(filing.form) in REPORT_FORMS and (before is None or filing.filing_date < before)]
     return sorted(reports, key=lambda report: report.filed)
 
@@ -43,7 +54,7 @@ def list_xbrl_sixks(company, since: date, predecessors: list = ()) -> list[Repor
     found = []
     for one, before in _registrants(company, predecessors):
         filings = _with_retries(lambda: one.get_filings(form=["6-K", "6-K/A"], filing_date=f"{since.isoformat()}:"))
-        found += [Report(str(filing.accession_no), "6-K", filing.filing_date, filing)
+        found += [Report(str(filing.accession_no), "6-K", filing.filing_date, filing, accepted=accepted_at(filing))
                   for filing in filings if getattr(filing, "is_xbrl", False) and str(filing.form) in ("6-K", "6-K/A")
                   and (before is None or filing.filing_date < before)]
     return sorted(found, key=lambda report: report.filed)
@@ -86,7 +97,8 @@ def _releases(company, since: date, quarter_end, before) -> list[Report]:
             continue
         end = quarter_end(filing.filing_date)
         if RELEASE_WINDOW[0] <= (filing.filing_date - end).days <= RELEASE_WINDOW[1]:
-            found.append(Report(str(filing.accession_no), "6-K", filing.filing_date, filing, period_end=end))
+            found.append(Report(str(filing.accession_no), "6-K", filing.filing_date, filing, period_end=end,
+                                accepted=accepted_at(filing)))
     return sorted(found, key=lambda report: report.filed)
 
 

@@ -50,6 +50,21 @@ def consolidated_figures(facts) -> dict[tuple[str, str], dict[float, str | None]
     return figures
 
 
+def fact_units(facts) -> dict[tuple[str, str], tuple[str | None, str | None]]:
+    """(concept, period) -> the unit and currency of the figure tagged for the company as a whole (`usd` and USD,
+    `usdPerShare` and USD, `shares` and none), for each line's unit (domain/line_fields.py)."""
+    if facts is None or "period_key" not in facts or "unit_ref" not in facts:
+        return {}
+    plain = facts[facts["is_dimensioned"] != True] if "is_dimensioned" in facts else facts  # noqa: E712 - pandas mask
+    currencies = plain["currency"] if "currency" in plain else [None] * len(plain)
+    units: dict[tuple[str, str], tuple[str | None, str | None]] = {}
+    for concept, key, unit, currency in zip(plain["concept"], plain["period_key"], plain["unit_ref"], currencies):
+        if isinstance(unit, str):
+            units.setdefault((str(concept).replace(":", "_", 1), re.sub(r"\s+", "", str(key))),
+                             (unit, currency if isinstance(currency, str) else None))
+    return units
+
+
 class ReportingCurrency:
     """A filer may tag a line twice for one period: in its own currency and as a convenience translation (TSMC's 20-F
     gives the latest year in US dollars as well). Each line takes the figure in the currency the filing reports in."""

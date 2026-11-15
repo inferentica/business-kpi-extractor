@@ -5,6 +5,7 @@ differs from the period's own filing."""
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import asdict
 
 from ..domain.basis import ifrs_family
 from ..domain.model import REGULATOR_SOURCES, Reading
@@ -92,7 +93,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
             record.update({
                 "source_accession": winner.accession, "source_form": winner.form, "source_filed": winner.filed.isoformat(),
                 "from_comparative": not winner.own, "currency": winner.currency, "basis": winner.basis,
-                "scope": winner.scope, "witness": verdict(winner, eligible),
+                "scope": winner.scope, "witness": verdict(winner, eligible), **_served_fields(winner),
                 "lines": winner.lines,
             })
             if set_aside:
@@ -138,7 +139,15 @@ def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
             if reading.basis not in newest or reading.filed > newest[reading.basis].filed:
                 newest[reading.basis] = reading
     return [{"basis": basis, "source_accession": reading.accession, "source_filed": reading.filed.isoformat(),
+             "source_form": reading.form, "from_comparative": not reading.own, "scope": reading.scope,
+             "witness": verdict(reading, [other for other in kept if other.basis == basis]), **_served_fields(reading),
              "currency": reading.currency, "lines": reading.lines} for basis, reading in sorted(newest.items())]
+
+
+def _served_fields(reading: Reading) -> dict:
+    """What Quotiva serves beside a statement's lines: its source, first day, and the checks it passed as read."""
+    return {"source": reading.source, "period_start": reading.period_start.isoformat() if reading.period_start else None,
+            "checks": {"checks": [asdict(check) for check in reading.checks], "arelle": reading.arelle}}
 
 
 def _reporting_currencies(readings: list[Reading]) -> dict[str, set[str]]:

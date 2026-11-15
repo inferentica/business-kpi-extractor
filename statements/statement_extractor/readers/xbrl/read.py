@@ -17,7 +17,8 @@ from ...domain.basis import taxonomy_basis
 from ...domain.model import Reading
 from ...domain.periods import (OWN_SLACK, Period, label_period, opening_instant, parse_period, presented_periods,
                                short_first_year)
-from .facts import ReportingCurrency, consolidated_figures, decimals, load_facts, number
+from ...domain.line_fields import fact_kind
+from .facts import ReportingCurrency, consolidated_figures, decimals, fact_units, load_facts, number
 from .rows import (STATEMENT_METHODS, annotated, clean_label, is_instant_line, key_for, label_for, presented_rows,
                    statement_of)
 
@@ -48,6 +49,7 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
     facts = load_facts(xbrl)
     currency = ReportingCurrency(facts)
     consolidated = consolidated_figures(facts)
+    units = fact_units(facts)
     readings: list[Reading] = []
     notes: list[str] = []
     for name, methods in STATEMENT_METHODS:
@@ -71,7 +73,7 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
             if labelled is None:
                 notes.append(f"{name}: column {period.key} off the calendar")
                 continue
-            reading = _read_column(name, rows, period, instants, arcs, currency, consolidated, labelled)
+            reading = _read_column(name, rows, period, instants, arcs, currency, consolidated, labelled, units)
             if reading is None:
                 continue
             reading.accession, reading.form, reading.filed = accession, form, filed
@@ -81,7 +83,8 @@ def read_filing(xbrl, *, accession: str, form: str, filed: date, fiscal_year_end
 
 
 def _read_column(name: str, rows: list[dict], period: Period, instants: dict[date, str], arcs, currency,
-                 consolidated: dict[tuple[str, str], dict], labelled: tuple[str, str, str]) -> Reading | None:
+                 consolidated: dict[tuple[str, str], dict], labelled: tuple[str, str, str],
+                 units: dict | None = None) -> Reading | None:
     fiscal_year, fiscal_period, duration = labelled
     lines: list[dict] = []
     column = Column()
@@ -91,7 +94,7 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
         concept = str(row["concept"])
         heading = bool(row.get("is_abstract"))
         member = row.get("_member")
-        value = None
+        value, key, places, sign = None, None, None, 1.0
         if member and not heading:
             key = period.key
             if period.start is not None and is_instant_line(row):  # a balance by segment in a flow statement
@@ -101,7 +104,8 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
             if raw is None:
                 continue  # a breakdown this period does not print
             raw = currency.value(concept, parse_period(key).end.isoformat(), raw)
-            value = raw * (number((row.get("preferred_signs") or {}).get(key)) or 1.0)
+            places, sign = (row.get("decimals") or {}).get(key), number((row.get("preferred_signs") or {}).get(key)) or 1.0
+            value = raw * sign
         elif not heading:
             key = key_for(row, period, instants)
             raw = number((row.get("values") or {}).get(key)) if key else None
@@ -134,10 +138,13 @@ def _read_column(name: str, rows: list[dict], period: Period, instants: dict[dat
                     column.presented.append((concept, str(row.get("parent") or ""), sign))
         labels = str(row.get("label") or member) if member else label_for(row)  # a breakdown's label is its member
         level = number(row.get("level"))
+        # Its unit from the fact's, its rounding as tagged, and whether its label reverses the tag's sign.
+        fields = {} if heading else {"unit_kind": fact_kind(*(units or {}).get((concept, key), (None, None)), concept, labels),
+                                     "decimals": decimals(places), "negated": sign < 0}
         lines.append({
             "line": len(lines), "concept": concept[:200], "label": clean_label(labels),
             "level": max(0, min(20, int(level) - base)) if level is not None else 0,
-            "is_heading": heading, "value": value, **({"member": member} if member else {}),
+            "is_heading": heading, "value": value, **({"member": member} if member else {}), **fields,
         })
     if name == "balance":
         lines = _through_grand_total(lines)

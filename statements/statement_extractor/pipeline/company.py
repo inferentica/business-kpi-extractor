@@ -19,7 +19,9 @@ from ..domain.calendar import ANNUAL_FORMS, year_end_for
 from ..domain.model import REGULATOR_SOURCES
 from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period, summarise
+from ..domain.line_fields import finish_lines
 from ..readers.xbrl.read import read_filing
+from ..readers.xbrl.taxonomy import tag_taxonomies, taxonomy_versions
 from ..selection.choose import choose
 from ..selection.fourth import derive_fourth_quarters
 from ..selection.identity import apply_identity
@@ -31,6 +33,7 @@ from ..sources.edgar import company_profile, configure_identity, learn_year_offs
 from ..sources.listing import filing_for, list_reports, list_xbrl_sixks
 from ..sources.predecessors import predecessor_companies
 from .currencies import settle_currencies
+from .served import served_snapshot
 from .standards import use_standard_labels
 from ..sources.retry import with_network_retries
 from .prefetch import load_all
@@ -64,7 +67,8 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     arelle = Checks(cache) if (cache := arelle_cache()) else None
     for ref in reports:
         fiscal_year_end = year_ends[ref.accession]
-        record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False}
+        record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
+                  "accepted": ref.accepted}
         try:
             xbrl = with_network_retries(lambda: (load_submission(ref.filing), ref.filing.xbrl())[1])
         except Exception as error:  # noqa: BLE001 - one unreadable filing never stops the company
@@ -118,6 +122,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
                        **own_period(own, ref.form),
                        "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
                        "columns": len(found), "notes": notes})
+        tag_taxonomies(found, taxonomy_versions(ref.filing))  # us-gaap/2024: the years its schema imports
         if arelle and found:
             arelle.submit(ref.filing, found, record)  # Arelle's second reading of the filing, a check only
         filings.append(record)
@@ -149,13 +154,15 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
                                          printed_signs))
     _release_bases(readings)
     settle_currencies(readings)  # pipeline/currencies.py
+    finish_lines(readings)  # each line's unit, taxonomy, rounding and sign, its currency now known (domain/line_fields.py)
     readings = align_dates(readings)
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
     mark = _phase(phases, "second looks", mark)
     chosen = choose(readings, printed_signs)
     keys = apply_identity(chosen, readings)  # one key per line across the company's eras (selection/identity.py)
     chosen += derive_fourth_quarters(chosen, readings, keys)  # fourth quarters of one vintage (selection/fourth.py)
-    adjust_for_splits(chosen, split_ledger(readings))  # per-share figures on today's share basis (selection/splits.py)
+    ledger = split_ledger(readings)
+    adjust_for_splits(chosen, ledger)  # per-share figures on today's share basis (selection/splits.py)
     mark = _phase(phases, "choose", mark)
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     summary_figures = choose_summaries(summaries, readings, chosen)
@@ -171,6 +178,9 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     (out / "filings.json").write_text(json.dumps(filings, default=str, indent=1))
     (out / "summary.json").write_text(json.dumps(summary, default=str, indent=1))
     (out / "summary_figures.json").write_text(json.dumps({**summary_figures, "read": summaries}, default=str))
+    # What Quotiva serves, as statements_store takes it (pipeline/served.py); written there only from main.
+    served = served_snapshot(symbol, summary.get("cik"), chosen, filings, ledger, summary)
+    (out / "served.json").write_text(json.dumps(served, default=str))
     return summary
 
 

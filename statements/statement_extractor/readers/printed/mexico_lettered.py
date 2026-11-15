@@ -17,6 +17,7 @@ from ...domain.model import Reading
 from ...domain.periods import Period, label_period
 from .mexico_coded import _day, _start, _sum_check
 from .tables import clean, number
+from ...domain.line_fields import printed_decimals
 
 _CODE = re.compile(r"^(s|rt|r|e)(\d{2,3})$")
 _KINDS = (("balance", re.compile(r"\bbalance\s+sheets?\b", re.I)), ("cash_flow", re.compile(r"\bstatements?\s+of\s+cash\s+flows?", re.I)),
@@ -70,7 +71,8 @@ def _values(table, position: int, unit: float, kind: str) -> tuple[dict, list]:
             values[key] = value * unit
         lines.append({"line": len(lines), "concept": _KEY.get(key or "", f"bmv_{code}" if match else "printed_"
                       + re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")), "code": code, "label": label,
-                      "level": 0, "is_heading": False, "value": value * unit})
+                      "level": 0, "is_heading": False, "value": value * unit,
+                      "decimals": printed_decimals(value, unit)})
     return values, lines
 
 

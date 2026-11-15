@@ -1,8 +1,10 @@
 # Statements storage in Quotiva and R2 (Phase 7, s7-layout)
 
-Status: **design for the owner's approval** (revised 2026-11-16 against the SEC's Financial Statement Data Sets and
-point-in-time practice: unit, decimals, negation, taxonomy and publication time per value). Nothing here is applied. The SQL below becomes a migration in
-`services/quotiva/supabase/migrations/` only after approval, and is applied to Quotiva's project by hand.
+Status: **approved 2026-11-16, applied to Quotiva** (s7-gate; `label_en` added in s7-writes). Revised 2026-11-16 against the SEC's Financial Statement Data Sets and
+point-in-time practice: unit, decimals, negation, taxonomy and publication time per value. The SQL below is the migration
+`services/quotiva/supabase/migrations/20261116090000_statements_storage.sql` in the TradeTracker repository, with the
+write gate `statements_store` (Edge Function statements-store); `20261116100000_statement_lines_label_en.sql` adds
+`label_en`.
 
 ## What is stored where
 
@@ -29,7 +31,7 @@ create function public.statement_lines_schema() returns json language sql immuta
     "properties": {
       "line": {"type": "integer"}, "key": {"type": "string"}, "concept": {"type": "string"},
       "taxonomy": {"type": ["string", "null"]}, "member": {"type": ["string", "null"]},
-      "label": {"type": "string"}, "level": {"type": "integer"}, "is_heading": {"type": "boolean"},
+      "label": {"type": "string"}, "label_en": {"type": ["string", "null"]}, "level": {"type": "integer"}, "is_heading": {"type": "boolean"},
       "negated": {"type": "boolean"}, "value": {"type": ["number", "null"]}, "printed_value": {"type": ["number", "null"]},
       "unit": {"type": ["string", "null"]}, "decimals": {"type": ["integer", "null"]},
       "split_factor": {"type": ["number", "null"]}}}}'::json $$;
@@ -135,14 +137,20 @@ Each line carries what the SEC's Financial Statement Data Sets carry for a value
 | `concept`, `taxonomy` | The XBRL tag and its taxonomy (`us-gaap/2024`, `ifrs-full/2025`), or `printed_…` for a line read from print | NUM `tag`, `version` |
 | `member` | The axis member of a breakdown line | NUM `segments` |
 | `label`, `level`, `is_heading` | The filer's label, indentation, heading | PRE `plabel`, `inpth` |
+| `label_en` | The English label of a line a regulator's form labels in Portuguese or Korean (CVM, DART), from its chart of accounts | (none) |
 | `negated` | Shown with the tag's sign reversed (a negated label) | PRE `negating` |
 | `value` | The figure as presented, in whole units, split-adjusted for per-share lines and share counts | NUM `value` |
 | `printed_value`, `split_factor` | The figure as printed and the factor applied, where adjusted | (none) |
 | `unit` | ISO 4217 code, `shares`, `<code>/share` or `pure` | NUM `uom`, XBRL `unitRef` |
 | `decimals` | The figure's rounding as printed or tagged (`-6` for millions) | XBRL `decimals` |
 
-The extractor's readings already hold the label, level, member, sign and value; writing to Quotiva (s7-writes) adds
-the unit, decimals, taxonomy and negated flag from the reading, and `available_from` from EDGAR's acceptance time.
+The extractor's readings hold the label, level, member, sign and value; since s7-writes each reader adds what only it
+knows (domain/line_fields.py): an XBRL line's unit from its fact's unit and currency, its decimals as tagged, its
+taxonomy and year from the filing's schema (`us-gaap/2024`) and `negated` from a negated label; a printed line's kind
+(money, per share, shares) and decimals from the scale it was read in (1,234 in millions is -6); a CVM or Mexican
+line's decimals from its form's scale. A field no reader knows stays null. `available_from` is EDGAR's acceptance time
+(UTC, as its filing list gives it); a source EDGAR does not time (a regulator's form, an archived report) is public
+from the end of its filing day in New York, so a point-in-time query never sees it too soon.
 
 ## Time: three clocks
 
@@ -172,6 +180,7 @@ Under `sec-filings/statements/v1/<cik>/` (a foreign filer without a CIK uses its
 | `readings/<source>-<id>.json.gz` | The same for a regulator's form or an archived report (`CVM-ITR-162068-v1`, `DART-20260814002198`, `archive-TSM-6-K-2000-06-30`) |
 | `filings.json.gz` | Every filing considered and what its reading noted |
 | `served.json.gz` | The served statements as written to Quotiva, for bulk downloads and an edge cache |
+| `candidate.json.gz` | A dry run's snapshot, checked against what Quotiva serves and never served |
 | `summary.json.gz` | The run's summary (coverage, phases, Arelle, AI calls: 0) |
 
 Readings are written once per filing and reader version; a reader change re-writes only the filings its era covers

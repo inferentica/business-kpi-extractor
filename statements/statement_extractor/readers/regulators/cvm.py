@@ -11,6 +11,7 @@ from ...checks.coded import cvm_checks
 from ...domain.basis import CPC_IFRS
 from ...domain.model import Reading
 from ...domain.periods import Period, label_period
+from ...domain.line_fields import printed_decimals
 
 _SCALES = {"MIL": 1000.0, "UNIDADE": 1.0, "MILHAO": 1e6, "MILHÃO": 1e6}
 _CURRENCIES = {"REAL": "BRL"}
@@ -60,7 +61,8 @@ def cvm_readings(form: str, rows: dict[str, list[dict]], fiscal_year_end: str, y
             scope="consolidated" if scope == "con" else "parent",
             lines=[{"line": index, "concept": _KEY_CONCEPTS.get((statement, row["CD_CONTA"]), f"cvm_{row['CD_CONTA']}"),
                     "code": row["CD_CONTA"], "label": row["DS_CONTA"], "fixed": row.get("ST_CONTA_FIXA") == "S",
-                    "level": min(20, row["CD_CONTA"].count(".")), "is_heading": False, "value": values[row["CD_CONTA"]]}
+                    "level": min(20, row["CD_CONTA"].count(".")), "is_heading": False, "value": values[row["CD_CONTA"]],
+                    "decimals": printed_decimals(float(row["VL_CONTA"]), unit)}
                    for index, row in enumerate(ordered)],
             checks=cvm_checks(statement, values, unit, {row['CD_CONTA'] for row in ordered if row.get('ST_CONTA_FIXA') == 'S'}))
         readings.append(reading)

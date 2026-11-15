@@ -9,6 +9,8 @@ value, never guessed. Each derived quarter names both filings it came from. A qu
 replaced."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 from ..domain.model import REGULATOR_SOURCES as REGULATORS
 from ..domain.printed_labels import PER_SHARE, SHARE_COUNT
 from .identity import _same
@@ -115,6 +117,9 @@ def derive_fourth_quarters(chosen: list[dict], readings: list, keys: dict) -> li
             "derived_from": {"year": whole.accession, "year_filed": whole.filed.isoformat(),
                              "nine_months": nine.accession, "nine_months_filed": nine.filed.isoformat()},
             "source_accession": whole.accession, "source_form": whole.form, "source_filed": whole.filed.isoformat(),
+            # The quarter after the nine months; served with the year's source, and no checks of its own (derived).
+            "period_start": (nine.period_end + timedelta(days=1)).isoformat(), "source": whole.source,
+            "from_comparative": not whole.own, "checks": {"checks": [], "arelle": None},
             "currency": whole.currency, "basis": whole.basis, "scope": whole.scope, "witness": "derived",
             "lines": [line for line in lines if line.get("is_heading") or line["value"] is not None],
         })

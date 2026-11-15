@@ -26,6 +26,7 @@ from .dates import column_periods
 from .find import TITLES, find_statements, unlabelled_totals
 from .two_currencies import two_columns
 from .scales import line_scale, share_scale, statement_scale, states_two
+from ...domain.line_fields import printed_fields
 from .scope import statement_scope
 from .side_by_side import column_scopes
 from .tables import Table, figure_columns, statement_rows
@@ -235,15 +236,11 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                     r"per\s+(common\s+)?share\b|earnings|income|loss", row.label, re.I)):
                 per_share = False  # TSMC's "BASIC WEIGHTED AVERAGE SHARES OUTSTANDING (THOUSANDS)"
             shares = not per_share and kind == "income" and (under_shares or counted or bool(SHARE_COUNT.search(row.label)))
-            if value is None or per_share:
-                amount = value
-            elif shares:
-                amount = value * (line_scale(row.label, heading if under_shares else "") or shares_scale)
-            else:
-                amount = value * scale
+            factor = 1.0 if per_share else (line_scale(row.label, heading if under_shares else "") or shares_scale) if shares else scale
+            amount = None if value is None else value * factor
             lines.append({"line": len(lines), "concept": _concept(row.label, kind), "label": row.label[:300],
                           "level": max(0, min(20, row.level - base)), "is_heading": not row.figures, "value": amount,
-                          **({"code": row.code} if row.code else {})})
+                          **({"code": row.code} if row.code else {}), **printed_fields(value, factor, per_share, shares)})
             meaning = named.get(id(row), row.label)
             if kind == "cash_flow" and row.figures and not row.label and section:
                 # A section closed by an unlabelled total (Scotiabank, Brookfield): its last before the next section

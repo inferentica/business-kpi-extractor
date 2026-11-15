@@ -55,7 +55,7 @@ def test_the_earlier_template_is_read_by_its_codes():
     balance = readings["balance", date(2009, 6, 30)]  # the same quarter a year before, not the year end
     assert (balance.fiscal_period, balance.own, balance.status, balance.currency) == ("Q2", False, "kept", "MXN")
     assert balance.lines[0] == {"line": 0, "concept": "bmv_Assets", "code": "s01", "label": "TOTAL ASSETS", "level": 0,
-                                "is_heading": False, "value": 111_820_954_000}  # not its share "100"
+                                "is_heading": False, "value": 111_820_954_000, "decimals": -3}  # not its share "100"
     flows = readings["cash_flow", date(2010, 6, 30)]
     assert (flows.period_start, flows.duration, flows.status) == (date(2010, 1, 1), "ytd", "kept")
 

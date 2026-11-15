@@ -24,6 +24,12 @@ on:
         required: false
         type: boolean
         default: false
+      store:
+        description: "After reading, write each company to Quotiva (main only): a dry run checks, a write serves"
+        required: false
+        type: choice
+        options: ["no", "dry run", "write"]
+        default: "no"
 
 permissions:
   contents: read
@@ -164,6 +170,43 @@ jobs:
           name: statements-golden
           path: golden_results.json
           retention-days: 30
+
+  # Writes each company read to Quotiva through its statements-store gate (Phase 7, s7-writes), by hand on main only:
+  # the gate takes this workflow's OIDC token from main and nothing else, and this is the only job holding one.
+  store:
+    needs: read
+    if: always() && needs.read.result != 'skipped' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.store != 'no'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: statements-[A-Z]*
+          path: out
+          merge-multiple: true
+      - env:
+          MODE: ${{ inputs.store }}
+        run: |
+          failed=0
+          for folder in out/*/; do
+            [ -f "$folder/served.json" ] || { echo "::warning::$folder has no served.json"; continue; }
+            if [ "$MODE" = "dry run" ]; then flag=--dry-run; else flag=; fi
+            python -m statement_extractor store "$folder" $flag || { echo "::error::$folder failed"; failed=1; }
+          done
+          exit $failed
 
   # The AI column-map pilot (decision 2026-11-12): DeepSeek's column maps beside the rules' for the pilot 20-Fs, with
   # calls, yuan and seconds. Nothing it answers is read into a statement.
