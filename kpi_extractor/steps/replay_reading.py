@@ -181,24 +181,14 @@ class ReplayReading:
                    and sideless_key(str((v.get("locator") or {}).get("row_label") or "")) == sideless_key(label)
                    for v in self.values.values()):
             return False
-        # The next quarter's release (a trend table's second column) and the year-later one (its year-ago column, read
-        # first when a backfill reads newest first).
-        refs = getattr(self, "_release_refs", [])
-        laters = [min((ref for ref in refs if ref.period_end and low <= (ref.period_end - expected).days <= high),
-                      key=lambda ref: ref.period_end, default=None) for low, high in ((30, 130), (330, 400))]
-        if not label or not item.value:
+        later = min((ref for ref in getattr(self, "_release_refs", []) if ref.period_end and 30 <= (ref.period_end - expected).days <= 130),
+                    key=lambda ref: ref.period_end, default=None)
+        if not label or later is None or not item.value:
             return False
-        try:
-            quarter = int(fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)[1][1])
-        except Exception:  # noqa: BLE001 - no fiscal quarter confirms nothing
-            return False
-        return any(self._prints_again(later, label, item.value, expected, quarter) for later in laters if later is not None)
-
-    def _prints_again(self, later, label: str, value: float, expected: date, quarter: int) -> bool:
-        """Whether a later release prints `value` on a row labelled `label`, in a column headed for this quarter."""
         try:
             document = self._code_document(later)
-        except Exception:  # noqa: BLE001 - an unreadable release confirms nothing
+            quarter = int(fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)[1][1])
+        except Exception:  # noqa: BLE001 - an unreadable release, or no fiscal quarter, confirms nothing
             return False
         for table in document.tables.values():
             for row, cells in enumerate(table.rows):
@@ -206,8 +196,8 @@ class ReplayReading:
                     continue
                 for col in range(1, len(cells)):
                     cell = parse_number(table.cell(row, col))
-                    factor = release_unit(value, cell.value) if cell and cell.value else None
-                    if factor and same_figure(cell.value * factor, value) and names_period(table, row, col, expected, quarter):
+                    factor = release_unit(item.value, cell.value) if cell and cell.value else None
+                    if factor and same_figure(cell.value * factor, item.value) and names_period(table, row, col, expected, quarter):
                         return True
         return False
 
