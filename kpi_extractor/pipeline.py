@@ -282,8 +282,32 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.store.write(self._fill_tagged_metrics(reports, spec))
             self.store.write(self._fill_quarter_tables(releases))
             self.store.write(self._fill_quoted_rows(releases))
-        # Across periods, in this order: each step sees what the one before wrote, in memory; what changed is sent once.
+        # Across periods, in this order: each step sees what the one before wrote, in memory; what changed is sent once,
+        # also when a step fails part way (the run still fails): what the steps before it settled is never lost.
         self.store.hold()
+        try:
+            self._cross_period(releases, spec)
+        finally:
+            self.store.release()
+        self.result.q4_gaps = self._q4_gaps()
+        self.result.served_changes = self.store.served_changes()
+        if self.result.served_changes:
+            self.log(f"{self.symbol}: served figures changed: {self.result.served_changes}")
+        live = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] != "rejected"]
+        self.result.release_values = len(live)
+        self.result.release_verified = sum(1 for v in live if v["validation_status"] == "verified")
+        if len(live) >= 5 and self.result.release_verified < 0.5 * len(live):
+            self.log(f"{self.symbol}: only {self.result.release_verified} of {len(live)} release values are verified")
+        if self.result.q4_gaps:
+            self.log(f"{self.symbol}: no Q4 for {', '.join(self.result.q4_gaps[:10])}")
+        for future in self._archiving:
+            future.exception()  # archiving finishes before the download threads are shut down
+        self.log(f"{self.symbol}: filing archive {self.archive.reads} read ({self.archive.submissions} full submissions "
+                 f"and {self.archive.lists} filing list instead of SEC), {self.archive.writes} added")
+        return self.result
+
+    def _cross_period(self, releases, spec) -> None:
+        """The steps across periods, while the store holds their writes in memory."""
         self.store.write(self._unfile_quarters())
         self.store.write(self._refile_annuals())
         self.store.write(self._withdraw_unproven_clears())
@@ -306,23 +330,6 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.write(self.store.reread_disagreements())
         if self.result.rule_evidence:
             self.log(f"{self.symbol}: learned rules now {self.store.rule_evidence(self.result.rule_evidence)}")
-        self.store.release()
-        self.result.q4_gaps = self._q4_gaps()
-        self.result.served_changes = self.store.served_changes()
-        if self.result.served_changes:
-            self.log(f"{self.symbol}: served figures changed: {self.result.served_changes}")
-        live = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] != "rejected"]
-        self.result.release_values = len(live)
-        self.result.release_verified = sum(1 for v in live if v["validation_status"] == "verified")
-        if len(live) >= 5 and self.result.release_verified < 0.5 * len(live):
-            self.log(f"{self.symbol}: only {self.result.release_verified} of {len(live)} release values are verified")
-        if self.result.q4_gaps:
-            self.log(f"{self.symbol}: no Q4 for {', '.join(self.result.q4_gaps[:10])}")
-        for future in self._archiving:
-            future.exception()  # archiving finishes before the download threads are shut down
-        self.log(f"{self.symbol}: filing archive {self.archive.reads} read ({self.archive.submissions} full submissions "
-                 f"and {self.archive.lists} filing list instead of SEC), {self.archive.writes} added")
-        return self.result
 
     def _write_extra(self, rows: list[dict], what: str) -> None:
         """Figures a filing's report will replace or that only add to it: failing to store them never holds up the KPIs."""

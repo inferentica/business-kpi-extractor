@@ -24,3 +24,19 @@ def test_recent_6ks_that_are_not_candidates_are_passed_over(monkeypatch):
     refs = earnings_releases(company, profile, date(2020, 1, 1), passed=passed)
     assert [ref.accession for ref in refs] == ["release"]
     assert [ref.accession for ref in passed] == ["no-exhibit"]
+
+
+def test_one_filing_that_cannot_be_read_leaves_the_others_listed(monkeypatch):
+    # An unreadable candidate once failed the listing, and every release of the company with it.
+    filed = date(2025, 4, 25)
+    filings = [_filing("broken", filed), _filing("release", filed + timedelta(days=1))]
+    company = SimpleNamespace(get_filings=lambda **_: filings)
+    exhibit = SimpleNamespace(url="https://sec.gov/ex99.htm")
+
+    def exhibits(filing, archive):
+        if filing.accession_no == "broken":
+            raise ConnectionError("SEC returned HTML")
+        return [exhibit]
+    monkeypatch.setattr(sec, "_archived_exhibits", exhibits)
+    refs = earnings_releases(company, CompanyProfile("TSM", 1, "TSMC", "1231", True), date(2020, 1, 1))
+    assert [ref.accession for ref in refs] == ["release"]

@@ -297,3 +297,31 @@ def test_a_reports_registrant_name_is_sent_with_its_filing_as_stored_once():
     assert sent == [[{"accession": "r1", "status": "processed", "attempts": 1, "notes": ["xbrl reader 48"], "value_count": 9,
                       "spec_version": 3, "source_url": "u", "period_end": "2026-09-30", "form": "10-Q",
                       "filed_at": "2026-11-04", "document_role": "periodic_report", "registrant_name": "Wells Fargo & Company"}]]
+
+def test_held_writes_are_sent_when_a_later_step_fails():
+    from types import SimpleNamespace
+    from kpi_extractor.pipeline import SymbolPipeline
+    sent = []
+
+    class Control:
+        def call(self, operation, **payload):
+            sent.extend(payload.get("values") or [])
+            return {}
+    pipeline = SymbolPipeline(Control(), "TSM", quarters=4, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(name="TSMC", fiscal_year_end="1231", foreign=True)
+    row = {"group_key": "kpi_nodes", "kpi_key": "n3", "fiscal_year": "2026", "fiscal_period": "Q1", "period_end": "2026-03-31",
+           "method": "ai", "validation_status": "verified", "value": 1.0, "notes": [], "locator": {}}
+
+    def steps(releases, spec):
+        pipeline.store.write([row])  # a step settled this figure
+        raise RuntimeError("a later step failed")
+    pipeline._cross_period = steps
+    pipeline.store.hold()
+    try:
+        try:
+            pipeline._cross_period([], None)
+        finally:
+            pipeline.store.release()
+    except RuntimeError:
+        pass
+    assert [value["kpi_key"] for value in sent] == ["n3"]
