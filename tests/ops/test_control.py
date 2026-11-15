@@ -154,3 +154,18 @@ def test_the_quick_set_scores_one_company_for_each_way_of_reading():
     # Every quick-set company has golden values, and the set stays well under the full set.
     assert {item["symbol"] for item in quick} == set(QUICK_SET)
     assert len(quick) == 53 and len(golden) == 92
+
+
+def test_an_evaluation_asks_again_only_when_told(monkeypatch):
+    from kpi_extractor.ops.control import ControlPlane
+    sent = []
+
+    class Plane(ControlPlane):
+        def call(self, operation, **payload):
+            sent.append(payload)
+            return {"content": "{}", "callId": "c1"}
+    plane = Plane("https://example.test/functions/v1/business-kpi-workflow")
+    plane.ai("AAPL", "locate", "system", "user", False)
+    monkeypatch.setenv("KPI_FRESH_ANSWERS", "1")
+    plane.ai("AAPL", "locate", "system", "user", False)
+    assert "fresh" not in sent[0] and sent[1]["fresh"] is True
