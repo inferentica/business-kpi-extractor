@@ -87,3 +87,33 @@ def test_a_dry_run_writes_only_its_candidate_snapshot(tmp_path):
     # Gzipped without a time stamp: one snapshot is always the same bytes.
     store(_folder(tmp_path), dry_run=True, post=post, put=lambda link, body: written.__setitem__("again", body))
     assert written["again"] == written["https://r2/candidate.json.gz"]
+
+
+def test_a_read_with_units_stores_them_and_the_next_read_gets_them_back(tmp_path):
+    from statement_extractor.pipeline.store import fetch_units
+    from statement_extractor.pipeline.units import Units
+    (tmp_path / "read").mkdir()
+    folder = _folder(tmp_path / "read")
+    units = Units(folder)
+    units.keep("report", "0000320193-24-000123", {"offset": 0}, {"accession": "0000320193-24-000123"}, [],
+               accession="0000320193-24-000123", filed="2024-11-01")
+    units.finish()
+    posted, written = [], {}
+
+    def post(body):
+        posted.append(body)
+        if body["operation"] == "uploads":
+            return {"links": {file["name"]: f"https://r2/{file['name']}" for file in body["files"]}}
+        if body["operation"] == "downloads":
+            return {"links": {link[len("https://r2/"):]: link for link in written if "/units/" in link}}
+        return {"new": 0}
+
+    store(folder, post=post, put=lambda link, body: written.setdefault(link, body))
+    names = [file["name"] for file in posted[0]["files"]]
+    assert names == ["units/report-0000320193-24-000123.json.gz", "units/index.json.gz", "filings.json.gz",
+                     "summary.json.gz", "served.json.gz"]  # units in place of readings/, the snapshot last
+    later = tmp_path / "previous"
+    assert fetch_units(later, 320193, post=post, get=lambda link: written[link]) == 1
+    assert posted[-1] == {"operation": "downloads", "cik": 320193}
+    again = Units(tmp_path / "next", previous=later)
+    assert again.reuse("report-0000320193-24-000123", {"offset": 0})["record"] == {"accession": "0000320193-24-000123"}

@@ -11,8 +11,9 @@ from pathlib import Path
 from ..quality.golden import report_text, score
 from ..quality.report import report
 from .company import read_company
+from ..sources.edgar import company_profile, configure_identity
 from .handcheck import write_rows
-from .store import store
+from .store import fetch_units, store
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -33,7 +34,16 @@ def main(argv: list[str] | None = None) -> int:
     stored.add_argument("folder")
     stored.add_argument("--dry-run", action="store_true", help="Check against what Quotiva serves; write nothing")
     stored.add_argument("--allow-withdraw", action="store_true", help="Let it withdraw many periods at once")
+    fetched = commands.add_parser("fetch-units", help="A company's units from its last stored read (main only)")
+    fetched.add_argument("--symbol", required=True)
+    fetched.add_argument("--out", required=True)
     args = parser.parse_args(argv)
+    if args.command == "fetch-units":
+        configure_identity()
+        cik = company_profile(args.symbol.upper())[0].cik
+        count = fetch_units(Path(args.out), int(cik)) if cik else 0
+        print(json.dumps({"symbol": args.symbol.upper(), "cik": cik, "units": count}))
+        return 0
     if args.command == "store":
         print(json.dumps(store(Path(args.folder), args.dry_run, args.allow_withdraw)))
         return 0

@@ -30,6 +30,11 @@ on:
         type: choice
         options: ["no", "dry run", "write"]
         default: "no"
+      incremental:
+        description: "On main, build each company on its units in R2 (its last stored read): read only what is new"
+        required: false
+        type: boolean
+        default: false
       previous_run:
         description: "A run whose reads to build on: each company reads only what is new since (its units/)"
         required: false
@@ -116,6 +121,7 @@ jobs:
     permissions:
       contents: read
       actions: read  # the previous run's reads, with previous_run
+      id-token: write  # on main with incremental, the units the gate signs links for (statements-store)
     strategy:
       fail-fast: false
       max-parallel: 16
@@ -150,6 +156,9 @@ jobs:
           path: previous
           run-id: ${{ inputs.previous_run }}
           github-token: ${{ github.token }}
+      - if: github.ref == 'refs/heads/main' && inputs.incremental
+        continue-on-error: true  # a company never stored, or the gate unreachable: read in full
+        run: python -m statement_extractor fetch-units --symbol "${{ matrix.symbol }}" --out "previous/${{ matrix.symbol }}"
       - env:
           SYMBOL: ${{ matrix.symbol }}
           SINCE: ${{ matrix.since }}

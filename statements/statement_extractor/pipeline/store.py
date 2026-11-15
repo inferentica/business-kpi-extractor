@@ -4,10 +4,14 @@ evidence under statements/v1/<cik>/ in R2, writes it, then asks the gate to serv
 
     statement-extractor store out/AAPL [--dry-run]
 
-The evidence (statements/docs/storage.md): each filing's readings (readings/<accession>.json.gz), the filings read
+The evidence (statements/docs/storage.md): the read's units (units/<unit>.json.gz with units/index.json.gz, s7-
+incremental; a read without units gives each filing's readings, readings/<accession>.json.gz), the filings read
 (filings.json.gz), the served snapshot (served.json.gz) and the run's summary (summary.json.gz), gzipped with no
 time stamp so a file read alike is written alike. A dry run writes only its snapshot, as candidate.json.gz: what R2
-holds as served stays what Quotiva serves."""
+holds as served stays what Quotiva serves.
+
+The next read of the company builds on those units (`fetch_units`): the gate signs links to read them, for main's
+statements workflow only."""
 from __future__ import annotations
 
 import gzip
@@ -36,13 +40,18 @@ def evidence_name(accession: str) -> str:
 
 
 def evidence(folder: Path) -> dict[str, bytes]:
-    by_filing: dict[str, list] = defaultdict(list)
-    with (folder / "readings.jsonl").open() as handle:
-        for line in handle:
-            if line.strip():
-                reading = json.loads(line)
-                by_filing[evidence_name(reading["accession"])].append(reading)
-    files = {name: _packed(readings) for name, readings in sorted(by_filing.items())}
+    units = folder / "units"
+    if (units / "index.json").exists():
+        files = {f"units/{path.name}": path.read_bytes() for path in sorted(units.glob("*.json.gz"))}
+        files["units/index.json.gz"] = _packed(json.loads((units / "index.json").read_text()))
+    else:
+        by_filing: dict[str, list] = defaultdict(list)
+        with (folder / "readings.jsonl").open() as handle:
+            for line in handle:
+                if line.strip():
+                    reading = json.loads(line)
+                    by_filing[evidence_name(reading["accession"])].append(reading)
+        files = {name: _packed(readings) for name, readings in sorted(by_filing.items())}
     for name in ("filings", "served", "summary"):
         files[f"{name}.json.gz"] = _packed(json.loads((folder / f"{name}.json").read_text()))
     return files
@@ -66,6 +75,34 @@ def store(folder: Path, dry_run: bool = False, allow_withdraw: bool = False, pos
             put(links[name], files[name])
     result = post({"operation": "store", "cik": cik, "dry_run": dry_run, "allow_withdraw": allow_withdraw})
     return {**result, "files": len(files), "bytes": sum(len(body) for body in files.values())}
+
+
+def fetch_units(folder: Path, cik: int, post=None, get=None) -> int:
+    """The company's units as its last stored read left them, into `folder`/units for `read --previous`; how many."""
+    post, get = post or _post, get or _get
+    links = post({"operation": "downloads", "cik": cik})["links"]
+    units = folder / "units"
+    units.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for name, link in sorted(links.items()):
+        if name == "units/index.json.gz":
+            (units / "index.json").write_bytes(gzip.decompress(get(link)))
+        elif re.fullmatch(r"units/[A-Za-z0-9][A-Za-z0-9._-]*\.json\.gz", name):
+            (units / name.split("/", 1)[1]).write_bytes(get(link))
+            count += 1
+    return count
+
+
+def _get(link: str) -> bytes:
+    for attempt in range(1, 4):
+        try:
+            with urllib.request.urlopen(link, timeout=120) as response:
+                return response.read()
+        except (urllib.error.URLError, TimeoutError) as error:
+            if attempt == 3:
+                raise RuntimeError(f"unit download failed: {error}") from error
+        time.sleep(5 * attempt)
+    raise RuntimeError("unit download failed")
 
 
 def _post(body: dict) -> dict:
