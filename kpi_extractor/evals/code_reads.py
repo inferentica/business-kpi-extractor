@@ -106,6 +106,8 @@ class CodeOnlyPipeline(SymbolPipeline):
         self.kinds: dict[str, str] = {}
         # Why each figure code tried was not read, with the place it was looked for: (accession, "group.kpi") -> both.
         self.misses: dict[tuple[str, str], dict] = {}
+        # Learned rules read as if live, never spot-checked (KPI_RULES_LIVE=1): their figures scored like any code read.
+        self.rules_live = os.environ.get("KPI_RULES_LIVE") == "1"
         self._reread_picked = None
         # Frozen: a reading is recorded, never applied, so later quarters replay only from verified stored places.
         self.store._apply = lambda values: None
@@ -440,6 +442,10 @@ def summarize(companies: list[dict]) -> dict:
         if row["outcome"] != "extra":
             by_origin[row["origin"]][row["outcome"]] += 1
     by_reader = Counter(row["readBy"] for row in rows if row["outcome"] == "right")
+    wrong_by_reader = Counter(row["readBy"] for row in rows if row["outcome"] in ("wrong", "rounded"))
+    # Each figure a learned rule read, beside the accepted one: how a rule earns live reading (KPI_RULES_LIVE).
+    rule_rows = [{key: row.get(key) for key in ("symbol", "kpi", "period", "expected", "found", "outcome")}
+                 for row in rows if row["readBy"] == "rule"]
     missed_why = Counter((row["kind"], row["why"]) for row in rows if row["outcome"] == "missed")
     timings = [seconds for company in companies for seconds in company["codeSeconds"]]
     outcomes = Counter()
@@ -450,6 +456,8 @@ def summarize(companies: list[dict]) -> dict:
         "byOrigin": {key: dict(counts) for key, counts in by_origin.items()},
         "outcomes": dict(outcomes.most_common()),
         "rightByReader": dict(by_reader.most_common()),
+        "wrongByReader": dict(wrong_by_reader.most_common()),
+        "ruleRows": rule_rows,
         "missedWhy": {f"{kind}|{why}": count for (kind, why), count in missed_why.most_common()},
         "byCompany": {company["symbol"]: dict(Counter(row["outcome"] for row in company["rows"])) for company in companies},
         "documents": len(timings),
@@ -485,6 +493,12 @@ def report_text(summary: dict) -> str:
         total = sum(counts.values())
         lines.append(f"| {key} | {total:,} | {counts.get('right', 0):,} | {counts.get('wrong', 0):,} | {_coverage(counts)} |")
     lines += ["", "Right, by the code that read it: " + ", ".join(f"{name} {count:,}" for name, count in summary.get("rightByReader", {}).items())]
+    if summary.get("wrongByReader"):
+        lines += ["Wrong or rounded, by the code that read it: " + ", ".join(f"{name} {count:,}" for name, count in summary["wrongByReader"].items())]
+    if summary.get("ruleRows"):
+        lines += ["", "| Rule read | Period | Accepted | Rule | Outcome |", "|---|---|---|---|---|"]
+        lines += [f"| {row['symbol']} {row['kpi']} | {row['period']} | {row['expected']} | {row['found']} | {row['outcome']} |"
+                  for row in summary["ruleRows"]]
     lines += ["", f"Speed: {summary['documents']:,} documents, code {summary['codeMsMedian']} ms median, "
               f"{summary['codeMsP90']} ms p90, {summary['codeSecondsTotal']} s in all",
               f"AI requests refused (none made): {summary['refused'] or 'none'}", "",

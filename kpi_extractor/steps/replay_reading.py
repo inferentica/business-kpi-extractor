@@ -16,7 +16,7 @@ from ..rules.segment_tables import company_segments, names_segment, segment_page
 from ..rules.period import release_unit
 from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
-from ..readers.anchor import KIND as ANCHOR, anchor_locator
+from ..readers.anchor import KIND as ANCHOR, anchor_locator, rounded_elsewhere
 from ..readers.quoted_rows import row_line
 from ..readers.row_finder import shows_figure, table_from_rows
 from ..rules.identity import sideless_key
@@ -486,19 +486,21 @@ class ReplayReading:
         """A quoted metric KPI replay could not find, tried by the anchor-phrase rule. Live, its reading stands (but in
         one filing in ten the AI reads too, as a spot check); in shadow, or spot-checked, it waits beside the AI's
         reading and the two are compared (_settle_rule_evidence). Otherwise the replay's miss stands."""
-        status = (getattr(self, "learned_rules", None) or {}).get(ANCHOR)
+        rules_live = getattr(self, "rules_live", False)  # code-reads scoring a rule as if live (evals/code_reads.py)
+        status = LIVE if rules_live else (getattr(self, "learned_rules", None) or {}).get(ANCHOR)
         if status not in (SHADOW, LIVE):
             return miss
-        found = anchor_locator(document, key, locators[key])
+        label = next((kpi.label for group in part.groups for kpi in group.kpis if f"{group.key}.{kpi.key}" == key), "")
+        found = anchor_locator(document, key, locators[key], label)
         if isinstance(found, str):
             return miss
         locator, anchor = found
         located = Located(period_end=reported_period(document, expected).isoformat(), values=[locator])
         checked = self._checked(document, part, located, expected, currency, {"rule": ANCHOR, "anchor": anchor})
-        if isinstance(checked, str):
+        if isinstance(checked, str) or rounded_elsewhere(document, checked[1][0].value, str(locator.value_text or "")):
             return miss
         accession = getattr(self._local, "accession", None)
-        if status == LIVE and accession and not spot_checked(accession):
+        if status == LIVE and accession and (rules_live or not spot_checked(accession)):
             return checked
         self._local.__dict__.setdefault("rule_candidates", {})[key] = ("spot-check" if status == LIVE else SHADOW, checked[1][0])
         return miss
