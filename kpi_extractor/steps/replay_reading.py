@@ -9,7 +9,10 @@ import re
 from datetime import date, timedelta
 
 from ..ai import GroupSpec, Located, Spec
-from ..documents.document import Document, parse_number
+from ..documents.document import Document, clean, parse_number
+from ..readers.period_column import names_period
+from ..rules.numbers import same_figure
+from ..rules.period import release_unit
 from ..domain.fiscal import fiscal_label
 from ..readers.extract import ReadValue, read_values
 from ..readers.anchor import KIND as ANCHOR, anchor_locator
@@ -163,6 +166,32 @@ class ReplayReading:
                 key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
                 earlier.setdefault(key, []).append(float(value["value"]))
         return earlier
+
+    def _later_column_matches(self, item: ReadValue, expected: date) -> bool:
+        """Whether the next quarter's release prints this figure again, digit for digit, on a row of the same label in a
+        column headed for this quarter: a bank's supplement shows five quarters side by side, so two filings agree on
+        it and a second reading would only repeat that. The release is opened, not read (its figures masked where one
+        OCR model alone read them); one more than about a quarter later, or none, says nothing."""
+        label = str(item.locator.get("row_label") or "")
+        later = min((ref for ref in getattr(self, "_release_refs", []) if ref.period_end and 30 <= (ref.period_end - expected).days <= 130),
+                    key=lambda ref: ref.period_end, default=None)
+        if not label or later is None or not item.value:
+            return False
+        try:
+            document = self._code_document(later)
+            quarter = int(fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)[1][1])
+        except Exception:  # noqa: BLE001 - an unreadable release, or no fiscal quarter, confirms nothing
+            return False
+        for table in document.tables.values():
+            for row, cells in enumerate(table.rows):
+                if not cells or (clean(cells[0]).lower() != clean(label).lower() and sideless_key(cells[0]) != sideless_key(label)):
+                    continue
+                for col in range(1, len(cells)):
+                    cell = parse_number(table.cell(row, col))
+                    factor = release_unit(item.value, cell.value) if cell and cell.value else None
+                    if factor and same_figure(cell.value * factor, item.value) and names_period(table, row, col, expected, quarter):
+                        return True
+        return False
 
     @staticmethod
     def _repeats(item: ReadValue, document: Document | None, earlier: list[float], period_end: date | None = None) -> bool:

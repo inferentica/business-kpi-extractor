@@ -361,6 +361,7 @@ class ReleaseFlow:
         filing this run is still to re-read are never a reference. Afterwards the quarters just read are checked against
         each other in date order, as reading them one by one would have."""
         before = {key for key, value in self.values.items() if value["method"] == "ai"}
+        self._release_refs = list(refs)  # a later release's columns can confirm an earlier quarter's reading
         self._dead = self._never_verified()
         pending = [ref for ref in refs if self._reread_due(ref.accession)] if getattr(self, "reread", None) else [
             ref for ref in refs if self.force or self._pending(ref) or (self.filings.get(ref.accession) or {}).get("spec_version") != version]
