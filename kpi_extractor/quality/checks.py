@@ -255,15 +255,23 @@ def _shared_cells(values: list) -> None:
     """Two listed metrics read from one table cell: at most one of them is that cell's figure. Exxon's six "Worldwide"
     rows (production, throughput, sales) were each read from the capital expenditure table's "Worldwide" row, 7,159,
     and all six passed every check. Both are held. A found row on a listed metric's cell is its copy, not a second
-    metric (UnitedHealthcare's Employer & Individual, read as Domestic and again under its own name)."""
+    metric (UnitedHealthcare's Employer & Individual, read as Domestic and again under its own name). A figure read in
+    full elsewhere still holds the rounded cell it was read from: Truist's summary row "Deposits" is its average deposits,
+    and the period-end deposits read from that row too stay held once the average moves to its full figure (the average,
+    read in full on a row naming it, is not)."""
     by_cell: dict[tuple, list] = {}
     for item in values:
-        cell = cell_of(item.locator)
-        if cell is not None and any(kpi.key == item.kpi.key for kpi in item.group.kpis):
+        if not any(kpi.key == item.kpi.key for kpi in item.group.kpis):
+            continue
+        cells = {cell_of(item.locator), cell_of(item.locator.get("rounded_from") or {})} - {None}
+        for cell in cells:
             by_cell.setdefault(cell, []).append(item)
-    for items in by_cell.values():
+    for cell, items in by_cell.items():
         if len({(item.group.key, item.kpi.key) for item in items}) > 1:
-            _flag((item for item in items if SHARED_CELL not in item.notes), SHARED_CELL)
+            # The one read in full from a row naming its own metric is that cell's; the others are held.
+            moved = [item for item in items if cell_of(item.locator) != cell]
+            held = [item for item in items if cell_of(item.locator) == cell] if len(moved) == 1 else items
+            _flag((item for item in held if SHARED_CELL not in item.notes), SHARED_CELL)
 
 
 def validate_groups(values: list, previous: dict[str, float]) -> None:
