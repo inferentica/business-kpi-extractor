@@ -30,7 +30,8 @@ def test_the_snapshot_serves_kept_periods_and_their_other_bases():
     other = {"basis": "IFRS", "source_accession": "0001-25-1", "source_filed": "2025-03-01", "source_form": "20-F",
              "from_comparative": True, "scope": "consolidated", "witness": "single", "source": "xbrl",
              "period_start": "2023-10-01", "checks": {"checks": [], "arelle": None}, "currency": "USD", "lines": [LINE]}
-    chosen = [_record(other_bases=[other]), _record(fiscal_year="2023", status="rejected")]
+    chosen = [_record(other_bases=[other, {**other, "basis": "BR GAAP", "currency": None}]),
+              _record(fiscal_year="2023", status="rejected")]
     filings = [{"accession": "0000320193-24-000123", "filed": "2024-11-01", "accepted": "2024-11-01T10:01:36+00:00"}]
     served = served_snapshot("AAPL", 320193, chosen, filings, [(date(2020, 8, 31), 4.0, "")], {"periods": 2})
     assert [(row["basis"], row["is_primary"], row["own_accession"]) for row in served["periods"]] == [
@@ -39,6 +40,8 @@ def test_the_snapshot_serves_kept_periods_and_their_other_bases():
     assert "code" not in served["periods"][0]["lines"][0]
     assert served["splits"] == [{"first_filed": "2020-08-31", "ratio": 4.0, "share_class": ""}]
     assert served["read"]["last_filed"] == "2024-11-01" and served["read"]["coverage"]["periods"] == 2
+    assert served["read"]["coverage"]["unserved"] == [{"statement": "income", "fiscal_year": "2024", "fiscal_period": "FY",
+        "duration": "year", "basis": "BR GAAP", "source_accession": "0001-25-1", "why": "no currency stated"}]
 
 
 def _folder(tmp_path):

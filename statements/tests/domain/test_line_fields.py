@@ -63,3 +63,13 @@ def test_every_line_gets_a_unit_once_its_currency_is_known():
     assert set(served) == {"line", "key", "concept", "taxonomy", "label", "level", "is_heading", "negated", "value",
                            "unit", "decimals"}
     assert served_line(reading.lines[1])["key"] == "printed_per_share"  # a heading keys by its own concept
+
+
+def test_only_a_tagged_line_has_a_taxonomy():
+    printed = _reading([{"line": 0, "concept": "us-gaap_NetIncomeLoss", "label": "Net income", "level": 0,
+                         "is_heading": False, "value": 1.0, "unit_kind": "money"}])
+    tagged = _reading([{"line": 0, "concept": "ifrs-full_Revenue", "label": "Revenue", "level": 0,
+                        "is_heading": False, "value": 1.0}])
+    tagged.source = "dart"
+    finish_lines([printed, tagged])
+    assert printed.lines[0]["taxonomy"] is None and tagged.lines[0]["taxonomy"] == "ifrs-full"

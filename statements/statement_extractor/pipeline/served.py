@@ -40,12 +40,19 @@ def _row(record: dict, source: dict, primary: bool, accepted: dict) -> dict:
 def served_snapshot(symbol: str, cik: int | None, chosen: list[dict], filings: list[dict],
                     ledger: list[tuple[date, float, str]], summary: dict) -> dict:
     accepted = {record["accession"]: record.get("accepted") for record in filings}
-    periods = []
+    periods, unserved = [], []
     for record in chosen:
         if record.get("status") != "kept" or not record.get("lines"):
             continue
-        periods.append(_row(record, record, True, accepted))
-        periods.extend(_row(record, other, False, accepted) for other in record.get("other_bases") or [])
+        for row in [_row(record, record, True, accepted)] + [
+                _row(record, other, False, accepted) for other in record.get("other_bases") or []]:
+            # A presentation whose currency its filing does not state is never served: Quotiva refuses it, and a
+            # currency guessed would be worse than none. Listed in the read's summary instead.
+            if row["currency"]:
+                periods.append(row)
+            else:
+                unserved.append({**{field: row[field] for field in (*_PERIOD, "basis", "source_accession")},
+                                 "why": "no currency stated"})
     filed = [str(record["filed"])[:10] for record in filings if record.get("filed")]
     coverage = {field: summary.get(field) for field in (
         "periods", "by_status", "own_expected", "own_kept", "quarters_expected", "quarters_kept", "first_period",
@@ -53,5 +60,5 @@ def served_snapshot(symbol: str, cik: int | None, chosen: list[dict], filings: l
     return {
         "cik": cik, "symbol": symbol, "periods": periods,
         "splits": [{"first_filed": when.isoformat(), "ratio": ratio, "share_class": member} for when, ratio, member in ledger],
-        "read": {"last_filed": max(filed) if filed else None, "coverage": coverage},
+        "read": {"last_filed": max(filed) if filed else None, "coverage": {**coverage, "unserved": unserved}},
     }

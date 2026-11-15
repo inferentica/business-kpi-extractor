@@ -12,7 +12,7 @@ import re
 from .printed_labels import PER_SHARE, SHARE_COUNT
 
 MONEY, PER_SHARE_KIND, SHARES, PURE = "money", "per_share", "shares", "pure"
-STANDARD_PREFIXES = ("us-gaap", "ifrs-full", "srt", "dei")
+TAGGED = ("xbrl", "dart", "bmv", "cmf")  # sources whose lines are XBRL tags: the SEC's, and Korea's, Mexico's and Chile's
 # The fields a served line may carry (Quotiva's statement_lines_schema); a reader's own notes stay in the evidence.
 SERVED = ("line", "key", "concept", "taxonomy", "member", "label", "label_en", "level", "is_heading", "negated", "value",
           "printed_value", "unit", "decimals", "split_factor")
@@ -94,7 +94,8 @@ def finish_lines(readings: list) -> None:
                 continue
             kind = kind or _by_label(str(line.get("concept") or ""), str(line.get("label_en") or line.get("label") or ""))
             line["unit"] = unit_of(kind, reading.currency)
-            line.setdefault("taxonomy", taxonomy_of(str(line.get("concept") or "")))
+            # A tag's taxonomy only where the line was tagged: never a printed line named after a tag it resembles.
+            line.setdefault("taxonomy", taxonomy_of(str(line.get("concept") or "")) if reading.source in TAGGED else None)
             line.setdefault("decimals", None)
             line.setdefault("negated", False)
 

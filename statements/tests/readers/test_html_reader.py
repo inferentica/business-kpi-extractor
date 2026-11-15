@@ -482,3 +482,14 @@ def test_a_dollar_thousands_caption_is_no_per_share_heading():
     from statement_extractor.readers.printed.read import _caption_only
     assert _caption_only("($000, except per share data)") and _caption_only("($ in thousands, except per share)")
     assert not _caption_only("Sales ($000)")
+
+
+def test_a_currency_mark_ends_a_line_s_label_only_before_its_figures():
+    from statement_extractor.readers.html.parse import parse_html
+    html = ("<table><tr><td>INCOME STATEMENT</td></tr><tr><td>CONSOLIDATED - Corporate Law - In Thousand of R$</td></tr>"
+            "<tr><td></td><td>2Q10</td><td>1Q11</td></tr><tr><td>Net Revenues</td><td>3,872,553</td><td>3,789,008</td></tr>"
+            "<tr><td>Net income Ps.</td><td>1,200</td><td>1,300</td></tr></table>")
+    labels = [row.label for table in parse_html(html) for row in table.rows]
+    # CSN's 2011 releases name their currency only at the end of the caption (its comparatives read without one).
+    assert "CONSOLIDATED - Corporate Law - In Thousand of R$" in labels
+    assert "Net income" in labels  # Televisa's peso sign before its figures is no part of the label
