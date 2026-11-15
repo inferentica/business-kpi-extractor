@@ -475,3 +475,10 @@ def test_a_note_reconciling_two_standards_is_no_income_statement():
     note = SimpleNamespace(rows=[row("Operating profit under IFRS as issued by the IASB"), row("Impairment loss"),
                                  row("Donations"), row("Others"), row("Net income (loss) under IFRS as issued by the IASB")])
     assert not profit_below_lines(note)
+
+
+def test_a_dollar_thousands_caption_is_no_per_share_heading():
+    # Ross's 2002 10-K: "($000, except per share data)" over SALES, which was served unscaled.
+    from statement_extractor.readers.printed.read import _caption_only
+    assert _caption_only("($000, except per share data)") and _caption_only("($ in thousands, except per share)")
+    assert not _caption_only("Sales ($000)")

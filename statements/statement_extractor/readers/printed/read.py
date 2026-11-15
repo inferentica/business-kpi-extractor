@@ -142,11 +142,11 @@ def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> flo
 # A row that only states the scale or the audit status: "Notes (in thousands, except per share data) EUR EUR".
 # Woori's "(Korean Won in millions, except per share data)": the currency named before its scale.
 _CAPTION = re.compile(r"\(\s*(?:[A-Za-z]+\s+){0,2}(?:in|amounts\s+in|dollars\s+in|expressed\s+in)\s+(?:[A-Z]{2,3}\s+)?(thousands|millions|billions)\b|"
+                      r"^\(\s*\$?\s*000(?:,000)?(?:'?s)?(?:\s+omitted)?\s*(?:[,)]|except\b)|\(\s*\$\s*in\s+(thousands|millions|billions)\b|"
                       r"^\(?unaudited\)?$|^amounts\s+expressed\s+in\s+(thousands|millions|billions)\b|"  # Coca-Cola FEMSA's 20-Fs
                       # A caption's second line: TSMC's "Except for Per Share Amounts and Shares Outstanding)".
                       r"^\(?\s*except\s+(for\s+)?(per\s+share|share|earnings\s+per)|"
-                      # …and Woori's 2010 caption over two columns, its second line twice: "per common share data) per
-                      # common share data)".
+                      # Ross's "($000, except per share data)"; Woori's 2010 "per common share data) per common share data)".
                       r"^(?:(?:income\s+)?per\s+(?:common\s+)?share\s+data\)\s*)+$", re.I)
 
 
