@@ -28,6 +28,9 @@ MAX_DOCUMENT_CHARS = 120_000
 # A 6-K read from its own document is classified from the report after its cover; one judged on the cover before is
 # asked again once (TSMC's 2016–2019 results and financial statements were all judged on the cover).
 _OWN_6K_DOCUMENT = re.compile(r"6-?k", re.I)
+# A locator's keys that say where its figure sits; the rest say what read it (replayed_from, rule, ai_call).
+_CELL_KEYS = {"table", "row", "col", "row_label", "context", "scale", "scale_text", "header", "row_numbers", "scale_from",
+              "block", "quote", "value_text", "whole_table", "total", "total_row_label"}
 _INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in|combined line|row mismatch")
 
 def _explain_pointer(problem: str, document: Document) -> str:
@@ -458,6 +461,9 @@ class AiReading:
                     got[0].locator["rounded_from"] = {key: item.locator[key] for key in ("table", "row", "col", "block", "quote")
                                                       if item.locator.get(key) is not None} | {"figure": printed}
                     got[0].notes.append(f"{PRECISE_FIGURE}: {printed}")
+                    # What read it (a replay's or a rule's marks, the reader's call) stays with the figure.
+                    got[0].locator = {**{key: value for key, value in item.locator.items() if key not in _CELL_KEYS},
+                                      **got[0].locator}
                     item = got[0]
             kept.append(item)
         return kept
