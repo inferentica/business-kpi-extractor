@@ -6,7 +6,7 @@ from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parents[1] / "statement_extractor"
 # The KPI extractor's base layer this package may use, and only from sources/edgar.py.
-SHARED = {"kpi_extractor.sec", "kpi_extractor.fiscal"}
+SHARED = {"kpi_extractor.sources.sec", "kpi_extractor.domain.fiscal"}
 # AI clients and the KPI extractor's AI, control plane, readers and pipeline: never imported here.
 FORBIDDEN = ("openai", "anthropic", "dashscope", "deepseek", "kpi_extractor.ai", "kpi_extractor.control",
              "kpi_extractor.pipeline", "kpi_extractor.steps", "kpi_extractor.store")
