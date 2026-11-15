@@ -173,6 +173,14 @@ class ReplayReading:
         it and a second reading would only repeat that. The release is opened, not read (its figures masked where one
         OCR model alone read them); one more than about a quarter later, or none, says nothing."""
         label = str(item.locator.get("row_label") or "")
+        # Two filings printing a figure prove its digits and its column, not its row: Truist's summary "Loans and leases"
+        # ($314.0 billion, with loans held for sale) is printed again next quarter as surely as its "Total loans and leases
+        # held for investment" (312,601). Only a row labelled as the KPI's accepted readings were counts.
+        key = (f"{AI_GROUP_PREFIX}{item.group.key}", item.kpi.key)
+        if not any(v["validation_status"] == "verified" and v["method"] == "ai" and (v["group_key"], v["kpi_key"]) == key
+                   and sideless_key(str((v.get("locator") or {}).get("row_label") or "")) == sideless_key(label)
+                   for v in self.values.values()):
+            return False
         later = min((ref for ref in getattr(self, "_release_refs", []) if ref.period_end and 30 <= (ref.period_end - expected).days <= 130),
                     key=lambda ref: ref.period_end, default=None)
         if not label or later is None or not item.value:
