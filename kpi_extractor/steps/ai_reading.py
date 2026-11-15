@@ -15,7 +15,8 @@ from ..readers.replay import _same_place, _source_template, asked_of, missing_si
 from ..readers.trace import placed_elsewhere, stamp_call
 from ..rules.period import states_quarter
 from .replay_reading import in_full_groups, left_for_ai
-from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _identity_text,
+from ..quality.stated import _names
+from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _identity_text, _rounding, xbrl_figures,
                      _later_place, _same, _same_chain, _year_ago_cells)
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
@@ -162,7 +163,7 @@ class AiReading:
             # missing: a key the current list no longer has, a row the filing no longer has).
             if missing_since(last, keys, group.key, whole, listed, document):
                 continue
-            if any(self._repeats(item, document, earlier.get(f"{group.key}.{item.kpi.key}", [])) for item in parts):
+            if any(self._repeats(item, document, earlier.get(f"{group.key}.{item.kpi.key}", []), expected) for item in parts):
                 continue
             trial = copy.deepcopy(items)
             validate_groups(trial, self._previous(expected))
@@ -174,7 +175,23 @@ class AiReading:
             if all(item.kpi.key in new or self._same_place_as_last(item, expected, document, before := stored.get(f"{group.key}.{item.kpi.key}"))
                    or self._year_ago_cell_matches(item, document, before) for item in parts) and len(new) < len(parts):
                 confirmed.add(group.key)
+            elif self._adds_up_to_xbrl(group, parts, expected):
+                confirmed.add(group.key)
         return confirmed
+
+    def _adds_up_to_xbrl(self, group, parts: list[ReadValue], expected: date) -> bool:
+        """A breakdown no earlier quarter places: every part on a row its own label names, passing the checks above, and
+        the parts adding up to a figure the company reported in XBRL for the quarter, to the parts' own rounding. The
+        same proof settles a held breakdown after reading (series_checks, "parts add up to a figure reported in XBRL"),
+        so a second reader would only repeat it: a company's first quarters, read in a backfill after its reports."""
+        if group.kind != "revenue_breakdown" or len(parts) < 2 or not all(
+                _names(str(item.locator.get("row_label") or ""), item.kpi.label) for item in parts):
+            return False
+        total = sum(item.value for item in parts)
+        rounding = sum(_rounding(item.value) for item in parts) / abs(total) if total else 0
+        tolerance = max(1e-5, min(rounding, 0.005))
+        return any(abs(_days(end, expected.isoformat())) <= 12 and abs(other - total) <= abs(total) * tolerance
+                   for end, other, _label in xbrl_figures(self.values.values()).get(False, []))
 
     def _settle_by_checks(self, agreed: list[ReadValue], disputed: dict[str, tuple], expected: date) -> None:
         """Two readings of a group that disagree, settled without a reasoning review only on structural evidence: one adds up
@@ -257,7 +274,7 @@ class AiReading:
             key = f"{item.group.key}.{item.kpi.key}"
             if item.is_total or item.kpi.key == item.group.total_kpi:
                 continue  # totals are not stored; the parts must still add up to them
-            if self._repeats(item, document, earlier.get(key, [])):
+            if self._repeats(item, document, earlier.get(key, []), expected):
                 return "repeats_earlier"  # the same number as an earlier period: likely a prior-period column
         trial = copy.deepcopy(read)
         validate_groups(trial, self._previous(expected))
