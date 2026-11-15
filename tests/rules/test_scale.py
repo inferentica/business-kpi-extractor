@@ -98,3 +98,18 @@ def test_a_column_headed_as_a_quarter_states_its_period():
     from kpi_extractor.rules.period import states_quarter
     assert all(states_quarter(header) for header in ("Three Months Ended December 31, 2025", "Q4 2025", "4Q25", "13 weeks ended"))
     assert not any(states_quarter(header) for header in ("December 31, 2025", "Twelve Months Ended", "Fiscal 2025"))
+
+
+def test_a_heading_row_inside_the_table_states_its_rows_scale_over_the_columns_header():
+    # ServiceNow's results: a column "Amount ($ millions)", then "($ billions)" over its cRPO and RPO rows.
+    table = Table(id="T1", context="", rows=[["", "Amount ($ millions)", "Year/Year Growth (%)"],
+                                             ["Subscription revenues", "$1,609", "28"],
+                                             ["($ billions) (2)", "Year/Year Growth (%)"],
+                                             ["cRPO", "$5.7", "29"], ["RPO", "$11.5", "29"]])
+    doc = document(table)
+    own, _notes = cell_amount_scale(doc, table, 3, 1, "Current Remaining Performance Obligations (cRPO)", reader(), 5.7)
+    assert (own.factor, own.source, own.words) == (1e9, "heading", "($ billions)")
+    assert cell_amount_scale(doc, table, 1, 1, "Subscription revenues", reader(), 1609)[0].factor == 1e6
+    # A caption row's "except per share amounts" is no per-unit scale for the rows under it.
+    caption = Table(id="T2", context="", rows=[["", "Q3"], ["($ in millions, except per share amounts)", ""], ["Revenue", "512"]])
+    assert cell_amount_scale(document(caption), caption, 2, 1, "Revenue", reader(), 512)[0].factor == 1e6

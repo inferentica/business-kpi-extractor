@@ -127,3 +127,11 @@ def test_figures_put_on_their_series_scale_by_code_are_read_again():
     rescaled = {"validation_status": "verified", "notes": ["read without its table's scale: 1000× to match the series"]}
     assert picks(rescaled)
     assert not picks({**rescaled, "owner_decision": "corrected"}) and not picks({"validation_status": "verified", "notes": []})
+
+
+def test_figures_a_reread_held_for_differing_are_read_once_more():
+    from kpi_extractor.ops.reread import SELECTORS
+    picks = SELECTORS["reread-differs"][1]
+    held = {"validation_status": "needs_review",
+            "notes": ["a new reading of this filing differs from the figure served before: 5,700,000,000"]}
+    assert picks(held) and not picks({**held, "owner_decision": "confirmed"}) and not picks({**held, "validation_status": "verified"})
