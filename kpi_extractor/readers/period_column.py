@@ -111,6 +111,21 @@ def current_column(table: Table, first_data_row: int, col: int) -> bool:
     return bool(column) and max(column) == max(every)
 
 
+def names_period(table: Table, row: int, col: int, expected: date, quarter: int | None, allowed: set[str] = frozenset()) -> bool:
+    """Whether a column's header names the quarter ending `expected`: a quarter's span or none (never a change, a half,
+    nine months, a year or a year to date), no word changing the measure (non-GAAP, adjusted) beyond `allowed`, and a
+    date within the period tolerance of its end, or this fiscal quarter's name with this year or the next."""
+    header = column_header(table, row, col, DEEP_HEADER_ROWS)
+    if _spans(comparable_header(header)) - {"quarter"} or any(
+            _OTHER_MEASURE.match(word) and word not in allowed for word in re.findall(r"[a-z][a-z-]*[a-z]", header)):
+        return False
+    dates, years = column_dates(table, row, col)
+    if dates:
+        return any(abs((day - expected).days) <= PERIOD_TOLERANCE_DAYS for day in dates)
+    named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(header)}
+    return bool(quarter and named == {quarter} and years and set(years) <= {expected.year, expected.year + 1})
+
+
 def period_column(table: Table, row: int, col: int, locator: dict, expected: date, quarter: int | None) -> int | None:
     """The one column of a row whose header names the filing's own period, when last quarter's column fails the tests
     above: a bank's supplement moves its quarters one column on each quarter ("3Q23 2Q23 1Q23 4Q22 3Q22"), and a table
@@ -123,21 +138,9 @@ def period_column(table: Table, row: int, col: int, locator: dict, expected: dat
     if "header" not in locator or _spans(before) - {"quarter"}:
         return None
     words_before = set(re.findall(r"[a-z][a-z-]*[a-z]", before))
-    found = []
-    for index in range(1, len(table.rows[row])):
-        if not parse_number(table.cell(row, index)):  # last quarter's own column too: its header may only be reworded
-            continue
-        header = column_header(table, row, index, DEEP_HEADER_ROWS)
-        if _spans(comparable_header(header)) - {"quarter"} or any(
-                _OTHER_MEASURE.match(word) and word not in words_before for word in re.findall(r"[a-z][a-z-]*[a-z]", header)):
-            continue
-        dates, years = column_dates(table, row, index)
-        named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(header)}
-        if dates:
-            if any(abs((day - expected).days) <= PERIOD_TOLERANCE_DAYS for day in dates):
-                found.append(index)
-        elif quarter and named == {quarter} and years and set(years) <= {expected.year, expected.year + 1}:
-            found.append(index)
+    # Last quarter's own column too: its header may only be reworded.
+    found = [index for index in range(1, len(table.rows[row]))
+             if parse_number(table.cell(row, index)) and names_period(table, row, index, expected, quarter, words_before)]
     if len(found) > 1:
         found = [index for index in found if current_column(table, row, index)]
     return found[0] if len(found) == 1 else None
