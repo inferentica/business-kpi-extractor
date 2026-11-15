@@ -70,6 +70,13 @@ def _series_rescaled(value: dict) -> bool:
     return value.get("validation_status") != "rejected" and not value.get("owner_decision") and has(value.get("notes"), "rescaled")
 
 
+def _reread_differs(value: dict) -> bool:
+    """A figure a re-read held because it read the figure served before differently: read once more after a reader fix
+    (ServiceNow's cRPO, re-read at its column's "$ millions" before a heading row's "($ billions)" counted, 2026-11-15).
+    A held figure is no longer compared with what was served, so the new reading stands on its own checks."""
+    return value.get("validation_status") == "needs_review" and not value.get("owner_decision") and has(value.get("notes"), "reread_differs")
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -89,6 +96,8 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
                         "held for a place their section's title names", _unit_price_row),
     "series-rescaled": ("figures put on their series' scale by code, read again at the scale their filing states",
                         _series_rescaled),
+    "reread-differs": ("figures a re-read held for reading the served figure differently, read once more after a reader fix",
+                       _reread_differs),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }

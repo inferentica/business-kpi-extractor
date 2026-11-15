@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ..documents.document import _AMOUNT_WORDS, _SCALE_WORDS, _TABLE_SCALE, clean, Document, Table, TextBlock
+from ..documents.document import _AMOUNT_WORDS, _SCALE_WORDS, _TABLE_SCALE, clean, Document, parse_number, Table, TextBlock
 from .table import _heading, _nearest_heading
 
 
@@ -232,11 +232,38 @@ def cell_count_scale(document: Document, table: Table, row: int, col: int, locat
     return ScaleFrom(1.0, "units"), []
 
 
+def _heading_scale_words(text: str) -> tuple[float, str] | None:
+    """The scale a heading row states ("($ billions)", "(in millions)"): scale words only, never a per-unit reading
+    of a caption's "except per share amounts"."""
+    if match := _ROW_SCALE.search(text):
+        return SCALE_WORDS[(match.group("word") or match.group("within")).lower()], match.group(0)
+    if (short := _COLUMN_SCALE.search(text)) and (found := _scale_word(short.group("word") or short.group("letter") or short.group("bare"))):
+        return found, short.group(0)
+    return None
+
+
+def _body_heading(table: Table, row: int) -> str:
+    """The labels of the rows with no figures just above a row, below the table's first row of figures: a section's
+    heading inside the table, never its header (whose cells head columns, each with its own scale)."""
+    first = next((i for i, cells in enumerate(table.rows) if any(parse_number(cell) for cell in cells[1:])), len(table.rows))
+    labels = []
+    for index in range(row - 1, first, -1):
+        cells = table.rows[index]
+        if any(parse_number(cell) for cell in cells[1:]):
+            break
+        labels.append(cells[0] if cells else "")
+    return " ".join(labels)
+
+
 def _own_amount_scale(table: Table, row: int, col: int, kpi_label: str) -> ScaleFrom | None:
     """An amount's own scale: its row's (JPM's "Debit and credit card sales volume (in billions)" in a table "(in
-    millions)"), its column's, or none for a per-unit amount (a price keeps its units)."""
+    millions)"), the heading row just above it inside the table (ServiceNow's results, a column "Amount ($ millions)"
+    with "($ billions)" over its cRPO and RPO rows: $5.7 billion, never $5.7 million), its column's, or none for a
+    per-unit amount (a price keeps its units)."""
     if found := _row_scale_words(" ".join(table.rows[row])):
         return ScaleFrom(found[0], "row", found[1])
+    if found := _heading_scale_words(_body_heading(table, row)):
+        return ScaleFrom(found[0], "heading", found[1])
     if found := _column_scale_words(table, row, col):
         return ScaleFrom(found[0], "column", found[1])
     if per_unit := _PER_UNIT_KPI.search(kpi_label):
