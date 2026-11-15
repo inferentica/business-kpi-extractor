@@ -155,7 +155,7 @@ class ReleaseFlow:
             period_hint = f"quarter ended about {expected} (fiscal {fiscal_period} {fiscal_year})"
 
             def text(subset: Spec | None = None, hints: bool = True) -> str:  # built only when the AI reads
-                return ai.prompt(self.company, self._prompt_document(document, spec), ai.LOCATE_TASK,
+                return ai.prompt(self.company, self._locate_document(document, spec), ai.LOCATE_TASK,
                                  ai.locate_data(period_hint, subset or spec, self._hints(expected) if hints else {}))
 
             self._local.accession, self._local.rule_candidates = ref.accession, {}
