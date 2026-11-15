@@ -2228,3 +2228,21 @@ def test_two_listed_metrics_read_from_one_cell_are_both_held():
     listed, copy_ = item("crude", 7), item("x", 7, KpiSpec(key="worldwide", label="Worldwide", unit="count"))
     validate_groups([listed, copy_], {})
     assert listed.status == "verified" and copy_.status == "verified"
+
+
+def test_a_rounded_cell_read_in_full_elsewhere_still_holds_the_other_metric_read_there():
+    """Truist: its summary's "Deposits" row is the average; average and period-end deposits were both read from it. The
+    average, read in full on its own row, leaves the cell; the period-end figure left there is held."""
+    from kpi_extractor.ai import GroupSpec
+    from kpi_extractor.quality.checks import SHARED_CELL, validate_groups
+    group = GroupSpec.model_validate({"key": "operating", "label": "Operating", "kind": "metric", "kpis": [
+        {"key": "average_deposits", "label": "Average Deposits", "unit": "currency"},
+        {"key": "total_deposits", "label": "Total Deposits", "unit": "currency"}]})
+    kpis = {kpi.key: kpi for kpi in group.kpis}
+    average = SimpleNamespace(group=group, kpi=kpis["average_deposits"], value=396_600e6, is_total=False, status="verified",
+                              notes=[], locator={"table": "A_T13", "row": 6, "col": 1,
+                                                 "rounded_from": {"table": "A_T1", "row": 32, "col": 1, "figure": "397"}})
+    total = SimpleNamespace(group=group, kpi=kpis["total_deposits"], value=397e9, is_total=False, status="verified",
+                            notes=[], locator={"table": "A_T1", "row": 32, "col": 1})
+    validate_groups([average, total], {})
+    assert (average.status, total.status) == ("verified", "needs_review") and total.notes == [SHARED_CELL]
