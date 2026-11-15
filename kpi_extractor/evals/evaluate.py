@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from ..ops.cli import company_pool
-from ..ops.control import ControlPlane
+from ..ops.control import ControlPlane, Reply
 from ..readers.extract import labels_agree
 from ..pipeline import SymbolPipeline, SymbolResult
 from ..sources.sec import configure_identity
@@ -74,8 +74,12 @@ class EvalControl:
             return {}
         return self.plane.call(operation, **payload)
 
-    def ai(self, *args, **kwargs) -> str:
-        return self.plane.ai(*args, **kwargs)
+    def ai(self, symbol: str, purpose: str, *args, **kwargs) -> str:
+        # A list fixed for the run (a trial's lists_from) stays as it came: its audit finds nothing to add or retire.
+        # Before, the audit grew it (USB 24 to 32 KPIs), so a rerun read twice the releases and measured another list.
+        if purpose == "maintain" and symbol in self.fixed_lists:
+            return Reply("{}", None)
+        return self.plane.ai(symbol, purpose, *args, **kwargs)
 
     def ocr(self, *args, **kwargs) -> dict:
         return self.plane.ocr(*args, **kwargs)

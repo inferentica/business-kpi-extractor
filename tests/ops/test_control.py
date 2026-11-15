@@ -169,3 +169,17 @@ def test_an_evaluation_asks_again_only_when_told(monkeypatch):
     monkeypatch.setenv("KPI_FRESH_ANSWERS", "1")
     plane.ai("AAPL", "locate", "system", "user", False)
     assert "fresh" not in sent[0] and sent[1]["fresh"] is True
+
+
+def test_a_trials_reused_list_is_not_audited():
+    from kpi_extractor.evals.evaluate import EvalControl
+    asked = []
+
+    class Plane:
+        def ai(self, *args, **kwargs):
+            asked.append(args[1])
+            return "answer"
+    control = EvalControl(Plane(), fixed_lists={"USB": {"groups": [{"key": "g"}]}})
+    assert str(control.ai("USB", "maintain", "system", "user", True)) == "{}" and asked == []
+    assert control.ai("USB", "locate", "system", "user", False) == "answer" and asked == ["locate"]
+    assert control.ai("PNC", "maintain", "system", "user", True) == "answer"  # a list written fresh is audited
