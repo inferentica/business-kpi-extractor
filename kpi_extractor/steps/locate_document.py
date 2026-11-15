@@ -8,7 +8,7 @@ from datetime import date
 from ..ai import Spec
 from ..documents.document import Document
 from .ai_reading import MAX_DOCUMENT_CHARS
-from .shared import _identity_text
+from .shared import _NOT_REPORTED, _identity_text
 
 # A document below this is read whole: narrowing it saves little. Above it, Locate reads the tables where each KPI sat
 # last when they are under 60% of it (a bank's supplement: 42,000-67,000 tokens a call, whole).
@@ -41,15 +41,17 @@ class LocateDocument:
         return text
 
     def _last_places(self, document: Document, spec: Spec) -> set[str] | None:
-        """The parts of a document sent whole today (40,000 to 120,000 characters: a bank's or an asset manager's
-        supplement) where each listed KPI is: the tables with a row its label or latest row label starts, the two
-        nearest the one it was read from when the label recurs ("Total net revenue" on page after page), the passages
-        naming it, and the part it was last read from with its neighbours when nothing names it (Apollo's highlight
-        bullets). None when the document is short or long (Select already narrows it), a KPI was never read, or the
-        parts are not under 60% of it: the usual document then goes."""
+        """The parts of a long document (over 40,000 characters: a bank's or an asset manager's supplement) where each
+        listed KPI is: the tables with a row its label or latest row label starts, the two nearest the one it was read
+        from when the label recurs ("Total net revenue" on page after page), the passages naming it, and the part it was
+        last read from with its neighbours when nothing names it (Apollo's highlight bullets). A KPI never read and
+        named nowhere is left out when earlier releases already reported it missing (a missed KPI sends the second
+        reading the whole document). None when the document is short, a KPI was never looked for, or the parts are not
+        under 60% of what goes today (the whole document, or Select's choice of at most 120,000 characters)."""
         whole = len(document.render())
-        if whole <= NARROW_ABOVE_CHARS or not document.fits(MAX_DOCUMENT_CHARS):
+        if whole <= NARROW_ABOVE_CHARS:
             return None
+        missing_before = self._reported_missing()
         history = self._ai_history(date.max)
         found: set[str] = set()
         for key in self._asked_keys(spec):
@@ -63,10 +65,21 @@ class LocateDocument:
             place = str(last.get("table") or last.get("block") or "")
             if not tables and not blocks:
                 near = [part for part in document.order if place and _table_distance(part, place) <= 1]
+                if not near and key in missing_before:
+                    continue  # looked for before and not reported: nothing here to send it for
                 if not near:
-                    return None  # never read, or nowhere like where it was
+                    return None  # never looked for, or nowhere like where it was
                 found |= set(near)
                 continue
             found |= {*sorted(tables, key=lambda t: _table_distance(t, str(last.get("table") or "")))[:2], *blocks[:3]}
         chosen = sum(len((document.tables.get(key) or document.blocks[key]).render()) for key in found)
-        return found if chosen <= whole * 0.6 else None
+        return found if chosen <= min(whole, MAX_DOCUMENT_CHARS) * 0.6 else None
+
+    def _reported_missing(self) -> set[str]:
+        """KPIs an earlier release's reading looked for and did not find ("not reported: fees.advisory, ...")."""
+        missing: set[str] = set()
+        for filing in list(self.filings.values()):
+            for note in filing.get("notes") or []:
+                if note.startswith(_NOT_REPORTED):
+                    missing |= {key.strip() for key in note.removeprefix(_NOT_REPORTED).split(",") if key.strip()}
+        return missing
