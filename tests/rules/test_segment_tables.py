@@ -72,3 +72,22 @@ def test_a_table_by_segment_and_a_sentence_naming_one_head_no_segments_table():
     assert segment_of(uber, []) is None
     unh = Table("T8", "Adjusted scripts grew on new clients at Optum Rx", [["", "2026"], ["Medicaid", "7,200"]])
     assert segment_of(unh, segment_names(["Optum Rx", "UnitedHealthcare"])) is None
+
+
+def test_labels_differing_only_by_footnotes_are_one_label():
+    from kpi_extractor.documents.document import Document
+    from kpi_extractor.rules.segment_tables import segment_page_of
+    segment = Table("B_T9", "", [["SECURITIES SERVICES BUSINESS SEGMENT", "", ""], ["", "3Q24", "2Q24"],
+                                 ["AUC/A at period end (in trillions) (b)", "$37.5", "$35.7"]])
+    company = Table("A_T7", "", [["CONSOLIDATED FINANCIAL HIGHLIGHTS", "", ""], ["", "3Q24", "2Q24"],
+                                 ["AUC/A at period end (in trillions) (current period is preliminary)", "$52.1", "$49.5"]])
+    document = Document(source_url="x")
+    document.tables = {"A_T7": company, "B_T9": segment}
+    assert segment_page_of(document, segment, "AUC/A at period end (in trillions) (b)", BNY, 37.5) == "securities services"
+    assert segment_page_of(document, segment, "AUC/A at period end (in trillions) (b)", BNY, 52.1) is None
+
+
+def test_a_companys_segment_results_table_is_no_one_segments():
+    table = Table("A_T9", "", [["KKR SEGMENT RESULTS AND OTHER SELECTED FINANCIAL INFORMATION (UNAUDITED)", ""],
+                               ["", "Quarter Ended"], ["Assets Under Management", "191,265,400"]])
+    assert segment_of(table, segment_names(["Asset Management", "Insurance", "Capital Markets"])) is None

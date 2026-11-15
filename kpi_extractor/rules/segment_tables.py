@@ -24,6 +24,12 @@ def _words(text: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", text.lower().replace("&", " and ")))
 
 
+def _label_key(label: str) -> str:
+    """A row label without its parenthesised notes and footnote marks: BNY's company row "AUC/A at period end (in
+    trillions) (current period is preliminary)" and its segment row "AUC/A at period end (in trillions) (b)" are one."""
+    return _words(re.sub(r"\([^)]*\)", " ", label or ""))
+
+
 def segment_names(labels) -> list[str]:
     """The company's segments, from its XBRL segment labels, without the reconciling lines."""
     names = {_words(label) for label in labels if label}
@@ -71,7 +77,9 @@ def segment_of(table: Table, names: list[str]) -> str | None:
         return found[0]
     if not found and _SEGMENT_WORD.search(heading(table)) and not re.search(r"\bsegments\b|\bby\b", title):
         # "Results by offering and segment" lists every segment; "Wealth Management segment" is one.
-        return _words(_SEGMENT_WORD.split(heading(table))[0])[-60:] or None
+        # The words before "segment" name it; one word is the company's own ("KKR SEGMENT RESULTS": every segment's).
+        named = _words(_SEGMENT_WORD.split(heading(table))[0])[-60:]
+        return named if len(named.split()) >= 2 else None
     return None
 
 
@@ -94,9 +102,11 @@ def segment_page_of(document, table: Table, label: str, names: list[str], figure
     segment = segment_of(table, names)
     if not segment:
         return None
-    key = _words(label)
+    key = _label_key(label)
+    if not key:
+        return None
     rows = [row for other in document.tables.values() if other is not table and segment_of(other, names) is None
-            for row in other.rows if row and _words(row[0]) == key]
+            for row in other.rows if row and _label_key(row[0]) == key]
     if not rows:
         return None
     if figure is not None and any((number := parse_number(cell)) is not None and same_figure(number.value, figure)
