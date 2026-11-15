@@ -95,9 +95,11 @@ def test_the_reading_step_reads_the_full_figure_through_the_cells_checks():
                                                                row_label=HIGHLIGHTS.rows[4][0], scale=1e12)])
     read, _ = read_values(doc, spec, located, "USD")
     assert read[0].value == 2.2e12
+    read[0].locator["replayed_from"] = "0001390777-26-000071"  # a replay's reading keeps what read it
     pipeline = SymbolPipeline(Control(), "BK", quarters=4, force=False, log=lambda *_: None)
     pipeline.profile, pipeline.offset = SimpleNamespace(name="BNY", fiscal_year_end="1231", foreign=False), 0
     [item] = pipeline._prefer_precise(read, doc, spec, located, "USD", Q3)
     assert item.value == 2.187e12 and item.locator["table"] == "B_T14"
     assert item.locator["rounded_from"] == {"table": "B_T2", "row": 4, "col": 1, "figure": "$2.2"}
     assert item.notes[-1] == "the full figure, printed rounded elsewhere: $2.2"
+    assert item.locator["replayed_from"] == "0001390777-26-000071" and item.locator["row_label"] == "Total AUM"
