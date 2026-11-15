@@ -6,47 +6,45 @@ runs on GitHub-hosted runners and hands its files back as the run's artifact.
 """
 from __future__ import annotations
 
-import gc
 import json
-import re
 import time
 from datetime import date
 from pathlib import Path
 
 from ..checks.across import cash_against_balances
-from ..checks.arelle import Checks, arelle_summary, enabled as arelle_cache
-from ..domain.calendar import ANNUAL_FORMS, year_end_for
-from ..domain.model import REGULATOR_SOURCES
-from ..domain.periods import Period, label_period
-from ..quality.coverage import own_period, summarise
+from ..checks.arelle import arelle_summary, enabled as arelle_cache
+from ..domain.calendar import ANNUAL_FORMS
 from ..domain.line_fields import finish_lines
-from ..readers.xbrl.read import read_filing
-from ..readers.xbrl.taxonomy import tag_taxonomies, taxonomy_versions
+from ..domain.model import REGULATOR_SOURCES
+from ..quality.coverage import summarise
 from ..selection.choose import choose
 from ..selection.fourth import derive_fourth_quarters
 from ..selection.identity import apply_identity
-from ..selection.splits import adjust_for_splits, split_ledger
 from ..selection.period_dates import align_dates
-from ..selection.signs import sign_ties
+from ..selection.splits import adjust_for_splits, split_ledger
 from ..selection.summaries import choose_summaries, summary_coverage
-from ..sources.edgar import company_profile, configure_identity, learn_year_offset, load_submission
-from ..sources.listing import filing_for, list_reports, list_xbrl_sixks
+from ..sources.edgar import company_profile, configure_identity
+from ..sources.listing import list_reports, list_xbrl_sixks
 from ..sources.predecessors import predecessor_companies
-from .currencies import settle_currencies
-from .served import served_snapshot
-from .standards import use_standard_labels
-from ..sources.retry import with_network_retries
-from .prefetch import load_all
-from .printed import read_printed
 from .archives import read_archives
+from .currencies import settle_currencies
 from .regulators import read_regulators
 from .releases import read_releases
+from .reports import read_reports
+from .second_look import printed_second_look
+from .served import served_snapshot
+from .standards import use_standard_labels
+from .units import Units
 
 
-def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
+def read_company(symbol: str, since: date, out: Path, log=print, previous: Path | None = None,
+                 drop_newest: int = 0) -> dict:
+    """With `previous` (an earlier read's folder, its units/), only what is new or read in another context is read
+    (pipeline/units.py); `drop_newest` sets the newest filings' units aside, to prove the two reads agree."""
     configure_identity()
     use_standard_labels()  # the IFRS and US GAAP taxonomies' titles and key lines (pipeline/standards.py)
     out.mkdir(parents=True, exist_ok=True)
+    units = Units(out, previous, drop_newest)
     started = time.time()
     phases: dict[str, float] = {}  # seconds each part of the read took, kept in the summary (where a round's time goes)
     mark = time.time()
@@ -57,86 +55,17 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         reports += list_xbrl_sixks(company, since, predecessors)  # read from their XBRL like a 10-Q
     reports = sorted(reports, key=lambda ref: ref.filed, reverse=True)
     mark = _phase(phases, "listing", mark)
-    readings, filings, offset, summaries, regulator_reads = [], [], None, [], []
-    # Every report's period is read from its submission, so they are downloaded first, four at a time
-    # (pipeline/prefetch.py); each is held on its filing until read, as it was when they came one by one.
-    load_all([ref.filing for ref in reports], load_submission)
-    mark = _phase(phases, "reports download", mark)
-    annual_ends = [end for ref in reports if ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None]
-    year_ends = {ref.accession: year_end_for(_period_end(ref), annual_ends, profile.fiscal_year_end) for ref in reports}
-    arelle = Checks(cache) if (cache := arelle_cache()) else None
-    for ref in reports:
-        fiscal_year_end = year_ends[ref.accession]
-        record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
-                  "accepted": ref.accepted}
-        try:
-            xbrl = with_network_retries(lambda: (load_submission(ref.filing), ref.filing.xbrl())[1])
-        except Exception as error:  # noqa: BLE001 - one unreadable filing never stops the company
-            record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"
-            if ref.form == "6-K":
-                xbrl = None  # EDGAR's flag without an instance (2016-17); the release reader reads its pages
-            else:
-                filings.append(record)
-                continue
-        if xbrl is None and ref.form == "6-K":
-            record.setdefault("note", "no XBRL")
-            filings.append(record)
-            ref.filing = None
-            continue
-        if xbrl is None:
-            found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0, summaries=summaries)
-            printed_end = _printed_year_end(notes, ref) if ref.form in ANNUAL_FORMS and _period_end(ref) is None else None
-            if printed_end and printed_end != fiscal_year_end:
-                # No period on EDGAR and its years off the company's calendar: its own year end (Gildan's 40-Fs to
-                # 2013 close in late September, before its move to calendar years).
-                fiscal_year_end = year_ends[ref.accession] = printed_end
-                found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0, summaries=summaries)
-            own = [reading for reading in found if reading.own]
-            record.update({"note": "no XBRL", "printed": kinds, "columns": len(found), "notes": notes,
-                           "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
-                           **own_period(own, ref.form)})
-            if not own and ref.form in ANNUAL_FORMS and (end := _period_end(ref)) is not None:
-                # An annual report whose statements came elsewhere (Brookfield's FY2010 40-F holds its annual
-                # information form; the statements came on 6-K): its year, so another filing's statements count.
-                labelled = label_period(Period(end), fiscal_year_end, offset or 0)
-                if labelled:
-                    record.update({"fiscal_year": labelled[0], "fiscal_period": "FY"})
-            filings.append(record)
-            readings.extend(found)
-            log(f"{symbol}: {ref.form} {ref.filed} printed ({','.join(kinds) or 'nothing readable'}) {len(found)} columns, "
-                f"own {[f'{s}/{d}:{st}' for s, d, st in record['own']]}")
-            ref.filing = None
-            gc.collect()
-            continue
-        entity = xbrl.entity_info or {}
-        if offset is None:
-            # The company's own fiscal-year naming, from its newest filing that states it (NVIDIA's FY2027 ends in
-            # January 2027).
-            end, year = entity.get("document_period_end_date"), entity.get("fiscal_year")
-            if end and year:
-                offset = learn_year_offset([(date.fromisoformat(str(end)[:10]), str(year), False)], profile.fiscal_year_end)
-        found, notes = read_filing(xbrl, accession=ref.accession, form=ref.form, filed=ref.filed,
-                                   fiscal_year_end=fiscal_year_end, year_offset=offset or 0)
-        own = [reading for reading in found if reading.own]
-        record.update({"xbrl": True, "period_end": str(entity.get("document_period_end_date"))[:10],
-                       **own_period(own, ref.form),
-                       "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
-                       "columns": len(found), "notes": notes})
-        tag_taxonomies(found, taxonomy_versions(ref.filing))  # us-gaap/2024: the years its schema imports
-        if arelle and found:
-            arelle.submit(ref.filing, found, record)  # Arelle's second reading of the filing, a check only
-        filings.append(record)
-        readings.extend(found)
-        log(f"{symbol}: {ref.form} {ref.filed} {len(found)} columns, own {[f'{s}/{d}:{st}' for s, d, st in record['own']]}")
-        del xbrl
-        ref.filing = None
-        gc.collect()
-    mark = _phase(phases, "reports read", mark)
-    if arelle:
-        arelle.finish()
-        mark = _phase(phases, "arelle", mark)  # the wait for Arelle after the reader's last filing
+    summaries, regulator_reads = [], []
+    clock = {"mark": mark}
+
+    def lap(name: str) -> None:
+        clock["mark"] = _phase(phases, name, clock["mark"])
+
+    readings, filings, offset, year_ends = read_reports(symbol, reports, profile, units, summaries, log, lap)
+    mark = clock["mark"]
     if profile.foreign or any(ref.form in ("20-F", "40-F") for ref in reports):
-        records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log, phases, predecessors)
+        records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log, phases,
+                                       predecessors, units)
         filings.extend(records)
         readings.extend(found)
         archived_summaries: list[dict] = []
@@ -146,12 +75,13 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
         readings.extend(reading for reading in found if reading.filed >= since)
         summaries.extend(figure for figure in archived_summaries if figure["filed"] >= since.isoformat())
         mark = _phase(phases, "archives", mark)
-        regulator_reads, found = read_regulators(symbol, since, profile.fiscal_year_end, offset or 0, readings, log)
+        regulator_reads, found = read_regulators(symbol, since, profile.fiscal_year_end, offset or 0, readings, log,
+                                                 units)
         readings.extend(reading for reading in found if reading.filed >= since)
     mark = _phase(phases, "regulators", mark)
     printed_signs: dict[str, dict] = {}
-    readings.extend(_printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
-                                         printed_signs))
+    readings.extend(printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
+                                        printed_signs, units))
     _release_bases(readings)
     settle_currencies(readings)  # pipeline/currencies.py
     finish_lines(readings)  # each line's unit, taxonomy, rounding and sign, its currency now known (domain/line_fields.py)
@@ -169,6 +99,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     summary["summary_figures"] = summary_coverage(summary_figures, chosen)
     summary["regulator_reads"] = regulator_reads
     summary["phases"] = phases
+    summary["incremental"] = units.finish()
     if arelle_cache():
         summary["arelle"] = arelle_summary(readings, filings, arelle_cache())
     with (out / "readings.jsonl").open("w") as handle:
@@ -184,55 +115,10 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     return summary
 
 
-def _printed_second_look(symbol, reports, filings, readings, year_ends: dict[str, str], year_offset: int, log,
-                         printed_signs: dict) -> list:
-    """The printed statements of XBRL filings that need them: one whose own statement failed its checks in XBRL (JPM's
-    Q2 2010 balance sheet, which edgartools maps wrongly), and one whose served figure differs in sign from another
-    presentation (the printed sign decides, from the statement or any table of the filing)."""
-    failed = {reading.accession for reading in readings
-              if reading.source == "xbrl" and reading.own and reading.status != "kept"}
-    ties = sign_ties(readings)
-    needed = failed | ties
-    by_accession = {ref.accession: ref for ref in reports}
-    records = {record["accession"]: record for record in filings}
-    found_all = []
-    for accession in sorted(needed):
-        ref = by_accession.get(accession)
-        if ref is None:
-            continue
-        try:
-            ref.filing = filing_for(accession)
-            found, notes, kinds = read_printed(ref, year_ends[accession], year_offset,
-                                                printed_signs.setdefault(accession, {}) if accession in ties else None)
-        except Exception as error:  # noqa: BLE001 - a second look that fails leaves the XBRL readings as they are
-            records[accession]["second_look"] = f"unreadable ({type(error).__name__})"
-            continue
-        finally:
-            ref.filing = None
-        records[accession]["second_look"] = {"why": "failed in XBRL" if accession in failed else "sign",
-                                             "printed": kinds, "columns": len(found), "notes": notes[:5]}
-        log(f"{symbol}: {ref.form} {ref.filed} printed second look ({records[accession]['second_look']['why']}): "
-            f"{len(found)} columns")
-        found_all.extend(found)
-    return found_all
-
-
 def _phase(phases: dict, name: str, since: float) -> float:
     now = time.time()
     phases[name] = round(phases.get(name, 0.0) + now - since, 1)
     return now
-
-
-def _period_end(ref) -> date | None:
-    """The filing's period, as SEC's index states it. A period ending within a week of the filing date is no report
-    period but the index's mistake (Helix's 10-Ks of 2014 and 2015 'end' on the day they were filed, which made
-    February 21 its fiscal year end and every column of 2013-15 fall off the calendar): unknown."""
-    try:  # SEC can answer with an error page for a filing's header; its period is then unknown, not fatal
-        raw = getattr(ref.filing, "period_of_report", None)
-        end = date.fromisoformat(str(raw)[:10]) if raw else None
-    except Exception:  # noqa: BLE001
-        return None
-    return None if end is not None and (ref.filed - end).days < 7 else end
 
 
 def _release_bases(readings) -> None:
@@ -259,17 +145,3 @@ def _release_bases(readings) -> None:
             # Else the nearest year's: TSMC's 1997-99 quarters, before its first 20-F we hold (FY2000, ROC GAAP).
             nearest = min(annual, key=lambda year: abs(int(year) - int(reading.fiscal_year))) if annual else None
             reading.basis = annual.get(reading.fiscal_year) or home.get(reading.fiscal_year) or annual[nearest]
-
-
-_OFF_YEAR = re.compile(r"column duration_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2}) off the calendar")
-
-
-def _printed_year_end(notes: list[str], ref) -> str | None:
-    """The year end an annual report's own full-year columns print, when they fall off the company's calendar: the
-    latest such column ending within a year before the report was filed."""
-    ends = []
-    for match in _OFF_YEAR.finditer(" ".join(notes)):
-        start, end = date.fromisoformat(match.group(1)), date.fromisoformat(match.group(2))
-        if 350 <= (end - start).days + 1 <= 380 and 0 <= (ref.filed - end).days <= 366:
-            ends.append(end)
-    return f"{max(ends).month:02d}{max(ends).day:02d}" if ends else None

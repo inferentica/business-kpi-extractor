@@ -30,6 +30,15 @@ on:
         type: choice
         options: ["no", "dry run", "write"]
         default: "no"
+      previous_run:
+        description: "A run whose reads to build on: each company reads only what is new since (its units/)"
+        required: false
+        type: string
+      drop_newest:
+        description: "With previous_run, read each company's newest filings again as if new (the incremental test)"
+        required: false
+        type: string
+        default: "0"
 
 permissions:
   contents: read
@@ -104,6 +113,9 @@ jobs:
     needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 240
+    permissions:
+      contents: read
+      actions: read  # the previous run's reads, with previous_run
     strategy:
       fail-fast: false
       max-parallel: 16
@@ -130,7 +142,22 @@ jobs:
           path: archive-cache
           key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
           restore-keys: statements-archive-${{ matrix.symbol }}-
-      - run: python -m statement_extractor read --symbol "${{ matrix.symbol }}" --since "${{ matrix.since }}" --out "out/${{ matrix.symbol }}"
+      - uses: actions/download-artifact@v7
+        if: inputs.previous_run != '' && inputs.previous_run != null
+        continue-on-error: true  # a company the previous run did not read is read in full
+        with:
+          name: statements-${{ matrix.symbol }}
+          path: previous
+          run-id: ${{ inputs.previous_run }}
+          github-token: ${{ github.token }}
+      - env:
+          SYMBOL: ${{ matrix.symbol }}
+          SINCE: ${{ matrix.since }}
+          DROP: ${{ inputs.drop_newest || '0' }}
+        run: |
+          flags=()
+          if [ -d "previous/$SYMBOL/units" ]; then flags=(--previous "previous/$SYMBOL" --drop-newest "$DROP"); fi
+          python -m statement_extractor read --symbol "$SYMBOL" --since "$SINCE" --out "out/$SYMBOL" "${flags[@]}"
       - uses: actions/cache/save@v4
         if: always()
         with:

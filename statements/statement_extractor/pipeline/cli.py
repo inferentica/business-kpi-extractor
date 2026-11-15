@@ -22,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     read.add_argument("--symbol", required=True)
     read.add_argument("--since", default="2001-01-01")
     read.add_argument("--out", required=True)
+    read.add_argument("--previous", help="An earlier read's folder: only what is new is read (its units/)")
+    read.add_argument("--drop-newest", type=int, default=0, help="Read the newest filings again, as if new (a test)")
     scored = commands.add_parser("report", help="Score a set of reads")
     scored.add_argument("folders", nargs="+")
     rows = commands.add_parser("rows", help="Raw printed rows for hand checks of sampled served lines")
@@ -39,7 +41,8 @@ def main(argv: list[str] | None = None) -> int:
         write_rows(Path(args.samples), Path(args.out))
         return 0
     if args.command == "read":
-        summary = read_company(args.symbol.upper(), date.fromisoformat(args.since), Path(args.out))
+        summary = read_company(args.symbol.upper(), date.fromisoformat(args.since), Path(args.out),
+                               previous=Path(args.previous) if args.previous else None, drop_newest=args.drop_newest)
         print(json.dumps({key: summary[key] for key in ("symbol", "periods", "by_status", "own_kept", "own_expected")}))
         return 0
     folders = [Path(folder) for folder in args.folders]
