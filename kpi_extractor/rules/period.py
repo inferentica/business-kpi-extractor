@@ -132,7 +132,7 @@ def column_header(table: Table, first_data_row: int, col: int, rows: int = HEADE
     text = re.sub(r"(?<!<)\b(\d{1,2})(\s*-?\s*)(months?|weeks?|quarters?)\b(?!>)", r"<\1 \3>", text)
     # A quarter's label keeps its meaning once its digits blank: Scotiabank's "Q4" and Digital Realty's "3Q26" were "q#"
     # and "#q#", which the period gate could not read, so a fourth quarter's ratio was stored as the fiscal year's.
-    text = re.sub(r"\b(?:q([1-4])|([1-4])q)(?:\s*'?\s*(?:fy)?\s*\d{2,4})?\b", lambda m: f"<{_ORDINAL[m.group(1) or m.group(2)]} quarter>", text)
+    text = re.sub(r"\b(?:q([1-4])|([1-4])q)(?:\s*['’]?\s*(?:fy)?\s*\d{2,4})?\b", lambda m: f"<{_ORDINAL[m.group(1) or m.group(2)]} quarter>", text)
     return re.sub(r"(?<![<\d])[\d.,]+(?![\d]* (?:months?|weeks?|quarters?)>)", "#", text)[:120]
 
 
@@ -148,7 +148,7 @@ _NUMERIC_DATE = re.compile(r"\b(\d{1,2})/(\d{1,2})/((?:19|20)\d{2})\b")
 _FULL_DATE = re.compile(r"\b(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")\.?\s+(\d{1,2}),?\s+((?:19|20)\d{2})\b")
 
 
-_YEAR = re.compile(r"(?<![\d$.,])(?:fy\s?)?'?((?:19|20)\d{2})(?![\d%]|[,.]\d)|\b[1-4]q'?(\d{2})\b|\bq[1-4]\s?'?(\d{2}|(?:19|20)\d{2})\b")
+_YEAR = re.compile(r"(?<![\d$.,])(?:fy\s?)?['’]?((?:19|20)\d{2})(?![\d%]|[,.]\d)|\b[1-4]q['’]?(\d{2})\b|\bq[1-4]\s?['’]?(\d{2}|(?:19|20)\d{2})\b")
 
 
 def column_dates(table: Table, first_data_row: int, col: int) -> tuple[list[date], list[int]]:

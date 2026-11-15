@@ -15,7 +15,8 @@ from .extract import _row_label, column_header
 from .quoted_rows import _SLOT, replay_row_line, row_line
 from .row_finder import row_finder, shows_dash, shows_figure
 from ..rules.identity import sideless_key
-from ..rules.period import DEEP_HEADER_ROWS
+from .period_column import (_same_header, _spans, comparable_header, current_column, period_column,  # noqa: F401
+                            same_period_words)  # comparable_header and same_period_words: imported from here by callers
 from ..xbrl import member_key
 
 _MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
@@ -25,9 +26,6 @@ _PERIOD_WORD = (r"\b(?:" + "|".join(_MONTHS) + r"|jan|feb|mar|apr|jun|jul|aug|se
                 r"|first|second|third|fourth|q[1-4]|[1-4]q)\b")
 # Period words first, so a quarter's label ("3Q'22") is one period word, not a number glued to a letter.
 _TOKEN = re.compile(_PERIOD_WORD + r"|\d[\d.,]*", re.I)
-# A year may run into the word before it: Bank of America's supplement heads its quarters "SecondQuarter2025".
-_YEAR = re.compile(r"(?<!\d)(20\d{2})(?!\d)|(?:\bQ[1-4]|\b[1-4]Q|\bFY)\s*'?(\d{2})\b|'(\d{2})\b", re.I)
-
 _PERIOD_WORDS = re.compile(r"\b(january|february|march|april|may|june|july|august|september|october|november|december|"
                            r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|first|second|third|fourth|q[1-4])\b")
 
@@ -83,14 +81,14 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
         if locator.get("whole_table") and (whole[key.split(".", 1)[0]] > alone[key.split(".", 1)[0]] if as_table is None else as_table):
             tables.setdefault(key.split(".", 1)[0], []).append((key, locator))
             continue
-        found = _replay_value(document, key, locator, quarter, alone=len(last) == 1)
+        found = _replay_value(document, key, locator, quarter, alone=len(last) == 1, expected=expected)
         if isinstance(found, str) and not (len(last) > 1 and shows_dash(document, locator)):  # a dash: nothing reported
             return found
         if not isinstance(found, str):
             values.append(found)
     table_locators = []
     for group, rows in tables.items():
-        found = _replay_table(document, group, [locator for _key, locator in rows], quarter)
+        found = _replay_table(document, group, [locator for _key, locator in rows], quarter, expected)
         if isinstance(found, str):
             return found
         # Each row keyed as last quarter's reading keyed it, where its label does not name a listed KPI by itself.
@@ -114,7 +112,8 @@ def reported_period(document: Document, expected: date) -> date:
     return counts.most_common(1)[0][0] if counts else expected
 
 
-def _replay_value(document: Document, key: str, locator: dict, quarter: int | None = None, alone: bool = False) -> Locator | str:
+def _replay_value(document: Document, key: str, locator: dict, quarter: int | None = None, alone: bool = False,
+                  expected: date | None = None) -> Locator | str:
     if "quote" in locator:
         return _replay_quote(document, key, locator)
     label = clean(locator.get("row_label") or "").lower()
@@ -133,17 +132,19 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
             # A label the table repeats once per section (Mastercard's "Worldwide" under each card program, then again
             # for six months): the row where it sat last quarter, while no row above it opens another period's section.
             rows = [int(locator["row"])]
+        newest = bool(rows) and current_column(table, rows[0], col)
+        held = newest and _same_header(table, rows[0], col, locator, quarter)
+        moved = None if len(rows) != 1 or held or expected is None else period_column(table, rows[0], col, locator, expected, quarter)
         if len(rows) > 1:
             misses.append("row label found more than once")
-        elif rows and not current_column(table, rows[0], col):
-            misses.append("column not the newest period")
-        elif rows and not _same_header(table, rows[0], col, locator, quarter):
-            misses.append("column header changed" if "header" in locator else "column header not recorded")
+        elif rows and (held or moved is not None):
+            matches.append((table.id, rows[0], col if held else moved))  # the column its header names, if not last quarter's
         elif rows:
-            matches.append((table.id, rows[0]))
+            misses.append("column header changed" if newest and "header" in locator else "column not the newest period"
+                          if not newest else "column header not recorded")
     if not matches:
         return misses[0] if misses else "row label not found"
-    figures = {parse_number(document.tables[table_id].cell(row, col)).value for table_id, row in matches}
+    figures = {parse_number(document.tables[table_id].cell(row, at)).value for table_id, row, at in matches}
     if len(figures) > 1:
         # The label gives other figures in other tables (Uber's "Freight" under Gross Bookings, Revenue and Segment
         # Operating Income; a Q4 release's full-year table more moves them all one place on): last quarter's table
@@ -151,15 +152,15 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
         # (steps/replay_reading.py, _one_of); within a group, last quarter's table stands only while its row's year-ago
         # cells do not contradict the figure stored for last year (_year_ago_contradicts).
         if alone:
-            return AmbiguousQuote([(Locator(kpi=key, table=table_id, row=row, col=col, scale=locator.get("scale"),
+            return AmbiguousQuote([(Locator(kpi=key, table=table_id, row=row, col=at, scale=locator.get("scale"),
                                             scale_text=locator.get("scale_text")),
-                                    "last" if table_id == locator.get("table") else None) for table_id, row in matches],
+                                    "last" if table_id == locator.get("table") else None) for table_id, row, at in matches],
                                   "row in several tables")
         if matches[0][0] != locator.get("table"):
             return "row in several tables"  # and none of them is last quarter's
-        chosen_by_number(document).add((matches[0][0], matches[0][1], col))
+        chosen_by_number(document).add(matches[0])
     # Otherwise every table gives the one figure (Goldman's summary page and its detail table): it is the filing's.
-    table_id, row = matches[0]
+    table_id, row, col = matches[0]
     # The scale words last quarter's reading quoted ("(in thousands)") go with the place: the scale check still holds the
     # figure unless the words are in this filing beside its table (UnitedHealth's members were held for an unstated scale).
     return Locator(kpi=key, table=table_id, row=row, col=col, scale=locator.get("scale"), scale_text=locator.get("scale_text"))
@@ -195,7 +196,8 @@ def missing_since(last: dict[str, dict], keys: set[str], group: str, whole: bool
                and shows_figure(document, locator) for key, locator in last.items())  # a dash this quarter is no figure
 
 
-def _replay_table(document: Document, group: str, parts: list[dict], quarter: int | None = None) -> TableLocator | str:
+def _replay_table(document: Document, group: str, parts: list[dict], quarter: int | None = None,
+                  expected: date | None = None) -> TableLocator | str:
     first = parts[0]
     col = first.get("col")
     if col is None or "total_row_label" not in first:
@@ -223,10 +225,12 @@ def _replay_table(document: Document, group: str, parts: list[dict], quarter: in
             continue
         if total_row is not None:
             first_row = _with_rows_above(table, first_row, total_row, col)
-        if not current_column(table, first_row, col) or not _same_header(table, first_row, col, first, quarter):
+        column = col if current_column(table, first_row, col) and _same_header(table, first_row, col, first, quarter) else \
+            period_column(table, first_row, col, first, expected, quarter) if expected is not None else None
+        if column is None:
             misses.append("column header changed" if "header" in first else "column header not recorded")
             continue
-        return TableLocator(group=group, table=table.id, col=col, first_row=first_row, last_row=last_row,
+        return TableLocator(group=group, table=table.id, col=column, first_row=first_row, last_row=last_row,
                             total_row=total_row, scale=first.get("scale"), scale_text=first.get("scale_text"))
     return misses[0] if misses else "table rows not found"
 
@@ -496,101 +500,9 @@ def _names(text: str, token: re.Match) -> bool:
     return bool(glued_after) or bool(re.match(r"[A-Za-z]", before))
 
 
-def _same_header(table: Table, first_data_row: int, col: int, locator: dict, quarter: int | None = None) -> bool:
-    """The column is headed as last quarter's was (three months, not six; this year's quarter, not a year to date). The
-    quarter's own name and the date's form may differ ("Q2" for "Q1", "June 2026" for "March 31, 2026"), but a column
-    that names its quarter must name this filing's: never a neighbouring quarter's column read as this one."""
-    # A reading stored before headers were recorded carries no evidence of its column: the AI reads it once more.
-    if "header" not in locator:
-        return False
-    named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(column_header(table, first_data_row, col, DEEP_HEADER_ROWS))}
-    if named and quarter and named != {quarter}:
-        return False
-    raw_now = column_header(table, first_data_row, col)
-    now, before = comparable_header(raw_now), comparable_header(locator["header"])
-    return _FOOTNOTE.sub("", now) == _FOOTNOTE.sub("", before) \
-        or same_period_words(now, before, cut=len(raw_now) >= _HEADER_CAP or len(locator["header"]) >= _HEADER_CAP)
-
-
-# A footnote mark glued to a heading's word: Coca-Cola's "Unit Case Volume³" heads the column "Unit Case Volume" did.
-_FOOTNOTE = re.compile(r"(?<=[a-z])#")
-_HEADER_CAP = 118  # column_header keeps 120 characters: a header that long may end in a word cut short
-# The spans a header names, each as its kind: what a column's period is, whatever title or unit words come with it.
-_SPANS = [("quarter", r"\bthree months\b|<3 months>|<13 weeks>|\bquarters? ended\b|<(?:first|second|third|fourth) quarter>|<quarter>|\bquarterly\b"),
-          ("half", r"\bsix months\b|<6 months>|<26 weeks>|\bhalf[- ]year"),
-          ("nine", r"\bnine months\b|<9 months>|<39 weeks>"),
-          ("year", r"\btwelve months\b|<12 months>|<5[23] weeks>|\byears? ended\b|\bfull[- ]year\b|\bfiscal year\b|\bannual\b|\bltm\b|\bttm\b"),
-          ("to date", r"\byear[- ]to[- ]date\b|\bytd\b"),
-          ("change", r"%|\bchange\b|\bvariance\b|\byoy\b|\bgrowth\b|\bvs\b|\bincrease\b|\bdecrease\b")]
-# Words that say nothing of what a column measures: the period's own, and scale and unit words beside it.
-_NOT_MEASURE = re.compile(r"^(?:three|six|nine|twelve|months?|weeks?|quarters?|quarterly|years?|ended|ending|fiscal|full|to|date|"
-                          r"ytd|in|millions?|billions?|thousands?|dollars?|usd|unaudited|except|percentages?|per|share|data|"
-                          r"and|of|the|as|at|for|amounts?)$")
-# Words that change what a column measures when a header gains them: never a title.
-_OTHER_MEASURE = re.compile(r"^(?:non-gaap|adjusted|organic|comparable|constant|neutral|excluding|normalized|underlying|core|"
-                            r"pro-forma|proforma|segment|change)$")
-
-
-def _spans(header: str) -> set[str]:
-    return {kind for kind, pattern in _SPANS if re.search(pattern, header)}
-
-
-def same_period_words(now: str, before: str, cut: bool = False) -> bool:
-    """Whether two column headers head the same column though their words drifted (Visa's title row "Q3 FISCAL 2023"
-    some quarters and not others, Morgan Stanley's table titles above "Quarter Ended"): they name the same spans, and
-    one's measure words are the other's with title words in front. The spans must be named, both must name a measure,
-    and no added word may change it (non-GAAP, adjusted, organic)."""
-    if not _spans(now) or _spans(now) != _spans(before):
-        return False
-
-    def words(header: str) -> list[str]:
-        found = re.findall(r"[a-z][a-z-]*[a-z]", _FOOTNOTE.sub("", header))
-        found = found[:-1] if cut and found else found  # the last word may be cut short
-        return [word for word in found if not _NOT_MEASURE.match(word)]
-    a, b = words(now), words(before)
-    short, long = (a, b) if len(a) <= len(b) else (b, a)
-    if not short or long[len(long) - len(short):] != short:
-        return False
-    return not any(_OTHER_MEASURE.match(word) for word in long[:len(long) - len(short)])
-
-
-_QUARTERS = {"first": 1, "second": 2, "third": 3, "fourth": 4}
-_QUARTER_NAME = re.compile(r"<?\b(first|second|third|fourth) ?quarter(?![a-z])>?")  # "secondquarter" run together too
-_FULL_MONTH = ("january|february|march|april|june|july|august|september|october|november|december")
-
-
-def comparable_header(header: str) -> str:
-    """A recorded column header with what does not change the period taken out: which quarter it names, whether its
-    date shows the day, and words a document ran together ("endedseptember", "monthsended"). Headers recorded before
-    quarter names were kept ("#q#") compare too."""
-    text = re.sub(rf"(?<=[a-z])(?=(?:{_FULL_MONTH})\b)|(?<=months)(?=ended)", " ", header)
-    text = re.sub(rf"\b(?:{_FULL_MONTH})\b", "@", text)
-    text = _QUARTER_NAME.sub("<quarter>", re.sub(r"(?<![\w<])#q#(?!\w)", "<quarter>", text))
-    return re.sub(r"#(?:\s*#)+", "#", text)
-
-
 def _tables_by_preference(document: Document, table_id: str | None) -> list[Table]:
     tables = list(document.tables.values())
     return sorted(tables, key=lambda table: table.id != table_id)
-
-
-def current_column(table: Table, first_data_row: int, col: int) -> bool:
-    """Whether a column is the newest period the table shows: when its header names years, it names the latest."""
-    def years(texts: list[str]) -> set[int]:
-        found = set()
-        for text in texts:
-            for four, short, apostrophe in _YEAR.findall(text):
-                found.add(int(four) if four else 2000 + int(short or apostrophe))
-        return found
-
-    header_rows = table.rows[:max(first_data_row, 1)][:DEEP_HEADER_ROWS]
-    column = years([row[col] for row in header_rows if col < len(row)])
-    every = years([cell for row in header_rows for cell in row[1:]])
-    if not every:
-        return True  # no years in the header: the prior-period checks decide
-    if not column and len(every) == 1:
-        return True  # one year over the whole table (Mastercard's "For the 3 Months ended June 30, 2023"): no other period's column
-    return bool(column) and max(column) == max(every)
 
 
 def mostly_whole(last: dict[str, dict]) -> bool | None:
