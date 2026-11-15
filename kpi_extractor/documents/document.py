@@ -16,7 +16,9 @@ _TRAILING_SYMBOLS = {"%", ")", "%)", ")%", "pts", "bps"}
 _TEXT_BLOCK_CHARS = 600
 _CONTEXT_CHARS = 300
 
-_NUMBER = re.compile(r"(?P<neg>[-−])?\(?\s*(?:[A-Z]{0,3}\$|€|£|¥)?\s*(?P<int>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?P<frac>\d+))?")
+# A fraction may be printed with no leading zero (U.S. Bancorp's ".51" net charge-off ratio): the point belongs to it.
+_NUMBER = re.compile(r"(?P<neg>[-−])?\(?\s*(?:[A-Z]{0,3}\$|€|£|¥)?\s*(?:(?P<int>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?P<frac>\d+))?"
+                     r"|(?<![\w.,])\.(?P<bare>\d+))")
 _SCALE_WORDS = {"thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12, "mn": 1e6, "mm": 1e6, "bn": 1e9}
 _SCALE_AFTER = re.compile(r"^(?:\s*(?P<word>thousand|million|billion|trillion)s?\b|(?P<abbr>bn|B|M|K)\b)", re.I)
 _SCALE_ABBREVIATIONS = {"bn": "billion", "b": "billion", "m": "million", "k": "thousand"}
@@ -240,8 +242,12 @@ def parse_number(text: str | None) -> ParsedNumber | None:
     match = _NUMBER.search(text)
     if not match:
         return None
-    value = float(match.group("int").replace(",", "") + ("." + match.group("frac") if match.group("frac") else ""))
-    before, after = text[: match.start("int")], text[match.end():]
+    if match.group("bare"):
+        value, start = float("0." + match.group("bare")), match.start("bare") - 1
+    else:
+        value = float(match.group("int").replace(",", "") + ("." + match.group("frac") if match.group("frac") else ""))
+        start = match.start("int")
+    before, after = text[:start], text[match.end():]
     negative = bool(match.group("neg")) or ("(" in before and ")" in after[:3])
     scale = _SCALE_AFTER.match(after)
     scale_word = None
