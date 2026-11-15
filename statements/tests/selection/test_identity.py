@@ -53,3 +53,17 @@ def test_served_lines_get_their_key_and_keep_their_concept():
     apply_identity(chosen, readings)
     line = chosen[0]["lines"][0]
     assert (line["concept"], line["key"], line["value"]) == ("printed_total_net_sales", "us-gaap_SalesRevenueNet", 32_479e6)
+
+
+def test_lines_of_one_name_and_printed_cash_balances_share_keys():
+    readings = [
+        # KO's issued shares: a label whose figures change with each filing, never printed beside its other wording
+        reading("h1", date(1998, 3, 1), "1997", [("printed_issued_1_710_shares_at_june_30", "Issued 1,710,459,889 shares at June 30", 1_710e6)]),
+        reading("h2", date(2000, 3, 1), "1999", [("printed_issued_3_429_shares_at_december_31", "Issued 3,429,677,945 shares at December 31", 857e6)]),
+        # TSMC's current and noncurrent "Provisions": a name two lines printed side by side share decides nothing
+        reading("x1", date(2020, 3, 1), "2019", [("ifrs-full_CurrentProvisions", "Provisions", 5e9), ("ifrs-full_NoncurrentProvisions", "Provisions", 7e9)]),
+        reading("h3", date(2010, 3, 1), "2009", [("printed_provisions_note_5", "Provisions (Note 5)", 3e9)]),
+    ]
+    keys = line_identity(readings)
+    assert keys[("income", "printed_issued_1_710_shares_at_june_30", "")] == keys[("income", "printed_issued_3_429_shares_at_december_31", "")]
+    assert keys.get(("income", "printed_provisions_note_5", ""), "printed_provisions_note_5") == "printed_provisions_note_5"

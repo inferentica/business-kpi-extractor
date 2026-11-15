@@ -5,7 +5,8 @@ for an earlier period are the next filing's comparatives, so a line followed fro
 though its label changes ("Net sales" in 1995, "Total net sales" in 2008), and an XBRL filing's comparative columns name
 the concept of the printed line before it (Apple's 2007-08 figures in its FY2009 10-K and its FY2008 10-K). A figure
 printed twice in one statement says nothing (a subtotal equal to its only line), and two lines one statement prints
-side by side are never one line, and one period alone joins two lines only when their labels share a word. Each line then takes its group's XBRL concept, the newest tagged one where a filer
+side by side are never one line, and one period alone joins two lines only when their labels share a word. Lines of
+one name (notes, figures and dates aside) never printed side by side are one line too. Each line then takes its group's XBRL concept, the newest tagged one where a filer
 retagged it (SalesRevenueNet before Revenues), else its newest printed key. Keys only: no figure changes."""
 from __future__ import annotations
 
@@ -17,6 +18,21 @@ from ..domain.basis import ifrs_family
 _PRINTED = "printed_"
 _PLAIN = {"and", "of", "the", "in", "net", "total", "to", "from", "for", "on", "at", "by", "other", "others", "less", "note", "notes",
           "with", "year", "period", "respectively", "shares", "share", "value", "par"}
+
+
+_BALANCE = re.compile(r"\b(cash|balance)\b.*\b(beginning|end|at\s+(january|march|june|september|october|december))\b|"
+                      r"\b(beginning|end)\b.*\bcash\b", re.I)  # JPM's "Cash and due from banks at June 30" too
+_MONTHS = {"january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november",
+           "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"}
+_NAME_PLAIN = {"and", "of", "the", "in", "at", "as", "on", "total", "respectively", "end", "beginning"} | _MONTHS
+
+
+def _name(label: str) -> str:
+    """A label as its line's name: without note references, figures, dates or bracketed asides ("Cash and cash
+    equivalents (Note 4)", "Issued 1,710,459,889 shares at June 30" and their next filings' wording)."""
+    label = re.sub(r"\([^)]*\)?|\bnotes?\s+[\d,\sand]+", " ", label.lower())
+    words = [word for word in re.findall(r"[a-z]+", label) if word not in _NAME_PLAIN and len(word) > 1]
+    return " ".join(words)
 
 
 def _stems(label: str) -> set[str]:
@@ -86,22 +102,38 @@ class _Groups:
 
 
 def line_identity(readings: list) -> dict[tuple, str]:
-    """(statement, concept, member) -> the line's key for the company, from its kept consolidated readings."""
-    kept = [reading for reading in readings if reading.status == "kept" and reading.scope == "consolidated"]
+    """(statement, concept, member) -> the line's key for the company, from its kept readings: the group's and the
+    parent's alone (TSMC's quarters to 2004) share their lines' keys, their figures compared only within one scope."""
+    kept = [reading for reading in readings if reading.status == "kept"]
     together: dict[tuple, set] = defaultdict(set)
     newest: dict[tuple, str] = {}
     words: dict[tuple, set] = defaultdict(set)
+    named: dict[tuple, list] = defaultdict(list)
+    balances: set[tuple] = set()  # a printed flow statement's opening and closing cash
+    closing = None  # the concept the company's tagged cash flows close on
     for reading in sorted(kept, key=lambda item: item.filed):
+        if reading.statement == "cash_flow":
+            valued = [line for line in reading.lines if not line.get("is_heading") and line.get("value") is not None]
+            twice = [concept for concept, count in Counter(line["concept"] for line in valued).items()
+                     if count > 1 and "Cash" in concept]  # the cash a tagged flow statement opens and closes on
+            if reading.source == "xbrl" and twice:
+                closing = twice[0]
+            balances |= {_node("cash_flow", line) for line in valued if line["concept"].startswith(_PRINTED)
+                         and _BALANCE.search(str(line.get("label") or ""))}
         nodes = {_node(reading.statement, line) for line in reading.lines if not line.get("is_heading")}
         for line in reading.lines:
             if not line.get("is_heading"):
-                words[_node(reading.statement, line)] |= _stems(str(line.get("label") or ""))
+                node = _node(reading.statement, line)
+                words[node] |= _stems(str(line.get("label") or ""))
+                name = _name(str(line.get("label") or ""))
+                if _stems(name) and node not in named[(node[0], node[2], name)]:
+                    named[(node[0], node[2], name)].append(node)
         for node in nodes:
             together[node] |= nodes - {node}
             newest[node] = reading.filed.isoformat()
     periods: dict[tuple, list] = defaultdict(list)
     for reading in kept:
-        periods[(reading.key, ifrs_family(reading.basis), reading.currency)].append(reading)
+        periods[(reading.key, ifrs_family(reading.basis), reading.currency, reading.scope)].append(reading)
     votes: Counter = Counter()
     for group in periods.values():
         printed = [_figures(reading) for reading in group]
@@ -118,6 +150,15 @@ def line_identity(readings: list) -> dict[tuple, str]:
         # ("Capital expenditures", then "Purchase of property, plant and equipment").
         if count >= 2 or words[left] & words[right]:
             groups.join(left, right, together)
+    # Lines of one name never printed side by side are one line too, whatever their figures: a label whose figures
+    # change with every filing ("Issued 1,710,459,889 shares at June 30"), or a line across a change of basis
+    # (TSMC's "Cash and cash equivalents (Note 4)" on ROC GAAP, its IFRS cash after).
+    # A name two lines printed side by side share decides nothing (TSMC's current and noncurrent "Provisions").
+    for nodes in named.values():
+        if any(other in together[node] for index, node in enumerate(nodes) for other in nodes[index + 1:]):
+            continue
+        for node in nodes[1:]:
+            groups.join(nodes[0], node, together)
     keys = {}
     for root in list(groups.members):
         members = groups.members[root]
@@ -126,6 +167,9 @@ def line_identity(readings: list) -> dict[tuple, str]:
         pick = max(tagged or named or members, key=lambda node: newest.get(node, ""))
         for node in members:
             keys[node] = pick[1]
+    # Opening and closing cash: one concept for both, as tagged statements give them (KO's "Balance at end of year").
+    for node in balances if closing else ():
+        keys[node] = closing
     return keys
 
 
