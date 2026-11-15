@@ -173,11 +173,12 @@ def line_identity(readings: list) -> dict[tuple, str]:
     return keys
 
 
-def apply_identity(chosen: list[dict], readings: list) -> None:
-    """Each served line's `key`: its concept as the company's eras share it (its own where it stands alone)."""
+def apply_identity(chosen: list[dict], readings: list) -> dict[tuple, str]:
+    """Each served line's `key`: its concept as the company's eras share it (its own where it stands alone); the keys."""
     keys = line_identity(readings)
     for record in chosen:
         for lines in [record.get("lines") or []] + [other.get("lines") or [] for other in record.get("other_bases") or []]:
             for line in lines:
                 if not line.get("is_heading"):
                     line["key"] = keys.get((record["statement"], line["concept"], line.get("member") or ""), line["concept"])
+    return keys

@@ -21,6 +21,7 @@ from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period, summarise
 from ..readers.xbrl.read import read_filing
 from ..selection.choose import choose
+from ..selection.fourth import derive_fourth_quarters
 from ..selection.identity import apply_identity
 from ..selection.period_dates import align_dates
 from ..selection.signs import sign_ties
@@ -151,7 +152,8 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
     mark = _phase(phases, "second looks", mark)
     chosen = choose(readings, printed_signs)
-    apply_identity(chosen, readings)  # one key per line across the company's eras (selection/identity.py)
+    keys = apply_identity(chosen, readings)  # one key per line across the company's eras (selection/identity.py)
+    chosen += derive_fourth_quarters(chosen, readings, keys)  # fourth quarters of one vintage (selection/fourth.py)
     mark = _phase(phases, "choose", mark)
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     summary_figures = choose_summaries(summaries, readings, chosen)
