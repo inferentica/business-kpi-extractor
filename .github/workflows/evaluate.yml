@@ -67,6 +67,11 @@ on:
         options:
           - full
           - quick
+      fresh_answers:
+        description: Ask the AI every prompt again instead of reusing the reply logged for a prompt asked before (the weekly schedule always does)
+        required: false
+        type: boolean
+        default: false
       platform:
         description: Where the golden set runs - x64 on the runner itself, or arm64 inside the worker image (Dockerfile), as on Oracle's ARM machines
         required: false
@@ -108,6 +113,9 @@ jobs:
       BUSINESS_KPI_WORKFLOW_URL: ${{ vars.BUSINESS_KPI_WORKFLOW_URL || 'https://uyctfctddoknjchvtmyy.supabase.co/functions/v1/business-kpi-workflow' }}
       SEC_USER_AGENT: TradeTracker admin@inferentica.com
       PYTHONUNBUFFERED: "1"
+      # An evaluation reuses logged replies for prompts asked before; the weekly run and a run started with
+      # fresh_answers ask again, so the model's own drift still shows.
+      KPI_FRESH_ANSWERS: ${{ (github.event_name == 'schedule' || inputs.fresh_answers) && '1' || '' }}
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v10.2.0

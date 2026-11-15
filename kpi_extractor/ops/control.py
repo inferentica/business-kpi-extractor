@@ -73,7 +73,10 @@ class ControlPlane:
             response = self.call("ai", timeout=390, attempts=2, symbol=symbol, purpose=purpose, model=model,
                                  system=system, user=user, thinking=thinking, **({"effort": effort} if effort else {}),
                                  **({"provider": provider} if provider != "deepseek" else {}),
-                                 **({"promptVersion": prompt_version} if prompt_version else {}))
+                                 **({"promptVersion": prompt_version} if prompt_version else {}),
+                                 # An evaluation reuses the reply logged for a prompt asked before, unless told to ask
+                                 # again (the weekly run, so the model's own drift still shows).
+                                 **({"fresh": True} if os.environ.get("KPI_FRESH_ANSWERS") == "1" else {}))
             if not response.get("error"):
                 return Reply(str(response.get("content") or ""), response.get("callId"))
             if attempt == 2:
