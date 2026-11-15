@@ -12,13 +12,13 @@ from ..documents.image_pages import hold_single_reads
 from ..documents.document import Document, clean
 from ..quality.checks import check_period, date_order_findings, validate_groups
 from ..readers.extract import (_FOURTH_QUARTER, ReadValue, _stands_at_period_end, column_duration_problem, explanation_supports, falls,
-                       forward_looking, net_gross_mismatch, previous_from_jump)
+                       forward_looking, net_gross_mismatch)
 from ..domain.fiscal import fiscal_label
 from ..sources.base import FilingRef
 from ..xbrl import member_key
 from ..store import FilingReading, failed_reading
 from .ai_reading import AiReading
-from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI, _annual_header, _chain_of, _days, _document_text, _is_jump, value_key)
+from .shared import (AI_GROUP_ORDER, AI_GROUP_PREFIX, _DONE, _MAX_ATTEMPTS, _NOT_REPORTED, _READ_BY_AI, _annual_header, _chain_of, _days, value_key)
 
 _READ_BY_REPLAY = "read by replay"
 # Stamped on every earnings release read. A release an older reader left with a tracked group unread is read again
@@ -77,15 +77,6 @@ def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
     found = {f"{item.group.key}.{item.kpi.key}" for item in read}
     return [f"{group.key}.{kpi.key}" for group in spec.groups if group.key not in whole for kpi in group.kpis
             if kpi.key != group.total_kpi and f"{group.key}.{kpi.key}" not in found]
-
-
-def _previous_of(notes: list[str], value: float) -> float | None:
-    return next((previous for note in notes if _is_jump(note) and (previous := previous_from_jump(note, value)) is not None), None)
-
-
-def _previous_text(row: dict) -> str:
-    previous = _previous_of(row.get("notes") or [], float(row["value"]))
-    return f", previous {previous:.4g}" if previous is not None else ""
 
 
 def stored_reading_fails(value: dict, read_by: int = 0) -> bool:
@@ -197,7 +188,6 @@ class ReleaseFlow:
             self._mark_year_ago_agreement(read, document, period_end, annual=located.annual)
             self._flag_partial_tables(read, period_end, document)
             hold_single_reads(read, document)  # a figure one OCR model alone read, until a check proves it
-            self._explain_jumps(read, document, spec)
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
             verified = sum(1 for record in records if record["validation_status"] == "verified")
             status = "processed" if verified else "needs_review" if records else "skipped"
@@ -400,17 +390,15 @@ class ReleaseFlow:
                 chains.setdefault(_chain_of(ref.period_end or date.min), []).append(ref)
             with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:
                 list(pool.map(chain, chains.values()))
-            flagged, jumps = self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
-                                                     | {key for key in before if self.values[key].get("source_accession") in done})
-            self.store.write(flagged)
-            self.store.write(self._explain_stored(jumps, refs))
+            self.store.write(self._check_read_series({key for key, value in self.values.items() if value["method"] == "ai"} - before
+                                                     | {key for key in before if self.values[key].get("source_accession") in done}))
         return [ref for ref in refs if ref.accession in done]
 
-    def _check_read_series(self, keys: set[tuple]) -> tuple[list[dict], set[tuple]]:
+    def _check_read_series(self, keys: set[tuple]) -> list[dict]:
         """The jump checks of quarters read side by side, run again in date order: each value against the quarter before
         it (a share against its last share, an amount against three times or a third of its last), and an amount equal
-        to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole. Gives the
-        rows to flag and the keys of those that jumped."""
+        to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole. A jump
+        is held until a proof from the filings settles it (steps.series_checks); no reader is asked to explain it."""
         flagged = date_order_findings(self.values.values(), keys, value_key)
         groups = {(k[0], k[2], k[3]) for k in flagged if self.values[k]["group_kind"] != "metric"}
         changed = []
@@ -419,49 +407,7 @@ class ReleaseFlow:
             if key in flagged or (group_period in groups and value["method"] == "ai" and value["validation_status"] == "verified"):
                 note = flagged.get(key, "another part of this breakdown needs review")
                 changed.append({**value, "validation_status": "needs_review", "notes": [*(value.get("notes") or []), note]})
-        return changed, {key for key, note in flagged.items() if _is_jump(note)}
-
-    def _explain_stored(self, keys: set[tuple], refs: list[FilingRef]) -> list[dict]:
-        """Jumps the date-order check found, given the reading-time treatment: the reasoning reader is asked whether each is a real
-        change, and one backed by a quote found in the document stands (its breakdown's other parts are released by
-        _release_held_breakdowns). One reasoning call per release with such a jump."""
-        by_accession = {ref.accession: ref for ref in refs}
-        jumps: dict[str, list[dict]] = {}
-        for key in keys:
-            value = self.values.get(key)
-            if value and value.get("source_accession") in by_accession:
-                jumps.setdefault(value["source_accession"], []).append(value)
-        def explain(item: tuple[str, list[dict]]):
-            accession, rows = item
-            try:
-                document = self._document(by_accession[accession])
-                lines = "\n".join(
-                    f"- {v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']} ({v['group_label']} / {v['kpi_label']}): "
-                    f"now {float(v['value']):g}{_previous_text(v)}; {'; '.join(n for n in v.get('notes') or [] if _is_jump(n))}"
-                    for v in rows)
-                answer = self._ask(ai.prompt(self.company, self._prompt_document(document, None), ai.EXPLAIN_TASK, lines),
-                                   "explain", ai.Explanations, thinking_first=True, model="flash")
-                return rows, document, answer
-            except Exception:  # noqa: BLE001 - unexplained, they stay flagged
-                return rows, None, None
-
-        cleared = []
-        with ThreadPoolExecutor(max_workers=RELEASE_READERS) as pool:  # one reasoning call per release, side by side
-            answers = list(pool.map(explain, jumps.items()))
-        for rows, document, answer in answers:
-            if answer is None:
-                continue
-            haystack = _document_text(document)
-            for v in rows:
-                verdict = answer.items.get(f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}")
-                quote = clean(verdict.quote or "") if verdict else ""
-                if verdict and verdict.legitimate and quote in haystack and explanation_supports(
-                        quote, v["kpi_label"], float(v["value"]), _previous_of(v.get("notes") or [], float(v["value"]))):
-                    call = self._call_of(answer)
-                    cleared.append({**v, "validation_status": "verified",
-                                    "notes": [n for n in v.get("notes") or [] if not _is_jump(n)] + [f"{EXPLAINED}{quote[:200]}"],
-                                    **({"locator": {**(v.get("locator") or {}), "explain_call": call}} if call else {})})
-        return cleared
+        return changed
 
     def _release_records(self, read: list[ReadValue], spec: Spec, ref: FilingRef, document: Document, fiscal_year: str,
                          fiscal_period: str, period_end: date, period_problem: str | None) -> list[dict]:

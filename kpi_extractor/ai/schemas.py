@@ -295,15 +295,6 @@ class Curation(BaseModel):
     members: list[str] = Field(default_factory=list)
 
 
-class Explanation(BaseModel):
-    legitimate: bool
-    quote: str | None = None
-
-
-class Explanations(BaseModel):
-    items: dict[str, Explanation] = Field(default_factory=dict)
-
-
 def normalize_spec(spec: Spec) -> Spec:
     """A list whose every breakdown can be checked: a revenue breakdown needs at least two parts, a mix two shares.
     Anything less can never reconcile (Broadcom's lone "AI Semiconductor" amount was a one-row breakdown, hidden every

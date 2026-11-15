@@ -55,6 +55,8 @@ STATED = "stated in its filing"
 REVIEWED = "confirmed by review"
 EXPLAINED = "change explained: "
 RESCALED = "to match the series"
+EXPLAINED_UNPROVEN = "its change was explained by the AI; its filing does not state it"
+UNNAMED_XBRL = "it equals no XBRL line that names it"
 
 _REASONS = (
     # The figure's own holds.
@@ -76,6 +78,8 @@ _REASONS = (
     Reason("reread_differs", HOLD, REREAD_NOTE, "start"),
     Reason("outside_periods", HOLD, OUTSIDE_REPORTED_PERIODS),
     Reason("annual_refiled", HOLD, ANNUAL_REFILED),
+    Reason("explained_unproven", HOLD, EXPLAINED_UNPROVEN),
+    Reason("unnamed_xbrl", HOLD, UNNAMED_XBRL),
     Reason("labels_contradicted", HOLD, LABELS_CONTRADICTED),
     # Holds a row has from its group.
     Reason("parts_differ", GROUP, "parts differ from the total by", "start"),

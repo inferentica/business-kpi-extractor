@@ -63,6 +63,13 @@ def _unit_price_row(value: dict) -> bool:
     return _place_held(value)
 
 
+def _series_rescaled(value: dict) -> bool:
+    """A figure put on its series' scale by code rather than read at a scale its filing states, before that ended
+    (2026-11-15): Visa's processed transactions, 29,321 for 29.3 billion. Read again with today's scale rules; a new
+    reading that differs from the figure served is held for the owner, as every re-read's is."""
+    return value.get("validation_status") != "rejected" and not value.get("owner_decision") and has(value.get("notes"), "rescaled")
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -80,6 +87,8 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
                     "a percent read from an amounts row (Wells Fargo's allowance coverage)", _audit_held),
     "unit-price-rows": ("prices whose row states its unit (Exxon's \"Brent ($/b)\") read with a scale or held, and figures "
                         "held for a place their section's title names", _unit_price_row),
+    "series-rescaled": ("figures put on their series' scale by code, read again at the scale their filing states",
+                        _series_rescaled),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }

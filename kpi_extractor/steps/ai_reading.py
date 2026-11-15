@@ -3,21 +3,19 @@ from __future__ import annotations
 
 import copy
 import re
-from datetime import date, timedelta
+from datetime import date
 
 from .. import ai
 from ..ai import AiResponseError, Located, Spec
-from ..ops.control import ControlError
-from ..documents.document import Document, clean
+from ..documents.document import Document
 from ..quality.checks import check_period, far_above_quarter, looks_like_part_of_table, total_label, validate_groups
-from ..readers.extract import (ReadValue, describe, explanation_supports, header_contradicts, locator_hint, previous_from_jump,
+from ..readers.extract import (ReadValue, describe, header_contradicts, locator_hint,
                        read_values)
 from ..readers.replay import _same_place, _source_template, asked_of, missing_since
 from ..readers.trace import placed_elsewhere, stamp_call
 from ..rules.period import states_quarter
-from ..quality.reasons import is_, without
 from .replay_reading import in_full_groups, left_for_ai
-from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _document_text, _identity_text, _is_jump,
+from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _identity_text,
                      _later_place, _same, _same_chain, _year_ago_cells)
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
@@ -40,16 +38,6 @@ def _explain_pointer(problem: str, document: Document) -> str:
     if match:
         return f"{problem}: the document's tables are {', '.join(list(document.tables)[:40]) or 'none'}"
     return problem
-
-
-
-def _previous_of(notes: list[str], value: float) -> float | None:
-    return next((previous for note in notes if _is_jump(note) and (previous := previous_from_jump(note, value)) is not None), None)
-
-
-def _previous_text(item) -> str:
-    previous = _previous_of(item.notes, item.value)
-    return f", previous {previous:.4g}" if previous is not None else ""
 
 
 class AiReading:
@@ -342,30 +330,6 @@ class AiReading:
                 for item in items:
                     item.status = "needs_review"
                     item.notes.append("fewer rows and under half the total of the quarter compared: likely part of the table")
-
-    def _explain_jumps(self, read: list[ReadValue], document: Document, spec: Spec) -> None:
-        """Values flagged only for a sharp change get a reading by the reasoning reader; a real change backed by a quote stands."""
-        flagged = [item for item in read if item.status == "needs_review"
-                   and item.notes and all(is_(note, "jump") for note in without(item.notes, "reviewed"))]
-        if not flagged:
-            return
-        lines = "\n".join(f"- {item.group.key}.{item.kpi.key} ({item.group.label} / {item.kpi.label}): now {item.value:g}"
-                          f"{_previous_text(item)}; {'; '.join(item.notes)}" for item in flagged)
-        try:
-            answer = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.EXPLAIN_TASK, lines),
-                               "explain", ai.Explanations, thinking_first=True, model="flash")
-        except (AiResponseError, ControlError):
-            return  # the flagged values stay needs_review
-        haystack = _document_text(document)
-        for item in flagged:
-            verdict = answer.items.get(f"{item.group.key}.{item.kpi.key}")
-            quote = clean(verdict.quote or "") if verdict else ""
-            if verdict and verdict.legitimate and quote in haystack and explanation_supports(
-                    quote, item.kpi.label, item.value, _previous_of(item.notes, item.value)):
-                item.status = "verified"
-                item.notes = [*item.notes, f"change explained: {quote[:200]}"]
-                if call := self._call_of(answer):
-                    item.locator["explain_call"] = call
 
     def _ask(self, text: str, purpose: str, schema, thinking_first: bool, model: str = "flash"):
         last_error = None

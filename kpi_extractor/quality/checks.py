@@ -1,5 +1,5 @@
 """The checks on figures, in one engine. Each check declares what it applies to, and answers with findings: it changes
-nothing itself. What comes of a finding (flag it, read again, ask the AI to explain it) is the caller's to decide.
+nothing itself. What comes of a finding (flag it, look for proof in the filings) is the caller's to decide.
 
 How a reader reads stays with the reader: a chart's or a release table's rows must add up before they count as read at
 all. These checks judge what has been read."""

@@ -4,8 +4,6 @@ Each case is a stored figure verified by the checks (about 0.7% of them are wron
 today's parse of its filing, with a wrong answer planted beside it:
 - review: the figure's cell against the year-ago column of its row (or a neighbouring row), as A and B in an order
   fixed by the case: the right pick scores, "none" or the planted cell does not.
-- explain: steady figures given a planted near-doubling (or halving) that the document cannot explain, which must be
-  refused, and genuine explained changes (the stored ones), which should stand.
 - select: long documents and the tables their verified figures came from, which Select should keep, both with the
   company's KPI list (as Locate asks) and with none (as Propose asks for a new company: UBS got no list when Select
   dropped its segment tables).
@@ -28,11 +26,10 @@ from types import SimpleNamespace
 from .. import ai
 from ..ai import AiResponseError, Spec
 from ..ops.control import ControlPlane
-from ..documents.document import Document, clean, parse_document, parse_number
-from ..readers.extract import _row_label, describe, explanation_supports, previous_from_jump
+from ..documents.document import Document, parse_document, parse_number
+from ..readers.extract import _row_label, describe
 from ..sources.sec import company_profile, configure_identity
 from ..steps.ai_reading import MAX_DOCUMENT_CHARS, AiReading
-from ..steps.shared import _document_text
 
 CASES = Path("evals/prompts.json")
 _FETCH = Lock()
@@ -113,36 +110,6 @@ class Runner:
                              "wrong_kind": case["wrong_kind"], "outcome": outcome, "reason": answer.reasons.get(key)})
         return outcomes
 
-    # --- explain ------------------------------------------------------------------------------------------------
-    def explain(self, cases: list[dict]) -> list[dict]:
-        document = self.document(cases[0]["url"], cases[0]["prefix"])
-        if document.fits(MAX_DOCUMENT_CHARS):
-            body = document.render()
-        else:
-            body = document.render_ids({case.get("table") or case.get("block") for case in cases} - {None}, MAX_DOCUMENT_CHARS, opening=6)
-        keys, lines = {}, []
-        for index, case in enumerate(cases):
-            key = f"{case['kpi']['group']}.{case['kpi']['key']}#{index}"
-            keys[key] = case
-            previous = previous_from_jump(case["jump"], case["value"])
-            shown = f", previous {previous:.4g}" if previous is not None else ""
-            lines.append(f"- {key} ({case['kpi']['group_label']} / {case['kpi']['label']}): now {case['value']:g}{shown}; {case['jump']}")
-        text = ai.prompt(self.company(cases[0]["symbol"]), body, ai.EXPLAIN_TASK, "\n".join(lines))
-        answer = self.ask(cases[0]["symbol"], "explain", text, ai.Explanations, thinking_first=True)
-        haystack = _document_text(document)
-        outcomes = []
-        for key, case in keys.items():
-            verdict = answer.items.get(key)
-            quote = clean(verdict.quote or "") if verdict else ""
-            said = bool(verdict and verdict.legitimate)
-            # What production keeps: a yes with a quote found in the document that supports the figure.
-            previous = previous_from_jump(case["jump"], case["value"])
-            stands = said and bool(quote) and quote in haystack and explanation_supports(quote, case["kpi"]["label"], case["value"], previous)
-            outcomes.append({"symbol": case["symbol"], "period_end": case["period_end"], "kpi": case["kpi"]["label"],
-                             "planted": case["planted"], "said_real": said, "stands": stands, "quote": quote[:160],
-                             "growth": "growth" in case["kpi"]["label"].lower()})
-        return outcomes
-
     # --- select -------------------------------------------------------------------------------------------------
     def select(self, case: dict) -> list[dict]:
         document = self.document(case["url"], case["prefix"])
@@ -170,22 +137,15 @@ class Runner:
 
 
 def summarize(results: dict[str, list[dict]]) -> dict:
-    review, explain, select = results.get("review", []), results.get("explain", []), results.get("select", [])
+    review, select = results.get("review", []), results.get("select", [])
     by_kind = defaultdict(Counter)
     for item in review:
         by_kind[item["wrong_kind"]][item["outcome"]] += 1
-    planted = [item for item in explain if item["planted"] and not item.get("growth")]
-    growth = [item for item in explain if item["planted"] and item.get("growth")]
-    genuine = [item for item in explain if not item["planted"]]
     needed = sum(item["needed"] for item in select)
     return {
         "review": {"cases": len(review), "right": sum(1 for i in review if i["outcome"] == "right"),
                    "planted": sum(1 for i in review if i["outcome"] == "planted"),
                    "none": sum(1 for i in review if i["outcome"] == "none"), "byKind": {k: dict(v) for k, v in by_kind.items()}},
-        "explain": {"planted": len(planted), "plantedSaidReal": sum(1 for i in planted if i["said_real"]),
-                    "plantedStands": sum(1 for i in planted if i["stands"]), "genuine": len(genuine),
-                    "genuineStands": sum(1 for i in genuine if i["stands"]),
-                    "growthPlanted": len(growth), "growthPlantedStands": sum(1 for i in growth if i["stands"])},
         "select": {"documents": len(select), "tablesNeeded": needed, "selectKept": sum(i["select_kept"] for i in select),
                    "withNamesKept": sum(i["with_names_kept"] for i in select),
                    "documentsComplete": sum(1 for i in select if i["with_names_kept"] == i["needed"]),
@@ -195,15 +155,12 @@ def summarize(results: dict[str, list[dict]]) -> dict:
 
 
 def lines_of(summary: dict, calls: int) -> list[str]:
-    r, e, s = summary["review"], summary["explain"], summary["select"]
+    r, s = summary["review"], summary["select"]
     pct = lambda a, b: f"{a / b:.0%}" if b else "—"
     out = [f"Prompt scores; AI calls {calls}", "",
            f"Review: {r['right']}/{r['cases']} right ({pct(r['right'], r['cases'])}), {r['planted']} took the planted cell, {r['none']} kept neither"]
     out += [f"  {kind}: {dict(counts)}" for kind, counts in r["byKind"].items()]
-    out += [f"Explain: planted false jumps passed {e['plantedStands']}/{e['planted']} ({pct(e['plantedStands'], e['planted'])}); "
-            f"said real before the quote checks {e['plantedSaidReal']}; genuine changes kept {e['genuineStands']}/{e['genuine']}; "
-            f"growth-rate KPIs (a planted jump may be real there) passed {e['growthPlantedStands']}/{e['growthPlanted']}",
-            f"Select: kept {s['selectKept']}/{s['tablesNeeded']} needed tables alone, {s['withNamesKept']} with the KPI-name rule; "
+    out += [f"Select: kept {s['selectKept']}/{s['tablesNeeded']} needed tables alone, {s['withNamesKept']} with the KPI-name rule; "
             f"{s['documentsComplete']}/{s['documents']} documents complete",
             f"Select with no list (as Propose asks a new company): kept {s.get('unlistedKept', 0)}/{s['tablesNeeded']} needed tables; "
             f"{s.get('unlistedComplete', 0)}/{s['documents']} documents complete"]
@@ -219,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
     plane.run_id = started["runId"]
     runner = Runner(plane)
     jobs = []
-    for purpose in ("review", "explain"):
+    for purpose in ("review",):
         grouped = defaultdict(list)
         for case in cases:
             if case["purpose"] == purpose:
@@ -246,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = summarize(results)
     summary["failures"] = dict(failures)
     plane.call("finish", summary={"prompts": summary, "aiCalls": runner.calls,
-                                  "promptVersions": {p: ai.prompt_version(p) for p in ("review", "explain", "select")}})
+                                  "promptVersions": {p: ai.prompt_version(p) for p in ("review", "select")}})
     text = "\n".join(lines_of(summary, runner.calls) + ([f"Failures: {dict(failures)}"] if failures else []))
     print(text)
     if os.environ.get("GITHUB_STEP_SUMMARY"):

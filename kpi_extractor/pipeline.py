@@ -280,6 +280,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.hold()
         self.store.write(self._unfile_quarters())
         self.store.write(self._refile_annuals())
+        self.store.write(self._withdraw_unproven_clears())
         self.store.write(self._recheck_flagged())
         self.store.write(self._stand_stated_figures())
         self.store.write(self._link_replays())
