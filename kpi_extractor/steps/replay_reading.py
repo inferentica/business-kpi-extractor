@@ -160,7 +160,7 @@ class ReplayReading:
         chained = getattr(self._local, "chained", False)
         oldest = (before - timedelta(days=400)).isoformat()
         for value in list(self.values.values()):
-            if chained and not _same_chain(value["period_end"], before):
+            if chained and not (getattr(self._local, "lead", False) or _same_chain(value["period_end"], before)):
                 continue  # the other chains' quarters are compared after reading, in date order
             if value["method"] == "ai" and oldest <= value["period_end"] < (before - timedelta(days=20)).isoformat():
                 key = f"{value['group_key'].removeprefix(AI_GROUP_PREFIX)}.{value['kpi_key']}"
