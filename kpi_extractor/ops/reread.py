@@ -77,6 +77,13 @@ def _reread_differs(value: dict) -> bool:
     return value.get("validation_status") == "needs_review" and not value.get("owner_decision") and has(value.get("notes"), "reread_differs")
 
 
+def _scale_disputed(value: dict) -> bool:
+    """A figure read at its table's scale where the AI gave another: read again after a scale rule changes which words
+    decide (ServiceNow's Q4 2021 cRPO, $5.7 billion, served as $5.7 million before a header inside the table counted)."""
+    return (value.get("validation_status") != "rejected" and not value.get("owner_decision")
+            and any(str(note).startswith("table declares scale ") for note in value.get("notes") or []))
+
+
 def _read_by_anchor_rule(value: dict) -> bool:
     return (value.get("locator") or {}).get("rule") == "anchor-phrase" and value.get("validation_status") != "rejected"
 
@@ -98,6 +105,8 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
                         _series_rescaled),
     "reread-differs": ("figures a re-read held for reading the served figure differently, read once more after a reader fix",
                        _reread_differs),
+    "scale-disputed": ("figures read at their table's scale where the AI gave another, read again after a scale rule fix",
+                       _scale_disputed),
     # A demoted learned rule's figures (ops/learned.py): read again by the AI.
     "rule-anchor-phrase": ("figures the anchor-phrase rule read", _read_by_anchor_rule),
 }

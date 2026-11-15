@@ -113,3 +113,17 @@ def test_a_heading_row_inside_the_table_states_its_rows_scale_over_the_columns_h
     # A caption row's "except per share amounts" is no per-unit scale for the rows under it.
     caption = Table(id="T2", context="", rows=[["", "Q3"], ["($ in millions, except per share amounts)", ""], ["Revenue", "512"]])
     assert cell_amount_scale(document(caption), caption, 2, 1, "Revenue", reader(), 512)[0].factor == 1e6
+
+
+def test_a_header_repeated_inside_the_table_states_the_scale_of_its_column_below_it():
+    # ServiceNow's Q4 2021 results: "Amount ($ billions)" heads the cRPO column under the top's "Amount ($ millions)".
+    table = Table(id="T1", context="", rows=[["", "Amount ($ millions)", "Year/Year Growth (%)"],
+                                             ["Total revenues", "$1,614", "29%"],
+                                             ["", "Amount ($ billions)(2)", "Year/Year Growth (%)"],
+                                             ["cRPO", "$5.7", "29%"], ["RPO", "$11.5", "29%"],
+                                             ["", "Amount ($ millions)", "Margin (%)"], ["Subscription gross profit", "$1,241", "82%"]])
+    doc = document(table)
+    assert cell_amount_scale(doc, table, 3, 1, "cRPO", reader(), 5.7)[0].factor == 1e9
+    assert cell_amount_scale(doc, table, 4, 1, "RPO", reader(), 11.5)[0].factor == 1e9  # every row under the heading
+    assert cell_amount_scale(doc, table, 6, 1, "Subscription gross profit", reader(), 1241)[0].factor == 1e6
+    assert cell_amount_scale(doc, table, 1, 1, "Total revenues", reader(), 1614)[0].factor == 1e6

@@ -242,17 +242,21 @@ def _heading_scale_words(text: str) -> tuple[float, str] | None:
     return None
 
 
-def _body_heading(table: Table, row: int) -> str:
-    """The labels of the rows with no figures just above a row, below the table's first row of figures: a section's
-    heading inside the table, never its header (whose cells head columns, each with its own scale)."""
-    first = next((i for i, cells in enumerate(table.rows) if any(parse_number(cell) for cell in cells[1:])), len(table.rows))
-    labels = []
+def _body_scale(table: Table, row: int, col: int) -> tuple[float, str] | None:
+    """The scale the nearest heading inside the table above a row states: a row with no figures, below the table's
+    first row of figures, in its label ("($ billions)") or repeated as a header in the figure's own column (ServiceNow's
+    "Amount ($ billions)" over cRPO and RPO, under "Amount ($ millions)" at the top). It holds for every row under it
+    until the next; never the table's own header, whose cells head columns with scales of their own."""
+    def figures(cells: list[str]) -> bool:  # a header's footnote mark, "Amount ($ billions)(2)", is no figure
+        return any(parse_number(cell) and not re.search(r"[A-Za-z]{3}", cell) for cell in cells[1:])
+
+    first = next((i for i, cells in enumerate(table.rows) if figures(cells)), len(table.rows))
     for index in range(row - 1, first, -1):
         cells = table.rows[index]
-        if any(parse_number(cell) for cell in cells[1:]):
-            break
-        labels.append(cells[0] if cells else "")
-    return " ".join(labels)
+        if not figures(cells) and (found := _heading_scale_words(
+                f"{cells[0] if cells else ''} {_heading(cells, col) if col < len(cells) else ''}")):
+            return found
+    return None
 
 
 def _own_amount_scale(table: Table, row: int, col: int, kpi_label: str) -> ScaleFrom | None:
@@ -262,7 +266,7 @@ def _own_amount_scale(table: Table, row: int, col: int, kpi_label: str) -> Scale
     per-unit amount (a price keeps its units)."""
     if found := _row_scale_words(" ".join(table.rows[row])):
         return ScaleFrom(found[0], "row", found[1])
-    if found := _heading_scale_words(_body_heading(table, row)):
+    if found := _body_scale(table, row, col):
         return ScaleFrom(found[0], "heading", found[1])
     if found := _column_scale_words(table, row, col):
         return ScaleFrom(found[0], "column", found[1])

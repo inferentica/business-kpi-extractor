@@ -135,3 +135,10 @@ def test_figures_a_reread_held_for_differing_are_read_once_more():
     held = {"validation_status": "needs_review",
             "notes": ["a new reading of this filing differs from the figure served before: 5,700,000,000"]}
     assert picks(held) and not picks({**held, "owner_decision": "confirmed"}) and not picks({**held, "validation_status": "verified"})
+
+
+def test_figures_read_at_a_scale_the_ai_disputed_are_read_again():
+    from kpi_extractor.ops.reread import SELECTORS
+    picks = SELECTORS["scale-disputed"][1]
+    assert picks({"validation_status": "verified", "notes": ["table declares scale 1e+06, AI said 1e+09"]})
+    assert not picks({"validation_status": "verified", "notes": ["scale quoted: 'in billions' over the table's 1e+06"]})
