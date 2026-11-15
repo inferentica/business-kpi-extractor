@@ -9,7 +9,7 @@ def reading(accession, filed, period, duration, statement, lines):
     return Reading(statement=statement, duration=duration, fiscal_year="2019", fiscal_period=period,
                    period_end=date(2019, 9, 28) if period == "FY" else date(2019, 6, 29), period_start=None,
                    currency="USD", accession=accession, form="10-K" if period == "FY" else "10-Q", filed=filed,
-                   own=False, source="xbrl", basis="US GAAP", checks=[Check("calc", "pass")],
+                   own=False, source="xbrl", basis="US GAAP", checks=[Check("cash" if statement == "cash_flow" else "calc", "pass")],
                    lines=[{"line": i, "concept": c, "label": label, "level": 0, "is_heading": False, "value": v}
                           for i, (c, label, v) in enumerate(lines)])
 
