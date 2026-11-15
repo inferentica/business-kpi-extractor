@@ -57,3 +57,15 @@ def test_a_short_document_a_kpi_never_read_or_a_missed_kpi_sends_the_whole_one()
     narrowed = pipeline._locate_document(doc, SPEC)
     pipeline._whole_documents.add(str(id(doc)))  # what _read_ai does once the narrowed reading missed a KPI
     assert pipeline._locate_document(doc, SPEC) != narrowed and "Other line 5" in pipeline._locate_document(doc, SPEC)
+
+
+def test_a_kpi_looked_for_before_and_not_reported_no_longer_keeps_the_whole_document():
+    doc = supplement()
+    spec = Spec.model_validate({"groups": [{"key": "fees", "label": "Fees", "kind": "revenue_breakdown", "kpis": [
+        {"key": "advisory", "label": "Advisory", "unit": "currency"}, {"key": "underwriting", "label": "Underwriting", "unit": "currency"},
+        {"key": "trading", "label": "Prime brokerage", "unit": "currency"}]}]})
+    pipeline = run([("advisory", "Advisory"), ("underwriting", "Underwriting")])
+    assert pipeline._last_places(doc, spec) is None  # prime brokerage: never looked for, named nowhere
+    pipeline.store.load(values=list(pipeline.values.values()), filings=[{"accession": "Q3", "status": "processed",
+                                                                         "notes": ["not reported: fees.trading"]}])
+    assert "A_T60" in pipeline._last_places(doc, spec)
