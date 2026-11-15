@@ -1,0 +1,109 @@
+"""Which printed lines are subtotals of the lines above them, and where each one's lines start."""
+from __future__ import annotations
+
+import re
+
+from .tolerance import close
+
+
+# Labels a subtotal can carry: none at all, a total, a net or gross figure, an income or profit line, one before or
+# after something. Apple's 1999 retained earnings (1,499) equals the two lines above it (150 + 1,349) by chance.
+_SUBTOTAL_LABEL = re.compile(r"^$|^total\b|\bnet\b|^gross\b|\bincome\b|\bprofit\b|\bloss\b|\bearnings\b|\bbefore\b|"
+                             r"\bafter\b|\bcomprehensive\b|^revenues?\b|\bmargin\b|\bactivities\b|^cash\s+(generated|provided|used)\b",
+                             re.I)
+# IFRS's two groups of other comprehensive income, a subtotal even of one line: Woori prints "Items that will not be
+# reclassified to profit or loss 7,585" under its only line, "Remeasurement of the net defined benefit liability 7,585".
+_ONE_LINE_GROUP = re.compile(r"^items\s+that\s+(will|may|are|would)\s+(not\s+)?(be\s+)?(subsequently\s+)?reclassified\b", re.I)
+# Subtotals that sum lines under more than one heading.
+_SPANS_HEADINGS = re.compile(r"^total\b|comprehensive\s+income|\bfor\s+the\s+(year|period)\b|\bactivities\b|\boperations\b",
+                             re.I)
+
+
+def subtotals(printed) -> dict[int, int]:
+    """Where each subtotal's lines start: a printed "Total …", or a line equal to the two or more lines just above it
+    (an unlabelled net figure). An earlier subtotal counts as one line."""
+    starts: dict[int, int] = {}
+    for index, (label, _level, value) in enumerate(printed):
+        # A line of its own ("Retained earnings") is no subtotal because its figure happens to equal two lines above
+        # it; one that sums three or more is (Lloyds' "Financial assets at amortised cost" after its four lines).
+        # An unlabelled total of a heading's only line is that block's too (Copel's 2004 "Redemption of judicial deposits
+        # and escrows 25,000" under "Decrease in long-term receivables", then "25,000").
+        one_line = not label and index >= 2 and printed[index - 2][2] is None and printed[index - 1][2] == value
+        least = 1 if _ONE_LINE_GROUP.match(label) or one_line else 2 if _SUBTOTAL_LABEL.search(label) or _repeats_its_heading(printed, index) \
+            or _totals_its_others(printed, index) or _names_its_lines(printed, index) else 3
+        if value is None:
+            continue
+        sums, position, total, headed = [], index - 1, 0.0, False
+        while position >= 0 and len(sums) < 30:  # Copel sums 13 current assets
+            earlier_label, _earlier_level, earlier_value = printed[position]
+            if earlier_value is None:
+                # A subtotal over several headed blocks (TSMC's other comprehensive income for the year); the heading of
+                # a block it sums (Copel's 2003 "Property, plant and equipment" over its unlabelled net figure, then
+                # "Investments"); a heading ending in a colon within an unlabelled subtotal's lines (Copel's 2004
+                # "Disposals:" among its adjustments to net income).
+                if sums and (_SPANS_HEADINGS.search(label) or headed or not label and earlier_label.endswith(":")):
+                    position, headed = position - 1, False
+                    continue
+                break
+            total += -abs(earlier_value) if re.match(r"^less\b", earlier_label, re.I) else earlier_value
+            sums.append((position, total))
+            headed = position in starts
+            position = block_start(starts, position) - 1
+        # A line no label marks as a subtotal must sum exactly (Apple's "Other" 32 is not 45 - 12 + 0 = 33). Of the sums
+        # within rounding, the nearest: Embraer's June 2011 non-current assets close 0.5 short of the block without its
+        # "Trade accounts receivable 0.5", within the tolerance of ten lines (round 90).
+        fits = [(abs(running - value), count, start) for count, (start, running) in enumerate(sums, 1)
+                if count >= least and close(running, value, count + 1 if least == 2 else 0)]
+        if fits:
+            starts[index] = min(fits)[2]
+        else:
+            if least > 2:
+                continue
+            # A difference of the two lines above: JPM's net interest income, interest income less interest expense,
+            # both printed as plain figures.
+            if index >= 2 and printed[index - 1][2] is not None and printed[index - 2][2] is not None \
+                    and close(printed[index - 2][2] - printed[index - 1][2], value, 3) and index - 1 not in starts:
+                starts[index] = index - 2
+    return starts
+
+
+def block_start(starts: dict[int, int], index: int) -> int:
+    """The first line a subtotal sums, through subtotals inside it (Apple's net property, plant and equipment sums an
+    unlabelled gross figure that sums its own lines)."""
+    seen = set()
+    while index in starts and index not in seen:
+        seen.add(index)
+        index = starts[index]
+    return index
+
+
+def _repeats_its_heading(printed, index: int) -> bool:
+    """A line labelled as the heading its block opens with sums that block: Kroger's "Long-term debt including
+    obligations under capital leases" heads its face value and hedge adjustment, and its total repeats the words."""
+    key = re.sub(r"[^a-z0-9]+", " ", printed[index][0].lower()).strip()
+    for position in range(index - 1, -1, -1):
+        earlier_label, _level, earlier_value = printed[position]
+        if earlier_value is None:
+            return bool(key) and re.sub(r"[^a-z0-9]+", " ", earlier_label.lower()).strip() == key and index - position > 2
+    return False
+
+
+def _totals_its_others(printed, index: int) -> bool:
+    """A line named as the "Other …" line just above it, less "Other", totals its block: PepsiCo's goodwill and "Other
+    nonamortizable intangible assets", then "Nonamortizable intangible assets"."""
+    if index < 2:
+        return False
+    key = re.sub(r"[^a-z0-9]+", " ", printed[index][0].lower()).strip()
+    above = re.sub(r"[^a-z0-9]+", " ", printed[index - 1][0].lower()).strip()
+    return bool(key) and above == f"other {key}"
+
+
+def _names_its_lines(printed, index: int) -> bool:
+    """A line named after the two lines above it sums them: Lloyds TSB's "Depreciation" and "Amortisation of goodwill",
+    then "Depreciation and amortisation"."""
+    parts = re.split(r"\s+and\s+", printed[index][0].lower().strip())
+    if len(parts) != 2 or index < 2 or None in (printed[index - 1][2], printed[index - 2][2]):
+        return False
+    above = [re.findall(r"[a-z]+", printed[position][0].lower())[:1] for position in (index - 2, index - 1)]
+    named = [re.findall(r"[a-z]+", part)[:1] for part in parts]
+    return all(above) and all(named) and sorted(word[0][:6] for word in above) == sorted(word[0][:6] for word in named)

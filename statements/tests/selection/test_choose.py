@@ -1,0 +1,249 @@
+from datetime import date
+
+from statement_extractor.selection.choose import choose
+from statement_extractor.selection.vintage import mixed_vintage_q4s
+from statement_extractor.domain.model import Check, Reading
+
+
+def reading(accession, filed, value, own, result="pass", statement="income", period="FY", duration="year"):
+    return Reading(statement=statement, duration=duration, fiscal_year="2009", fiscal_period=period,
+                   period_end=date(2009, 9, 26), period_start=None, currency="USD", accession=accession, form="10-K",
+                   filed=filed, own=own, source="xbrl",
+                   lines=[{"line": 0, "concept": "us-gaap_Revenues", "label": "Net sales", "level": 0,
+                           "is_heading": False, "value": value}],
+                   checks=[Check("calc", result)])
+
+
+def test_the_newest_filing_whose_arithmetic_holds_wins_and_its_source_is_recorded():
+    own = reading("own", date(2009, 10, 27), 36_537e6, own=True)
+    restated = reading("later", date(2010, 10, 27), 42_905e6, own=False)
+    broken = reading("newest", date(2011, 10, 26), 1.0, own=False, result="fail")
+    [chosen] = choose([own, restated, broken])
+    assert chosen["status"] == "kept" and chosen["source_accession"] == "later" and chosen["from_comparative"]
+    assert chosen["own_accession"] == "own"
+    assert chosen["versus_own"]["changed"] == ["us-gaap_Revenues"]
+    assert chosen["rejections"] and chosen["rejections"][0].startswith("newest")
+
+
+def test_no_kept_reading_says_why():
+    [chosen] = choose([reading("a", date(2009, 10, 27), 1, own=True, result="fail")])
+    assert chosen["status"] == "rejected" and "lines" not in chosen
+    [chosen] = choose([reading("a", date(2009, 10, 27), 1, own=True, result="none")])
+    assert chosen["status"] == "unproven"
+
+
+def test_a_fourth_quarter_from_a_restated_year_and_an_unrestated_nine_months_is_flagged():
+    year = [reading("own", date(2009, 10, 27), 100, own=True), reading("later", date(2010, 10, 27), 110, own=False)]
+    nine = [reading("q3", date(2009, 7, 22), 70, own=True, period="Q3", duration="ytd")]
+    assert mixed_vintage_q4s(choose(year + nine)) == ["income 2009"]
+
+
+def test_a_sign_most_filings_print_wins_over_the_newest_that_dropped_it():
+    # JPM's 2010 credit losses recognized in income: (100) in the FY2010 and FY2011 10-Ks, 100 in the FY2012 one.
+    year = [reading("fy10", date(2011, 2, 28), -100e6, own=True), reading("fy11", date(2012, 2, 29), -100e6, own=False),
+            reading("fy12", date(2013, 2, 28), 100e6, own=False)]
+    [chosen] = choose(year)
+    assert chosen["source_accession"] == "fy12" and chosen["lines"][0]["value"] == -100e6
+    assert "versus_own" not in chosen or not chosen["versus_own"]["changed"]
+
+
+def test_a_retagged_line_is_matched_by_its_label_for_its_sign():
+    year = [reading("fy10", date(2011, 2, 28), -100e6, own=True), reading("fy11", date(2012, 2, 29), -100e6, own=False),
+            reading("fy12", date(2013, 2, 28), 100e6, own=False)]
+    year[2].lines[0]["concept"] = "us-gaap_RevenuesRetagged"
+    [chosen] = choose(year)
+    assert chosen["lines"][0]["value"] == -100e6
+
+
+def test_the_filings_own_printed_statement_settles_a_sign():
+    # JPM's FY2012 10-K: XBRL tags 2010 credit losses as 100, its printed statement shows (100).
+    xbrl = reading("fy12", date(2013, 2, 28), 100e6, own=False)
+    printed = reading("fy12", date(2013, 2, 28), -100e6, own=False)
+    printed.source = "html"
+    older = reading("fy11", date(2012, 2, 29), -100e6, own=False)
+    [chosen] = choose([older, xbrl, printed])
+    assert chosen["source_accession"] == "fy12" and chosen["lines"][0]["value"] == -100e6
+
+
+def test_a_sign_only_change_is_not_a_restatement():
+    own = reading("own", date(2011, 2, 28), -27e6, own=True)
+    later = reading("later", date(2012, 2, 29), 27e6, own=False)
+    [chosen] = choose([own, later])
+    assert chosen["versus_own"]["changed"] == [] and chosen["versus_own"]["sign_only"] == ["us-gaap_Revenues"]
+
+
+def test_a_sign_disagreement_asks_for_the_printed_statement():
+    from statement_extractor.selection.signs import sign_ties
+    older = reading("fy11", date(2012, 2, 29), -100e6, own=False)
+    newer = reading("fy12", date(2013, 2, 28), 100e6, own=False)
+    assert sign_ties([older, newer]) == {"fy12"}
+    assert sign_ties([older, reading("fy12", date(2013, 2, 28), -100e6, own=False)]) == set()
+
+
+def test_a_sign_printed_only_in_a_note_settles_it():
+    # JPM's FY2012 10-K tags its 2010 credit losses as 100 and prints (100) only in a note, not on the statement's face.
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.sign_index import printed_figures
+    note = parse_html("<table><tr><td></td><td>2012</td><td>2011</td><td>2010</td></tr>"
+                      "<tr><td>Net sales (a)</td><td>(28)</td><td>(76)</td><td>(100)</td></tr></table>")
+    xbrl = reading("fy12", date(2013, 2, 28), 100e6, own=False)
+    older = reading("fy11", date(2012, 2, 29), -100e6, own=False)
+    [chosen] = choose([older, xbrl], {"fy12": printed_figures(note)})
+    assert chosen["source_accession"] == "fy12" and chosen["lines"][0]["value"] == -100e6
+    # Without a dispute the note never changes a sign.
+    agreed = reading("fy11", date(2012, 2, 29), 100e6, own=False)
+    [chosen] = choose([agreed, reading("fy12", date(2013, 2, 28), 100e6, own=False)], {"fy12": printed_figures(note)})
+    assert chosen["lines"][0]["value"] == 100e6
+
+
+def test_a_comparative_column_takes_its_periods_own_dates():
+    from statement_extractor.selection.period_dates import align_dates
+    own = reading("fy06", date(2006, 12, 1), 1, own=True)
+    own.period_end, own.period_start = date(2006, 9, 30), date(2005, 9, 25)
+    later = reading("fy07", date(2007, 11, 15), 1, own=False)
+    later.period_end, later.period_start = date(2006, 9, 29), date(2005, 9, 30)  # dated from the FY2007 header
+    far = reading("fy08", date(2008, 11, 5), 1, own=False)
+    far.period_end = date(2006, 12, 31)
+    aligned = {r.accession: r for r in align_dates([own, later, far])}
+    assert aligned["fy07"].period_end == date(2006, 9, 30) and aligned["fy07"].period_start == date(2005, 9, 25)
+    assert aligned["fy08"].period_end == date(2006, 12, 31)  # more than a week apart: another period, left alone
+
+
+def test_a_period_restated_on_a_new_basis_keeps_its_first_basis_on_record():
+    # TSMC 2012: reported on ROC GAAP in its FY2012 20-F, printed again on IFRS by the FY2013 one.
+    first = reading("fy2012", date(2013, 4, 2), 506_249e6, own=True)
+    first.basis = "ROC GAAP"
+    again = reading("fy2013", date(2014, 4, 14), 506_754e6, own=False)
+    again.basis = "IFRS"
+    [chosen] = choose([first, again])
+    assert chosen["basis"] == "IFRS" and chosen["source_accession"] == "fy2013"
+    assert [(item["basis"], item["source_accession"]) for item in chosen["other_bases"]] == [("ROC GAAP", "fy2012")]
+
+
+def test_a_label_printed_twice_takes_each_occurrences_own_sign():
+    # Salesforce FY2012 cash flows: the excess tax benefit is taken away under operating and added under financing.
+    from statement_extractor.selection.signs import _signs_from
+    def flows(source, operating, financing):
+        found = reading("crm", date(2014, 3, 5), 0, own=False, statement="cash_flow")
+        found.source = source
+        found.lines = [{"line": 0, "concept": "c", "label": "Excess tax benefits from employee stock plans", "level": 0,
+                        "is_heading": False, "value": operating},
+                       {"line": 1, "concept": "c", "label": "Excess tax benefits from employee stock plans", "level": 0,
+                        "is_heading": False, "value": financing}]
+        return found
+    settled = _signs_from(flows("xbrl", -6018, -6018), flows("html", -6018, 6018))
+    assert [line["value"] for line in settled.lines] == [-6018, 6018]
+
+
+def test_among_releases_the_annual_reports_basis_wins():
+    # ASML 2011 Q2: its US GAAP release, and a December 2012 6-K printing the quarter again on IFRS.
+    annual = reading("20-F", date(2012, 2, 14), 1, own=True)
+    annual.basis, annual.form = "US GAAP", "20-F"
+    first = reading("q2", date(2011, 7, 13), 827.1e6, own=True, period="Q2", duration="ytd")
+    first.basis, first.form = "US GAAP", "6-K"
+    again = reading("ifrs", date(2012, 12, 14), 826.9e6, own=False, period="Q2", duration="ytd")
+    again.basis, again.form = "IFRS", "6-K"
+    chosen = {item["fiscal_period"]: item for item in choose([annual, first, again])}
+    assert chosen["Q2"]["source_accession"] == "q2" and chosen["Q2"]["other_bases"][0]["basis"] == "IFRS"
+
+
+def test_a_per_share_figure_is_matched_to_its_printed_places_in_the_vote():
+    # Volaris's FY2020 20-F prints 2017 earnings per share of 0.275; its earlier 20-Fs' (0.588) and (0.644) are other
+    # amounts, not the same one in the other sign.
+    year = [reading("fy18", date(2018, 4, 30), -0.588, own=True), reading("fy19", date(2019, 4, 30), -0.644, own=False),
+            reading("fy20", date(2020, 6, 30), 0.275, own=False)]
+    [chosen] = choose(year)
+    assert chosen["source_accession"] == "fy20" and chosen["lines"][0]["value"] == 0.275
+
+
+def test_a_rejected_reading_never_states_the_reporting_currency():
+    # Volaris's 2014 20-F read from its dollar column, rejected; its peso quarters stand.
+    from statement_extractor.selection.choose import _reporting_currencies
+    bad = reading("fy14", date(2015, 4, 30), 1.0, own=True, result="fail")
+    bad.currency = "USD"
+    good = reading("fy15", date(2016, 4, 30), 2.0, own=True)
+    good.fiscal_year, good.currency = "2015", "MXN"
+    assert _reporting_currencies([bad, good])["2009"] == {"MXN"}
+
+
+def test_a_release_is_served_before_mexicos_coded_template_of_the_same_period():
+    # Televisa: its press release ("Net sales") and, days later, the coded template ("40010000 NET INCOME" for revenue).
+    release = reading("press", date(2013, 7, 9), 16_983.8e6, own=True)
+    coded = reading("coded", date(2013, 7, 12), 16_983_775e3, own=True)
+    coded.lines[0]["concept"] = "bmv_Revenue"
+    [chosen] = choose([release, coded])
+    assert chosen["source_accession"] == "press"
+    [alone] = choose([coded])
+    assert alone["source_accession"] == "coded"  # where nothing else prints the statement
+
+
+def test_a_six_ks_xbrl_wins_over_its_own_printed_pages_and_earlier_releases():
+    tagged = reading("interim", date(2025, 8, 26), 100, own=True, period="Q2", duration="ytd")
+    tagged.form = "6-K"
+    release = reading("release", date(2025, 8, 26), 100, own=True, period="Q2", duration="ytd")
+    release.form, release.source = "6-K", "html"
+    [chosen] = choose([tagged, release])
+    assert chosen["source_accession"] == "interim"
+
+
+def test_a_six_ks_xbrl_on_another_basis_than_the_years_annual_report_is_a_release():
+    # Petrobras's Q1 2011: its own 6-K tagged on US GAAP; the 2012 release restates it on IFRS, as its FY2011 20-F.
+    annual = reading("20-F", date(2012, 4, 30), 500, own=True)
+    annual.basis, annual.form, annual.fiscal_year = "IFRS", "20-F", "2011"
+    tagged = reading("own 6-K", date(2011, 6, 8), 100, own=True, period="Q1", duration="quarter")
+    tagged.form, tagged.basis, tagged.fiscal_year = "6-K", "US GAAP", "2011"
+    release = reading("2012 release", date(2012, 5, 17), 110, own=False, period="Q1", duration="quarter")
+    release.form, release.source, release.basis, release.fiscal_year = "6-K", "html", "IFRS", "2011"
+    quarter = next(item for item in choose([annual, tagged, release]) if item["fiscal_period"] == "Q1")
+    assert quarter["source_accession"] == "2012 release"
+
+
+def test_a_later_six_k_restating_a_tagged_period_wins():
+    # UBS's Q2 2017: its 6-K of July 2018 tagged in XBRL; its March 2019 6-K restates the quarter.
+    tagged = reading("tagged", date(2018, 7, 24), 100, own=True, period="Q2", duration="quarter")
+    tagged.form = "6-K"
+    restated = reading("restated", date(2019, 3, 18), 101, own=False, period="Q2", duration="quarter")
+    restated.form, restated.source = "6-K", "html"
+    older = reading("older", date(2018, 7, 20), 99, own=True, period="Q2", duration="quarter")
+    older.form, older.source = "6-K", "html"
+    [chosen] = choose([tagged, restated, older])
+    assert chosen["source_accession"] == "restated"
+    [chosen] = choose([tagged, older])
+    assert chosen["source_accession"] == "tagged"
+
+
+def test_a_later_release_never_passes_a_20f_or_a_tagged_6k_on_another_basis():
+    year = reading("20-F", date(2019, 4, 1), 100, own=True)
+    year.form, year.basis = "20-F", "IFRS"
+    tagged = reading("tagged", date(2018, 8, 20), 100, own=False)
+    tagged.form, tagged.basis = "6-K", "IFRS"
+    release = reading("release", date(2020, 2, 1), 99, own=False)
+    release.form, release.source, release.basis = "6-K", "html", "IFRS"
+    [chosen] = choose([year, tagged, release])
+    assert chosen["source_accession"] == "20-F"
+    # TSMC's H1 2021: tagged on IFRS in its 6-K; its later releases print Taiwan-IFRS.
+    interim = reading("ifrs", date(2021, 10, 18), 277, own=False, period="Q2", duration="ytd")
+    interim.form, interim.basis = "6-K", "IFRS"
+    taiwan = reading("tifrs", date(2022, 8, 12), 274, own=False, period="Q2", duration="ytd")
+    taiwan.form, taiwan.source, taiwan.basis = "6-K", "html", "Taiwan-IFRS"
+    [chosen] = choose([interim, taiwan])
+    assert chosen["source_accession"] == "ifrs"
+
+
+def test_a_parents_summary_or_a_20fs_year_is_never_replaced_by_a_later_release():
+    # Lloyds' Q2 2020 balance sheet: tagged in its own 6-K; the 2021 half-year prints the parent's summary of it.
+    tagged = reading("tagged", date(2020, 7, 31), 872_994e6, own=True, period="Q2", duration="quarter")
+    tagged.form, tagged.scope = "6-K", "consolidated"
+    summary = reading("summary", date(2021, 7, 29), 872_994e6, own=False, period="Q2", duration="quarter")
+    summary.form, summary.source, summary.scope = "6-K", "html", "parent"
+    [chosen] = choose([tagged, summary])
+    assert chosen["source_accession"] == "tagged"
+    # Alcon's FY2025 balance sheet: its 20-F, a later 6-K tagged with it as a comparative, and a later release.
+    year = reading("20-F", date(2026, 2, 24), 1, own=True)
+    year.form = "20-F"
+    comparative = reading("tagged", date(2026, 8, 10), 1, own=False)
+    comparative.form = "6-K"
+    release = reading("release", date(2026, 11, 10), 1, own=False)
+    release.form, release.source = "6-K", "html"
+    [chosen] = choose([year, comparative, release])
+    assert chosen["source_accession"] == "20-F"  # for a year the 20-F stays first

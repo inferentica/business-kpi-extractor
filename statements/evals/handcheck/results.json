@@ -1,0 +1,1525 @@
+{
+ "checked": "2026-11-09",
+ "run": "pilot run 39 (42571102828), fixes verified in run 42 (42578075042); XBRL era sampled from run 43 (42579228783), rows from run 44 (42580819043)",
+ "how": "each sampled served line read off the source filing's own printed row: HTML cells with lxml, text lines, PDFs by pdfplumber's text; rows found by label only",
+ "results": [
+  {
+   "id": "AAPL-html-01",
+   "verdict": "agrees",
+   "printed": -41
+  },
+  {
+   "id": "AAPL-html-02",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "AAPL-html-03",
+   "verdict": "agrees",
+   "printed": 26
+  },
+  {
+   "id": "AAPL-html-04",
+   "verdict": "agrees",
+   "printed": 8279
+  },
+  {
+   "id": "AAPL-html-05",
+   "verdict": "wrong, fixed",
+   "printed": 345613,
+   "served_before": 345613.0,
+   "why": "share count under 'Shares used in computing earnings (loss) per share (in thousands):' served as 345,613, unscaled"
+  },
+  {
+   "id": "AAPL-html-06",
+   "verdict": "agrees",
+   "printed": 17
+  },
+  {
+   "id": "AAPL-html-07",
+   "verdict": "agrees",
+   "printed": 6992
+  },
+  {
+   "id": "AAPL-html-08",
+   "verdict": "agrees",
+   "printed": 1409
+  },
+  {
+   "id": "AAPL-html-09",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "AAPL-html-10",
+   "verdict": "agrees",
+   "printed": 27
+  },
+  {
+   "id": "AAPL-html-11",
+   "verdict": "agrees",
+   "printed": -1523
+  },
+  {
+   "id": "AAPL-html-12",
+   "verdict": "agrees",
+   "printed": 6392
+  },
+  {
+   "id": "AAPL-html-13",
+   "verdict": "agrees",
+   "printed": -282
+  },
+  {
+   "id": "AAPL-html-14",
+   "verdict": "agrees",
+   "printed": 6392
+  },
+  {
+   "id": "AAPL-html-15",
+   "verdict": "agrees",
+   "printed": 178
+  },
+  {
+   "id": "AAPL-text-01",
+   "verdict": "agrees",
+   "printed": 0.12
+  },
+  {
+   "id": "AAPL-text-02",
+   "verdict": "agrees",
+   "printed": 602,
+   "note": "statement in thousands; the filing's MD&A prints 602 million"
+  },
+  {
+   "id": "AAPL-text-03",
+   "verdict": "agrees",
+   "printed": -51
+  },
+  {
+   "id": "AAPL-text-04",
+   "verdict": "agrees",
+   "printed": 332
+  },
+  {
+   "id": "AAPL-text-05",
+   "verdict": "agrees",
+   "printed": 207
+  },
+  {
+   "id": "AAPL-text-06",
+   "verdict": "agrees",
+   "printed": 1633
+  },
+  {
+   "id": "AAPL-text-07",
+   "verdict": "agrees",
+   "printed": 420
+  },
+  {
+   "id": "AAPL-text-08",
+   "verdict": "agrees",
+   "printed": -801
+  },
+  {
+   "id": "AAPL-text-10",
+   "verdict": "agrees",
+   "printed": 5224
+  },
+  {
+   "id": "AAPL-text-11",
+   "verdict": "agrees",
+   "printed": 49
+  },
+  {
+   "id": "AAPL-text-12",
+   "verdict": "agrees",
+   "printed": -233
+  },
+  {
+   "id": "AAPL-text-13",
+   "verdict": "agrees",
+   "printed": 226
+  },
+  {
+   "id": "AAPL-text-14",
+   "verdict": "agrees",
+   "printed": 762
+  },
+  {
+   "id": "AAPL-text-15",
+   "verdict": "agrees",
+   "printed": -32
+  },
+  {
+   "id": "KO-html-01",
+   "verdict": "agrees",
+   "printed": 2177
+  },
+  {
+   "id": "KO-html-02",
+   "verdict": "agrees",
+   "printed": 2350
+  },
+  {
+   "id": "KO-html-03",
+   "verdict": "agrees",
+   "printed": -14
+  },
+  {
+   "id": "KO-html-04",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "KO-html-05",
+   "verdict": "agrees",
+   "printed": 1579
+  },
+  {
+   "id": "KO-html-06",
+   "verdict": "agrees",
+   "printed": 1538
+  },
+  {
+   "id": "KO-html-07",
+   "verdict": "agrees",
+   "printed": 57
+  },
+  {
+   "id": "KO-html-08",
+   "verdict": "agrees",
+   "printed": 314
+  },
+  {
+   "id": "KO-html-09",
+   "verdict": "agrees",
+   "printed": 5017
+  },
+  {
+   "id": "KO-html-10",
+   "verdict": "agrees",
+   "printed": 1307
+  },
+  {
+   "id": "KO-html-11",
+   "verdict": "agrees",
+   "printed": -32
+  },
+  {
+   "id": "KO-html-12",
+   "verdict": "agrees",
+   "printed": -651
+  },
+  {
+   "id": "KO-html-13",
+   "verdict": "agrees",
+   "printed": 56
+  },
+  {
+   "id": "KO-html-14",
+   "verdict": "agrees",
+   "printed": 3
+  },
+  {
+   "id": "KO-html-15",
+   "verdict": "agrees",
+   "printed": 138
+  },
+  {
+   "id": "KO-text-01",
+   "verdict": "agrees",
+   "printed": 2762
+  },
+  {
+   "id": "KO-text-02",
+   "verdict": "agrees",
+   "printed": 12
+  },
+  {
+   "id": "KO-text-03",
+   "verdict": "agrees",
+   "printed": 1842
+  },
+  {
+   "id": "KO-text-04",
+   "verdict": "agrees",
+   "printed": 0.68
+  },
+  {
+   "id": "KO-text-05",
+   "verdict": "agrees",
+   "printed": 0.35
+  },
+  {
+   "id": "KO-text-06",
+   "verdict": "agrees",
+   "printed": 742
+  },
+  {
+   "id": "KO-text-07",
+   "verdict": "agrees",
+   "printed": 495
+  },
+  {
+   "id": "KO-text-08",
+   "verdict": "agrees",
+   "printed": 1940
+  },
+  {
+   "id": "KO-text-09",
+   "verdict": "agrees",
+   "printed": 2979
+  },
+  {
+   "id": "KO-text-10",
+   "verdict": "agrees",
+   "printed": 260
+  },
+  {
+   "id": "KO-text-11",
+   "verdict": "agrees",
+   "printed": -21
+  },
+  {
+   "id": "KO-text-12",
+   "verdict": "agrees",
+   "printed": -957
+  },
+  {
+   "id": "KO-text-13",
+   "verdict": "agrees",
+   "printed": -16
+  },
+  {
+   "id": "KO-text-14",
+   "verdict": "agrees",
+   "printed": 1878
+  },
+  {
+   "id": "KO-text-15",
+   "verdict": "agrees",
+   "printed": -30
+  },
+  {
+   "id": "JPM-html-01",
+   "verdict": "agrees",
+   "printed": 993
+  },
+  {
+   "id": "JPM-html-02",
+   "verdict": "agrees",
+   "printed": 1612
+  },
+  {
+   "id": "JPM-html-03",
+   "verdict": "agrees",
+   "printed": 4320
+  },
+  {
+   "id": "JPM-html-04",
+   "verdict": "agrees",
+   "printed": 17500
+  },
+  {
+   "id": "JPM-html-05",
+   "verdict": "agrees",
+   "printed": 2546
+  },
+  {
+   "id": "JPM-html-06",
+   "verdict": "agrees",
+   "printed": 33082
+  },
+  {
+   "id": "JPM-html-07",
+   "verdict": "agrees",
+   "printed": 221971
+  },
+  {
+   "id": "JPM-html-08",
+   "verdict": "agrees",
+   "printed": 23663
+  },
+  {
+   "id": "JPM-html-09",
+   "verdict": "agrees",
+   "printed": -7056
+  },
+  {
+   "id": "JPM-html-10",
+   "verdict": "agrees",
+   "printed": 746983
+  },
+  {
+   "id": "JPM-html-11",
+   "verdict": "agrees",
+   "printed": 65
+  },
+  {
+   "id": "JPM-html-12",
+   "verdict": "agrees",
+   "printed": -20143
+  },
+  {
+   "id": "JPM-html-13",
+   "verdict": "agrees",
+   "printed": 676
+  },
+  {
+   "id": "JPM-html-14",
+   "verdict": "agrees",
+   "printed": 32170
+  },
+  {
+   "id": "JPM-html-15",
+   "verdict": "agrees",
+   "printed": -72
+  },
+  {
+   "id": "JPM-text-01",
+   "verdict": "agrees",
+   "printed": 88
+  },
+  {
+   "id": "JPM-text-02",
+   "verdict": "agrees",
+   "printed": 218
+  },
+  {
+   "id": "JPM-text-03",
+   "verdict": "agrees",
+   "printed": 207
+  },
+  {
+   "id": "JPM-text-04",
+   "verdict": "agrees",
+   "printed": 450
+  },
+  {
+   "id": "JPM-text-05",
+   "verdict": "agrees",
+   "printed": 1388
+  },
+  {
+   "id": "JPM-text-06",
+   "verdict": "agrees",
+   "printed": 81885,
+   "note": "first of two 'Interest-Bearing' deposit lines (domestic)"
+  },
+  {
+   "id": "JPM-text-07",
+   "verdict": "agrees",
+   "printed": 12797
+  },
+  {
+   "id": "JPM-text-08",
+   "verdict": "agrees",
+   "printed": 10846
+  },
+  {
+   "id": "JPM-text-09",
+   "verdict": "agrees",
+   "printed": 330690
+  },
+  {
+   "id": "JPM-text-10",
+   "verdict": "agrees",
+   "printed": 28368
+  },
+  {
+   "id": "JPM-text-11",
+   "verdict": "agrees",
+   "printed": 185
+  },
+  {
+   "id": "JPM-text-12",
+   "verdict": "agrees",
+   "printed": -200,
+   "note": "third of three 'Other, Net' lines in the cash flows"
+  },
+  {
+   "id": "JPM-text-13",
+   "verdict": "agrees",
+   "printed": 3853
+  },
+  {
+   "id": "JPM-text-14",
+   "verdict": "agrees",
+   "printed": 10433
+  },
+  {
+   "id": "JPM-text-15",
+   "verdict": "agrees",
+   "printed": 2834
+  },
+  {
+   "id": "PRU-html-01",
+   "verdict": "agrees",
+   "printed": 3153
+  },
+  {
+   "id": "PRU-html-02",
+   "verdict": "agrees",
+   "printed": 2218
+  },
+  {
+   "id": "PRU-html-03",
+   "verdict": "agrees",
+   "printed": 14630
+  },
+  {
+   "id": "PRU-html-04",
+   "verdict": "agrees",
+   "printed": 27364
+  },
+  {
+   "id": "PRU-html-05",
+   "verdict": "agrees",
+   "printed": -65
+  },
+  {
+   "id": "PRU-html-06",
+   "verdict": "agrees",
+   "printed": 2112
+  },
+  {
+   "id": "PRU-html-07",
+   "verdict": "agrees",
+   "printed": 3353
+  },
+  {
+   "id": "PRU-html-08",
+   "verdict": "agrees",
+   "printed": 6216
+  },
+  {
+   "id": "PRU-html-09",
+   "verdict": "agrees",
+   "printed": 154540
+  },
+  {
+   "id": "PRU-html-10",
+   "verdict": "agrees",
+   "printed": 3170
+  },
+  {
+   "id": "PRU-html-11",
+   "verdict": "agrees",
+   "printed": 9905
+  },
+  {
+   "id": "PRU-html-12",
+   "verdict": "agrees",
+   "printed": 4348
+  },
+  {
+   "id": "PRU-html-13",
+   "verdict": "agrees",
+   "printed": 33316
+  },
+  {
+   "id": "PRU-html-14",
+   "verdict": "agrees",
+   "printed": -115
+  },
+  {
+   "id": "PRU-html-15",
+   "verdict": "agrees",
+   "printed": -342
+  },
+  {
+   "id": "ASML-archive-01",
+   "verdict": "agrees",
+   "printed": 83627
+  },
+  {
+   "id": "ASML-archive-02",
+   "verdict": "agrees",
+   "printed": 144651
+  },
+  {
+   "id": "ASML-archive-03",
+   "verdict": "agrees",
+   "printed": 944609
+  },
+  {
+   "id": "ASML-archive-04",
+   "verdict": "agrees",
+   "printed": 1092241
+  },
+  {
+   "id": "ASML-archive-05",
+   "verdict": "agrees",
+   "printed": 2889
+  },
+  {
+   "id": "ASML-archive-06",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "ASML-html-01",
+   "verdict": "agrees",
+   "printed": 3768.2
+  },
+  {
+   "id": "ASML-html-02",
+   "verdict": "agrees",
+   "printed": 31013
+  },
+  {
+   "id": "ASML-html-03",
+   "verdict": "agrees",
+   "printed": -3201645
+  },
+  {
+   "id": "ASML-html-04",
+   "verdict": "agrees",
+   "printed": 95.8
+  },
+  {
+   "id": "ASML-html-05",
+   "verdict": "agrees",
+   "printed": 2516.8
+  },
+  {
+   "id": "ASML-html-06",
+   "verdict": "agrees",
+   "printed": 178706
+  },
+  {
+   "id": "ASML-html-07",
+   "verdict": "agrees",
+   "printed": 59991
+  },
+  {
+   "id": "ASML-html-08",
+   "verdict": "agrees",
+   "printed": 4704.0
+  },
+  {
+   "id": "ASML-html-09",
+   "verdict": "agrees",
+   "printed": 1,
+   "note": "value right; the served label joins two printed lines in the wrong order (Priority Shares)"
+  },
+  {
+   "id": "ASML-html-10",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "ASML-html-11",
+   "verdict": "agrees",
+   "printed": -438746
+  },
+  {
+   "id": "ASML-html-12",
+   "verdict": "agrees",
+   "printed": -76342
+  },
+  {
+   "id": "ASML-html-13",
+   "verdict": "agrees",
+   "printed": -241918
+  },
+  {
+   "id": "ASML-html-14",
+   "verdict": "agrees",
+   "printed": 251267
+  },
+  {
+   "id": "ASML-release-01",
+   "verdict": "wrong, fixed",
+   "printed": 431.4,
+   "served_before": 431.4,
+   "why": "share count in millions served as 431.4"
+  },
+  {
+   "id": "ASML-release-02",
+   "verdict": "agrees",
+   "printed": 0.17
+  },
+  {
+   "id": "ASML-release-03",
+   "verdict": "wrong, fixed",
+   "printed": 416.8,
+   "served_before": 416.8,
+   "why": "share count in millions served as 416.8"
+  },
+  {
+   "id": "ASML-release-04",
+   "verdict": "agrees",
+   "printed": -15.4
+  },
+  {
+   "id": "ASML-release-05",
+   "verdict": "agrees",
+   "printed": 56368
+  },
+  {
+   "id": "ASML-release-06",
+   "verdict": "agrees",
+   "printed": 1273.0
+  },
+  {
+   "id": "ASML-release-07",
+   "verdict": "agrees",
+   "printed": 3612.0
+  },
+  {
+   "id": "ASML-release-08",
+   "verdict": "agrees",
+   "printed": 2742.1
+  },
+  {
+   "id": "ASML-release-09",
+   "verdict": "agrees",
+   "printed": 1000.0
+  },
+  {
+   "id": "ASML-release-10",
+   "verdict": "agrees",
+   "printed": 7324.1
+  },
+  {
+   "id": "ASML-release-11",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "ASML-release-12",
+   "verdict": "agrees",
+   "printed": 259.5
+  },
+  {
+   "id": "ASML-release-13",
+   "verdict": "agrees",
+   "printed": 270275
+  },
+  {
+   "id": "ASML-release-14",
+   "verdict": "agrees",
+   "printed": 44.4
+  },
+  {
+   "id": "ASML-release-15",
+   "verdict": "agrees",
+   "printed": -133.1
+  },
+  {
+   "id": "TSM-archive-01",
+   "verdict": "agrees",
+   "printed": 10026
+  },
+  {
+   "id": "TSM-archive-02",
+   "verdict": "agrees",
+   "printed": -20124
+  },
+  {
+   "id": "TSM-archive-03",
+   "verdict": "agrees",
+   "printed": 2.47
+  },
+  {
+   "id": "TSM-archive-04",
+   "verdict": "agrees",
+   "printed": 22345
+  },
+  {
+   "id": "TSM-archive-05",
+   "verdict": "wrong, fixed",
+   "printed": 9990850,
+   "served_before": 9990850.0,
+   "why": "Shares Outstanding ('K) served as 9,990,850, unscaled"
+  },
+  {
+   "id": "TSM-archive-06",
+   "verdict": "agrees",
+   "printed": 11311
+  },
+  {
+   "id": "TSM-archive-07",
+   "verdict": "agrees",
+   "printed": 9544
+  },
+  {
+   "id": "TSM-archive-08",
+   "verdict": "agrees",
+   "printed": 27055.5
+  },
+  {
+   "id": "TSM-archive-09",
+   "verdict": "agrees",
+   "printed": 152570.5
+  },
+  {
+   "id": "TSM-archive-10",
+   "verdict": "agrees",
+   "printed": 1256
+  },
+  {
+   "id": "TSM-archive-11",
+   "verdict": "agrees",
+   "printed": -1179.3
+  },
+  {
+   "id": "TSM-archive-12",
+   "verdict": "agrees",
+   "printed": 21855.5
+  },
+  {
+   "id": "TSM-archive-13",
+   "verdict": "agrees",
+   "printed": -568
+  },
+  {
+   "id": "TSM-archive-14",
+   "verdict": "agrees",
+   "printed": 48198
+  },
+  {
+   "id": "TSM-html-01",
+   "verdict": "agrees",
+   "printed": 89217.8
+  },
+  {
+   "id": "TSM-html-02",
+   "verdict": "agrees",
+   "printed": 17633.0
+  },
+  {
+   "id": "TSM-html-03",
+   "verdict": "agrees",
+   "printed": 61294.7
+  },
+  {
+   "id": "TSM-html-04",
+   "verdict": "agrees",
+   "printed": 0,
+   "note": "second of two same-labelled lines (non-operating expenses)"
+  },
+  {
+   "id": "TSM-html-05",
+   "verdict": "agrees",
+   "printed": 73738.3
+  },
+  {
+   "id": "TSM-html-06",
+   "verdict": "agrees",
+   "printed": 3825.7,
+   "note": "IFRS transition balance (January 1, 2012 column)"
+  },
+  {
+   "id": "TSM-html-07",
+   "verdict": "agrees",
+   "printed": 16452.2
+  },
+  {
+   "id": "TSM-html-08",
+   "verdict": "agrees",
+   "printed": 13149.0
+  },
+  {
+   "id": "TSM-html-09",
+   "verdict": "agrees",
+   "printed": 6.2
+  },
+  {
+   "id": "TSM-html-10",
+   "verdict": "agrees",
+   "printed": -2094.1
+  },
+  {
+   "id": "TSM-html-11",
+   "verdict": "agrees",
+   "printed": -36.8
+  },
+  {
+   "id": "TSM-html-12",
+   "verdict": "agrees",
+   "printed": -3.0
+  },
+  {
+   "id": "TSM-html-13",
+   "verdict": "agrees",
+   "printed": 20.8
+  },
+  {
+   "id": "TSM-release-01",
+   "verdict": "agrees",
+   "printed": 95020306
+  },
+  {
+   "id": "TSM-release-02",
+   "verdict": "agrees",
+   "printed": 87764445
+  },
+  {
+   "id": "TSM-release-03",
+   "verdict": "agrees",
+   "printed": 260347882
+  },
+  {
+   "id": "TSM-release-04",
+   "verdict": "agrees",
+   "printed": 78940570
+  },
+  {
+   "id": "TSM-release-05",
+   "verdict": "agrees",
+   "printed": 353769
+  },
+  {
+   "id": "TSM-release-06",
+   "verdict": "agrees",
+   "printed": 56339981
+  },
+  {
+   "id": "TSM-release-07",
+   "verdict": "agrees",
+   "printed": 315550
+  },
+  {
+   "id": "TSM-release-08",
+   "verdict": "agrees",
+   "printed": -5657954
+  },
+  {
+   "id": "TSM-release-09",
+   "verdict": "agrees",
+   "printed": 56305751
+  },
+  {
+   "id": "TSM-release-10",
+   "verdict": "agrees",
+   "printed": 136744351
+  },
+  {
+   "id": "TSM-release-11",
+   "verdict": "agrees",
+   "printed": 28940908
+  },
+  {
+   "id": "TSM-release-12",
+   "verdict": "agrees",
+   "printed": -242024
+  },
+  {
+   "id": "TSM-release-13",
+   "verdict": "agrees",
+   "printed": -47164
+  },
+  {
+   "id": "TSM-release-14",
+   "verdict": "agrees",
+   "printed": 73286
+  },
+  {
+   "id": "TSM-release-15",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "AAPL-xbrl-01",
+   "verdict": "agrees",
+   "printed": 6.7
+  },
+  {
+   "id": "AAPL-xbrl-02",
+   "verdict": "agrees",
+   "printed": 6051711
+  },
+  {
+   "id": "AAPL-xbrl-03",
+   "verdict": "agrees",
+   "printed": 508
+  },
+  {
+   "id": "AAPL-xbrl-04",
+   "verdict": "agrees",
+   "printed": 38144
+  },
+  {
+   "id": "AAPL-xbrl-05",
+   "verdict": "agrees",
+   "printed": 4.29
+  },
+  {
+   "id": "AAPL-xbrl-06",
+   "verdict": "agrees",
+   "printed": 58313
+  },
+  {
+   "id": "AAPL-xbrl-07",
+   "verdict": "agrees",
+   "printed": 43270
+  },
+  {
+   "id": "AAPL-xbrl-08",
+   "verdict": "agrees",
+   "printed": 33312
+  },
+  {
+   "id": "AAPL-xbrl-09",
+   "verdict": "agrees",
+   "printed": 38510
+  },
+  {
+   "id": "AAPL-xbrl-10",
+   "verdict": "agrees",
+   "printed": 36533
+  },
+  {
+   "id": "AAPL-xbrl-11",
+   "verdict": "agrees",
+   "printed": 231839
+  },
+  {
+   "id": "AAPL-xbrl-12",
+   "verdict": "agrees",
+   "printed": 27491
+  },
+  {
+   "id": "AAPL-xbrl-13",
+   "verdict": "agrees",
+   "printed": -9473
+  },
+  {
+   "id": "AAPL-xbrl-14",
+   "verdict": "agrees",
+   "printed": -69
+  },
+  {
+   "id": "AAPL-xbrl-15",
+   "verdict": "agrees",
+   "printed": -32851
+  },
+  {
+   "id": "AAPL-xbrl-16",
+   "verdict": "agrees",
+   "printed": -6011
+  },
+  {
+   "id": "AAPL-xbrl-17",
+   "verdict": "agrees",
+   "printed": -963
+  },
+  {
+   "id": "KO-xbrl-01",
+   "verdict": "agrees",
+   "printed": 1.13
+  },
+  {
+   "id": "KO-xbrl-02",
+   "verdict": "agrees",
+   "printed": 13812
+  },
+  {
+   "id": "KO-xbrl-03",
+   "verdict": "agrees",
+   "printed": 0.79
+  },
+  {
+   "id": "KO-xbrl-04",
+   "verdict": "agrees",
+   "printed": 5
+  },
+  {
+   "id": "KO-xbrl-05",
+   "verdict": "agrees",
+   "printed": 7351
+  },
+  {
+   "id": "KO-xbrl-06",
+   "verdict": "agrees",
+   "printed": 12340
+  },
+  {
+   "id": "KO-xbrl-07",
+   "verdict": "agrees",
+   "printed": 23808
+  },
+  {
+   "id": "KO-xbrl-08",
+   "verdict": "agrees",
+   "printed": 98456
+  },
+  {
+   "id": "KO-xbrl-09",
+   "verdict": "agrees",
+   "printed": 3194
+  },
+  {
+   "id": "KO-xbrl-10",
+   "verdict": "agrees",
+   "printed": 450
+  },
+  {
+   "id": "KO-xbrl-11",
+   "verdict": "agrees",
+   "printed": 128
+  },
+  {
+   "id": "KO-xbrl-12",
+   "verdict": "agrees",
+   "printed": 3741
+  },
+  {
+   "id": "KO-xbrl-13",
+   "verdict": "agrees",
+   "printed": 9508
+  },
+  {
+   "id": "KO-xbrl-14",
+   "verdict": "agrees",
+   "printed": 1148
+  },
+  {
+   "id": "KO-xbrl-15",
+   "verdict": "agrees",
+   "printed": 3468
+  },
+  {
+   "id": "KO-xbrl-16",
+   "verdict": "agrees",
+   "printed": 234
+  },
+  {
+   "id": "KO-xbrl-17",
+   "verdict": "agrees",
+   "printed": 247,
+   "note": "value right; KO's XBRL label is longer than the printed 'Significant (gains) losses \u2014 net'"
+  },
+  {
+   "id": "JPM-xbrl-01",
+   "verdict": "agrees",
+   "printed": 4225
+  },
+  {
+   "id": "JPM-xbrl-02",
+   "verdict": "agrees",
+   "printed": 12942
+  },
+  {
+   "id": "JPM-xbrl-03",
+   "verdict": "agrees",
+   "printed": 2256
+  },
+  {
+   "id": "JPM-xbrl-04",
+   "verdict": "agrees",
+   "printed": 5178
+  },
+  {
+   "id": "JPM-xbrl-05",
+   "verdict": "agrees",
+   "printed": 1209
+  },
+  {
+   "id": "JPM-xbrl-06",
+   "verdict": "agrees",
+   "printed": 5120
+  },
+  {
+   "id": "JPM-xbrl-07",
+   "verdict": "agrees",
+   "printed": 181163
+  },
+  {
+   "id": "JPM-xbrl-08",
+   "verdict": "agrees",
+   "printed": 115028
+  },
+  {
+   "id": "JPM-xbrl-09",
+   "verdict": "agrees",
+   "printed": 54533
+  },
+  {
+   "id": "JPM-xbrl-10",
+   "verdict": "agrees",
+   "printed": 10750
+  },
+  {
+   "id": "JPM-xbrl-11",
+   "verdict": "agrees",
+   "printed": 241927
+  },
+  {
+   "id": "JPM-xbrl-12",
+   "verdict": "agrees",
+   "printed": 3868240
+  },
+  {
+   "id": "JPM-xbrl-13",
+   "verdict": "agrees",
+   "printed": -9850
+  },
+  {
+   "id": "JPM-xbrl-14",
+   "verdict": "agrees",
+   "printed": -23190
+  },
+  {
+   "id": "JPM-xbrl-15",
+   "verdict": "agrees",
+   "printed": -2763
+  },
+  {
+   "id": "JPM-xbrl-16",
+   "verdict": "agrees",
+   "printed": 1315
+  },
+  {
+   "id": "JPM-xbrl-17",
+   "verdict": "agrees",
+   "printed": -1800
+  },
+  {
+   "id": "PRU-xbrl-01",
+   "verdict": "agrees",
+   "printed": 1058
+  },
+  {
+   "id": "PRU-xbrl-02",
+   "verdict": "agrees",
+   "printed": 11
+  },
+  {
+   "id": "PRU-xbrl-03",
+   "verdict": "agrees",
+   "printed": 5
+  },
+  {
+   "id": "PRU-xbrl-04",
+   "verdict": "agrees",
+   "printed": 5892
+  },
+  {
+   "id": "PRU-xbrl-05",
+   "verdict": "agrees",
+   "printed": 566
+  },
+  {
+   "id": "PRU-xbrl-06",
+   "verdict": "agrees",
+   "printed": 7000
+  },
+  {
+   "id": "PRU-xbrl-07",
+   "verdict": "agrees",
+   "printed": 1233,
+   "note": "value right; the served label is PRU's XBRL label, which still says 'at March 31, 2019' where the Q3 10-Q prints September 30"
+  },
+  {
+   "id": "PRU-xbrl-08",
+   "verdict": "agrees",
+   "printed": 3193
+  },
+  {
+   "id": "PRU-xbrl-09",
+   "verdict": "agrees",
+   "printed": 21580
+  },
+  {
+   "id": "PRU-xbrl-10",
+   "verdict": "agrees",
+   "printed": 829677
+  },
+  {
+   "id": "PRU-xbrl-11",
+   "verdict": "agrees",
+   "printed": 15873
+  },
+  {
+   "id": "PRU-xbrl-12",
+   "verdict": "agrees",
+   "printed": 29326
+  },
+  {
+   "id": "PRU-xbrl-13",
+   "verdict": "agrees",
+   "printed": -9346
+  },
+  {
+   "id": "PRU-xbrl-14",
+   "verdict": "agrees",
+   "printed": 744
+  },
+  {
+   "id": "PRU-xbrl-15",
+   "verdict": "agrees",
+   "printed": 22234
+  },
+  {
+   "id": "PRU-xbrl-16",
+   "verdict": "agrees",
+   "printed": 3111
+  },
+  {
+   "id": "PRU-xbrl-17",
+   "verdict": "agrees",
+   "printed": 551
+  },
+  {
+   "id": "ASML-xbrl-01",
+   "verdict": "agrees",
+   "printed": 19.89
+  },
+  {
+   "id": "ASML-xbrl-02",
+   "verdict": "agrees",
+   "printed": -311741
+  },
+  {
+   "id": "ASML-xbrl-03",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "ASML-xbrl-04",
+   "verdict": "agrees",
+   "printed": 209.8
+  },
+  {
+   "id": "ASML-xbrl-05",
+   "verdict": "agrees",
+   "printed": 6.08
+  },
+  {
+   "id": "ASML-xbrl-06",
+   "verdict": "agrees",
+   "printed": 5883177,
+   "note": "statement row in the filing's remuneration table, 5,883,177 thousand (US GAAP)"
+  },
+  {
+   "id": "ASML-xbrl-07",
+   "verdict": "agrees",
+   "printed": 8557.4
+  },
+  {
+   "id": "ASML-xbrl-08",
+   "verdict": "agrees",
+   "printed": 5323.8
+  },
+  {
+   "id": "ASML-xbrl-09",
+   "verdict": "agrees",
+   "printed": 2955.6
+  },
+  {
+   "id": "ASML-xbrl-10",
+   "verdict": "agrees",
+   "printed": 301.9
+  },
+  {
+   "id": "ASML-xbrl-11",
+   "verdict": "agrees",
+   "printed": 2379,
+   "note": "value right; the served label keeps a footnote mark ('Deferred tax liabilities 1')"
+  },
+  {
+   "id": "ASML-xbrl-12",
+   "verdict": "agrees",
+   "printed": 1940.7
+  },
+  {
+   "id": "ASML-xbrl-13",
+   "verdict": "agrees",
+   "printed": -546.0
+  },
+  {
+   "id": "ASML-xbrl-14",
+   "verdict": "agrees",
+   "printed": -516.2
+  },
+  {
+   "id": "ASML-xbrl-15",
+   "verdict": "agrees",
+   "printed": 471.0
+  },
+  {
+   "id": "ASML-xbrl-16",
+   "verdict": "agrees",
+   "printed": -515.7
+  },
+  {
+   "id": "ASML-xbrl-17",
+   "verdict": "agrees",
+   "printed": 80555
+  },
+  {
+   "id": "TSM-xbrl-01",
+   "verdict": "agrees",
+   "printed": -3330.3
+  },
+  {
+   "id": "TSM-xbrl-02",
+   "verdict": "agrees",
+   "printed": 71207.7
+  },
+  {
+   "id": "TSM-xbrl-03",
+   "verdict": "agrees",
+   "printed": 17161.0
+  },
+  {
+   "id": "TSM-xbrl-04",
+   "verdict": "agrees",
+   "printed": -83.0
+  },
+  {
+   "id": "TSM-xbrl-05",
+   "verdict": "agrees",
+   "printed": 50845.6
+  },
+  {
+   "id": "TSM-xbrl-06",
+   "verdict": "agrees",
+   "printed": 32.85
+  },
+  {
+   "id": "TSM-xbrl-07",
+   "verdict": "agrees",
+   "printed": 27158.8
+  },
+  {
+   "id": "TSM-xbrl-08",
+   "verdict": "agrees",
+   "printed": 127396.6
+  },
+  {
+   "id": "TSM-xbrl-09",
+   "verdict": "agrees",
+   "printed": 26282.5
+  },
+  {
+   "id": "TSM-xbrl-10",
+   "verdict": "agrees",
+   "printed": 25768.1
+  },
+  {
+   "id": "TSM-xbrl-11",
+   "verdict": "agrees",
+   "printed": 8271.4
+  },
+  {
+   "id": "TSM-xbrl-12",
+   "verdict": "agrees",
+   "printed": 63766.8
+  },
+  {
+   "id": "TSM-xbrl-13",
+   "verdict": "agrees",
+   "printed": -155582.3
+  },
+  {
+   "id": "TSM-xbrl-14",
+   "verdict": "agrees",
+   "printed": -1532.2
+  },
+  {
+   "id": "TSM-xbrl-15",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "TSM-xbrl-16",
+   "verdict": "agrees",
+   "printed": 44.6
+  },
+  {
+   "id": "TSM-xbrl-17",
+   "verdict": "agrees",
+   "printed": 983.3
+  },
+  {
+   "id": "PLTR-xbrl-01",
+   "verdict": "agrees",
+   "printed": 377163
+  },
+  {
+   "id": "PLTR-xbrl-02",
+   "verdict": "agrees",
+   "printed": 135043
+  },
+  {
+   "id": "PLTR-xbrl-03",
+   "verdict": "agrees",
+   "printed": -3640
+  },
+  {
+   "id": "PLTR-xbrl-04",
+   "verdict": "agrees",
+   "printed": -110455
+  },
+  {
+   "id": "PLTR-xbrl-05",
+   "verdict": "agrees",
+   "printed": 1181092
+  },
+  {
+   "id": "PLTR-xbrl-06",
+   "verdict": "agrees",
+   "printed": 110726
+  },
+  {
+   "id": "PLTR-xbrl-07",
+   "verdict": "agrees",
+   "printed": 2364746
+  },
+  {
+   "id": "PLTR-xbrl-08",
+   "verdict": "agrees",
+   "printed": 10398181
+  },
+  {
+   "id": "PLTR-xbrl-09",
+   "verdict": "agrees",
+   "printed": 164697
+  },
+  {
+   "id": "PLTR-xbrl-10",
+   "verdict": "agrees",
+   "printed": 77111
+  },
+  {
+   "id": "PLTR-xbrl-11",
+   "verdict": "agrees",
+   "printed": 242998
+  },
+  {
+   "id": "PLTR-xbrl-12",
+   "verdict": "agrees",
+   "printed": 667626
+  },
+  {
+   "id": "PLTR-xbrl-13",
+   "verdict": "agrees",
+   "printed": 2063358
+  },
+  {
+   "id": "PLTR-xbrl-14",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "PLTR-xbrl-15",
+   "verdict": "agrees",
+   "printed": 539665
+  },
+  {
+   "id": "PLTR-xbrl-16",
+   "verdict": "agrees",
+   "printed": 0
+  },
+  {
+   "id": "PLTR-xbrl-17",
+   "verdict": "agrees",
+   "printed": 0
+  }
+ ]
+}

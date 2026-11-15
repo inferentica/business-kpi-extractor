@@ -1,0 +1,224 @@
+"""Printed statement tables as both formats yield them, HTML and plain text: each row's label, its indentation and
+its figures by column position, and each column's header text. A figure lines up with the header above it however the
+filer laid out "$", the number and its closing bracket.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+
+from ...domain.basis import currencies_named, is_currency_word
+
+# A figure may drop its leading zero: Coca-Cola's 1994 "$ .59" a share.
+_NUMBER = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*(\d{1,3}(?:,\d{3})+|\d+|(?=\.\d))(\.\d+)?\s*\)?$")
+
+
+_DASH = re.compile(r"^[—–\-−]+$")
+
+
+NOTE_MARK = re.compile(r"\s*(\(\d{1,2}\)|\([a-z]\)|\*+)$")
+
+
+@dataclass
+class Cell:
+    start: int
+    span: int
+    text: str
+
+    @property
+    def end(self) -> int:
+        return self.start + self.span
+
+
+@dataclass
+class Row:
+    label: str
+    level: int  # the physical column the label starts in
+    figures: dict[int, float] = field(default_factory=dict)  # physical column -> figure as printed
+    cells: list[Cell] = field(default_factory=list)
+    printed: list[float] = field(default_factory=list)  # a text line's figures in printed order, before columns
+    code: str = ""  # a CVM account code printed before the label ("3.01"), kept beside it
+
+    @property
+    def is_heading(self) -> bool:
+        return not self.figures
+
+
+@dataclass
+class Table:
+    rows: list[Row]
+    header: list[list[Cell]]  # rows above the first row with figures
+    context: str  # the text before the table (its title, scale)
+    index: int  # the table's place in the document
+    header_text: str = ""  # a text table's header lines as printed, before their words are given to columns
+    dollars: bool = False  # a text table's lines print "$" before figures (the parser keeps figures, not the sign)
+    release_of: str = ""  # the issuer whose release opening (dateline, name, NYSE ticker) last came before the table
+    audited_of: str = ""  # the company the auditors' report last before the table names (readers/html/audited.py)
+
+
+# An account code before a label in Brazil's CVM forms: "3.09 Profit before taxation", "1.01.01 Cash and cash equivalents".
+ACCOUNT_CODE = re.compile(r"^\d{1,2}(?:\.\d{2})+\s+(?=[A-Za-z(])")
+
+
+def clean(text: str) -> str:
+    return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
+
+
+def number(text: str) -> float | None:
+    """A printed figure: 1,234 | (1,234) | -1,234 | — (nothing, read as zero). "($000)" is a scale, not a figure
+    (Ross's cash flow statements print it beside their year row)."""
+    if re.fullmatch(r"\(\s*\$\s*000'?s?\s*\)|\$\s*000'?s?|\d{1,2}\.\d{1,2}\.(\d{2}|\d{4})", text.strip()):
+        return None  # a scale, or a date written day first (UBS's "31.12.14")
+    text = text.replace("$", "").strip()
+    text = re.sub(r"^(\(?)\s*Ps\.?\s*(?=[\d.(\-−–])", r"\1", text)  # a peso sign in the figure's cell: FEMSA's "Ps. 35,497"
+    if _DASH.match(text):
+        return 0.0
+    match = _NUMBER.match(text)
+    if not match:
+        return None
+    value = float((match.group(1) + (match.group(2) or "")).replace(",", ""))
+    negative = text.startswith("(") or re.match(r"^\(?\s*[-−–]", text) is not None
+    return -value if negative else value
+
+
+YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
+# A quarter's name over a column: América Móvil's "3Q10 | 3Q09".
+QUARTER_CELL = re.compile(r"^\s*(?:[1-4]Q|Q[1-4])\s*['’]?\s*(?:19|20)?\d{2}\s*$", re.I)
+
+
+# Words a header row prints over each column rather than a period: TSMC's management reports print "USD | NTD | % |
+# NTD | % | … | Amount | %" under their dates.
+_COLUMN_WORD = re.compile(r"^(.{0,12}%.{0,12}|amounts?|change|chg|move|yoy|qoq|notes?|sales|\(?(un)?audited\)?)$", re.I)
+PERCENT_WORD = re.compile(r"%")  # "%", "% of Sales", "Inc(Dec)%"
+
+
+def is_column_word(text: str) -> bool:
+    return bool(_COLUMN_WORD.match(text.strip())) or is_currency_word(text) and text.strip() != "$"
+
+
+def is_subheader(cells: list[Cell]) -> bool:
+    """A row naming what each column holds (currencies, amounts, percentages), after a label cell at most."""
+    words = [cell for cell in cells if cell.text and cell.start > 0]
+    return len(words) > 1 and all(is_column_word(cell.text) for cell in words) and \
+        any(currencies_named(cell.text) or PERCENT_WORD.search(cell.text) for cell in words)
+
+
+COLUMN_TITLE = re.compile(r"\b(19|20)\d{2}\b|\b(months|weeks|year|years|quarter)\s+ended\b|\bended\b|\bhalf[-\s]year\b|"
+                           r"\b\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|"  # Lloyds TSB's "30 June"
+                           r"^(\s*(first|second|third|fourth)\s+quarter|\s*(one|two|three|four|six|nine|twelve)\s+months?)\b|"  # Delta's "Two Months | One Month"
+                           r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|"
+                           r"\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b|"  # PepsiCo's "3/21/09"
+                           r"\b\d{1,2}\.\d{1,2}\.(\d{2}|\d{4})\b|"  # UBS's "31.12.14", day first
+                           r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*-\d{2}\b", re.I)  # TSMC's "Sep-99"
+
+
+def is_header_figures(row: Row) -> bool:
+    """A row whose only figures are years printed bare ("2007 | 2006 | 2005", no comma), or note marks (Embraer's "(1) |
+    (1) | (1)" over its column headings, "A S S E T S (2) (1)", read as -1s until round 90): a header, not figures. Rows
+    after a table's first figures are its lines whatever they print (parse.py)."""
+    texts = {cell.start: cell.text for cell in row.cells}
+    marks = all(re.fullmatch(r"\(\d{1,2}\)", texts.get(column, "").strip()) for column in row.figures)
+    return bool(row.figures) and (marks or all(YEAR_ONLY.match(texts.get(column, "").strip("()$ ")) for column in row.figures))
+
+
+def header_text(table: Table, column: int) -> str:
+    """Everything printed above a figure's column, top to bottom: in each header row, the cell covering it, else the
+    nearest cell within two columns (a year printed over the "$" beside its figure)."""
+    parts = []
+    for cells in table.header:
+        # The row's label cell, unless it holds a bare year (Brookfield's year row starts with "2023" at the left edge).
+        label = cells[0] if cells and cells[0].start == 0 and len(cells) > 1 and not YEAR_ONLY.match(cells[0].text) else None
+        covering = [cell for cell in cells if cell.start <= column < cell.end and cell is not label]
+        if not covering:
+            # Not the row's label cell; on a tie, the cell to the left (over the "$" before the figure). TSMC prints
+            # "2002" one column left of its figures and "2003" from one column left of its two: the figure between
+            # them is 2002's.
+            near = [(min(abs(cell.start - column), abs(cell.end - 1 - column)), cell.end - 1 >= column, cell)
+                    for cell in cells if cell.text and cell is not label]
+            near = [item for item in near if item[0] <= 2]
+            covering = [min(near, key=lambda item: item[:2])[2]] if near else []
+        parts.extend(cell.text for cell in covering)
+    return " ".join(parts)
+
+
+def figure_columns(table: Table) -> list[tuple[int, ...]]:
+    """The table's figure columns, left to right, each as the physical columns its figures sit in: figures printed one
+    cell apart (after a "$" cell on some rows, not on others) under one header cell, or side by side, are one column."""
+    counts: dict[int, int] = {}
+    for row in table.rows:
+        for column in row.figures:
+            counts[column] = counts.get(column, 0) + 1
+    if not counts:
+        return []
+    most = max(counts.values())
+    positions = sorted(column for column, count in counts.items() if count >= 2 or most < 3)
+    # A "Notes" column's references go before grouping: a currency row spanning it and the next column ("NT$" over
+    # both in TSMC's FY2001 20-F) would merge them.
+    notes = {position for position in positions for cells in table.header for cell in cells
+             if cell.start <= position < cell.end and re.fullmatch(r"notes?", cell.text.strip(), re.I)}
+    positions = [position for position in positions if position not in notes]
+    # A row naming each column's currency sits lowest and splits a year's two columns, its own and a translation
+    # (TSMC's "2003" over "NT$ | US$"); else the lowest row with years or spans.
+    # Only the lowest row that heads the figures, though: KEPCO's "Won | U.S. dollars" sits above its years and spans
+    # three of them, which it must not merge.
+    lowest = next((cells for cells in reversed(table.header) if [cell for cell in cells if cell.start > 0]), None)
+    money = [cell for cell in lowest or [] if cell.start > 0]
+    bottom = (lowest if money and (all(currencies_named(cell.text) for cell in money) or is_subheader(lowest))
+              else None) or next((cells for cells in reversed(table.header) if any(
+                  YEAR_ONLY.match(cell.text) or COLUMN_TITLE.search(cell.text) or QUARTER_CELL.match(cell.text)
+                  for cell in cells[1:] or cells)), [])
+
+    def under(position: int):
+        return next(((cell.start, cell.end) for cell in bottom if cell.start <= position < cell.end and cell.text), None)
+
+    groups: list[list[int]] = []
+    for position in positions:
+        if groups:
+            last = groups[-1][-1]
+            # A header cell naming two years spans two columns (TIM's "June 2023 June 2022" over both).
+            same_header = under(position) is not None and under(position) == under(last) and \
+                len(re.findall(r"\b(?:19|20)\d{2}\b", next(cell.text for cell in bottom if (cell.start, cell.end) == under(position)))) < 2
+            if same_header or (position - last == 1 and under(position) is None):
+                groups[-1].append(position)
+                continue
+        groups.append([position])
+    # A "Notes" column holds note references, not figures (TSMC: "Cash and cash equivalents | 6 | 242,695.6").
+    # Its header is the cell right over it; the rows above and below may reach it from the columns beside it.
+    # A percentage column beside each amount (TSMC's "% of net sales") is no figure column either.
+    groups = [group for group in groups if not any(cell.start <= group[0] < cell.end and (re.fullmatch(r"notes?", cell.text.strip(), re.I)
+                                                                                          or PERCENT_WORD.search(cell.text))
+                                                   for cells in table.header for cell in cells)]
+    if len(groups) > 2 and _notes_named(table) and all(
+            # note numbers: "4", "13.2" (and a dash where a line has none)
+            round(value * 10) == value * 10 and 0 <= value < 100 for row in table.rows for position, value in row.figures.items()
+            if position in groups[0]):
+        groups = groups[1:]  # Copel: "Note" heads a row above, not the header; its first column holds note numbers
+    if not groups:
+        return []
+    # A group carrying few figures beside a full one is a stray cell (a footnote figure), not a column.
+    sizes = [sum(counts.get(position, 0) for position in group) for group in groups]
+    keep = max(sizes) * 0.3
+    return [tuple(group) for group, size in zip(groups, sizes) if size >= keep]
+
+
+def _notes_named(table: Table) -> bool:
+    """Whether a "Note" column heading is printed in the table's rows above its first figures: Copel's 2009-10 ITRs
+    head it "N." over "no."."""
+    for row in table.rows:
+        if row.figures:
+            return False
+        if re.search(r"\bnotes?\b", row.label, re.I) or re.search(r"\bN[.º°](?:\s|$)", row.label):
+            return True
+    return False
+
+
+# A heading after a statement's lines that opens other figures in the same table: FEMSA's 2010 releases run on into
+# "EBITDA & CAPEX" and "FINANCIAL RATIOS" (liquidity 1.53 read as 1,530,000 until round 92).
+_AFTER_STATEMENT = re.compile(r"^(ebitda\b.*|financial\s+ratios|key\s+ratios)$", re.I)
+
+
+def statement_rows(rows: list[Row]) -> list[Row]:
+    """A table's rows up to a heading of other figures after the statement's own."""
+    end = next((index for index, row in enumerate(rows) if not row.figures and _AFTER_STATEMENT.match(row.label.strip())
+                and any(earlier.figures for earlier in rows[:index])), len(rows))
+    return rows[:end]

@@ -1,0 +1,139 @@
+"""The scales a printed statement's figures are in: its money ("in millions"), and its share counts, which a filer
+can print in another scale ("in millions, except share amounts which are reflected in thousands") or name per line
+("Basic weighted average shares outstanding (thousands)")."""
+from __future__ import annotations
+
+import re
+
+from ...domain.basis import currencies_named
+from .tables import Table
+
+_UNIT = r"(thousands?|millions?|billions?)"  # TSMC's 2003 quarterly reports: "In Thousand New Taiwan Dollars"
+_SCALES = {"thousands": 1e3, "millions": 1e6, "billions": 1e9, "thousand": 1e3, "million": 1e6, "billion": 1e9}
+_MONEY = re.compile(r"\b(?:in|amounts in|dollars in|expressed in|figures(?:\s+in)?)\s+(?:[A-Z]{2,3}\$?\s+|US\$\s*|NT\$\s*|€\s*|euros?\s+)?"
+                    + _UNIT + r"\b", re.I)
+# A currency sign before the unit: Scotiabank's "($ millions)", "US$ millions", Lloyds's "£ million" and "£m".
+_DOLLAR_UNIT = re.compile(r"(?:(?:US|C|CDN|NT|HK)?\$|£|€|¥)\s*" + _UNIT + r"\b|"
+                          # Lloyds TSB's text releases: "GBPm" over each column; UBS since 2023: "USD m" over the labels
+                          r"(?<![\w.])(?:£|GBP|USD|EUR|US\$|CHF)\s?m\b|"
+                          # UBS's "CHF million", "USD million": a currency code before the unit
+                          r"\b(?:CHF|USD|EUR|GBP|JPY|CNY|RMB|KRW|BRL|CAD|AUD|HKD|TWD|NTD|INR|MXN|SEK|NOK|DKK)\s+" + _UNIT + r"\b|"
+                          # James Hardie's "(Millions of US dollars)"
+                          r"\b" + _UNIT + r"\s+of\s+(?:[A-Z.]+\s+|new\s+taiwan\s+|hong\s+kong\s+)?(?:dollars|euros?|pounds|yen|won|reais|francs|yuan|renminbi|pesos|rupees|soles|MxP)\b|"  # Televisa's "(Millions of Mexican Pesos)"
+                          r"\(\s*" + _UNIT + r"\s*(?:,\s*except\b[^)]*)?\)", re.I)  # Brookfield's "(MILLIONS)"
+# Thousands written as zeros: Ross's "($000, except stores and per share data, unaudited)", Icahn's "(In $000s, except
+# unit amounts)" and "(In 000s ...)", "($000's)", "(000 omitted)"; Copel's releases "R$'000" over their labels.
+_ZEROS = re.compile(r"\(\s*(?:in\s+)?\$?\s*000(?:'?s)?(?:\s+omitted)?\s*[,)]|\bin\s+\$?\s*000'?s\b|\bR\$\s*['’]\s*000\b", re.I)
+# Words that put a scale on share counts rather than money.
+_SHARES_IN = re.compile(r"\bshares?(?:\s+(?:amounts?|data|counts?|outstanding))?(?:\s*,)?(?:\s+which\s+are)?"
+                        r"(?:\s+(?:reflected|stated|presented|expressed))?\s+(?:are\s+)?in\s+" + _UNIT + r"\b|"
+                        r"\b" + _UNIT + r"\s+of\s+shares\b", re.I)
+# "except share and per share amounts", "except share data", "except number of shares": share counts in units.
+_SHARES_EXCEPTED = re.compile(r"\bexcept\b[^)]*?\b(?<!per )(share|shares)\b(?!\s+(?:amounts?\s+)?which)", re.I)
+_LINE_UNIT = re.compile(r"\(\s*(?:in\s+)?" + _UNIT + r"(?:\s+of\s+shares)?\s*\)|\bin\s+" + _UNIT + r"\s*\)?\s*:?$", re.I)
+
+
+# Figures in whole currency units, the currency named and no unit: "(In US dollars)", "(Expressed in Canadian dollars)".
+_UNITS_STATED = re.compile(r"\(\s*(?:in|expressed\s+in)\s+(?:U\.?\s?S\.?|US|Canadian|CDN|Cdn\.?)?\s*dollars\s*\)", re.I)
+# James Hardie's releases: "Millions of" over each of "US Dollars | Australian Dollars", the currency row above the dates.
+_UNIT_CELL = re.compile(r"^" + _UNIT + r"(?:\s+of)?(?:,?\s+except\b.*)?$", re.I)
+
+
+TRANSLATED = re.compile(r"\btranslat(?:ion|ed)\s+(?:in)?to\s+", re.I)  # "Translation into U.S. dollars"
+
+
+def scale_text(group: list[Table]) -> str:
+    first = group[0]
+    leading = []
+    for row in first.rows:
+        if row.figures:
+            break
+        leading.append(row.label)  # "(In millions except par value)" printed as a row above the figures
+    return first.context[-400:] + " " + " ".join(" ".join(cell.text for cell in cells) for cells in first.header) + " " + \
+        " ".join(leading)
+
+
+# Money and share counts in one scale: Laureate's "(Dollar and share amounts in thousands, except per share data)".
+_BOTH = re.compile(r"\bdollars?\s+and\s+share\s+amounts\s+(?:are\s+)?in\s+" + _UNIT + r"\b", re.I)
+_CURRENCY_WORDS = re.compile(r"\b(won|yen|euros?|pounds|reais|francs|yuan|renminbi|rmb|nt\$|u\.?s\.?\s*dollars|pesos|"
+                             r"new\s+taiwan\s+dollars)\b", re.I)
+
+
+def _scale(match: re.Match) -> float:
+    unit = next((unit for unit in match.groups() if unit), None)
+    return _SCALES[unit.lower()] if unit else 1e6  # "£m"
+
+
+def _parenthesis(text: str, start: int) -> str:
+    """The words from `start` to the parenthesis that closes them."""
+    end = text.find(")", start)
+    return text[start:end if end != -1 else start + 60]
+
+
+def statement_scale(group: list[Table]) -> float | None:
+    """The money scale, when the statement states one; a scale stated for its share counts is not one. A statement
+    with a convenience translation states one scale for each currency (KEPCO: "(In millions...)" over its won columns,
+    "(In thousands...)" over the U.S. dollar ones): the first, over the reporting currency's columns, is the money
+    scale; the translated columns are never read."""
+    raw = scale_text(group)
+    both = [_SCALES[match.group(1).lower()] for match in _BOTH.finditer(raw)]
+    text = _SHARES_IN.sub(" ", raw)
+    matches = sorted((match for pattern in (_MONEY, _DOLLAR_UNIT) for match in pattern.finditer(text)),
+                     key=lambda match: match.start())
+    found = {_scale(match) for match in matches} | set(both)
+    # A header cell that is the unit alone: Brookfield's 2001-03 releases print "MILLIONS" (or "MILLIONS, EXCEPT PER
+    # SHARE AMOUNTS") over their labels.
+    found |= {_SCALES[unit.group(1).lower()] for cells in group[0].header for cell in cells
+              if (unit := _UNIT_CELL.match(cell.text.strip()))}
+    # …or set on a row of its own above the first figures, each cell the unit alone (James Hardie's "Millions of").
+    for row in group[0].rows:
+        if row.figures:
+            break
+        units = [_UNIT_CELL.match(cell.text.strip()) for cell in row.cells if cell.text.strip()]
+        if units and all(units):
+            found |= {_SCALES[unit.group(1).lower()] for unit in units}
+    if _ZEROS.search(text):
+        found.add(1e3)
+    if _UNITS_STATED.search(text):
+        found.add(1.0)  # Gildan's 2003-05 statements: "(In US dollars)", every figure printed in full
+    if len(found) == 2 and matches and len({word.lower() for word in _CURRENCY_WORDS.findall(raw)}) >= 2:
+        # Not the translation's, stated after its own heading: KB's 2010 20-F prints "Translation into U.S. dollars
+        # (Note 1) (In thousands)" before "(In millions of Korean won)" (its balance sheets read a thousandth until round 94).
+        # The one that names a currency other than the translation's: KB's 2010 20-F prints "Translation into U.S. dollars
+        # (Note 1) (In thousands)" before "(In millions of Korean won)" (its balance sheets read a thousandth until round
+        # 94); SK Telecom's "Korean won | Translation into U.S. dollars | (In millions) | (In thousands)" names none.
+        translated = {code for heading in TRANSLATED.finditer(text) for code in currencies_named(text[heading.end():heading.end() + 40])[:1]}
+        own = [match for match in matches if set(currencies_named(_parenthesis(text, match.start()))) - translated]
+        return _scale((own or matches)[0])
+    return found.pop() if len(found) == 1 else None
+
+
+def share_scale(group: list[Table], money: float) -> float:
+    """The scale of the statement's share counts: the one stated for them, else none when the money scale excepts
+    them, else the money scale (Coca-Cola's "in millions except per share data" prints shares in millions)."""
+    text = scale_text(group)
+    stated = _SHARES_IN.search(text)
+    if stated:
+        return _SCALES[next(group for group in stated.groups() if group).lower()]
+    if _SHARES_EXCEPTED.search(text):
+        return 1.0
+    return money
+
+
+def line_scale(*texts: str) -> float | None:
+    """A scale printed in a share line's own label or heading: "(thousands)", "(in millions)"."""
+    for text in texts:
+        short = re.search(r"\(\s*'?\s*(M|K|000)\s*\)", text or "")  # TSMC's "Weighted Average Outstanding Shares ('M)",
+        if short:                                                       # its 1999-2000 releases' "Shares Outstanding ('K)"
+            return 1e6 if short.group(1) == "M" else 1e3
+        if re.search(r"\(\s*(in\s+)?units?\s*\)", text or "", re.I):  # Copel's CVM "NUMBER OF SHARES, EXCEPT TREASURY (Units)"
+            return 1.0
+        match = _LINE_UNIT.search(text or "")
+        if match:
+            return _SCALES[next(group for group in match.groups() if group).lower()]
+    return None
+
+
+def states_two(group) -> bool:
+    """Whether the statement names two scales (then it is ambiguous, not unstated)."""
+    return bool(re.search(r"\b(thousands?|millions?|billions?)\b", scale_text(group), re.I))

@@ -1,0 +1,6 @@
+{
+  "since": "2009-01-01",
+  "note": "Phase 1 parity: the 28 companies whose statements KPI runs store, plus week-based calendars (COST, PEP, KR) and a smaller filer whose XBRL starts in 2011 (SYBT).",
+  "symbols": ["AAPL", "ADBE", "AMD", "AMZN", "ANET", "APO", "ASML", "AVGO", "BAM", "CRM", "GEV", "GOOGL", "GS", "INTC", "JPM", "KKR",
+              "KO", "MA", "META", "MS", "MSFT", "NVDA", "PLTR", "SPCX", "TSM", "U", "UNH", "V", "COST", "PEP", "KR", "SYBT"]
+}

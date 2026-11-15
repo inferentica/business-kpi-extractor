@@ -1,0 +1,269 @@
+"""HTML tables as printed statements: each row's cells laid out on the table's physical columns (a cell spanning three
+columns covers three), so a figure lines up with the header above it. A label's indentation is how far right its cell
+starts. Filings before XBRL (about 2001-2008) print their statements this way.
+"""
+from __future__ import annotations
+
+import re
+
+import lxml.html
+
+from ...domain.basis import currencies_named, is_currency_word
+from .audited import audit_reports, audited_names
+from .cells import _cells, _spanned, dotted_thousands
+from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_column_word,
+                              is_header_figures, is_subheader, number)
+
+
+def _row(cells: list[Cell]) -> Row | None:
+    """A row's label (the text before its first figure) and figures. A closing bracket in a cell of its own makes the
+    figure before it negative; "$" and "%" cells are not figures."""
+    label_parts, figures, level = [], {}, None
+    last_figure = None
+    for cell in cells:
+        text = cell.text
+        if not text:
+            continue
+        if text in (")", ")%") and last_figure is not None:
+            figures[last_figure] = -abs(figures[last_figure])
+            continue
+        # A currency sign in a cell of its own, KEPCO's won sign printed "W" included: no part of the label.
+        if text in ("$", "%", "€", "NT$", "US$", "£", "¥", "₩", "R$") or text == "W" and label_parts \
+                or text.endswith("%") and number(text.rstrip("%")) is not None:
+            continue
+        value = number(text.rstrip(")")) if text.endswith(")") and not text.startswith("(") else number(text)
+        if value is not None and not label_parts and re.fullmatch(r"\d{1,2}", text):
+            continue  # a note reference, not a figure
+        if value is not None and not label_parts and not figures and cell.start > 0:
+            figures[cell.start] = value  # an unlabelled subtotal (PepsiCo's net property, plant and equipment)
+            last_figure = cell.start
+            continue
+        if value is not None and (figures or label_parts):
+            if text.endswith(")") and not text.startswith("("):
+                value = -abs(value)
+            figures[cell.start] = value
+            last_figure = cell.start
+            continue
+        if text.startswith("(") and not text.endswith(")") and number(text + ")") is not None and (figures or label_parts):
+            figures[cell.start] = -abs(number(text + ")"))  # "(1,234" with its bracket in the next cell
+            last_figure = cell.start
+            continue
+        if figures:
+            continue  # text after the figures (a footnote mark)
+        if re.fullmatch(r"\d{1,2}(\s*,\s*\d{1,2})*", text):
+            continue  # a note reference before or after the label (ASML's and TSMC's "Notes" columns)
+        if level is None:
+            level = cell.start
+        label_parts.append(text)
+    # Rules run on after a label are no part of it: Alcon's 2002 "Total liabilities and shareholders' equity ===== =====".
+    label = NOTE_MARK.sub("", re.sub(r"(\s+[=_\-]{3,})+$", "", " ".join(label_parts))).strip()
+    code = ACCOUNT_CODE.match(label)
+    account = code.group(0).strip() if code else ""
+    if code:  # a CVM account code: its depth is the line's level ("3.10" over "3.10.01")
+        label, level = label[code.end():], (level or 0) + 20 * code.group(0).count(".")
+    label = re.sub(r"\s+\d{1,2}(\s*,\s*\d{1,2})+$|\s+\d{1,2},$", "", label)  # "NET SALES 2, 26" in one cell
+    # KEPCO's "Profit for the period ￦" before its figure, Televisa's "Net income Ps."
+    # KEPCO's 2005-08 20-Fs: "Total assets (Won)", the won marking the first and last lines' figures.
+    # Only before figures: a caption keeps its currency (CSN's 2011 releases, "In Thousand of R$").
+    if figures:
+        label = re.sub(r"\s+(?:￦|₩|R\$|US\$|NT\$|Ch\$|Ps\.?|\$|£|€|¥|\((?:Won|W|₩|￦)\))$", "", label)
+    if not label and not figures:
+        return None
+    return Row(label=label, level=level if level is not None else 0, figures=figures, cells=cells, code=account)
+
+
+def _currency_row(cells: list[Cell]) -> bool:
+    """A row naming each column's currency, after a caption at most: TSMC's "NT$ | NT$ | US$", ASML's "Notes | (in
+    thousands, except per share data) | EUR | EUR | EUR | US$"."""
+    named = [cell for cell in cells if cell.text]
+    money = [cell for cell in named if is_currency_word(cell.text)]
+    if not money or not all(cell.start < money[0].start for cell in named if cell not in money):
+        return False
+    # One currency alone names a translation column over its figures (TSMC's 2002 cash flows: "U.S.$ (Note 4)").
+    return len(money) > 1 or money[0].start > 0 and bool(currencies_named(money[0].text))
+
+
+_OPEN_ENDED = re.compile(r"\b(at|of|for|and|in|to|from|on|by|with|the|net\s+of|before|after)\s*$", re.I)
+
+
+def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
+    """A table's rows, its header rows (those above the first figures) and whether it has figures."""
+    rows, header, seen_figures = [], [], False
+    for cells in lines:
+        if not seen_figures and (_currency_row(cells) or is_subheader(cells)):
+            header.append([cell for cell in cells if cell.text])
+            continue
+        row = _row(cells)
+        if row is None:
+            continue
+        if row.figures and not is_header_figures(row):
+            seen_figures = True
+            previous = rows[-1] if rows else None
+            if previous is not None and not previous.figures and previous.label and row.label[:1].islower() \
+                    and not previous.label.rstrip().endswith(":") and row.level >= previous.level:
+                # A label wrapped onto the row below, which holds the figures (Scotiabank's 2003 40-F: "Subordinated"
+                # / "debentures   26   26   45").
+                rows[-1] = Row(label=f"{previous.label} {row.label}", level=previous.level, figures=row.figures,
+                               cells=row.cells)
+                continue
+            rows.append(row)
+        elif not seen_figures:
+            texts = " ".join(cell.text for cell in cells)
+            quarters = [cell.text for cell in cells if cell.text.strip()][1 if cells and cells[0].text.strip() else 0:]
+            quarters = [NOTE_MARK.sub("", text) for text in quarters]  # Copel's "1Q09 (1) | 4Q08 (2) | 1Q08 (3) | Var.% (1/2)"
+            if COLUMN_TITLE.search(texts) or sum(bool(QUARTER_CELL.match(text)) for text in quarters) >= 2 and all(
+                    QUARTER_CELL.match(text) or is_column_word(text) for text in quarters):
+                header.append([cell for cell in cells if cell.text])
+            elif row.label:
+                rows.append(Row(label=row.label, level=row.level, cells=cells))
+        elif rows and rows[-1].figures and row.label[:1].islower() and _OPEN_ENDED.search(rows[-1].label):
+            # A label run on below its figures (Scotiabank's May 2003 6-K: "Cash and cash equivalents at  255" /
+            # "end of period").
+            rows[-1] = Row(label=f"{rows[-1].label} {row.label}", level=rows[-1].level, figures=rows[-1].figures,
+                           cells=rows[-1].cells)
+        else:
+            rows.append(row)
+    return rows, header, seen_figures
+
+
+def _side_by_side(lines: list[list[Cell]]) -> int | None:
+    """Where a second statement starts beside the first: a column where most figure rows print a label after figures
+    and more figures after it."""
+    starts: dict[int, int] = {}
+    figured = 0
+    for cells in lines:
+        texts = [cell for cell in cells if cell.text]
+        kinds = [(cell.start, number(cell.text) is not None or cell.text in ("$", ")", "-", "—")) for cell in texts]
+        if not any(is_figure for _start, is_figure in kinds):
+            continue
+        figured += 1
+        for position, (start, is_figure) in enumerate(kinds):
+            # Two figure cells on each side at least: a note number before a label is no statement beside it (ASML).
+            if not is_figure and start > 0 and sum(f for _s, f in kinds[:position]) >= 2 and \
+                    sum(f for _s, f in kinds[position + 1:]) >= 2:
+                starts[start] = starts.get(start, 0) + 1
+                break
+    if not starts or figured < 6:
+        return None
+    middle, count = max(starts.items(), key=lambda item: item[1])
+    return middle if count >= max(5, figured * 0.3) else None
+
+
+# A release opens with its dateline, issuer and tickers: "Mexico City April 29, 2015, Coca-Cola FEMSA, S.A.B. de C.V.
+# (BMV: KOFL, NYSE: KOF)", in FEMSA's 6-Ks after FEMSA's own release. Its issuer's name is kept for the pipeline
+# (pipeline/printed.py) to tell another issuer's release from the company's own under an old ticker (Brookfield's
+# "BAM", Embraer's "ERJ"). A name in passing ("The Coca-Cola Company (NYSE: KO)") has no dateline before it.
+_OPENING = re.compile(r"\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?"
+                      r"\s+(?:19|20)\d{2}\b\)?[\s,:—–-]*(?P<name>(?:(?!\b(?:19|20)\d{2}\b)[^()]){3,120}?)\s*(?:\([^()]*\)\s*)?"
+                      r"\([^()]*\bNYSE\s*:\s*[A-Z][A-Z.]{0,6}\b", re.I | re.S)
+# A sentence, not a name: "FEMSA announced that subsidiaries of FEMSA have signed …". A name's lower-case words are
+# its connectors ("Coca-Cola FEMSA, S.A.B. de C.V.").
+_PROSE = re.compile(r"\b(?!(?:de|del|la|las|los|y|e|and|of|the|du|des|et)\b)[a-z]{3,}\b")
+_HIDDEN = re.compile(r"visibility\s*:\s*hidden|display\s*:\s*none", re.I)
+
+
+def _openings(root) -> list[tuple[int, str]]:
+    """Each release opening's place in document order (root.iter()'s) and its issuer's name: every piece of text is
+    read, a table cell's too (Coca-Cola FEMSA's release in FEMSA's 6-K)."""
+    found, window = [], []
+    for order, piece in _texts(root):
+        if piece and piece.strip():
+            window = (window + [clean(piece)])[-8:]
+            announced = [match.group("name").strip(" ,:—–-") for match in _OPENING.finditer(" ".join(window))]
+            announced = [name for name in announced if not _PROSE.search(name)]
+            if announced:
+                found.append((order, announced[-1]))
+                window = []
+    return found
+
+
+def _texts(root):
+    """Each piece of text in reading order, with its place in root.iter()'s order: an element's text, its children's,
+    then its tail. Taking a tail before the children read "(BMV: KOF UBL, NYSE: KOF)" ahead of the "Mexico City, July
+    22, 2020, Coca-Cola FEMSA, S.A.B. de C.V." it follows (FEMSA's 6-K of July 2020)."""
+    index = {element: order for order, element in enumerate(root.iter())}
+    stack, last = [(root, False)], 0
+    while stack:
+        element, closing = stack.pop()
+        if closing:
+            yield last, element.tail
+            continue
+        last = index[element]
+        stack.append((element, True))
+        if isinstance(element.tag, str):
+            yield last, element.text
+        stack.extend((child, False) for child in reversed(element))
+
+
+def _walk(root):
+    """Every element in document order (as root.iter() gives them), each with whether a table holds it: one pass
+    carrying the answer down, where asking each element's ancestors walked them again for every element (Vale's
+    releases spent most of their reading there)."""
+    stack = [(root, False)]
+    while stack:
+        element, in_table = stack.pop()
+        yield element, in_table
+        below = in_table or element.tag == "table"
+        stack.extend((child, below) for child in reversed(element))
+
+
+def parse_html(html: str | bytes) -> list[Table]:
+    """Every table of a document with rows, its header rows and the text before it."""
+    raw = html.encode("utf-8") if isinstance(html, str) else html
+    # A block break separates words: PepsiCo's title cell holds "Condensed Consolidated Balance Sheet" and "PepsiCo,
+    # Inc." in two divs, which would otherwise read as "Balance SheetPepsiCo".
+    raw = re.sub(rb"(?i)(</(?:div|p|li|h[1-6])>|<br\s*/?>)", rb"\1 ", raw)
+    # A footnote mark in superscript is not part of the figure or year beside it (Intel's "2008<sup>1</sup>"); a
+    # superscript before "/" is a fraction's numerator (PepsiCo's "1<sup>2</sup>/3¢" par value) and stays.
+    raw = re.sub(rb"(?is)<sup[^>]*>\s*(?:<[^>]+>\s*)*(?:[\w*]|\xe2\x80[\xa0\xa1]){1,2}\s*(?:</[^>]+>\s*)*</sup>(?!\s*(?:<[^>]+>\s*)*[/\xe2\x81\x84])",
+                 b"", raw)
+    # The same mark set as a raised run of type (Lloyds' 2025 releases: a <font> styled vertical-align: super holding
+    # "1"; Coca-Cola's 10-Qs: a small <span> moved up by position: relative), which would otherwise run into the label
+    # as "Other income1".
+    raw = re.sub(rb"(?is)<(font|span)\b[^>]*(?:vertical-align:\s*super|position:\s*relative;\s*top:\s*-\d)[^>]*>\s*[\w*]{1,2}\s*(?:<font[^>]*>\s*</font>\s*)?</\1>"
+                 rb"(?!\s*(?:<[^>]+>\s*)*[/\xe2\x81\x84])", b"", raw)
+    tree = lxml.html.fromstring(raw)
+    found, places = [], []
+    previous_text: list[str] = []
+    openings, audits = _openings(tree), audit_reports(_texts(tree))
+    order = {element: index for index, element in enumerate(tree.iter())} if openings or audits else {}
+    for element, in_table in _walk(tree):
+        if not isinstance(element.tag, str):
+            continue
+        if element.tag == "table":
+            if in_table:
+                continue
+            # A row styled invisible sizes the columns and is never seen (Brookfield's 2011 annual report: a hidden first
+            # row of "00000000" atop each statement, which read as figures and left the years below as a line).
+            lines = dotted_thousands(_spanned(tr for tr in element.iter("tr") if not _HIDDEN.search(tr.get("style") or "")))
+            rows, header, seen_figures = _rows(lines)
+            middle = _side_by_side(lines)
+            if middle is not None:
+                # Assets on the left and liabilities on the right of each row (TSMC's consolidated half-year balance
+                # sheets): the right half is read after the left, on the left's columns.
+                rows, header, seen_figures = _rows([[cell for cell in cells if cell.start < middle] for cells in lines])
+                right, _header, _seen = _rows([[Cell(cell.start - middle, cell.span, cell.text) for cell in cells
+                                                if cell.start >= middle] for cells in lines])
+                rows += right[next((index for index, row in enumerate(right) if row.figures), len(right)):]
+            context = " ".join(previous_text)[-600:]
+            release_of = next((name for place, name in reversed(openings) if place <= order.get(element, -1)), "")
+            found.append(Table(rows=rows, header=header, context=context, index=len(found), release_of=release_of))
+            places.append((order.get(element, -1), bool(seen_figures)))
+            if seen_figures:
+                previous_text = []
+            else:
+                # A table without figures is the page's layout: its words lead into the next table (Morgan Stanley
+                # titles each statement in a one-row table beside its logo).
+                words = [clean(" ".join(cell.text for cell in _cells(tr))) for tr in element.iter("tr")]
+                previous_text = (previous_text + [word for word in words if word])[-40:]
+        elif element.tag in ("p", "div", "font", "b", "i", "em", "strong", "u", "small", "a", "center", "h1", "h2", "h3",
+                             "h4", "span", "td") and not in_table:
+            if element.text and element.text.strip():
+                previous_text.append(clean(element.text))
+            for child in element:
+                if child.tail and child.tail.strip():
+                    previous_text.append(clean(child.tail))
+            previous_text = previous_text[-40:]
+    for table, name in zip(found, audited_names(audits, places) if audits else []):
+        table.audited_of = name
+    return found

@@ -1,0 +1,91 @@
+"""The company a printed statement's title names: "GOLD TOE MORETZ HOLDINGS CORP. AND SUBSIDIARIES CONSOLIDATED
+BALANCE SHEETS", "Quattor Participações S.A. Consolidated Balance Sheets". The pipeline compares it with the filer's
+names (pipeline/printed.py), so an acquired company's statements furnished with a release are never the company's."""
+from __future__ import annotations
+
+import re
+
+from .find import _COMPREHENSIVE, TITLES
+from .tables import Table
+
+# "GOLD TOE MORETZ HOLDINGS CORP. AND SUBSIDIARIES CONSOLIDATED BALANCE SHEETS": the company a statement's title names.
+_SUBSIDIARIES = re.compile(r"\band\s+(?:its\s+)?(?:consolidated\s+)?subsidiar(?:y|ies)\b", re.I)
+_ABBREVIATIONS = {"INC.", "CORP.", "CO.", "LTD.", "S.A.", "N.V.", "L.P.", "PLC.", "B.V.", "AG.", "S.A.B."}
+
+
+def titled_company(kind: str, table: Table) -> str | None:
+    """The company named just before a statement's title, as "<name> and subsidiaries" or a name ending in its legal
+    form ("Quattor Participações S.A. Consolidated Balance Sheets"); None where the title names none that way, or the
+    name is cut off or runs into a page's other words."""
+    text = table.context[-600:]
+    title = None
+    # An income statement titled as one of comprehensive income too (Brookfield Asset Management Ltd.'s).
+    for pattern in [dict(TITLES)[kind]] + ([_COMPREHENSIVE] if kind == "income" else []):
+        for found in pattern.finditer(text):
+            if title is None or found.start() > title.start():
+                title = found
+    if title is None or title.start() < len(text) - 300:
+        return None
+    possessive = _POSSESSIVE.search(text[:title.start()])
+    if possessive and not set(possessive.group(1).upper().split()) <= _OWN_WORDS:
+        return possessive.group(1) + "’s"  # a report's prose quoting a company's statements ("Amaca’s Income Statements")
+    after = _after_title(text[title.end():])
+    if after:
+        return after  # the name heading the statement itself, right after its title (CEMEX Latam's, after a "CLH" page head)
+    named = None
+    for named in _SUBSIDIARIES.finditer(text, 0, title.start()):
+        pass
+    if named is not None and title.start() - named.end() <= 80:
+        before = text[:named.start()].split()
+    else:
+        # The words of the title before its kind: "… ULC CONDENSED CONSOLIDATED AND COMBINED BALANCE SHEETS".
+        before = re.sub(r"(?i)(\b(unaudited|condensed|interim|consolidated|combined|and)\s*)+$", "",
+                        text[:title.start()].rstrip()).split()
+        if not before or before[-1].upper().rstrip(",") not in _LEGAL_FORMS:
+            return None
+    words: list[str] = []
+    for position in range(len(before) - 1, max(-1, len(before) - 9), -1):
+        word = before[position]
+        if not re.match(r"[A-Z&]", word) or _PAGE_WORD.match(word) or re.search(r"['’]s$", word, re.I) or \
+                (words and word.endswith(".") and word.upper() not in _ABBREVIATIONS):
+            break  # a page number or label, a lower-case word or a sentence's end: the text before the name
+        if position == 0 and len(table.context) >= 600:
+            return None  # the name runs back to where the parser's 600 characters before the table begin: cut off
+        words.insert(0, word)
+    return " ".join(words) or None
+
+
+# "summary of Amaca’s Income Statements for the period to June 2004" (James Hardie's 6-K of September 2004 furnishes
+# an inquiry's report on its former subsidiaries): a name in the possessive right before the title.
+_POSSESSIVE = re.compile(r"\b([A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*){0,4})['’]s\s+(?:(?:summari[sz]ed|consolidated|condensed|"
+                         r"interim|unaudited)\s+)*$")
+_OWN_WORDS = {"THE", "COMPANY", "COMPANY'S", "GROUP", "CORPORATION", "REGISTRANT", "ISSUER", "BANK", "PARENT", "OUR"}
+_LEGAL_FORMS = _ABBREVIATIONS | {"INC", "CORP", "CORPORATION", "LTD", "LIMITED", "PLC", "S.A", "AG", "N.V", "SA", "NV",
+                                 "ULC"}  # an unlimited liability company: Brookfield Asset Management ULC
+_PAGE_WORD = re.compile(r"^(F|FS|FS-R)-?\d+$|^(contents|index|statements?|page)$", re.I)
+
+
+# The name printed after the title, before its scale: CEMEX's 6-Ks furnish its listed subsidiaries' results, "Income
+# Statement & Balance Sheet Information CEMEX Holdings Philippines, Inc. (Thousands of Philippine Pesos …)", "CEMEX Latam
+# Holdings, S.A. and Subsidiaries in thousands of U.S. Dollars".
+_SCALE_START = re.compile(r"\(|\b(?:in|expressed\s+in)\s+(?:thousands|millions|billions)\b", re.I)
+_STATEMENT_WORDS = {"INFORMATION", "SHEET", "SHEETS", "STATEMENT", "STATEMENTS", "BALANCE", "INCOME", "DATA", "&", "AND",
+                    "FINANCIAL", "CONSOLIDATED", "OF", "OPERATIONS", "POSITION", "CASH", "FLOWS", "RESULTS"}
+
+
+def _after_title(text: str) -> str | None:
+    segment = text[:(_SCALE_START.search(text) or re.search(r"$", text)).start()][:120]
+    named = None
+    for named in _SUBSIDIARIES.finditer(segment):
+        pass
+    before = (segment[:named.start()] if named else segment).split()
+    if not before or not named and before[-1].upper().rstrip(",") not in _LEGAL_FORMS:
+        return None
+    words: list[str] = []
+    for word in reversed(before):
+        if word.upper().strip(",") in _STATEMENT_WORDS:
+            return " ".join(words) or None  # the name follows the title's words directly
+        if not re.match(r"[A-Z]", word) or words and word.endswith(".") and word.upper() not in _ABBREVIATIONS:
+            return None  # other words between the title and the name: no name of the title's
+        words.insert(0, word)
+    return None

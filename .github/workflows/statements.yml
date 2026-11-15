@@ -1,0 +1,279 @@
+name: Statements
+
+# The three financial statements, read by rules only (statements/). A pilot reads each company into files and hands
+# them back as this run's artifacts; it stores nothing anywhere else and calls no AI. Only the AI pilot job, run by hand
+# (assist_pilot), asks DeepSeek, through Quotiva's statements-ai function with this run's OIDC token: no key here.
+on:
+  push:
+    branches: ["statements/**"]
+    paths:
+      - "statements/**"
+      - ".github/workflows/statements.yml"
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated tickers; the pilot set (statements/pilot.json) when empty"
+        required: false
+        type: string
+      since:
+        description: "Earliest filing date to read (YYYY-MM-DD); the pilot set's when empty"
+        required: false
+        type: string
+      assist_pilot:
+        description: "Run the AI column-map pilot (statement_extractor.assist) instead of reading"
+        required: false
+        type: boolean
+        default: false
+      store:
+        description: "After reading, write each company to Quotiva (main only): a dry run checks, a write serves"
+        required: false
+        type: choice
+        options: ["no", "dry run", "write"]
+        default: "no"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: statements-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . './statements[test]'
+      - run: pytest
+        working-directory: statements
+
+  plan:
+    needs: test
+    # Reads run on a run branch (statements/run-round, statements/run-<set>) or by hand; a push to any other branch
+    # (statements/foundation) only tests, so its pilot reads do not take runners from the round that reads them too.
+    if: (github.event_name == 'workflow_dispatch' && !inputs.assist_pilot) || startsWith(github.ref_name, 'statements/run-')
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: list
+        env:
+          SYMBOLS: ${{ inputs.symbols }}
+          SINCE: ${{ inputs.since }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os
+          # A branch named statements/run-<set> runs statements/sets/<set>.json; statements/run-round runs every set
+          # at once, each company read once from the earliest date any of its sets reads it; any other branch runs the
+          # pilot set.
+          branch = os.environ.get("BRANCH", "")
+          name = branch.split("statements/run-", 1)[1] if branch.startswith("statements/run-") else None
+          if name == "round":
+              sets = [json.load(open("statements/pilot.json"))] + [
+                  json.load(open(f"statements/sets/{part}.json")) for part in ("phase1", "foreign", "sample50", "regulated", "latam")]
+              since = {}
+              for one in sets:
+                  for symbol in one["symbols"]:
+                      since[symbol] = min(since.get(symbol, one["since"]), one["since"])
+          else:
+              pilot = json.load(open(f"statements/sets/{name}.json" if name else "statements/pilot.json"))
+              symbols = [s.strip().upper() for s in os.environ.get("SYMBOLS", "").split(",") if s.strip()] or pilot["symbols"]
+              since = {symbol: os.environ.get("SINCE") or pilot["since"] for symbol in symbols}
+          # The slowest companies start first (sets/durations.json, the last measured round), new ones before them: a
+          # long job started last would otherwise be the round's whole tail.
+          try:
+              minutes = json.load(open("statements/sets/durations.json"))["minutes"]
+          except (OSError, ValueError, KeyError):
+              minutes = {}
+          order = sorted(since, key=lambda symbol: -minutes.get(symbol, 99.0))
+          print("matrix=" + json.dumps([{"symbol": symbol, "since": since[symbol]} for symbol in order]))
+          EOF
+
+  read:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+      STATEMENTS_ARCHIVE_CACHE: archive-cache  # archived reports fetched once, kept between runs
+      DART_API_KEY: ${{ secrets.DART_API_KEY }}  # OpenDART (Korea's FSS) for KEPCO's own filings
+      STATEMENTS_ARELLE_CACHE: ${{ github.workspace }}/arelle-cache  # Arelle's taxonomies, this job only (checks/arelle.py)
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . './statements[arelle]'
+      - uses: actions/cache/restore@v4
+        with:
+          path: archive-cache
+          key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
+          restore-keys: statements-archive-${{ matrix.symbol }}-
+      - run: python -m statement_extractor read --symbol "${{ matrix.symbol }}" --since "${{ matrix.since }}" --out "out/${{ matrix.symbol }}"
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: archive-cache
+          key: statements-archive-${{ matrix.symbol }}-${{ github.run_id }}
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: statements-${{ matrix.symbol }}
+          path: out/
+          retention-days: 30
+
+  report:
+    needs: read
+    if: always() && needs.read.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: statements-[A-Z]*
+          path: out
+          merge-multiple: true
+      - run: python -m statement_extractor report out/*
+      - uses: actions/upload-artifact@v6
+        with:
+          name: statements-golden
+          path: golden_results.json
+          retention-days: 30
+
+  # Writes each company read to Quotiva through its statements-store gate (Phase 7, s7-writes), by hand on main only:
+  # the gate takes this workflow's OIDC token from main and nothing else, and this is the only job holding one.
+  store:
+    needs: read
+    if: always() && needs.read.result != 'skipped' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.store != 'no'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: statements-[A-Z]*
+          path: out
+          merge-multiple: true
+      - env:
+          MODE: ${{ inputs.store }}
+        run: |
+          failed=0
+          for folder in out/*/; do
+            [ -f "$folder/served.json" ] || { echo "::warning::$folder has no served.json"; continue; }
+            if [ "$MODE" = "dry run" ]; then flag=--dry-run; else flag=; fi
+            python -m statement_extractor store "$folder" $flag || { echo "::error::$folder failed"; failed=1; }
+          done
+          exit $failed
+
+  # The AI column-map pilot (decision 2026-11-12): DeepSeek's column maps beside the rules' for the pilot 20-Fs, with
+  # calls, yuan and seconds. Nothing it answers is read into a statement.
+  assist-pilot:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && inputs.assist_pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - run: python -m statement_extractor.assist.pilot pilot-out
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: statements-assist-pilot
+          path: pilot-out/
+          retention-days: 30
+
+  # Raw printed rows for hand checks (statements/evals/handcheck/queue.json), on a commit whose message asks for
+  # them with [handcheck]: here, so the archived reports cached by this branch's reads are at hand.
+  handcheck:
+    if: contains(github.event.head_commit.message, '[handcheck]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SEC_USER_AGENT: TradeTracker admin@inferentica.com
+      STATEMENTS_ARCHIVE_CACHE: archive-cache
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            statements/pyproject.toml
+      - run: uv pip install . ./statements
+      - uses: actions/cache/restore@v4
+        with:
+          path: archive-cache-tsm
+          key: statements-archive-TSM-handcheck-${{ github.run_id }}
+          restore-keys: statements-archive-TSM-
+      - uses: actions/cache/restore@v4
+        with:
+          path: archive-cache-asml
+          key: statements-archive-ASML-handcheck-${{ github.run_id }}
+          restore-keys: statements-archive-ASML-
+      - run: mkdir -p archive-cache && (cp -rn archive-cache-tsm/. archive-cache-asml/. archive-cache/ 2>/dev/null || true) && ls archive-cache | wc -l
+      - run: python -m statement_extractor rows statements/evals/handcheck/queue.json --out rows.md
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: statements-handcheck-rows
+          path: rows.md
+          retention-days: 30
