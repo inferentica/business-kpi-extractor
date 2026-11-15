@@ -359,7 +359,7 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
                          KpiSpec(key="x", label="x", unit="currency"), default_currency,
                          context if declared_currency(context) else document.declared_currency()) if unit == "currency" else None
     # What the next quarter's replay needs: the total row's label (None when the table has none) and the scale used.
-    total_label = _row_label(total_table.rows[total_index], total_col)[:80] if total_row is not None else None
+    total_label = _row_label(total_table.rows[total_index], total_col)[:200] if total_row is not None else None
     # A third quarter's report also shows the nine months to date beside the quarter; Q4 is then the year less them.
     nine = _nine_month_columns(document, table, locator, parts, continued, total_table, total_index) if unit == "currency" else {}
     values = []
@@ -367,7 +367,7 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
         if key not in kept:
             continue
         source_table, source_row, source_col = continued.get(key, (locator.table, index, locator.col))
-        record = {"table": source_table, "row": source_row, "col": source_col, "row_label": label[:80],
+        record = {"table": source_table, "row": source_row, "col": source_col, "row_label": label[:200],
                   "context": table.context[-80:], "whole_table": True, "total_row_label": total_label,
                   "scale": scale if unit == "currency" else None,
                   "header": column_header(table, locator.first_row, locator.col),
@@ -569,7 +569,7 @@ def _locator_record(document: Document, locator: Locator, period_end: str | None
         table = document.tables[locator.table]
         row = table.rows[locator.row] if locator.row < len(table.rows) else []
         return {"table": locator.table, "row": locator.row, "col": locator.col,
-                "row_label": _row_label(row, locator.col)[:80], "context": table.context[-80:], "scale": locator.scale,
+                "row_label": _row_label(row, locator.col)[:200], "context": table.context[-80:], "scale": locator.scale,
                 # The words the reading quoted for its scale, so a later replay judges the scale exactly as this one did.
                 **({"scale_text": clean(locator.scale_text)[:80]} if locator.scale_text else {}),
                 "header": column_header(table, locator.row, locator.col),

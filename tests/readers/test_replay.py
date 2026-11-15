@@ -1104,3 +1104,23 @@ def test_a_single_row_showing_a_dash_this_quarter_leaves_the_rest_of_the_group_t
     assert not isinstance(located, str) and [value.kpi for value in located.values] == ["noninterest.card"]
     gone = {**last, "noninterest.lease": place(6, "Lease income")}  # a row with no dash and no label here still stops it
     assert isinstance(replay(document, gone, date(2023, 3, 31), quarter=1), str)
+
+
+def test_a_row_label_stored_cut_at_80_characters_finds_its_row_again():
+    # Truist's asset quality ratios: "Allowance for loan and lease losses as a percentage of loans and leases held for
+    # investment" was stored cut at 80 characters, so replay never found it again (2026-11-15).
+    from kpi_extractor.documents.document import Document, Table
+    from kpi_extractor.readers.replay import _replay_value
+    full = "Allowance for loan and lease losses as a percentage of loans and leases held for investment"
+    twin = "Loans 90 days or more past due and still accruing as a percentage of loans and leases"
+    document = Document(source_url="x")
+    document.tables["A_T17"] = Table("A_T17", "", [["Asset Quality", "", ""], ["", "3Q25", "2Q25"], [full, "1.54", "1.54"],
+                                                   [twin, "0.18", "0.17"], [twin + ", excluding government guaranteed", "0.05", "0.04"]])
+    from kpi_extractor.readers.extract import column_header
+    header = column_header(document.tables["A_T17"], 2, 1)
+    found = _replay_value(document, "asset_quality.alll_ratio", {"table": "A_T17", "row": 2, "col": 1, "row_label": full[:80],
+                                                                  "header": header}, quarter=None)
+    assert not isinstance(found, str) and (found.table, found.row) == ("A_T17", 2)
+    # Two rows begin with the same 80 characters: no reading.
+    twice = _replay_value(document, "asset_quality.past_due", {"table": "A_T17", "row": 3, "col": 1, "row_label": (twin + ", excluding government guaranteed")[:80], "header": header})
+    assert isinstance(twice, str)

@@ -112,6 +112,9 @@ def reported_period(document: Document, expected: date) -> date:
     return counts.most_common(1)[0][0] if counts else expected
 
 
+LABEL_CUT = 80  # how long a stored row label was before 2026-11-15; longer labels were cut there
+
+
 def _replay_value(document: Document, key: str, locator: dict, quarter: int | None = None, alone: bool = False,
                   expected: date | None = None) -> Locator | str:
     if "quote" in locator:
@@ -124,6 +127,10 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
     for table in _tables_by_preference(document, locator.get("table")):
         rows = [index for index, row in enumerate(table.rows)
                 if clean(_row_label(row, col)).lower() == label and parse_number(table.cell(index, col))]
+        if not rows and len(label) >= LABEL_CUT - 2:  # stored cut at 80 characters until 2026-11-15 (Truist's asset quality
+            rows = [index for index, row in enumerate(table.rows)  # ratios): the one row whose label begins with it
+                    if clean(_row_label(row, col)).lower().startswith(label) and parse_number(table.cell(index, col))][:2]
+            rows = rows if len(rows) == 1 else []
         if not rows:  # renamed for the side its figure fell on ("Net gains (losses) from …", then "Net gains from …")
             rows = [index for index, row in enumerate(table.rows)
                     if sideless_key(_row_label(row, col)) == sideless_key(label) and parse_number(table.cell(index, col))][:2]
