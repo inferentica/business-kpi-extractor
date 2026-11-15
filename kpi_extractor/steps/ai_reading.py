@@ -487,8 +487,9 @@ class AiReading:
             if value["method"] != "ai" or placed_elsewhere(value) or abs(_days(value["period_end"], cutoff)) <= 20 \
                     or (quarters and value["fiscal_period"] == "FY"):  # quarters: a year's readings left out
                 continue
-            if chained and (value["period_end"] > cutoff or not _same_chain(value["period_end"], before)):
-                continue  # in a chain: only its own earlier quarters, which are always read first
+            if chained and (value["period_end"] > cutoff
+                            or not (getattr(self._local, "lead", False) or _same_chain(value["period_end"], before))):
+                continue  # in a chain: only its own earlier quarters, which are always read first (a lead quarter: any)
             # The kind of document is its filing's: a figure links to the exhibit it was read from, which may not be the first.
             filing_url = (self.filings.get(value.get("source_accession") or "") or {}).get("source_url") or value.get("source_url") or ""
             if source is not None and _source_template(filing_url) != source:
