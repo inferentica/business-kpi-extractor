@@ -72,6 +72,11 @@ on:
         required: false
         type: boolean
         default: false
+      rules_live:
+        description: For code-reads - read with every learned rule as if live (never spot-checked), so each rule's figures are scored against the accepted ones
+        required: false
+        type: boolean
+        default: false
       platform:
         description: Where the golden set runs - x64 on the runner itself, or arm64 inside the worker image (Dockerfile), as on Oracle's ARM machines
         required: false
@@ -134,6 +139,7 @@ jobs:
         env:
           SYMBOLS: ${{ inputs.symbols }}
           QUARTERS: ${{ inputs.quarters || '12' }}
+          KPI_RULES_LIVE: ${{ inputs.rules_live && '1' || '' }}
         # Each release as it arrives (from the quarter before it), then as a backfill (from the quarter a year earlier).
         run: |
           status=0

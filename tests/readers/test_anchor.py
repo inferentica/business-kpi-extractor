@@ -116,3 +116,43 @@ def test_a_figure_with_no_leading_zero_is_found_whole():
     last = {"quote": "The net charge-off ratio was 0.52 percent in the first quarter", "value_text": "0.52 percent"}
     locator, _anchor = anchor_locator(document, "operating.nco", last)
     assert locator.value_text == ".49 percent"
+
+
+def test_an_anchor_names_its_metric_by_two_of_its_own_words():
+    from kpi_extractor.readers.anchor import names_metric
+    assert names_metric(("off", "ratio", "of"), "Net Charge-off Ratio")
+    assert names_metric(("client", "assets", "of"), "Client Assets")
+    assert not names_metric(("assets", "of"), "Client Assets")  # Wells Fargo's brokerage assets, $428 billion
+    assert not names_metric(("ltm", "gross", "return"), "Traditional Private Equity")  # one phrase, three strategies
+    assert not names_metric(("comparable", "traffic"), "Comparable Ticket")  # Costco prints the label after the figure
+    assert not names_metric(("there", "was"), "AUM Not Yet Paying Fees")
+    assert names_metric(("the", "nim", "was"), "Net Interest Margin") is False  # one word, even as initials
+    assert names_metric(("reported", "nim", "of"), "Reported NIM") is True
+
+
+def test_a_rounded_sentence_figure_printed_precisely_in_a_table_is_left_to_the_table():
+    from kpi_extractor.documents.document import Table
+    from kpi_extractor.readers.anchor import rounded_elsewhere
+    document = Document(source_url="x")
+    document.tables["T1"] = Table("T1", "", [["($ in millions)", "Q4"], ["Capital Invested", "31,835"]])
+    assert rounded_elsewhere(document, 32e9, "$32 billion")  # KKR: the table's 31,835 is the figure
+    assert not rounded_elsewhere(document, 21e9, "$21 billion")
+    assert not rounded_elsewhere(document, 0.49, "0.49 percent")
+
+
+def test_code_reads_scores_a_rule_as_if_live_even_in_a_spot_checked_filing():
+    second = text(SECOND, 2)
+    control = NoAi()
+    pipeline = _pipeline(control, history(), notes=("read by AI",))
+    pipeline.learned_rules, pipeline.rules_live = {"anchor-phrase": "shadow"}, True
+    pipeline._local.accession, pipeline._local.rule_candidates = "ACC-15", {}  # spot-checked, were the rule live
+    read, _, _ = pipeline._read(lambda *_, **__: "prompt", second, SPEC, Q2, version=1)
+    assert control.calls == [] and read[0].value == 310e6 and read[0].locator["rule"] == "anchor-phrase"
+
+
+def test_a_phrase_that_names_no_metric_is_not_read_by_the_rule():
+    document = Document(source_url="x")
+    document.blocks["B1"] = TextBlock(id="B1", text="At quarter end brokerage assets of $428 billion were held.")
+    document.order.append("B1")
+    last = {"quote": "Wealth management had client assets of $1.4 trillion", "value_text": "$1.4 trillion"}
+    assert anchor_locator(document, "operating.client_assets", last, "Client Assets") == "anchor phrase does not name the metric"
