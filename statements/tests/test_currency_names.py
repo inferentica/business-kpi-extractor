@@ -144,7 +144,7 @@ def test_two_columns_under_one_heading_are_not_read():
     # FEMSA's FY2009 20-F: "2009" over the dollar translation, "2008" spanning its 2009 peso column and its 2008 one.
     from statement_extractor.domain.periods import Period
     from statement_extractor.readers.html.parse import parse_html
-    from statement_extractor.readers.printed.find import two_columns
+    from statement_extractor.readers.printed.two_currencies import two_columns
     html = "<p>Amounts expressed in millions of U.S. dollars ($) and in millions of Mexican pesos (Ps.)</p>" \
            "<table><tr><td></td><td colspan='2'>2009</td><td colspan='4'>2008</td></tr>" \
            "<tr><td>Net sales</td><td>$</td><td>15,018</td><td>Ps.</td><td>196,103</td><td>Ps.</td><td>167,171</td></tr>" \

@@ -6,7 +6,6 @@ import re
 from dataclasses import replace
 
 from .comprehensive import income_in_one
-from ...domain.basis import currencies_named
 from ...domain.printed_labels import (ASSETS, BARE_TOTAL, BEFORE_FINANCING, Widened, CASH_HEADING, CLOSING, DATED_CASH, EQUITY, LIABILITIES,
                                       LIABILITIES_AND_EQUITY, NET_INCOME, PRETAX, SECTIONS, EQUITY_SECTION)
 from .side_by_side import SIDE_BY_SIDE
@@ -137,10 +136,11 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
             continue
         group = [table]
         for later in all_tables[position + 1:position + 6]:
-            if _complete(kind, group) and not (kind == "income" and re.search(r"\bcontinued\b", later.context[-200:], re.I)
-                                               and _titled(dict(TITLES)["income"], later.context[-200:])
-                                               and not any(NET_INCOME.match(label) for label in labels_in_context(group))):
-                break  # an income statement to its profit before tax goes on to its net income (Petrobras's 2005 6-K)
+            if _complete(kind, group) and not (kind == "income" and not any(NET_INCOME.match(label) for label in labels_in_context(group))
+                                               and (re.search(r"\bcontinued\b", later.context[-200:], re.I)
+                                                    and _titled(dict(TITLES)["income"], later.context[-200:])
+                                                    or _untitled_rest(later, table))):
+                break  # an income statement to its profit before tax goes on to its net income (Petrobras's 2005-08 6-Ks)
             if len([r for r in later.rows if r.figures]) < 2:
                 if later.rows and any(r.figures for r in later.rows):
                     break  # a small table of its own, not a spacer
@@ -159,6 +159,12 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
                                                                    for label in labels_in_context(group)) >= 3):
             found.append((kind, group))
     return found
+
+
+def _untitled_rest(later: Table, table: Table) -> bool:
+    """A page with no title of its own, in the statement's columns, that reaches a net income: the statement's rest."""
+    return figure_columns(later) == figure_columns(table) and not any(_titled(pattern, later.context[-200:]) for _, pattern in TITLES) \
+        and any(row.figures and NET_INCOME.match(row.label) for row in later.rows)
 
 
 def _heading(context: str) -> str:
@@ -287,14 +293,4 @@ def _complete(kind: str, group: list[Table]) -> bool:
     if kind == "cash_flow":
         return any(CLOSING.search(label) or BEFORE_FINANCING.match(label) for label in labels) or sum(1 for label in labels if DATED_CASH.search(label)) >= 2
     return any(NET_INCOME.match(label) or PRETAX.search(label) for label in labels)
-
-def two_columns(table, periods: dict) -> set:
-    """In a statement printed in two currencies, columns under one heading that print two figures in a row: two
-    columns, the heading of one lost. FEMSA's FY2009
-    20-F spans "2008" over its 2009 peso column and its 2008 one, beside "2009" over the dollar translation; neither
-    the year nor which figure is the period's can be told, so neither is read."""
-    if len(set(currencies_named(table.context[-400:]))) < 2:
-        return set()  # only a statement printed in two currencies, its translation beside it
-    return {column for column in periods if len(column) > 1 and any(
-        sum(1 for position in column if position in row.figures) > 1 for row in table.rows)}
 

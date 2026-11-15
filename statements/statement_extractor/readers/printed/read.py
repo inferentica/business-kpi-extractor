@@ -23,7 +23,8 @@ from .company_title import titled_company
 from .currency import column_currencies, reporting_currency, split_by_sign, translations
 from .ranges import without_repeats
 from .dates import column_periods
-from .find import TITLES, find_statements, two_columns, unlabelled_totals
+from .find import TITLES, find_statements, unlabelled_totals
+from .two_currencies import two_columns
 from .scales import line_scale, share_scale, statement_scale, states_two
 from .scope import statement_scope
 from .side_by_side import column_scopes
@@ -48,8 +49,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
                 left_out: frozenset = frozenset()) -> tuple[list[Reading], list[str]]:
     """Every statement column of a printed filing, checked; and notes on what it could not read. With
     `unstated_scale`, a statement that states no scale is read in that one (pipeline/unstated_scale.py proves it).
-    With `left_out`, another company's names, only statements titled for a company not among them: an untitled summary
-    beside them may be either's (Brookfield Asset Management Ltd.'s releases summarize Brookfield Asset Management ULC)."""
+    With `left_out` (other companies' names), only statements titled for a company not among them (Brookfield's)."""
     readings: list[Reading] = []
     notes: list[str] = []
     found = [(kind, group) for kind, group in find_statements(all_tables, release=form == "6-K") if not left_out

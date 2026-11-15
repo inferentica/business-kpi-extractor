@@ -10,7 +10,8 @@ from pathlib import Path
 from ..readers.html.parse import parse_html
 from ..readers.printed.currency import column_currencies, reporting_currency, split_by_sign, translations
 from ..readers.printed.dates import column_periods
-from ..readers.printed.find import find_statements, two_columns
+from ..readers.printed.find import find_statements
+from ..readers.printed.two_currencies import two_columns
 from ..readers.printed.scales import statement_scale
 from ..sources.edgar import configure_identity
 from ..sources.listing import filing_for
