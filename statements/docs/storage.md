@@ -1,6 +1,7 @@
 # Statements storage in Quotiva and R2 (Phase 7, s7-layout)
 
-Status: **design for the owner's approval.** Nothing here is applied. The SQL below becomes a migration in
+Status: **design for the owner's approval** (revised 2026-11-16 against the SEC's Financial Statement Data Sets and
+point-in-time practice: unit, decimals, negation, taxonomy and publication time per value). Nothing here is applied. The SQL below becomes a migration in
 `services/quotiva/supabase/migrations/` only after approval, and is applied to Quotiva's project by hand.
 
 ## What is stored where
@@ -19,6 +20,20 @@ versions older than a few years in R2) before the backfill.
 ## Quotiva tables
 
 ```sql
+-- The shape every period's lines must have (pg_jsonschema, available on Supabase).
+create extension if not exists pg_jsonschema;
+create function public.statement_lines_schema() returns json language sql immutable as $$ select '{
+  "type": "array",
+  "items": {"type": "object", "additionalProperties": false,
+    "required": ["line", "key", "concept", "label", "level", "is_heading", "value", "unit"],
+    "properties": {
+      "line": {"type": "integer"}, "key": {"type": "string"}, "concept": {"type": "string"},
+      "taxonomy": {"type": ["string", "null"]}, "member": {"type": ["string", "null"]},
+      "label": {"type": "string"}, "level": {"type": "integer"}, "is_heading": {"type": "boolean"},
+      "negated": {"type": "boolean"}, "value": {"type": ["number", "null"]}, "printed_value": {"type": ["number", "null"]},
+      "unit": {"type": ["string", "null"]}, "decimals": {"type": ["integer", "null"]},
+      "split_factor": {"type": ["number", "null"]}}}}'::json $$;
+
 -- One served statement per company, statement, period and basis: the newest presentation that passes its checks.
 create table public.statement_periods (
   company_id      text not null references public.companies (company_id),
@@ -30,18 +45,22 @@ create table public.statement_periods (
   is_primary      boolean not null,              -- the basis served by default; others are the newest presentation on each other basis
   period_start    date,
   period_end      date not null,
-  currency        text not null,
+  calendar_year   smallint generated always as (extract(year from period_end)::smallint) stored,
+  calendar_quarter smallint generated always as (extract(quarter from period_end)::smallint) stored,
+  currency        text not null check (currency ~ '^[A-Z]{3}$'),   -- ISO 4217
   scope           text not null check (scope in ('consolidated', 'parent')),
   source          text not null,                 -- xbrl, html, text, pdf, slides, regulator form (CVM-ITR, DART-Q3, BMV-Q3, ...)
   source_accession text not null,                -- EDGAR accession, or the regulator's or archive's own id
   source_form     text not null,
   source_filed    date not null,
+  available_from  timestamptz not null,          -- when it became public: the source filing's EDGAR acceptance time
+                                                 -- (a regulator's publication time): the point-in-time stamp
   from_comparative boolean not null,             -- served from a later filing's comparative column
   own_accession   text,                          -- the period's own filing, when another one is served
   witness         text not null,                 -- confirmed, restated, single, contradicted, derived
   derived_from    jsonb,                         -- a derived fourth quarter: {"year": accession, "nine_months": accession}
   checks          jsonb not null,                -- the reading's checks and Arelle's verdicts, as read
-  lines           jsonb not null,                -- [{line, key, concept, member, label, level, is_heading, value, printed_value, split_factor}]
+  lines           jsonb not null check (jsonb_matches_schema(statement_lines_schema(), lines)),  -- see "Line fields"
   reader_version  text not null,                 -- the extractor commit that chose it
   known_from      timestamptz not null default now(),
   primary key (company_id, statement, fiscal_year, fiscal_period, duration, basis)
@@ -54,7 +73,9 @@ create index statement_periods_company_end on public.statement_periods (company_
 create table public.statement_period_versions (
   version_id      bigint generated always as identity primary key,
   like public.statement_periods excluding constraints excluding indexes,
-  known_to        timestamptz not null,
+  known_to        timestamptz not null,          -- when Quotiva stopped serving it (transaction time)
+  available_to    timestamptz,                   -- when the filing that replaced it became public (point-in-time
+                                                 -- end); null when no filing replaced it (a reader change, withdrawn)
   ended_by        text not null                  -- restated, newer filing, reader change, withdrawn
 );
 create index statement_period_versions_period on public.statement_period_versions
@@ -79,6 +100,20 @@ create table public.statement_reads (
   evidence_prefix text not null                  -- statements/v1/<cik>/ in R2
 );
 
+-- One row per served value, the shape of the SEC's Financial Statement Data Sets (NUM joined to PRE), for queries
+-- across companies and for bulk exports.
+create view public.statement_values with (security_invoker = true) as
+select p.company_id, p.statement, p.fiscal_year, p.fiscal_period, p.duration, p.basis, p.is_primary,
+       p.period_start, p.period_end, p.calendar_year, p.calendar_quarter, p.currency, p.scope,
+       p.source_accession, p.source_form, p.available_from,
+       l.line, l.key, l.concept, l.taxonomy, l.member, l.label, l.level, l.negated,
+       l.value, l.printed_value, l.unit, l.decimals, l.split_factor
+from public.statement_periods p,
+     jsonb_to_recordset(p.lines) as l(line int, key text, concept text, taxonomy text, member text, label text,
+                                      level int, is_heading boolean, negated boolean, value numeric,
+                                      printed_value numeric, unit text, decimals int, split_factor numeric)
+where not l.is_heading;
+
 alter table public.statement_periods enable row level security;
 alter table public.statement_period_versions enable row level security;
 alter table public.statement_splits enable row level security;
@@ -87,6 +122,39 @@ alter table public.statement_reads enable row level security;
 grant select, insert, update, delete on public.statement_periods, public.statement_period_versions,
   public.statement_splits, public.statement_reads to service_role;
 ```
+
+## Line fields
+
+Each line carries what the SEC's Financial Statement Data Sets carry for a value (NUM) and its place on the statement
+(PRE), and what XBRL records with a fact:
+
+| Field | Meaning | SEC data set / XBRL equivalent |
+|---|---|---|
+| `line` | Order on the statement | PRE `line` |
+| `key` | The line's key across the company's eras (selection/identity.py) | (none: ours) |
+| `concept`, `taxonomy` | The XBRL tag and its taxonomy (`us-gaap/2024`, `ifrs-full/2025`), or `printed_…` for a line read from print | NUM `tag`, `version` |
+| `member` | The axis member of a breakdown line | NUM `segments` |
+| `label`, `level`, `is_heading` | The filer's label, indentation, heading | PRE `plabel`, `inpth` |
+| `negated` | Shown with the tag's sign reversed (a negated label) | PRE `negating` |
+| `value` | The figure as presented, in whole units, split-adjusted for per-share lines and share counts | NUM `value` |
+| `printed_value`, `split_factor` | The figure as printed and the factor applied, where adjusted | (none) |
+| `unit` | ISO 4217 code, `shares`, `<code>/share` or `pure` | NUM `uom`, XBRL `unitRef` |
+| `decimals` | The figure's rounding as printed or tagged (`-6` for millions) | XBRL `decimals` |
+
+The extractor's readings already hold the label, level, member, sign and value; writing to Quotiva (s7-writes) adds
+the unit, decimals, taxonomy and negated flag from the reading, and `available_from` from EDGAR's acceptance time.
+
+## Time: three clocks
+
+- **Period** (`period_start`, `period_end`, fiscal and calendar year and quarter): what the figures describe.
+- **Publication** (`available_from`, `available_to`): when the filing that gives the figures became public, and when
+  the one that replaced them did. A query "as known on a date" (point in time, for backtests) reads the row whose
+  publication interval contains that date, so a restatement never leaks into an earlier date.
+- **Serving** (`known_from`, `known_to`): when Quotiva served each version, so an audit can say what a client saw.
+
+The current table holds the newest version; the versions table every earlier one (as first reported, each
+restatement), both stamped on all three clocks, so as-reported and restated figures stay apart and nothing is
+overwritten.
 
 Writing a company: rows whose content changed are copied into `statement_period_versions` with `known_to = now()`
 and an `ended_by`, then replaced; unchanged rows are left alone, so `known_from` says since when a figure has been
