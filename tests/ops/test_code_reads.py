@@ -166,3 +166,9 @@ def test_a_learned_rules_reading_is_the_rules_though_traced_like_a_replay():
     from kpi_extractor.evals.code_reads import reader
     assert reader({"locator": {"rule": "anchor-phrase", "replayed_from": "a1"}}) == "rule"
     assert reader({"locator": {"replayed_from": "a1"}}) == "replay"
+
+
+def test_a_full_figure_beside_a_stored_rounded_one_with_float_noise_is_rounded_not_wrong():
+    from kpi_extractor.store import rounding_of
+    assert rounding_of(2049999999999.9998, 2045e9) and rounding_of(2140000000000.0002, 2144e9)
+    assert not rounding_of(2.2e12, 2.144e12)

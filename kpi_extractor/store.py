@@ -348,10 +348,15 @@ def _significant(value) -> int:
 
 
 def rounding_of(rough, exact) -> bool:
-    """Whether one figure is another rounded to fewer significant digits (5 for 5.25; 108,000 million for 107,592)."""
-    rough, exact = float(rough), float(exact)
+    """Whether one figure is another rounded to fewer significant digits (5 for 5.25; 108,000 million for 107,592). Scale
+    float noise is no digit: BNY's "$2.05" trillion stored as 2,049,999,999,999.9998 is $2,045 billion rounded."""
+    rough, exact = float(f"{float(rough):.12g}"), float(f"{float(exact):.12g}")
+    if rough == exact or not rough:
+        return False
     places = _significant(rough)
-    return rough != exact and places < _significant(exact) and float(f"{exact:.{places}g}") == rough
+    # Half a unit of the rough figure's last place either way: a filing rounds $2,045 billion up to "$2.05" trillion.
+    step = Decimal(10) ** (Decimal(repr(abs(rough))).adjusted() - places + 1)
+    return places < _significant(exact) and abs(Decimal(repr(exact)) - Decimal(repr(rough))) <= step / 2
 
 
 def _differs(value, before) -> bool:
