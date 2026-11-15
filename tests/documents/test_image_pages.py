@@ -120,3 +120,37 @@ def test_a_deck_skipped_on_its_cover_alone_is_classified_again_once(monkeypatch)
     checked = {"status": "skipped", "notes": [_NOT_EARNINGS, _CLASSIFIED_PAST_COVER, _CLASSIFIED_PICTURES]}
     is_release, asked, _recorded, ocr = _classifier(monkeypatch, previous=checked)
     assert not is_release and not asked and not ocr
+
+
+def test_the_same_digits_with_another_sign_or_without_the_percent_sign_are_another_figure():
+    deepseek = BOX.format(kind="table", x0=0, y0=0, x1=1000, y1=1000,
+                          content="<table><tr><td>Net income</td><td>(357)</td><td>12.5%</td><td>-30</td><td>8.1 %</td></tr></table>")
+    words = [(100, 100, 150, 110, "357"), (200, 100, 240, 110, "12.5"), (300, 100, 330, 110, "-30"),
+             (400, 100, 430, 110, "8.1"), (432, 100, 440, 110, "%")]  # RapidOCR lost a bracket and a percent sign
+    _page, kept, single = agreed_page(deepseek, words, (1000, 1000))
+    assert kept == 2 and single == {"357": DEEPSEEK, "125": DEEPSEEK}  # -30 agreed; 8.1 % agreed, its "%" a word apart
+
+
+def test_a_page_that_cannot_be_fetched_or_read_is_left_out_and_the_others_read():
+    def fetch(link):
+        if link.endswith("p2.jpg"):
+            raise OSError("404")
+        return b"p1"
+    pages, _single, totals = read_image_pages(["https://x/p1.jpg", "https://x/p2.jpg"], fetch,
+                                              lambda name, data: ("Volume 5,300", False),
+                                              lambda data: [SimpleNamespace(x0=1, y0=1, x1=9, y1=9, text="5,300")],
+                                              lambda data: (1467, 825))
+    assert list(pages) == ["https://x/p1.jpg"] and totals["pages not read"] == 1
+
+
+def test_code_readers_see_no_figure_one_model_alone_read():
+    from kpi_extractor.documents.image_pages import UNREAD, agreed_only
+    document = parse_document("<html><body><table><tr><td>Revenue</td><td>21,932,490</td><td>1,574</td></tr></table>"
+                              "<p>Net income was 3,155 in the quarter</p></body></html>", "https://x/y.htm")
+    document.single_reads = {"21932490": DEEPSEEK, "3155": LOCAL}
+    masked = agreed_only(document)
+    table = next(iter(masked.tables.values()))
+    assert table.rows[0][1:] == [UNREAD, "1,574"] and parse_number(UNREAD) is None
+    assert "3,155" not in masked.render() and "21,932,490" in document.render()  # the AI's reading still sees it
+    plain = parse_document("<table><tr><td>Revenue</td><td>512</td></tr></table>", "https://x/z.htm")
+    assert agreed_only(plain) is plain

@@ -55,3 +55,16 @@ def test_a_first_breakdown_adding_up_to_a_figure_reported_in_xbrl_stands_on_one_
     short = [named[0], item("fees", "underwriting", 600e6, row_label="Underwriting")]
     assert not pipeline._adds_up_to_xbrl(fees, short, date(2016, 3, 31))
     assert not pipeline._adds_up_to_xbrl(SPEC.groups[1], named, date(2016, 3, 31))
+
+
+def test_a_figure_one_ocr_model_alone_read_is_proven_only_digit_for_digit():
+    from kpi_extractor.steps.series_checks import ties_out
+    from kpi_extractor.steps.shared import equals_named_line, xbrl_figures
+    official = xbrl_figures([{"group_key": "segments", "kpi_key": "net", "kpi_label": "Net revenues", "method": "xbrl",
+                              "validation_status": "verified", "fiscal_period": "Q3", "period_end": "2026-09-30",
+                              "value": 21_932_480e3, "locator": {}}])
+    read = {"kpi_label": "Net revenues", "fiscal_period": "Q3", "period_end": "2026-09-30", "value": 21_932_490e3, "notes": []}
+    ocr = {**read, "notes": ["read by one OCR model only (DeepSeek)"]}
+    assert equals_named_line(official, read) and not equals_named_line(official, ocr)  # ASE's last digit, 0.00005% off
+    row = {"value": 21_932_490e3, "notes": [], "locator": {"row_numbers": [21_932_490, 21_932_485]}}
+    assert ties_out(row, 21_932_480e3) and not ties_out({**row, "notes": ocr["notes"]}, 21_932_480e3)

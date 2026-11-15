@@ -82,7 +82,7 @@ class ListingHistory:
         if previous.get("status") in _DONE and _PROSPECTUS_READER in (previous.get("notes") or []):
             return None, {}
         try:
-            document = self._document(ref)
+            document = self._code_document(ref)
             records: list[dict] = []
             renamed: dict[tuple[str, str], str] = {}  # (group, the prospectus's name) → the line it is today
             for group, lines in self._xbrl_groups().items():
@@ -178,7 +178,7 @@ class ListingHistory:
         (SpaceX's Starlink subscribers, launches and mass to orbit for Q1 2026 and Q1 2025), when no release gave them.
         Each quarter is its own reading of the prospectus, recorded once."""
         try:
-            document = self._document(ref)
+            document = self._code_document(ref)
         except Exception as error:  # noqa: BLE001
             self.log(f"{self.symbol}: prospectus not read ({type(error).__name__}: {error})"[:300])
             return

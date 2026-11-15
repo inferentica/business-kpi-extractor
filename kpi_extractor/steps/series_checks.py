@@ -17,7 +17,7 @@ from ..readers.extract import ReadValue, column_header
 from ..rules.period import release_unit
 from ..sources.base import FilingRef
 from .shared import (AI_GROUP_PREFIX, _days, _rounding, _significant,
-                     _year_ago_cells, equals_named_line, held_for_later, list_parents, value_key,
+                     _year_ago_cells, equals_named_line, held_for_later, list_parents, proof_tolerance, value_key,
                      xbrl_figures)
 
 # A split of part of a reported line (Adobe's two customer groups: 99.5% of its subscription revenue, the rest its
@@ -54,7 +54,8 @@ def ties_out(value: dict, year_ago: float | None) -> bool:
     if year_ago is None or len(numbers) < 2 or not numbers[0]:
         return False
     factor = release_unit(float(value["value"]), float(numbers[0]))
-    return factor is not None and any(abs(float(n) * factor - year_ago) <= max(abs(year_ago) * 1e-4, 1e-9) for n in numbers[1:])
+    tolerance = proof_tolerance(value, 1e-4)
+    return factor is not None and any(abs(float(n) * factor - year_ago) <= max(abs(year_ago) * tolerance, 1e-9) for n in numbers[1:])
 
 
 def _overlaps(rows: list[dict]) -> list[dict]:
@@ -245,7 +246,8 @@ class SeriesChecks:
             # its XBRL revenue to the thousand ($446.5 million).
             parts = sum(float(v["value"]) for v in rows)
             rounding = sum(_rounding(float(v["value"])) for v in rows) / abs(parts) if parts else 0
-            if waiting and len(rows) >= 2 and whole(rows[0]) and reported(rows[0], parts, max(1e-5, min(rounding, 0.005))):
+            tolerance = min(proof_tolerance(v, max(1e-5, min(rounding, 0.005))) for v in rows)  # one OCR model's: exact
+            if waiting and len(rows) >= 2 and whole(rows[0]) and reported(rows[0], parts, tolerance):
                 for v in waiting:
                     settle(v, _ADDS_TO_XBRL)
         # A split of part of a line (Adobe's customer groups of its subscription revenue, with their own total that XBRL
@@ -301,13 +303,13 @@ class SeriesChecks:
             if checked in (v.get("notes") or []):
                 continue
             try:
-                document = self._document(by_accession[later["source_accession"]])
+                document = self._code_document(by_accession[later["source_accession"]])
             except Exception:  # noqa: BLE001 - an unreadable release settles nothing
                 continue
             cells = _year_ago_cells(document, later["locator"], float(later["value"]))
             value = float(v["value"])
             named = _period_headed(document, later["locator"])
-            if any(abs(cell - value) <= max(abs(value) * 1e-4, 1e-9) for cell in cells):
+            if any(abs(cell - value) <= max(abs(value) * proof_tolerance(v, 1e-4), 1e-9) for cell in cells):
                 settle(v, _CONFIRMED_LATER)
             elif named and len(cells) == 1 and abs(cells[0] - value) <= abs(value) * MAX_RESTATEMENT:
                 if v["group_kind"] == "revenue_breakdown":

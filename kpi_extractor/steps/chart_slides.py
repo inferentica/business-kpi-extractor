@@ -251,7 +251,7 @@ class ChartReading:
                     and value["validation_status"] == "verified" and value["method"] != CHART_METHOD
                     and member_key(value["kpi_label"]) == name):
                 return float(value["value"]), value.get("currency")
-        for statement in release_statements(self._document(ref)):
+        for statement in release_statements(self._code_document(ref)):
             if statement.statement == "income" and abs((statement.period_end - period_end).days) <= 3:
                 for line in statement.lines:
                     if not line["is_heading"] and member_key(line["label"]) == name and line["value"]:
@@ -292,7 +292,7 @@ class ChartReading:
         total = sum(reported) if len(reported) == 2 else None  # new and used
         # The release's own table of units a quarter is the better witness: it is read by rule, not by the AI.
         try:
-            stated = next((units for end, units in reported_units(self._document(ref)).items()
+            stated = next((units for end, units in reported_units(self._code_document(ref)).items()
                            if abs((end - period_end).days) <= 3), None)
         except Exception:  # noqa: BLE001 - a document that cannot be read leaves the other witness
             stated = None

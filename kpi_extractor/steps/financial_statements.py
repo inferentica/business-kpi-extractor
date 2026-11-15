@@ -46,7 +46,7 @@ class StatementReading:
                 if owner and str(owner.get("filed_at") or "")[:10] >= ref.filed.isoformat():
                     continue
                 lines: list[dict] = []
-                for statement in release_statements(self._document(ref)):
+                for statement in release_statements(self._code_document(ref)):
                     if statement.currency is None:
                         continue  # amounts in more than one currency side by side (an offering document): not guessed
                     fiscal_year, fiscal_period = fiscal_label(statement.period_end, self.profile.fiscal_year_end,
@@ -80,7 +80,7 @@ class StatementReading:
                 return
             if (owners.get(("income", *own, "headline")) or {}).get("accession") == latest.accession:
                 return
-            statement = release_headline(self._document(latest), latest.period_end)
+            statement = release_headline(self._code_document(latest), latest.period_end)
             if statement is None:
                 return
             shared = {"statement": "income", "duration": "headline", "fiscal_year": own[0], "fiscal_period": own[1],
