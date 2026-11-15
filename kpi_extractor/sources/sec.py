@@ -271,10 +271,21 @@ def earnings_releases(company: Company, profile: CompanyProfile, since: date, ar
             candidates.append((filing, item_202))
         elif passed is not None and profile.foreign and filing.filing_date >= date.today() - PASSED_OVER_DAYS:
             passed.append(_passed_ref(filing, known_urls))
-    # Each candidate's exhibits come from the archive (or SEC), a few at a time rather than one after another.
+    # Each candidate's exhibits come from the archive (or SEC), a few at a time rather than one after another. One that
+    # cannot be read is left for the next run: it once failed the listing, and every release of the company with it.
+    def exhibits_of(candidate) -> list | None:
+        try:
+            return _archived_exhibits(candidate[0], archive)
+        except Exception as error:  # noqa: BLE001
+            print(f"SEC: exhibits of {candidate[0].form} {candidate[0].accession_no} not read ({type(error).__name__}); "
+                  "left for the next run", flush=True)
+            return None
+
     with ThreadPoolExecutor(max_workers=_LISTING_READERS) as pool:
-        found = list(pool.map(lambda candidate: _archived_exhibits(candidate[0], archive), candidates))
+        found = list(pool.map(exhibits_of, candidates))
     for (filing, item_202), exhibits in zip(candidates, found):
+        if exhibits is None:
+            continue
         if not exhibits:
             if passed is not None and profile.foreign and filing.filing_date >= date.today() - PASSED_OVER_DAYS:
                 passed.append(_passed_ref(filing, known_urls))
