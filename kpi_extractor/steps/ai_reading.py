@@ -6,15 +6,17 @@ import re
 from datetime import date
 
 from .. import ai
-from ..ai import AiResponseError, Located, Spec
-from ..documents.document import Document
+from ..ai import AiResponseError, Located, Locator, Spec
+from ..documents.document import Document, parse_number
+from ..domain.fiscal import fiscal_label
 from ..quality.checks import check_period, far_above_quarter, looks_like_part_of_table, total_label, validate_groups
 from ..readers.extract import (ReadValue, describe, header_contradicts, locator_hint,
                        read_values)
 from ..readers.replay import _same_place, _source_template, asked_of, missing_since
 from ..readers.trace import placed_elsewhere, stamp_call
 from ..rules.period import states_quarter
-from ..quality.reasons import SEGMENT_TABLE
+from ..quality.reasons import PRECISE_FIGURE, SEGMENT_TABLE
+from ..rules.precise_figures import precise_cell
 from ..rules.segment_tables import cell_figure, company_segments, names_segment, segment_page_of
 from .replay_reading import in_full_groups, left_for_ai
 from ..quality.stated import _names
@@ -80,6 +82,7 @@ class AiReading:
         full_text = build(spec if partial else None)
         flash, flash_read, flash_problems = self._locate(full_text, document, spec, currency, model="flash", thinking_first=False)
         flash_read, flash_problems = self._drop_wrong_columns(flash_read, flash_problems, document, flash, expected)
+        flash_read = self._prefer_precise(flash_read, document, spec, flash, currency, expected)
         self._local.second_read = None
         why = self._why_not_alone(flash, flash_read, spec, expected, document)
         if why is None or (
@@ -107,6 +110,7 @@ class AiReading:
         second_text = build((spec if partial else None) if subset is spec else subset, hints=False)
         pro, pro_read, pro_problems = self._locate(second_text, document, subset, currency, model="flash", thinking_first=True)
         pro_read, pro_problems = self._drop_wrong_columns(pro_read, pro_problems, document, pro, expected)
+        pro_read = self._prefer_precise(pro_read, document, subset, pro, currency, expected)
         open_keys = {group.key for group in open_groups}
         by_flash = {f"{item.group.key}.{item.kpi.key}": item for item in flash_read if item.group.key in open_keys}
         by_pro = {f"{item.group.key}.{item.kpi.key}": item for item in pro_read}
@@ -427,6 +431,36 @@ class AiReading:
             else:
                 kept.append(item)
         return kept, problems
+
+    def _prefer_precise(self, read: list[ReadValue], document: Document, spec: Spec, located: Located,
+                        currency: str | None, expected: date) -> list[ReadValue]:
+        """A rounded figure the filing prints in full elsewhere (rules.precise_figures: BNY's "$2.2" trillion AUM and its
+        "$2,187" billion) is read at the full figure's cell, through every check a reading's cell passes; the rounded
+        cell stays in the locator. The readers then agree whichever of the two tables each chose."""
+        try:
+            quarter = int(fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)[1][1])
+        except Exception:  # noqa: BLE001 - no fiscal quarter: a column's quarter name confirms nothing
+            quarter = None
+        names = company_segments(list(getattr(self, "values", {}).values()))
+        kept = []
+        for item in read:
+            found = precise_cell(document, item.locator, item.value, item.kpi.label, expected, quarter, names) \
+                if item.group.kind == "metric" and item.kpi.unit in ("currency", "count") and not item.is_total else None
+            if found:
+                table, row, col, label, scale = found
+                trial = located.model_copy(update={"tables": [], "values": [Locator(
+                    kpi=f"{item.group.key}.{item.kpi.key}", table=table, row=row, col=col, row_label=label, scale=scale)]})
+                full = parse_number(document.tables[table].cell(row, col))
+                got, _problems = read_values(document, spec, trial, currency)
+                if got and full is not None and _same(got[0].value, full.value * (1 if full.scale_word else scale)):
+                    printed = item.locator.get("value_text") or (document.tables[str(item.locator["table"])].cell(
+                        int(item.locator["row"]), int(item.locator["col"])))
+                    got[0].locator["rounded_from"] = {key: item.locator[key] for key in ("table", "row", "col", "block", "quote")
+                                                      if item.locator.get(key) is not None} | {"figure": printed}
+                    got[0].notes.append(f"{PRECISE_FIGURE}: {printed}")
+                    item = got[0]
+            kept.append(item)
+        return kept
 
     def _left_out_naming(self, document: Document, spec: Spec, keys: list[str]) -> set[str]:
         """The KPIs among `keys` that a part of a long document left out of the reading names: a table row with the

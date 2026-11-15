@@ -40,6 +40,7 @@ SCALE_OUTLIER = "amount far from its other periods or from revenue: a scale not 
 REREAD_NOTE = "a new reading of this filing differs from the figure served before:"
 SHARED_CELL = "read from the same table cell as another listed metric"
 SEGMENT_TABLE = "read from a table headed for one segment"
+PRECISE_FIGURE = "the full figure, printed rounded elsewhere"
 OUTSIDE_REPORTED_PERIODS = "outside the KPI's reported periods"
 ANNUAL_REFILED = "full-year figures, re-filed from Q4"
 LABELS_CONTRADICTED = "member labels contradict later filings"
@@ -102,6 +103,7 @@ _REASONS = (
     # Asides: a review's or a check's mark.
     Reason("reviewed", ASIDE, REVIEWED, "start"),
     Reason("settled", ASIDE, "settled by the checks", "start"),
+    Reason("precise_figure", ASIDE, PRECISE_FIGURE, "start"),
     Reason("checked", ASIDE, "checked against ", "start"),
     Reason("explained", ASIDE, EXPLAINED, "start"),
     Reason("rescaled", ASIDE, RESCALED, "within"),
