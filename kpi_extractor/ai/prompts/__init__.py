@@ -7,7 +7,6 @@ import hashlib
 from .classify import CLASSIFY_TASK
 from .common import SYSTEM
 from .curate import CURATE_TASK
-from .explain import EXPLAIN_TASK
 from .locate import LOCATE_TASK
 from .maintain import MAINTAIN_TASK
 from .propose import PROPOSE_TASK
@@ -18,7 +17,7 @@ from ..schemas import Spec
 
 
 _TASKS = {"propose": PROPOSE_TASK, "maintain": MAINTAIN_TASK, "locate": LOCATE_TASK, "review": REVIEW_TASK,
-          "classify": CLASSIFY_TASK, "select": SELECT_TASK, "curate": CURATE_TASK, "explain": EXPLAIN_TASK, "tags": TAG_TASK}
+          "classify": CLASSIFY_TASK, "select": SELECT_TASK, "curate": CURATE_TASK, "tags": TAG_TASK}
 
 
 def prompt_version(purpose: str) -> str:

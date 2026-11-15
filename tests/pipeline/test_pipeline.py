@@ -175,23 +175,6 @@ def test_curation_asks_once_for_the_same_rows():
     assert control.calls.count(("curate", "reasoning")) == 1
 
 
-def test_jumps_stand_only_with_a_quote_found_in_the_document():
-    document = parse_document("<p>Following the acquisition of Acme, subscribers rose to 90 million this quarter.</p>"
-                              "<p>Subscribers: 90 million</p>", "https://www.sec.gov/x.htm")
-    spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating Metrics", "kind": "metric",
-                                            "kpis": [{"key": "subs", "label": "Subscribers", "unit": "count"}]}]})
-    block = next(key for key, item in document.blocks.items() if "Subscribers:" in item.text)
-    located = ai.Located.model_validate({"period_end": "2026-06-30", "values": [
-        {"kpi": "operating.subs", "block": block, "quote": "Subscribers: 90 million", "value_text": "90 million"}]})
-    for quote, expected in (("Following the acquisition of Acme, subscribers rose", "verified"),
-                            ("Invented sentence that is not in the filing at all", "needs_review")):
-        read, _ = read_values(document, spec, located, None)
-        read[0].status, read[0].notes = "needs_review", ["changed 3.0x in a quarter"]
-        control = FakeControl({("explain", "reasoning"): {"items": {"operating.subs": {"legitimate": True, "quote": quote}}}})
-        _pipeline(control)._explain_jumps(read, document, spec)
-        assert read[0].status == expected
-
-
 def test_furnished_filings_are_classified_once():
     ref = SimpleNamespace(confirmed=False, accession="0001-26-1", exhibits=[], form="6-K", filed=date(2026, 7, 16),
                           role="earnings_release", source_url="https://www.sec.gov/x.htm")
@@ -950,7 +933,7 @@ def test_quarters_read_side_by_side_are_checked_against_each_other_in_date_order
                 "notes": []}
     values = [row("2026-03-31", 100.0, "Q1"), row("2026-06-30", 900.0, "Q2"), row("2026-09-30", 105.0, "Q3")]
     pipeline = _pipeline(FakeControl({}), values)
-    pipeline.store.write(pipeline._check_read_series({("kpi_ops", "users", "2026", "Q2")})[0])
+    pipeline.store.write(pipeline._check_read_series({("kpi_ops", "users", "2026", "Q2")}))
     assert pipeline.values[("kpi_ops", "users", "2026", "Q2")]["validation_status"] == "needs_review"
     assert pipeline.values[("kpi_ops", "users", "2026", "Q3")]["validation_status"] == "verified"  # not read now
 
@@ -1725,41 +1708,6 @@ def test_a_filled_figure_links_the_exhibit_its_row_is_in():
     assert [(v["fiscal_period"], v["value"], v["source_url"]) for v in stored] == [("Q2", 72, "https://www.sec.gov/q2-report.htm")]
 
 
-def test_a_run_read_without_its_tables_scale_is_put_back_on_the_series_scale():
-    # Visa's processed transactions: in billions as stated in text, in millions from its "(millions)" table without the
-    # scale for Q2 2018 to Q3 2020; only the run's two edges jump.
-    def row(year, period, value, notes=(), owner=None):
-        return {"group_key": "kpi_operating", "kpi_key": "transactions", "group_kind": "metric", "fiscal_year": year,
-                "fiscal_period": period, "period_end": f"{year}-{ {'Q1': '03', 'Q2': '06', 'Q3': '09', 'Q4': '12'}[period]}-28",
-                "method": "ai", "validation_status": "needs_review" if notes else "verified", "value": value, "unit": "count",
-                "notes": list(notes), **({"owner_decision": owner} if owner else {})}
-    values = [row("2017", "Q4", 29180e6), row("2018", "Q1", 30508e6), row("2018", "Q2", 29321, ["changed 0.0x in a quarter"]),
-              row("2018", "Q3", 31728), row("2018", "Q4", 32763), row("2019", "Q1", 37400e6, ["changed 1141535.2x in a quarter"]),
-              row("2019", "Q2", 39200e6), row("2019", "Q3", 42600e6)]
-    fixed = {(v["fiscal_year"], v["fiscal_period"]): v for v in _pipeline(None, values)._scale_runs()}
-    assert {quarter: v["value"] for quarter, v in fixed.items()} == {("2018", "Q2"): 29321e6, ("2018", "Q3"): 31728e6,
-                                                                     ("2018", "Q4"): 32763e6, ("2019", "Q1"): 37400e6}
-    assert fixed[("2019", "Q1")]["validation_status"] == "verified"
-    assert fixed[("2018", "Q2")]["validation_status"] == "verified"
-    # The reading's year-ago cell moves with it (Morgan Stanley's 2017 Q3 AUM gave 2016 Q3 as $417 million, not billion).
-    with_year_ago = [*values[:3], {**values[3], "locator": {"year_ago_value": 28_000, "ytd": 90_000, "scale": 1e6}}, *values[4:]]
-    moved = {(v["fiscal_year"], v["fiscal_period"]): v for v in _pipeline(None, with_year_ago)._scale_runs()}
-    assert moved[("2018", "Q3")]["locator"] == {"year_ago_value": 28_000e6, "ytd": 90_000e6, "scale": 1e6}
-    # A series that only grows has no run; an owner's figure is never changed.
-    assert _pipeline(None, [row("2018", "Q1", 10), row("2018", "Q2", 25), row("2018", "Q3", 60)])._scale_runs() == []
-    kept = _pipeline(None, [*values[:2], {**values[2], "owner_decision": "corrected"}, *values[5:]])._scale_runs()
-    assert ("2018", "Q2") not in {(v["fiscal_year"], v["fiscal_period"]) for v in kept}
-    # A per-unit amount has no table scale: FedEx's $15.32 composite yield is never raised to the quarters read wrongly
-    # with the table's "in thousands".
-    yields = [{**row(year, period, value), "unit": "currency", "kpi_label": "U.S. Domestic Composite Yield"}
-              for year, period, value in (("2025", "Q1", 14280.0), ("2025", "Q2", 14500.0), ("2025", "Q3", 14900.0), ("2026", "Q1", 15.32))]
-    assert _pipeline(None, yields)._scale_runs() == []
-    # Nor a price whose row states its unit, under a label that does not (Exxon's "Brent ($/b)", $74.35 cut to 0.000074).
-    brent = [{**row(year, period, value), "unit": "currency", "kpi_label": "Brent", "locator": {"row_label": "Brent ($/b)"}}
-             for year, period, value in (("2018", "Q1", 0.000067), ("2018", "Q2", 74.35), ("2018", "Q3", 0.000076), ("2018", "Q4", 0.000068))]
-    assert _pipeline(None, brent)._scale_runs() == []
-
-
 def test_a_worked_out_remainder_takes_the_name_the_reports_table_gives_it():
     # Salesforce's Q2 FY2027 10-Q tags no "Hedging gains", which its table lists beside its regions.
     from kpi_extractor.documents.document import parse_document
@@ -2031,10 +1979,8 @@ def test_prompt_scores_count_what_production_would_keep():
     from kpi_extractor.evals.prompt_eval import summarize
     summary = summarize({
         "review": [{"wrong_kind": "year-ago column", "outcome": "right"}, {"wrong_kind": "another row", "outcome": "planted"}],
-        "explain": [{"planted": True, "said_real": True, "stands": False}, {"planted": False, "said_real": True, "stands": True}],
         "select": [{"needed": 3, "select_kept": 2, "with_names_kept": 3}]})
     assert summary["review"]["right"] == 1 and summary["review"]["planted"] == 1
-    assert summary["explain"]["plantedSaidReal"] == 1 and summary["explain"]["plantedStands"] == 0 and summary["explain"]["genuineStands"] == 1
     assert summary["select"]["documentsComplete"] == 1
 
 

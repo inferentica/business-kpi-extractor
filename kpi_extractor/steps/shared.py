@@ -8,6 +8,7 @@ from ..ai import Spec
 from ..sources.archive import filing_folder
 from ..quality.checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
 from ..quality.reasons import is_
+from ..quality.stated import _names
 from ..documents.document import Document, clean, parse_number
 from ..readers.extract import column_header
 from ..rules.period import release_unit
@@ -136,13 +137,24 @@ def held_for_later(value: dict, cells: list[float], checked: str) -> dict:
     return {**value, "validation_status": "needs_review", "notes": notes}
 
 
-# A reading's other figures in its own units: put back on its series' scale with it, or its year-ago cell (kept as what
-# the release reported for the year before) stays a thousandfold off (Morgan Stanley's 2016 Q3 AUM, $417 million).
-_SCALED_FIGURES = ("year_ago_value", "ytd", "ytd_total")
+def xbrl_figures(values) -> dict[bool, list[tuple[str, float, str | None]]]:
+    """The figures the company reported in XBRL, by whether they are full years: each line's period end, value and
+    label, and each split's total (labelled None: the company's total, whichever line it is the sum of)."""
+    official: dict[bool, list[tuple[str, float, str | None]]] = {}
+    for v in values:
+        if v["method"] in ("xbrl", "derived") and not v["group_key"].startswith(AI_GROUP_PREFIX) and v["validation_status"] == "verified":
+            figures = official.setdefault(v["fiscal_period"] == "FY", [])
+            figures.append((v["period_end"], float(v["value"]), str(v.get("kpi_label") or "")))
+            if (v.get("locator") or {}).get("total"):
+                figures.append((v["period_end"], float(v["locator"]["total"]), None))
+    return official
 
 
-def _rescaled(locator: dict | None, factor: float) -> dict | None:
-    if not locator:
-        return locator
-    return {**locator, **{key: round(float(locator[key]) * factor, 6) for key in _SCALED_FIGURES
-                          if isinstance(locator.get(key), (int, float))}}
+def equals_named_line(official: dict, row: dict) -> bool:
+    """Whether a figure equals, to 0.01%, an XBRL line of its period whose label names it (Apple's Services, KKR's
+    capital markets fees): the same line, reported twice. A figure that only equals some other line is a coincidence,
+    no proof: Wells Fargo's Q4 2024 loss on debt securities, -$448 million, equals its segments' reconciling items."""
+    figure = float(row["value"])
+    return any(abs(_days(end, row["period_end"])) <= 12 and abs(other - figure) <= abs(figure) * 1e-4 and label is not None
+               and _names(label, row.get("kpi_label"))
+               for end, other, label in official.get(row["fiscal_period"] == "FY", []))

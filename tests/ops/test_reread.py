@@ -119,3 +119,11 @@ def test_reports_with_segment_income_but_no_segment_revenue_are_picked():
         4: {"source_accession": "c", "method": "ai", "group_key": "segment_income"},
     }
     assert picked_filings("reports-without-segments", values) == {"a"}
+
+
+def test_figures_put_on_their_series_scale_by_code_are_read_again():
+    from kpi_extractor.ops.reread import SELECTORS
+    picks = SELECTORS["series-rescaled"][1]
+    rescaled = {"validation_status": "verified", "notes": ["read without its table's scale: 1000× to match the series"]}
+    assert picks(rescaled)
+    assert not picks({**rescaled, "owner_decision": "corrected"}) and not picks({"validation_status": "verified", "notes": []})

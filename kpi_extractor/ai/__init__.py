@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from .schemas import (  # noqa: F401 - the package's names, as when it was one module
     _check_key, _codes, _KEY, BreakdownName, Classification, Curation,
-    Explanation, Explanations, for_period, GroupKind, GroupSpec, KpiSpec,
+    for_period, GroupKind, GroupSpec, KpiSpec,
     Located, Locator, Maintenance, MAX_GROUPS, MAX_KPIS_PER_GROUP, MAX_LISTED_KPIS,
     MIN_KEPT_METRICS, MISSING_REASONS, normalize_spec, Review, REVIEW_REASONS, Selection,
     Spec, TableLocator, TagPicks, Unit)
@@ -34,7 +34,5 @@ from .prompts.select import (  # noqa: F401 - the package's names, as when it wa
     SELECT_TASK)
 from .prompts.curate import (  # noqa: F401 - the package's names, as when it was one module
     CURATE_TASK)
-from .prompts.explain import (  # noqa: F401 - the package's names, as when it was one module
-    EXPLAIN_TASK)
 from .prompts import (  # noqa: F401 - the package's names, as when it was one module
     _TASKS, kpi_lines, locate_data, prompt_version, propose_data)

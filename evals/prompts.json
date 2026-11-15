@@ -30,28 +30,6 @@
  {
   "symbol": "AAPL",
   "company": "AAPL",
-  "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019321000055/a8-kex991q2202103272021.htm",
-  "prefix": "A_",
-  "period_end": "2021-03-27",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "revenue_by_product_type",
-   "group_label": "Revenue by Product Type",
-   "key": "products",
-   "label": "Products",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 72683000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AAPL",
-  "company": "AAPL",
   "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019318000005/a8-kexhibit992q12018123020.htm",
   "prefix": "B_",
   "period_end": "2017-12-30",
@@ -76,28 +54,6 @@
    4
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "AAPL",
-  "company": "AAPL",
-  "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019318000005/a8-kexhibit992q12018123020.htm",
-  "prefix": "B_",
-  "period_end": "2017-12-30",
-  "fiscal": "Q1 2018",
-  "kpi": {
-   "group": "products",
-   "group_label": "Revenue by Product",
-   "key": "mac",
-   "label": "Mac",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T0",
-  "value": 6895000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "AAPL",
@@ -130,28 +86,6 @@
  {
   "symbol": "AAPL",
   "company": "AAPL",
-  "url": "https://www.sec.gov/Archives/edgar/data/320193/000162828017004663/a8-kexhibit992q22017412017.htm",
-  "prefix": "B_",
-  "period_end": "2017-04-01",
-  "fiscal": "Q2 2017",
-  "kpi": {
-   "group": "products",
-   "group_label": "Revenue by Product",
-   "key": "iphone",
-   "label": "iPhone",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T0",
-  "value": 33249000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AAPL",
-  "company": "AAPL",
   "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019319000007/a8-kexhibit991q12019122920.htm",
   "prefix": "A_",
   "period_end": "2018-12-29",
@@ -176,28 +110,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "AAPL",
-  "company": "AAPL",
-  "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019319000007/a8-kexhibit991q12019122920.htm",
-  "prefix": "A_",
-  "period_end": "2018-12-29",
-  "fiscal": "Q1 2019",
-  "kpi": {
-   "group": "revenue_by_product_type",
-   "group_label": "Revenue by Product Type",
-   "key": "services",
-   "label": "Services",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T5",
-  "value": 10875000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "AAPL",
@@ -230,28 +142,6 @@
  {
   "symbol": "AAPL",
   "company": "AAPL",
-  "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019321000055/a8-kex991q2202103272021.htm",
-  "prefix": "A_",
-  "period_end": "2021-03-27",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "revenue_by_product_type",
-   "group_label": "Revenue by Product Type",
-   "key": "services",
-   "label": "Services",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 16901000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AAPL",
-  "company": "AAPL",
   "url": "https://www.sec.gov/Archives/edgar/data/320193/000162828017000663/a8-kexhibit992q12017123120.htm",
   "prefix": "B_",
   "period_end": "2016-12-31",
@@ -276,28 +166,6 @@
    4
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "AAPL",
-  "company": "AAPL",
-  "url": "https://www.sec.gov/Archives/edgar/data/320193/000162828017000663/a8-kexhibit992q12017123120.htm",
-  "prefix": "B_",
-  "period_end": "2016-12-31",
-  "fiscal": "Q1 2017",
-  "kpi": {
-   "group": "products",
-   "group_label": "Revenue by Product",
-   "key": "ipad",
-   "label": "iPad",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T0",
-  "value": 5533000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "AAPL",
@@ -328,28 +196,6 @@
   "wrong_kind": "year-ago column"
  },
  {
-  "symbol": "AAPL",
-  "company": "AAPL",
-  "url": "https://www.sec.gov/Archives/edgar/data/320193/000162828016017762/a8-kexhibit992q320166252016.htm",
-  "prefix": "B_",
-  "period_end": "2016-06-25",
-  "fiscal": "Q3 2016",
-  "kpi": {
-   "group": "products",
-   "group_label": "Revenue by Product",
-   "key": "services",
-   "label": "Services",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T0",
-  "value": 5976000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
   "symbol": "AMZN",
   "company": "AMZN",
   "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872417000098/amzn-20170630xex991.htm",
@@ -376,28 +222,6 @@
    1
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872417000098/amzn-20170630xex991.htm",
-  "prefix": "A_",
-  "period_end": "2017-06-30",
-  "fiscal": "Q2 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T44",
-  "value": 382400.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "AMZN",
@@ -430,28 +254,6 @@
  {
   "symbol": "AMZN",
   "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000024/amzn-20260630xex991.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "worldwide_paid_units_yoy_growth",
-   "label": "Worldwide Paid Units Year over Year Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T7",
-  "value": 17.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
   "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872417000049/amzn-20170331xex991.htm",
   "prefix": "A_",
   "period_end": "2017-03-31",
@@ -476,28 +278,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872417000049/amzn-20170331xex991.htm",
-  "prefix": "A_",
-  "period_end": "2017-03-31",
-  "fiscal": "Q1 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T48",
-  "value": 351000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "AMZN",
@@ -530,28 +310,6 @@
  {
   "symbol": "AMZN",
   "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872419000041/amzn-2019331xex991.htm",
-  "prefix": "A_",
-  "period_end": "2019-03-31",
-  "fiscal": "Q1 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "worldwide_paid_units_yoy_growth",
-   "label": "Worldwide Paid Units Year over Year Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T50",
-  "value": 10.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
   "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872418000070/amzn-20180331xex991.htm",
   "prefix": "A_",
   "period_end": "2018-03-31",
@@ -580,28 +338,6 @@
  {
   "symbol": "AMZN",
   "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872418000070/amzn-20180331xex991.htm",
-  "prefix": "A_",
-  "period_end": "2018-03-31",
-  "fiscal": "Q1 2018",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T49",
-  "value": 563100.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
   "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872421000018/amzn-20210630xex991.htm",
   "prefix": "A_",
   "period_end": "2021-06-30",
@@ -630,28 +366,6 @@
  {
   "symbol": "AMZN",
   "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872421000018/amzn-20210630xex991.htm",
-  "prefix": "A_",
-  "period_end": "2021-06-30",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "worldwide_paid_units_yoy_growth",
-   "label": "Worldwide Paid Units Year over Year Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T7",
-  "value": 15.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
   "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872417000131/amzn-20170930xex991.htm",
   "prefix": "A_",
   "period_end": "2017-09-30",
@@ -676,28 +390,6 @@
    1
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872417000131/amzn-20170930xex991.htm",
-  "prefix": "A_",
-  "period_end": "2017-09-30",
-  "fiscal": "Q3 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "third_party_seller_share_of_units",
-   "label": "Third-Party Seller Share of Units",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T53",
-  "value": 50.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "AMZN",
@@ -730,82 +422,10 @@
  {
   "symbol": "AMZN",
   "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872422000011/amzn-20220331xex991.htm",
-  "prefix": "A_",
-  "period_end": "2022-03-31",
-  "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "third_party_seller_share_of_units",
-   "label": "Third-Party Seller Share of Units",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T7",
-  "value": 55.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
   "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872422000017/amzn-20220630xex991.htm",
   "prefix": "A_",
   "period_end": "2022-06-30",
   "fiscal": "Q2 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "third_party_seller_share_of_units",
-   "label": "Third-Party Seller Share of Units",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "review",
-  "table": "A_T7",
-  "scale": 1.0,
-  "right": [
-   27,
-   6
-  ],
-  "wrong": [
-   27,
-   1
-  ],
-  "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872422000017/amzn-20220630xex991.htm",
-  "prefix": "A_",
-  "period_end": "2022-06-30",
-  "fiscal": "Q2 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "third_party_seller_share_of_units",
-   "label": "Third-Party Seller Share of Units",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T7",
-  "value": 57.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872424000128/amzn-20240630xex991.htm",
-  "prefix": "A_",
-  "period_end": "2024-06-30",
-  "fiscal": "Q2 2024",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -842,12 +462,18 @@
    "unit": "percent"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
+  "purpose": "review",
   "table": "A_T7",
-  "value": 61.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
+  "scale": 1.0,
+  "right": [
+   27,
+   6
+  ],
+  "wrong": [
+   27,
+   1
+  ],
+  "wrong_kind": "year-ago column"
  },
  {
   "symbol": "AMZN",
@@ -880,28 +506,6 @@
  {
   "symbol": "AMZN",
   "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872424000158/amzn-20240930xex991.htm",
-  "prefix": "A_",
-  "period_end": "2024-09-30",
-  "fiscal": "Q3 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "third_party_seller_share_of_units",
-   "label": "Third-Party Seller Share of Units",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T7",
-  "value": 60.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
   "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872419000041/amzn-2019331xex991.htm",
   "prefix": "A_",
   "period_end": "2019-03-31",
@@ -926,28 +530,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872419000041/amzn-2019331xex991.htm",
-  "prefix": "A_",
-  "period_end": "2019-03-31",
-  "fiscal": "Q1 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T50",
-  "value": 630600.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "AMZN",
@@ -980,28 +562,6 @@
  {
   "symbol": "AMZN",
   "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872423000006/amzn-20230331xex991.htm",
-  "prefix": "A_",
-  "period_end": "2023-03-31",
-  "fiscal": "Q1 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T7",
-  "value": 1465000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "AMZN",
-  "company": "AMZN",
   "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872416000282/amzn-20160630xex991.htm",
   "prefix": "A_",
   "period_end": "2016-06-30",
@@ -1028,28 +588,6 @@
   "wrong_kind": "year-ago column"
  },
  {
-  "symbol": "AMZN",
-  "company": "AMZN",
-  "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872416000282/amzn-20160630xex991.htm",
-  "prefix": "A_",
-  "period_end": "2016-06-30",
-  "fiscal": "Q2 2016",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "third_party_seller_share_of_units",
-   "label": "Third-Party Seller Share of Units",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T43",
-  "value": 49.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
   "symbol": "ASML",
   "company": "ASML",
   "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796622000022/financialstatementsusgaapq.htm",
@@ -1076,28 +614,6 @@
    1
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796622000022/financialstatementsusgaapq.htm",
-  "prefix": "C_",
-  "period_end": "2022-09-30",
-  "fiscal": "Q3 2022",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "net_service_and_field_option_sales",
-   "label": "Net service and field option sales",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "C_T0",
-  "value": 1523600000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "ASML",
@@ -1130,28 +646,6 @@
  {
   "symbol": "ASML",
   "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796618000003/financialstatementsusgaapq.htm",
-  "prefix": "C_",
-  "period_end": "2017-12-31",
-  "fiscal": "Q4 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "lithography_systems_sold",
-   "label": "Lithography Systems Sold",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "C_T1",
-  "value": 57.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
   "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796621000016/financialstatementsusgaapq.htm",
   "prefix": "C_",
   "period_end": "2021-07-04",
@@ -1176,28 +670,6 @@
    1
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796621000016/financialstatementsusgaapq.htm",
-  "prefix": "C_",
-  "period_end": "2021-07-04",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "net_service_and_field_option_sales",
-   "label": "Net service and field option sales",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "C_T0",
-  "value": 1070600000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "ASML",
@@ -1230,28 +702,6 @@
  {
   "symbol": "ASML",
   "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796618000003/pressreleasequarterlyresul.htm",
-  "prefix": "A_",
-  "period_end": "2017-12-31",
-  "fiscal": "Q4 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "used_lithography_systems_sold",
-   "label": "Used Lithography Systems Sold",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 9.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
   "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796617000003/financialstatementsusgaapq.htm",
   "prefix": "C_",
   "period_end": "2016-12-31",
@@ -1276,28 +726,6 @@
    1
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796617000003/financialstatementsusgaapq.htm",
-  "prefix": "C_",
-  "period_end": "2016-12-31",
-  "fiscal": "Q4 2016",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "net_service_and_field_option_sales",
-   "label": "Net service and field option sales",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "C_T0",
-  "value": 684400000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "ASML",
@@ -1330,28 +758,6 @@
  {
   "symbol": "ASML",
   "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796624000019/pressreleasequarterlyresul.htm",
-  "prefix": "A_",
-  "period_end": "2024-06-30",
-  "fiscal": "Q2 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "new_lithography_systems_sold",
-   "label": "New Lithography Systems Sold",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 89.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
   "url": "https://www.sec.gov/Archives/edgar/data/937966/000162828025045043/pressreleasequarterlyresul.htm",
   "prefix": "A_",
   "period_end": "2025-09-28",
@@ -1380,82 +786,10 @@
  {
   "symbol": "ASML",
   "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000162828025045043/pressreleasequarterlyresul.htm",
-  "prefix": "A_",
-  "period_end": "2025-09-28",
-  "fiscal": "Q3 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "used_lithography_systems_sold",
-   "label": "Used Lithography Systems Sold",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 6.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
   "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796625000014/financialstatementsusgaapq.htm",
   "prefix": "C_",
   "period_end": "2025-03-31",
   "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "net_service_and_field_option_sales",
-   "label": "Net service and field option sales",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "review",
-  "table": "C_T0",
-  "scale": 1000000.0,
-  "right": [
-   4,
-   2
-  ],
-  "wrong": [
-   4,
-   1
-  ],
-  "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796625000014/financialstatementsusgaapq.htm",
-  "prefix": "C_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "net_service_and_field_option_sales",
-   "label": "Net service and field option sales",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "C_T0",
-  "value": 2001100000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796624000013/financialstatementsusgaapq.htm",
-  "prefix": "C_",
-  "period_end": "2024-03-31",
-  "fiscal": "Q1 2024",
   "kpi": {
    "group": "revenue_by_product",
    "group_label": "Revenue by Product",
@@ -1492,12 +826,18 @@
    "unit": "currency"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
+  "purpose": "review",
   "table": "C_T0",
-  "value": 1324100000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
+  "scale": 1000000.0,
+  "right": [
+   4,
+   2
+  ],
+  "wrong": [
+   4,
+   1
+  ],
+  "wrong_kind": "year-ago column"
  },
  {
   "symbol": "ASML",
@@ -1526,28 +866,6 @@
    1
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000162828026025147/financialstatementsusgaa.htm",
-  "prefix": "C_",
-  "period_end": "2026-03-29",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "net_service_and_field_option_sales",
-   "label": "Net service and field option sales",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "C_P2_T",
-  "value": 2487500000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "ASML",
@@ -1580,28 +898,6 @@
  {
   "symbol": "ASML",
   "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000162828026048235/financialstatementsusgaa.htm",
-  "prefix": "C_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "net_service_and_field_option_sales",
-   "label": "Net service and field option sales",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "C_P6_T",
-  "value": 2761700000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
   "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796619000019/pressreleasequarterlyresul.htm",
   "prefix": "A_",
   "period_end": "2019-09-30",
@@ -1626,28 +922,6 @@
    2
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "ASML",
-  "company": "ASML",
-  "url": "https://www.sec.gov/Archives/edgar/data/937966/000093796619000019/pressreleasequarterlyresul.htm",
-  "prefix": "A_",
-  "period_end": "2019-09-30",
-  "fiscal": "Q3 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "used_lithography_systems_sold",
-   "label": "Used Lithography Systems Sold",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 5.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "CRM",
@@ -1687,78 +961,6 @@
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
-   "key": "rpo",
-   "label": "Total Remaining Performance Obligation (RPO)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T12",
-  "value": 42000000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "CRM",
-  "company": "CRM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1108524/000110852422000019/crm-q1fy23xexhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2022-04-30",
-  "fiscal": "Q1 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "crpo",
-   "label": "Current Remaining Performance Obligation (cRPO)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "review",
-  "table": "A_T12",
-  "scale": 1000000000.0,
-  "right": [
-   1,
-   1
-  ],
-  "wrong": [
-   3,
-   1
-  ],
-  "wrong_kind": "another row"
- },
- {
-  "symbol": "CRM",
-  "company": "CRM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1108524/000110852422000019/crm-q1fy23xexhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2022-04-30",
-  "fiscal": "Q1 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "crpo",
-   "label": "Current Remaining Performance Obligation (cRPO)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T12",
-  "value": 21500000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "CRM",
-  "company": "CRM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1108524/000110852423000021/crm-q1fy24xexhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2023-04-30",
-  "fiscal": "Q1 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
    "key": "crpo",
    "label": "Current Remaining Performance Obligation (cRPO)",
    "unit": "currency"
@@ -1792,40 +994,18 @@
    "unit": "currency"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T12",
-  "value": 24100000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204422000025/googexhibit991q12022.htm",
-  "prefix": "A_",
-  "period_end": "2022-03-31",
-  "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
   "purpose": "review",
-  "table": "A_T1",
-  "scale": 1.0,
+  "table": "A_T12",
+  "scale": 1000000000.0,
   "right": [
-   13,
-   2
-  ],
-  "wrong": [
-   13,
+   1,
    1
   ],
-  "wrong_kind": "year-ago column"
+  "wrong": [
+   3,
+   1
+  ],
+  "wrong_kind": "another row"
  },
  {
   "symbol": "GOOGL",
@@ -1834,28 +1014,6 @@
   "prefix": "A_",
   "period_end": "2022-03-31",
   "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T1",
-  "value": 163906.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204422000085/googexhibit991q32022.htm",
-  "prefix": "A_",
-  "period_end": "2022-09-30",
-  "fiscal": "Q3 2022",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -1892,28 +1050,6 @@
    "unit": "count"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T1",
-  "value": 186779.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204424000047/googexhibit991q12024.htm",
-  "prefix": "A_",
-  "period_end": "2024-03-31",
-  "fiscal": "Q1 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
   "purpose": "review",
   "table": "A_T1",
   "scale": 1.0,
@@ -1934,28 +1070,6 @@
   "prefix": "A_",
   "period_end": "2024-03-31",
   "fiscal": "Q1 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T1",
-  "value": 180895.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204423000013/googexhibit991q42022.htm",
-  "prefix": "A_",
-  "period_end": "2022-12-31",
-  "fiscal": "Q4 2022",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -1992,12 +1106,18 @@
    "unit": "count"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
+  "purpose": "review",
   "table": "A_T1",
-  "value": 190234.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
+  "scale": 1.0,
+  "right": [
+   13,
+   2
+  ],
+  "wrong": [
+   13,
+   1
+  ],
+  "wrong_kind": "year-ago column"
  },
  {
   "symbol": "GOOGL",
@@ -2030,82 +1150,10 @@
  {
   "symbol": "GOOGL",
   "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204420000031/googexhibit991q22020.htm",
-  "prefix": "A_",
-  "period_end": "2020-06-30",
-  "fiscal": "Q2 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T1",
-  "value": 127498.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
   "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204425000040/googexhibit991q12025.htm",
   "prefix": "A_",
   "period_end": "2025-03-31",
   "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "review",
-  "table": "A_T1",
-  "scale": 1.0,
-  "right": [
-   13,
-   2
-  ],
-  "wrong": [
-   13,
-   1
-  ],
-  "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204425000040/googexhibit991q12025.htm",
-  "prefix": "A_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T1",
-  "value": 185719.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204424000115/googexhibit991q32024.htm",
-  "prefix": "A_",
-  "period_end": "2024-09-30",
-  "fiscal": "Q3 2024",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -2142,37 +1190,15 @@
    "unit": "count"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T1",
-  "value": 181269.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204419000030/googexhibit991q32019.htm",
-  "prefix": "A_",
-  "period_end": "2019-09-30",
-  "fiscal": "Q3 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
   "purpose": "review",
-  "table": "A_T0",
+  "table": "A_T1",
   "scale": 1.0,
   "right": [
-   11,
+   13,
    2
   ],
   "wrong": [
-   11,
+   13,
    1
   ],
   "wrong_kind": "year-ago column"
@@ -2184,28 +1210,6 @@
   "prefix": "A_",
   "period_end": "2019-09-30",
   "fiscal": "Q3 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 114096.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204418000033/googexhibit991q32018.htm",
-  "prefix": "A_",
-  "period_end": "2018-09-30",
-  "fiscal": "Q3 2018",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -2242,37 +1246,15 @@
    "unit": "count"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
+  "purpose": "review",
   "table": "A_T0",
-  "value": 94372.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000043/googexhibit991q12026.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "review",
-  "table": "A_T1",
   "scale": 1.0,
   "right": [
-   13,
+   11,
    2
   ],
   "wrong": [
-   13,
+   11,
    1
   ],
   "wrong_kind": "year-ago column"
@@ -2284,28 +1266,6 @@
   "prefix": "A_",
   "period_end": "2026-03-31",
   "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T1",
-  "value": 194668.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204422000015/googexhibit991q42021.htm",
-  "prefix": "A_",
-  "period_end": "2021-12-31",
-  "fiscal": "Q4 2021",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -2342,12 +1302,18 @@
    "unit": "count"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
+  "purpose": "review",
   "table": "A_T1",
-  "value": 156500.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
+  "scale": 1.0,
+  "right": [
+   13,
+   2
+  ],
+  "wrong": [
+   13,
+   1
+  ],
+  "wrong_kind": "year-ago column"
  },
  {
   "symbol": "GOOGL",
@@ -2378,28 +1344,6 @@
   "wrong_kind": "year-ago column"
  },
  {
-  "symbol": "GOOGL",
-  "company": "GOOGL",
-  "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204423000088/googexhibit991q32023.htm",
-  "prefix": "A_",
-  "period_end": "2023-09-30",
-  "fiscal": "Q3 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "employees",
-   "label": "Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T1",
-  "value": 182381.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
   "symbol": "GS",
   "company": "GS",
   "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312517229806/d326982dex991.htm",
@@ -2430,28 +1374,6 @@
  {
   "symbol": "GS",
   "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312517229806/d326982dex991.htm",
-  "prefix": "A_",
-  "period_end": "2017-06-30",
-  "fiscal": "Q2 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "headcount",
-   "label": "Headcount",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T20",
-  "value": 34100.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GS",
-  "company": "GS",
   "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312517311348/d475899dex991.htm",
   "prefix": "A_",
   "period_end": "2017-09-30",
@@ -2476,28 +1398,6 @@
    5
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312517311348/d475899dex991.htm",
-  "prefix": "A_",
-  "period_end": "2017-09-30",
-  "fiscal": "Q3 2017",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Global Banking & Markets Revenue by Product",
-   "key": "transactionrevenues",
-   "label": "Transaction revenues",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T20",
-  "value": 168000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "GS",
@@ -2530,28 +1430,6 @@
  {
   "symbol": "GS",
   "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000088698226000096/a1q26gsearningsresults.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_aus",
-   "label": "Total Assets Under Supervision (AUS)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T30",
-  "value": 3650000000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GS",
-  "company": "GS",
   "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312517229806/d326982dex991.htm",
   "prefix": "A_",
   "period_end": "2017-06-30",
@@ -2580,28 +1458,6 @@
  {
   "symbol": "GS",
   "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312517229806/d326982dex991.htm",
-  "prefix": "A_",
-  "period_end": "2017-06-30",
-  "fiscal": "Q2 2017",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Global Banking & Markets Revenue by Product",
-   "key": "equity_underwriting",
-   "label": "Equity underwriting",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T19",
-  "value": 260000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GS",
-  "company": "GS",
   "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525079625/d750054dex991.htm",
   "prefix": "A_",
   "period_end": "2025-03-31",
@@ -2626,28 +1482,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525079625/d750054dex991.htm",
-  "prefix": "A_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Global Banking & Markets Revenue by Product",
-   "key": "debt_underwriting",
-   "label": "Debt underwriting",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T22",
-  "value": 752000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "GS",
@@ -2680,28 +1514,6 @@
  {
   "symbol": "GS",
   "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312517311348/d475899dex991.htm",
-  "prefix": "A_",
-  "period_end": "2017-09-30",
-  "fiscal": "Q3 2017",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Global Banking & Markets Revenue by Product",
-   "key": "commissionsandfees",
-   "label": "Commissions and fees",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T20",
-  "value": 681000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GS",
-  "company": "GS",
   "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525079625/d750054dex991.htm",
   "prefix": "A_",
   "period_end": "2025-03-31",
@@ -2726,28 +1538,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525079625/d750054dex991.htm",
-  "prefix": "A_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Global Banking & Markets Revenue by Product",
-   "key": "ficc_intermediation",
-   "label": "FICC intermediation",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T22",
-  "value": 3390000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "GS",
@@ -2780,28 +1570,6 @@
  {
   "symbol": "GS",
   "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312516740207/d436979dex991.htm",
-  "prefix": "A_",
-  "period_end": "2016-09-30",
-  "fiscal": "Q3 2016",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "long_term_aus_net_inflows",
-   "label": "Long-Term AUS Net Inflows",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T21",
-  "value": 14000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GS",
-  "company": "GS",
   "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312521213604/d188544dex991.htm",
   "prefix": "A_",
   "period_end": "2021-06-30",
@@ -2830,28 +1598,6 @@
  {
   "symbol": "GS",
   "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312521213604/d188544dex991.htm",
-  "prefix": "A_",
-  "period_end": "2021-06-30",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_aus_net_inflows",
-   "label": "Total AUS Net Inflows",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T36",
-  "value": 38000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GS",
-  "company": "GS",
   "url": "https://www.sec.gov/Archives/edgar/data/886982/000088698226000096/a1q26gsearningsresults.htm",
   "prefix": "A_",
   "period_end": "2026-03-31",
@@ -2876,28 +1622,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000088698226000096/a1q26gsearningsresults.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "revenue_by_product_awm",
-   "group_label": "Asset & Wealth Management Revenue by Product",
-   "key": "investments",
-   "label": "Investments",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T24",
-  "value": 180000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "GS",
@@ -2926,28 +1650,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525079625/d750054dex991.htm",
-  "prefix": "A_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Global Banking & Markets Revenue by Product",
-   "key": "equity_underwriting",
-   "label": "Equity underwriting",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T22",
-  "value": 370000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "GS",
@@ -2976,28 +1678,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525238058/d899312dex991.htm",
-  "prefix": "A_",
-  "period_end": "2025-09-30",
-  "fiscal": "Q3 2025",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Global Banking & Markets Revenue by Product",
-   "key": "ficc_financing",
-   "label": "FICC financing",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T17",
-  "value": 1035000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "GS",
@@ -3030,28 +1710,6 @@
  {
   "symbol": "GS",
   "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312523104264/d825833dex991.htm",
-  "prefix": "A_",
-  "period_end": "2023-03-31",
-  "fiscal": "Q1 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_aus_net_inflows",
-   "label": "Total AUS Net Inflows",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T28",
-  "value": 57000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "GS",
-  "company": "GS",
   "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312524095511/d817877dex991.htm",
   "prefix": "A_",
   "period_end": "2024-03-31",
@@ -3076,28 +1734,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312524095511/d817877dex991.htm",
-  "prefix": "A_",
-  "period_end": "2024-03-31",
-  "fiscal": "Q1 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_aus_net_inflows",
-   "label": "Total AUS Net Inflows",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": -15000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "INTC",
@@ -3130,28 +1766,6 @@
  {
   "symbol": "INTC",
   "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086317000040/newearningsreleaseq22017.htm",
-  "prefix": "A_",
-  "period_end": "2017-07-01",
-  "fiscal": "Q2 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_employees",
-   "label": "Total Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T21",
-  "value": 100600.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
   "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086324000074/q124_earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2024-03-28",
@@ -3176,28 +1790,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086324000074/q124_earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2024-03-28",
-  "fiscal": "Q1 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_employees",
-   "label": "Total Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T3",
-  "value": 130699.99999999999,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "INTC",
@@ -3230,28 +1822,6 @@
  {
   "symbol": "INTC",
   "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086318000003/q4-2017_earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2017-12-30",
-  "fiscal": "Q4 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_employees",
-   "label": "Total Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T22",
-  "value": 102700.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
   "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086326000077/q126earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2026-03-28",
@@ -3276,28 +1846,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086326000077/q126earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-28",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "subsidiary_employees",
-   "label": "Mobileye and Other Subsidiaries Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 4700.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "INTC",
@@ -3330,28 +1878,6 @@
  {
   "symbol": "INTC",
   "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086326000009/q425earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2025-12-27",
-  "fiscal": "Q4 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_employees",
-   "label": "Total Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T5",
-  "value": 85100.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
   "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086326000077/q126earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2026-03-28",
@@ -3380,28 +1906,6 @@
  {
   "symbol": "INTC",
   "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086326000077/q126earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-28",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "intel_employees",
-   "label": "Intel Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 78500.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
   "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086324000122/q224_earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2024-06-29",
@@ -3426,28 +1930,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086324000122/q224_earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2024-06-29",
-  "fiscal": "Q2 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_employees",
-   "label": "Total Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 125300.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "INTC",
@@ -3480,28 +1962,6 @@
  {
   "symbol": "INTC",
   "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086323000005/q422_earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2022-12-27",
-  "fiscal": "Q4 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_employees",
-   "label": "Total Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T5",
-  "value": 131900.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
   "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086325000169/q325earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2025-09-27",
@@ -3530,28 +1990,6 @@
  {
   "symbol": "INTC",
   "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086325000169/q325earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2025-09-27",
-  "fiscal": "Q3 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "subsidiary_employees",
-   "label": "Mobileye and Other Subsidiaries Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 5100.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
   "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086325000107/q225_earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2025-06-27",
@@ -3576,28 +2014,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "INTC",
-  "company": "INTC",
-  "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086325000107/q225_earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2025-06-27",
-  "fiscal": "Q2 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_employees",
-   "label": "Total Employees",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 101400.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "JPM",
@@ -3630,28 +2046,6 @@
  {
   "symbol": "JPM",
   "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961716001048/a2q16erfexhibit992suppleme.htm",
-  "prefix": "B_",
-  "period_end": "2016-06-30",
-  "fiscal": "Q2 2016",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "securities_services",
-   "label": "Securities Services",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T61",
-  "value": 907000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
   "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961721000446/a3q21erfex992supplement.htm",
   "prefix": "B_",
   "period_end": "2021-09-30",
@@ -3676,28 +2070,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961721000446/a3q21erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2021-09-30",
-  "fiscal": "Q3 2021",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "credit_adjustments_other",
-   "label": "Credit Adjustments & Other",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T15",
-  "value": 108000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "JPM",
@@ -3730,28 +2102,6 @@
  {
   "symbol": "JPM",
   "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026001902/a4q25erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2025-12-31",
-  "fiscal": "Q4 2025",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "commissions_and_other_fees",
-   "label": "Commissions and Other Fees",
-   "unit": "currency"
-  },
-  "owner_confirmed": true,
-  "purpose": "explain",
-  "table": "B_T3",
-  "value": 2108000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
   "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961722000486/a3q22erfex992supplement.htm",
   "prefix": "B_",
   "period_end": "2022-09-30",
@@ -3780,28 +2130,6 @@
  {
   "symbol": "JPM",
   "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961722000486/a3q22erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2022-09-30",
-  "fiscal": "Q3 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "global_private_bank_client_advisors",
-   "label": "Global Private Bank Client Advisors",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T20",
-  "value": 3110.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
   "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961718000147/a2q18erfexhibit992suppleme.htm",
   "prefix": "B_",
   "period_end": "2018-06-30",
@@ -3826,28 +2154,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961718000147/a2q18erfexhibit992suppleme.htm",
-  "prefix": "B_",
-  "period_end": "2018-06-30",
-  "fiscal": "Q2 2018",
-  "kpi": {
-   "group": "banking_payments_revenue_by_client_coverage_segm",
-   "group_label": "Commercial Banking Banking & Payments Revenue by Client Coverage Segment",
-   "key": "commercial_term_lending",
-   "label": "Commercial Term Lending",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T75",
-  "value": 344000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "JPM",
@@ -3880,28 +2186,6 @@
  {
   "symbol": "JPM",
   "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961725000332/a1q25erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "securities_services",
-   "label": "Securities Services",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T16",
-  "value": 1269000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
   "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961721000363/a2q21erfex992supplement.htm",
   "prefix": "B_",
   "period_end": "2021-06-30",
@@ -3926,28 +2210,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961721000363/a2q21erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2021-06-30",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "securities_services",
-   "label": "Securities Services",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T15",
-  "value": 1088000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "JPM",
@@ -3980,28 +2242,6 @@
  {
   "symbol": "JPM",
   "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961720000362/a2q20erfexhibit992supp.htm",
-  "prefix": "B_",
-  "period_end": "2020-06-30",
-  "fiscal": "Q2 2020",
-  "kpi": {
-   "group": "banking_payments_revenue_by_client_coverage_segm",
-   "group_label": "Commercial Banking Banking & Payments Revenue by Client Coverage Segment",
-   "key": "other",
-   "label": "Other",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T85",
-  "value": 101000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
   "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961716001142/a3q16erfexhibit992suppleme.htm",
   "prefix": "B_",
   "period_end": "2016-09-30",
@@ -4026,28 +2266,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961716001142/a3q16erfexhibit992suppleme.htm",
-  "prefix": "B_",
-  "period_end": "2016-09-30",
-  "fiscal": "Q3 2016",
-  "kpi": {
-   "group": "investment_banking_fees_by_product",
-   "group_label": "Investment Banking Fees by Product",
-   "key": "debt_underwriting",
-   "label": "Debt Underwriting",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T70",
-  "value": 943000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "JPM",
@@ -4080,28 +2298,6 @@
  {
   "symbol": "JPM",
   "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961724000555/a3q24erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2024-09-30",
-  "fiscal": "Q3 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "active_mobile_customers",
-   "label": "Active Mobile Customers",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T15",
-  "value": 56985000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
   "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961722000313/a1q22erfex992supplement.htm",
   "prefix": "B_",
   "period_end": "2022-03-31",
@@ -4130,28 +2326,6 @@
  {
   "symbol": "JPM",
   "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961722000313/a1q22erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2022-03-31",
-  "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "equity_markets",
-   "label": "Equity Markets",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T15",
-  "value": 3055000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
   "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961718000196/a3q18erfexhibit992suppleme.htm",
   "prefix": "B_",
   "period_end": "2018-09-30",
@@ -4176,28 +2350,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961718000196/a3q18erfexhibit992suppleme.htm",
-  "prefix": "B_",
-  "period_end": "2018-09-30",
-  "fiscal": "Q3 2018",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "equity_markets",
-   "label": "Equity Markets",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T65",
-  "value": 1595000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "JPM",
@@ -4226,28 +2378,6 @@
    6
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961724000555/a3q24erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2024-09-30",
-  "fiscal": "Q3 2024",
-  "kpi": {
-   "group": "revenue_by_product",
-   "group_label": "Revenue by Product",
-   "key": "commissions_and_other_fees",
-   "label": "Commissions and Other Fees",
-   "unit": "currency"
-  },
-  "owner_confirmed": true,
-  "purpose": "explain",
-  "table": "B_T3",
-  "value": 1936000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "JPM",
@@ -4278,28 +2408,6 @@
   "wrong_kind": "another row"
  },
  {
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026001902/a4q25erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2025-12-31",
-  "fiscal": "Q4 2025",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "investment_banking",
-   "label": "Investment Banking",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T16",
-  "value": 2552000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
   "symbol": "KKR",
   "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491218000003/q417earningsrelease.htm",
@@ -4326,28 +2434,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491218000003/q417earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2017-12-31",
-  "fiscal": "Q4 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_paying_assets_under_management",
-   "label": "Fee Paying Assets Under Management (FPAUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T9",
-  "value": 117437500000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KKR",
@@ -4380,28 +2466,6 @@
  {
   "symbol": "KKR",
   "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491217000002/q416earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2016-12-31",
-  "fiscal": "Q4 2016",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "new_capital_raised",
-   "label": "New Capital Raised",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T19",
-  "value": 4474300000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491219000008/q119earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2019-03-31",
@@ -4430,28 +2494,6 @@
  {
   "symbol": "KKR",
   "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491219000008/q119earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2019-03-31",
-  "fiscal": "Q1 2019",
-  "kpi": {
-   "group": "revenue_by_asset_management_product",
-   "group_label": "Revenue by Asset Management Product",
-   "key": "monitoringfees",
-   "label": "Monitoring Fees",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T19",
-  "value": 25651000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491220000021/q320earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2020-09-30",
@@ -4476,28 +2518,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491220000021/q320earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2020-09-30",
-  "fiscal": "Q3 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "assets_under_management",
-   "label": "Assets Under Management (AUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T20",
-  "value": 233808800000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KKR",
@@ -4530,28 +2550,6 @@
  {
   "symbol": "KKR",
   "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491218000003/q417earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2017-12-31",
-  "fiscal": "Q4 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "new_capital_raised",
-   "label": "New Capital Raised",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T25",
-  "value": 15700600000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491218000013/q218earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2018-06-30",
@@ -4576,28 +2574,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491218000013/q218earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2018-06-30",
-  "fiscal": "Q2 2018",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "assets_under_management",
-   "label": "Assets Under Management (AUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T9",
-  "value": 191265400000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KKR",
@@ -4630,28 +2606,6 @@
  {
   "symbol": "KKR",
   "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491218000019/q318earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2018-09-30",
-  "fiscal": "Q3 2018",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "performance_fee_eligible_aum",
-   "label": "Performance Fee Eligible AUM",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T55",
-  "value": 156014000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491220000003/q419earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2019-12-31",
@@ -4680,28 +2634,6 @@
  {
   "symbol": "KKR",
   "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491220000003/q419earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2019-12-31",
-  "fiscal": "Q4 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "new_capital_raised",
-   "label": "New Capital Raised",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T37",
-  "value": 7678500000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491219000004/q418earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2018-12-31",
@@ -4726,28 +2658,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491219000004/q418earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2018-12-31",
-  "fiscal": "Q4 2018",
-  "kpi": {
-   "group": "revenue_by_asset_management_product",
-   "group_label": "Revenue by Asset Management Product",
-   "key": "netrealizedgains",
-   "label": "Net Realized Gains (Losses)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T19",
-  "value": 78943000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KKR",
@@ -4780,28 +2690,6 @@
  {
   "symbol": "KKR",
   "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491219000008/q119earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2019-03-31",
-  "fiscal": "Q1 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "capital_invested",
-   "label": "Capital Invested",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T19",
-  "value": 5825000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491220000003/q419earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2019-12-31",
@@ -4826,28 +2714,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491220000003/q419earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2019-12-31",
-  "fiscal": "Q4 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_paying_assets_under_management",
-   "label": "Fee Paying Assets Under Management (FPAUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T17",
-  "value": 161209800000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KKR",
@@ -4880,28 +2746,6 @@
  {
   "symbol": "KKR",
   "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491219000008/q119earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2019-03-31",
-  "fiscal": "Q1 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_paying_assets_under_management",
-   "label": "Fee Paying Assets Under Management (FPAUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T19",
-  "value": 147685300000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491217000012/q217earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2017-06-30",
@@ -4930,28 +2774,6 @@
  {
   "symbol": "KKR",
   "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491217000012/q217earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2017-06-30",
-  "fiscal": "Q2 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "assets_under_management",
-   "label": "Assets Under Management (AUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T9",
-  "value": 148483000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
   "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491220000021/q320earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2020-09-30",
@@ -4976,28 +2798,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491220000021/q320earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2020-09-30",
-  "fiscal": "Q3 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "capital_invested",
-   "label": "Capital Invested",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T20",
-  "value": 10019100000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KO",
@@ -5026,28 +2826,6 @@
    7
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828026027723/a2026q1earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2026-04-03",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth",
-   "label": "Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 3.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KO",
@@ -5080,28 +2858,6 @@
  {
   "symbol": "KO",
   "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134421000021/a2021q2earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2021-07-02",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_emea",
-   "label": "EMEA Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 21.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KO",
-  "company": "KO",
   "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134423000005/a2022q4earningsreleaseex-9.htm",
   "prefix": "A_",
   "period_end": "2022-12-31",
@@ -5130,82 +2886,10 @@
  {
   "symbol": "KO",
   "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134423000005/a2022q4earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2022-12-31",
-  "fiscal": "Q4 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth",
-   "label": "Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": -1.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KO",
-  "company": "KO",
   "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134421000021/a2021q2earningsreleaseex-9.htm",
   "prefix": "A_",
   "period_end": "2021-07-02",
   "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_bottling",
-   "label": "Bottling Investments Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "review",
-  "table": "A_T4",
-  "scale": 1.0,
-  "right": [
-   7,
-   7
-  ],
-  "wrong": [
-   6,
-   7
-  ],
-  "wrong_kind": "another row"
- },
- {
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134421000021/a2021q2earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2021-07-02",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_bottling",
-   "label": "Bottling Investments Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 25.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134423000017/a2023q1earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2023-03-31",
-  "fiscal": "Q1 2023",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -5242,12 +2926,18 @@
    "unit": "percent"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
+  "purpose": "review",
   "table": "A_T4",
-  "value": -1.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
+  "scale": 1.0,
+  "right": [
+   7,
+   7
+  ],
+  "wrong": [
+   6,
+   7
+  ],
+  "wrong_kind": "another row"
  },
  {
   "symbol": "KO",
@@ -5280,28 +2970,6 @@
  {
   "symbol": "KO",
   "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134423000045/a2023q2earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2023-06-30",
-  "fiscal": "Q2 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_asia_pacific",
-   "label": "Asia Pacific Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 2.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KO",
-  "company": "KO",
   "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828025045577/a2025q3earningsreleaseex-9.htm",
   "prefix": "A_",
   "period_end": "2025-09-30",
@@ -5330,28 +2998,6 @@
  {
   "symbol": "KO",
   "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828025045577/a2025q3earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2025-09-30",
-  "fiscal": "Q3 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_emea",
-   "label": "EMEA Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 4.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KO",
-  "company": "KO",
   "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828019012399/a2019q3earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2019-09-27",
@@ -5380,28 +3026,6 @@
  {
   "symbol": "KO",
   "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828019012399/a2019q3earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2019-09-27",
-  "fiscal": "Q3 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_bottling",
-   "label": "Bottling Investments Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T14",
-  "value": 24.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KO",
-  "company": "KO",
   "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134424000056/a2024q3earningsreleaseex-9.htm",
   "prefix": "A_",
   "period_end": "2024-09-30",
@@ -5426,28 +3050,6 @@
    7
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134424000056/a2024q3earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2024-09-30",
-  "fiscal": "Q3 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_bottling",
-   "label": "Bottling Investments Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": -31.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KO",
@@ -5480,28 +3082,6 @@
  {
   "symbol": "KO",
   "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134421000003/a2020q4earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2020-12-31",
-  "fiscal": "Q4 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_asia_pacific",
-   "label": "Asia Pacific Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T5",
-  "value": -4.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KO",
-  "company": "KO",
   "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134422000004/a2021q4earningsreleaseex-9.htm",
   "prefix": "A_",
   "period_end": "2021-12-31",
@@ -5526,28 +3106,6 @@
    7
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134422000004/a2021q4earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2021-12-31",
-  "fiscal": "Q4 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_emea",
-   "label": "EMEA Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 11.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KO",
@@ -5580,28 +3138,6 @@
  {
   "symbol": "KO",
   "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134422000038/a2022q3earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2022-09-30",
-  "fiscal": "Q3 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_bottling",
-   "label": "Bottling Investments Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 16.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "KO",
-  "company": "KO",
   "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134421000003/a2020q4earningsreleaseex-9.htm",
   "prefix": "A_",
   "period_end": "2020-12-31",
@@ -5626,28 +3162,6 @@
    7
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134421000003/a2020q4earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2020-12-31",
-  "fiscal": "Q4 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_latam",
-   "label": "Latin America Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T5",
-  "value": 2.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "KO",
@@ -5678,28 +3192,6 @@
   "wrong_kind": "another row"
  },
  {
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134417000003/a2016q4earningsreleaseex-9.htm",
-  "prefix": "A_",
-  "period_end": "2016-12-31",
-  "fiscal": "Q4 2016",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_north_america",
-   "label": "North America Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T21",
-  "value": 1.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
   "symbol": "MA",
   "company": "MA",
   "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139123000155/ma09302023-exx991xearnings.htm",
@@ -5726,28 +3218,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139123000155/ma09302023-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2023-09-30",
-  "fiscal": "Q3 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "gross_dollar_volume",
-   "label": "Gross Dollar Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T27",
-  "value": 2305000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MA",
@@ -5787,28 +3257,6 @@
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
-   "key": "cash_transactions",
-   "label": "Cash Transactions",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 3067000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139126000003/ma12312025-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2025-12-31",
-  "fiscal": "Q4 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
    "key": "purchase_volume",
    "label": "Purchase Volume",
    "unit": "currency"
@@ -5826,28 +3274,6 @@
    4
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139126000003/ma12312025-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2025-12-31",
-  "fiscal": "Q4 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "purchase_volume",
-   "label": "Purchase Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 2344000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MA",
@@ -5876,28 +3302,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139125000003/ma12312024-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2024-12-31",
-  "fiscal": "Q4 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "gross_dollar_volume",
-   "label": "Gross Dollar Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 2561000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MA",
@@ -5930,28 +3334,6 @@
  {
   "symbol": "MA",
   "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139126000029/ma03312026-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cash_transactions",
-   "label": "Cash Transactions",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T19",
-  "value": 2852000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MA",
-  "company": "MA",
   "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139125000003/ma12312024-exx991xearnings.htm",
   "prefix": "A_",
   "period_end": "2024-12-31",
@@ -5976,28 +3358,6 @@
    4
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139125000003/ma12312024-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2024-12-31",
-  "fiscal": "Q4 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "purchase_volume",
-   "label": "Purchase Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 2114000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MA",
@@ -6030,28 +3390,6 @@
  {
   "symbol": "MA",
   "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139126000081/ma06302026-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cash_volume",
-   "label": "Cash Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 464000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MA",
-  "company": "MA",
   "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139122000161/ma09302022-exx991xearnings.htm",
   "prefix": "A_",
   "period_end": "2022-09-30",
@@ -6080,82 +3418,10 @@
  {
   "symbol": "MA",
   "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139122000161/ma09302022-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2022-09-30",
-  "fiscal": "Q3 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "purchase_volume",
-   "label": "Purchase Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 1669000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MA",
-  "company": "MA",
   "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139124000200/ma09302024-exx991xearnings.htm",
   "prefix": "A_",
   "period_end": "2024-09-30",
   "fiscal": "Q3 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "purchase_volume",
-   "label": "Purchase Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "review",
-  "table": "A_T26",
-  "scale": 1000000000.0,
-  "right": [
-   10,
-   4
-  ],
-  "wrong": [
-   9,
-   4
-  ],
-  "wrong_kind": "another row"
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139124000200/ma09302024-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2024-09-30",
-  "fiscal": "Q3 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "purchase_volume",
-   "label": "Purchase Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 2058000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139125000191/ma09302025-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2025-09-30",
-  "fiscal": "Q3 2025",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -6192,12 +3458,18 @@
    "unit": "currency"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
+  "purpose": "review",
   "table": "A_T26",
-  "value": 2280000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
+  "scale": 1000000000.0,
+  "right": [
+   10,
+   4
+  ],
+  "wrong": [
+   9,
+   4
+  ],
+  "wrong_kind": "another row"
  },
  {
   "symbol": "MA",
@@ -6230,82 +3502,10 @@
  {
   "symbol": "MA",
   "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139124000011/ma12312023-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2023-12-31",
-  "fiscal": "Q4 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "purchase_volume",
-   "label": "Purchase Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 1920000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MA",
-  "company": "MA",
   "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139124000159/ma06302024-exx991xearnings.htm",
   "prefix": "A_",
   "period_end": "2024-06-30",
   "fiscal": "Q2 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "purchase_transactions",
-   "label": "Purchase Transactions",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "review",
-  "table": "A_T26",
-  "scale": 1000000.0,
-  "right": [
-   10,
-   6
-  ],
-  "wrong": [
-   9,
-   6
-  ],
-  "wrong_kind": "another row"
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139124000159/ma06302024-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2024-06-30",
-  "fiscal": "Q2 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "purchase_transactions",
-   "label": "Purchase Transactions",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T26",
-  "value": 47382000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139124000200/ma09302024-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2024-09-30",
-  "fiscal": "Q3 2024",
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
@@ -6342,12 +3542,18 @@
    "unit": "count"
   },
   "owner_confirmed": false,
-  "purpose": "explain",
+  "purpose": "review",
   "table": "A_T26",
-  "value": 49342000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
+  "scale": 1000000.0,
+  "right": [
+   10,
+   6
+  ],
+  "wrong": [
+   9,
+   6
+  ],
+  "wrong_kind": "another row"
  },
  {
   "symbol": "MA",
@@ -6378,28 +3584,6 @@
   "wrong_kind": "another row"
  },
  {
-  "symbol": "MA",
-  "company": "MA",
-  "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139122000086/ma03312022-exx991xearnings.htm",
-  "prefix": "A_",
-  "period_end": "2022-03-31",
-  "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "gross_dollar_volume",
-   "label": "Gross Dollar Volume",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T18",
-  "value": 1919000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
   "symbol": "MS",
   "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000089542124000398/a2q24msfinancialsupplement.htm",
@@ -6426,28 +3610,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "MS",
-  "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000089542124000398/a2q24msfinancialsupplement.htm",
-  "prefix": "B_",
-  "period_end": "2024-06-30",
-  "fiscal": "Q2 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "total_client_assets",
-   "label": "Total Client Assets",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T14",
-  "value": 5690000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MS",
@@ -6480,28 +3642,6 @@
  {
   "symbol": "MS",
   "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752319001537/a52013522ex99_2.htm",
-  "prefix": "B_",
-  "period_end": "2019-06-30",
-  "fiscal": "Q2 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "aum",
-   "label": "Assets Under Management (AUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T9",
-  "value": 497000000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MS",
-  "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000089542125000419/a2q25msfinancialsupplement.htm",
   "prefix": "B_",
   "period_end": "2025-06-30",
@@ -6526,28 +3666,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "MS",
-  "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000089542125000419/a2q25msfinancialsupplement.htm",
-  "prefix": "B_",
-  "period_end": "2025-06-30",
-  "fiscal": "Q2 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_based_client_assets",
-   "label": "Fee-based Client Assets",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T14",
-  "value": 2478000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MS",
@@ -6580,28 +3698,6 @@
  {
   "symbol": "MS",
   "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752320000980/a52250280_ex992.htm",
-  "prefix": "B_",
-  "period_end": "2020-06-30",
-  "fiscal": "Q2 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "aum",
-   "label": "Assets Under Management (AUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T9",
-  "value": 665000000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MS",
-  "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752322000424/a52683164ex99_2.htm",
   "prefix": "B_",
   "period_end": "2022-03-31",
@@ -6626,28 +3722,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "MS",
-  "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752322000424/a52683164ex99_2.htm",
-  "prefix": "B_",
-  "period_end": "2022-03-31",
-  "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_based_asset_flows",
-   "label": "Fee-based Asset Flows",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T14",
-  "value": 97200000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MS",
@@ -6680,28 +3754,6 @@
  {
   "symbol": "MS",
   "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752321000874/a52459468ex99_2.htm",
-  "prefix": "B_",
-  "period_end": "2021-06-30",
-  "fiscal": "Q2 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "long_term_net_flows",
-   "label": "Long-term Net Flows",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T26",
-  "value": 13500000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MS",
-  "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000089542124000315/a1q24msfinancialsupplement.htm",
   "prefix": "B_",
   "period_end": "2024-03-31",
@@ -6726,28 +3778,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "MS",
-  "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000089542124000315/a1q24msfinancialsupplement.htm",
-  "prefix": "B_",
-  "period_end": "2024-03-31",
-  "fiscal": "Q1 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "aum",
-   "label": "Assets Under Management (AUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T18",
-  "value": 1505000000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MS",
@@ -6780,28 +3810,6 @@
  {
   "symbol": "MS",
   "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752318002043/a51882701ex99_2.htm",
-  "prefix": "B_",
-  "period_end": "2018-09-30",
-  "fiscal": "Q3 2018",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_based_client_assets",
-   "label": "Fee-based Client Assets",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T17",
-  "value": 1120000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MS",
-  "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752320001312/a52305268ex99_2.htm",
   "prefix": "B_",
   "period_end": "2020-09-30",
@@ -6826,28 +3834,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "MS",
-  "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752320001312/a52305268ex99_2.htm",
-  "prefix": "B_",
-  "period_end": "2020-09-30",
-  "fiscal": "Q3 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "aum",
-   "label": "Assets Under Management (AUM)",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T17",
-  "value": 715000000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "MS",
@@ -6880,28 +3866,6 @@
  {
   "symbol": "MS",
   "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752324000060/a53881916_ex992.htm",
-  "prefix": "B_",
-  "period_end": "2023-12-31",
-  "fiscal": "Q4 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_based_client_assets",
-   "label": "Fee-based Client Assets",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T19",
-  "value": 1983000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MS",
-  "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752320000072/a52158547ex99_2.htm",
   "prefix": "B_",
   "period_end": "2019-12-31",
@@ -6930,28 +3894,6 @@
  {
   "symbol": "MS",
   "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752320000072/a52158547ex99_2.htm",
-  "prefix": "B_",
-  "period_end": "2019-12-31",
-  "fiscal": "Q4 2019",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_based_client_assets",
-   "label": "Fee-based Client Assets",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T7",
-  "value": 1267000000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MS",
-  "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752323000051/a53203138ex99_2.htm",
   "prefix": "B_",
   "period_end": "2022-12-31",
@@ -6980,28 +3922,6 @@
  {
   "symbol": "MS",
   "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752323000051/a53203138ex99_2.htm",
-  "prefix": "B_",
-  "period_end": "2022-12-31",
-  "fiscal": "Q4 2022",
-  "kpi": {
-   "group": "investment_banking_revenue_by_product",
-   "group_label": "EMEA Investment Banking Revenue by Product",
-   "key": "fixed_income_underwriting",
-   "label": "Fixed income underwriting",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "B_T17",
-  "value": 314000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MS",
-  "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752324000060/a53881916_ex991.htm",
   "prefix": "A_",
   "period_end": "2023-12-31",
@@ -7030,28 +3950,6 @@
  {
   "symbol": "MS",
   "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752324000060/a53881916_ex991.htm",
-  "prefix": "A_",
-  "period_end": "2023-12-31",
-  "fiscal": "Q4 2023",
-  "kpi": {
-   "group": "investment_banking_revenue_by_product",
-   "group_label": "EMEA Investment Banking Revenue by Product",
-   "key": "advisory",
-   "label": "Advisory",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T9",
-  "value": 702000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "MS",
-  "company": "MS",
   "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752320000518/a52203680_ex991.htm",
   "prefix": "A_",
   "period_end": "2020-03-31",
@@ -7076,28 +3974,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "MS",
-  "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752320000518/a52203680_ex991.htm",
-  "prefix": "A_",
-  "period_end": "2020-03-31",
-  "fiscal": "Q1 2020",
-  "kpi": {
-   "group": "revenue_by_business_line",
-   "group_label": "Institutional Securities Revenue by Business Line",
-   "key": "fixedincomeunderwriting",
-   "label": "Fixed income underwriting",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 446000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "SPCX",
@@ -7137,28 +4013,6 @@
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
-   "key": "starlink_arpu",
-   "label": "Starlink ARPU",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T6",
-  "value": 69.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
    "key": "starlink_subscribers",
    "label": "Starlink Subscribers",
    "unit": "count"
@@ -7187,28 +4041,6 @@
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
-   "key": "starlink_subscribers",
-   "label": "Starlink Subscribers",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T6",
-  "value": 13600000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
    "key": "customer_payloads",
    "label": "Customer Payloads",
    "unit": "count"
@@ -7226,28 +4058,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "customer_payloads",
-   "label": "Customer Payloads",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 119.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "SPCX",
@@ -7287,28 +4097,6 @@
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
-   "key": "internal_launches",
-   "label": "Internal Launches",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 23.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
    "key": "nameplate_compute",
    "label": "Nameplate Compute",
    "unit": "count"
@@ -7326,28 +4114,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "nameplate_compute",
-   "label": "Nameplate Compute",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T8",
-  "value": 1.7,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "SPCX",
@@ -7387,28 +4153,6 @@
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
-   "key": "total_launches",
-   "label": "Total Launches",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 35.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
    "key": "customer_launches",
    "label": "Customer Launches",
    "unit": "count"
@@ -7426,28 +4170,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "customer_launches",
-   "label": "Customer Launches",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 12.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "SPCX",
@@ -7487,28 +4209,6 @@
   "kpi": {
    "group": "operating",
    "group_label": "Operating Metrics",
-   "key": "internal_payloads",
-   "label": "Internal Payloads",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 358.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
    "key": "mass_to_orbit",
    "label": "Mass to Orbit",
    "unit": "count"
@@ -7526,28 +4226,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "mass_to_orbit",
-   "label": "Mass to Orbit",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T4",
-  "value": 476.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "SPCX",
@@ -7578,28 +4256,6 @@
   "wrong_kind": "another row"
  },
  {
-  "symbol": "SPCX",
-  "company": "SPCX",
-  "url": "https://www.sec.gov/Archives/edgar/data/1181412/000162828026042639/spaceexplorationtechnologi.htm",
-  "prefix": "A_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "nameplate_compute",
-   "label": "Nameplate Compute",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T18",
-  "value": 0.3,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
   "symbol": "TSM",
   "company": "TSM",
   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617926000278/a2026q1consolidatedreport-.htm",
@@ -7626,28 +4282,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617926000278/a2026q1consolidatedreport-.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "revenue_by_technology",
-   "group_label": "Wafer Revenue by Technology",
-   "key": "r90nanometer",
-   "label": "90-nanometer",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T62",
-  "value": 5560407000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "TSM",
@@ -7680,28 +4314,6 @@
  {
   "symbol": "TSM",
   "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617924000094/tsmc2024q2consolidatdfinan.htm",
-  "prefix": "A_",
-  "period_end": "2024-06-30",
-  "fiscal": "Q2 2024",
-  "kpi": {
-   "group": "geography",
-   "group_label": "Revenue by Geography",
-   "key": "taiwan",
-   "label": "Taiwan",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T67",
-  "value": 60545774000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000156459022037471/tsm-ex991_19.htm",
   "prefix": "A_",
   "period_end": "2022-09-30",
@@ -7726,28 +4338,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000156459022037471/tsm-ex991_19.htm",
-  "prefix": "A_",
-  "period_end": "2022-09-30",
-  "fiscal": "Q3 2022",
-  "kpi": {
-   "group": "revenue_by_technology",
-   "group_label": "Wafer Revenue by Technology",
-   "key": "nm5",
-   "label": "5nm",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T102",
-  "value": 148812933000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "TSM",
@@ -7780,28 +4370,6 @@
  {
   "symbol": "TSM",
   "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000119312518153715/d582139d6k.htm",
-  "prefix": "A_",
-  "period_end": "2018-03-31",
-  "fiscal": "Q1 2018",
-  "kpi": {
-   "group": "geography",
-   "group_label": "Revenue by Geography",
-   "key": "china",
-   "label": "China",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T139",
-  "value": 46513034000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000162828023017752/tsmc2023q1.htm",
   "prefix": "A_",
   "period_end": "2023-03-31",
@@ -7826,28 +4394,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000162828023017752/tsmc2023q1.htm",
-  "prefix": "A_",
-  "period_end": "2023-03-31",
-  "fiscal": "Q1 2023",
-  "kpi": {
-   "group": "revenue_by_technology",
-   "group_label": "Wafer Revenue by Technology",
-   "key": "nm20",
-   "label": "20nm",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T67",
-  "value": 3121459000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "TSM",
@@ -7880,28 +4426,6 @@
  {
   "symbol": "TSM",
   "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000156459022037471/tsm-ex991_19.htm",
-  "prefix": "A_",
-  "period_end": "2022-09-30",
-  "fiscal": "Q3 2022",
-  "kpi": {
-   "group": "x_markets_of_customers",
-   "group_label": "Revenue by Platform",
-   "key": "high_performance_computing",
-   "label": "High Performance Computing",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T101",
-  "value": 238237286000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617924000094/tsmc2024q2consolidatdfinan.htm",
   "prefix": "A_",
   "period_end": "2024-06-30",
@@ -7926,28 +4450,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617924000094/tsmc2024q2consolidatdfinan.htm",
-  "prefix": "A_",
-  "period_end": "2024-06-30",
-  "fiscal": "Q2 2024",
-  "kpi": {
-   "group": "revenue_by_technology",
-   "group_label": "Wafer Revenue by Technology",
-   "key": "nm28",
-   "label": "28nm",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T69",
-  "value": 50557516000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "TSM",
@@ -7980,28 +4482,6 @@
  {
   "symbol": "TSM",
   "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617926000278/a2026q1consolidatedreport-.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "products",
-   "group_label": "Revenue by Product",
-   "key": "wafer",
-   "label": "Wafer",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T59",
-  "value": 968112334000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000156459020053724/tsm-ex991_61.htm",
   "prefix": "A_",
   "period_end": "2020-09-30",
@@ -8026,28 +4506,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000156459020053724/tsm-ex991_61.htm",
-  "prefix": "A_",
-  "period_end": "2020-09-30",
-  "fiscal": "Q3 2020",
-  "kpi": {
-   "group": "revenue_by_technology",
-   "group_label": "Wafer Revenue by Technology",
-   "key": "r90nanometer",
-   "label": "90-nanometer",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T112",
-  "value": 7670558000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "TSM",
@@ -8080,28 +4538,6 @@
  {
   "symbol": "TSM",
   "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617925000128/a2025q3consolidatedreport-.htm",
-  "prefix": "A_",
-  "period_end": "2025-09-30",
-  "fiscal": "Q3 2025",
-  "kpi": {
-   "group": "revenue_by_technology",
-   "group_label": "Wafer Revenue by Technology",
-   "key": "nm28",
-   "label": "28nm",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T68",
-  "value": 59227140000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000119312519223902/d750294d6k.htm",
   "prefix": "A_",
   "period_end": "2019-06-30",
@@ -8126,28 +4562,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000119312519223902/d750294d6k.htm",
-  "prefix": "A_",
-  "period_end": "2019-06-30",
-  "fiscal": "Q2 2019",
-  "kpi": {
-   "group": "revenue_by_technology",
-   "group_label": "Wafer Revenue by Technology",
-   "key": "r90nanometer",
-   "label": "90-nanometer",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T111",
-  "value": 5692407000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "TSM",
@@ -8180,28 +4594,6 @@
  {
   "symbol": "TSM",
   "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617926000541/a2026q2consolidatedreport-.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "revenue_by_technology",
-   "group_label": "Wafer Revenue by Technology",
-   "key": "nm7",
-   "label": "7nm",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T68",
-  "value": 121857311000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000156459020053724/tsm-ex991_61.htm",
   "prefix": "A_",
   "period_end": "2020-09-30",
@@ -8230,28 +4622,6 @@
  {
   "symbol": "TSM",
   "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000156459020053724/tsm-ex991_61.htm",
-  "prefix": "A_",
-  "period_end": "2020-09-30",
-  "fiscal": "Q3 2020",
-  "kpi": {
-   "group": "geography",
-   "group_label": "Revenue by Geography",
-   "key": "europe_middle_east_africa",
-   "label": "Europe, the Middle East and Africa",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T110",
-  "value": 17266396000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
   "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617923000023/tsmc2023q3consolidatdfinan.htm",
   "prefix": "A_",
   "period_end": "2023-09-30",
@@ -8276,28 +4646,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "TSM",
-  "company": "TSM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1046179/000104617923000023/tsmc2023q3consolidatdfinan.htm",
-  "prefix": "A_",
-  "period_end": "2023-09-30",
-  "fiscal": "Q3 2023",
-  "kpi": {
-   "group": "x_markets_of_customers",
-   "group_label": "Revenue by Platform",
-   "key": "internet_of_things",
-   "label": "Internet of Things",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T70",
-  "value": 47409811000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "U",
@@ -8330,28 +4678,6 @@
  {
   "symbol": "U",
   "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000041/a2026q2ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "non_strategic_revenue",
-   "label": "Non-Strategic Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 60057000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "U",
-  "company": "U",
   "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000053/a2026q3ex-991.htm",
   "prefix": "A_",
   "period_end": "2026-09-30",
@@ -8380,28 +4706,6 @@
  {
   "symbol": "U",
   "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000053/a2026q3ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "strategic_create_revenue",
-   "label": "Strategic Create Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 165070000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "U",
-  "company": "U",
   "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000041/a2026q2ex-991.htm",
   "prefix": "A_",
   "period_end": "2026-06-30",
@@ -8426,28 +4730,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "U",
-  "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000041/a2026q2ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "strategic_grow_revenue",
-   "label": "Strategic Grow Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 328955000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "U",
@@ -8480,28 +4762,6 @@
  {
   "symbol": "U",
   "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000030/a2026q1ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "strategic_create_revenue",
-   "label": "Strategic Create Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 153734000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "U",
-  "company": "U",
   "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000053/a2026q3ex-991.htm",
   "prefix": "A_",
   "period_end": "2026-09-30",
@@ -8526,28 +4786,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "U",
-  "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000053/a2026q3ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "strategic_grow_revenue",
-   "label": "Strategic Grow Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 431502000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "U",
@@ -8580,28 +4818,6 @@
  {
   "symbol": "U",
   "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000041/a2026q2ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "strategic_create_revenue",
-   "label": "Strategic Create Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 157456000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "U",
-  "company": "U",
   "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000030/a2026q1ex-991.htm",
   "prefix": "A_",
   "period_end": "2026-03-31",
@@ -8626,28 +4842,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "U",
-  "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000030/a2026q1ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "strategic_grow_revenue",
-   "label": "Strategic Grow Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 278681000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "U",
@@ -8680,28 +4874,6 @@
  {
   "symbol": "U",
   "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000030/a2026q1ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "non_strategic_revenue",
-   "label": "Non-Strategic Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 75823000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "U",
-  "company": "U",
   "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000053/a2026q3ex-991.htm",
   "prefix": "A_",
   "period_end": "2026-09-30",
@@ -8726,28 +4898,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "U",
-  "company": "U",
-  "url": "https://www.sec.gov/Archives/edgar/data/1810806/000181080626000053/a2026q3ex-991.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "non_strategic_revenue",
-   "label": "Non-Strategic Revenue",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T0",
-  "value": 25520000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "UNH",
@@ -8780,28 +4930,6 @@
  {
   "symbol": "UNH",
   "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176617000025/q22017exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2017-06-30",
-  "fiscal": "Q2 2017",
-  "kpi": {
-   "group": "revenue_by_customer_type",
-   "group_label": "UnitedHealthcare Revenue by Customer Type",
-   "key": "medicare_retirement",
-   "label": "Medicare & Retirement",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T37",
-  "value": 16747000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
   "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176623000058/a2023q3exhibit991.htm",
   "prefix": "A_",
   "period_end": "2023-09-30",
@@ -8826,28 +4954,6 @@
    2
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176623000058/a2023q3exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2023-09-30",
-  "fiscal": "Q3 2023",
-  "kpi": {
-   "group": "revenue_by_customer_type",
-   "group_label": "UnitedHealthcare Revenue by Customer Type",
-   "key": "community_state",
-   "label": "Community & State",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T7",
-  "value": 18560000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "UNH",
@@ -8880,28 +4986,6 @@
  {
   "symbol": "UNH",
   "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176620000002/a2019q4exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2019-12-31",
-  "fiscal": "Q4 2019",
-  "kpi": {
-   "group": "revenue_by_type",
-   "group_label": "Revenue by Type",
-   "key": "services",
-   "label": "Services",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T31",
-  "value": 5217000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
   "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176624000023/a2023q4exhibit991.htm",
   "prefix": "A_",
   "period_end": "2023-12-31",
@@ -8930,28 +5014,6 @@
  {
   "symbol": "UNH",
   "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176624000023/a2023q4exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2023-12-31",
-  "fiscal": "Q4 2023",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "uhc_commercial_risk_based_members",
-   "label": "UnitedHealthcare Commercial Risk-Based Members",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T8",
-  "value": 8115000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
   "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176623000003/a2022q4exhibit991.htm",
   "prefix": "A_",
   "period_end": "2022-12-31",
@@ -8976,28 +5038,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176623000003/a2022q4exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2022-12-31",
-  "fiscal": "Q4 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "uhc_medicaid_members",
-   "label": "UnitedHealthcare Medicaid Members",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T8",
-  "value": 8170000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "UNH",
@@ -9030,28 +5070,6 @@
  {
   "symbol": "UNH",
   "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176616000079/q2exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2016-06-30",
-  "fiscal": "Q2 2016",
-  "kpi": {
-   "group": "revenue_by_type",
-   "group_label": "Revenue by Type",
-   "key": "services",
-   "label": "Services",
-   "unit": "currency"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T42",
-  "value": 3269000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
   "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176620000020/a2020q1exhibit991.htm",
   "prefix": "A_",
   "period_end": "2020-03-31",
@@ -9080,28 +5098,6 @@
  {
   "symbol": "UNH",
   "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176620000020/a2020q1exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2020-03-31",
-  "fiscal": "Q1 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "uhc_medicare_supplement_members",
-   "label": "UnitedHealthcare Medicare Supplement Members",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T32",
-  "value": 4440000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
   "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176622000004/a2021q4exhibit991.htm",
   "prefix": "A_",
   "period_end": "2021-12-31",
@@ -9126,28 +5122,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176622000004/a2021q4exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2021-12-31",
-  "fiscal": "Q4 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "uhc_medicare_supplement_members",
-   "label": "UnitedHealthcare Medicare Supplement Members",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T9",
-  "value": 4395000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "UNH",
@@ -9180,28 +5154,6 @@
  {
   "symbol": "UNH",
   "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176618000002/q42017exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2017-12-31",
-  "fiscal": "Q4 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "optum_rx_adjusted_scripts",
-   "label": "Optum Rx Adjusted Scripts",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T38",
-  "value": 333000000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
   "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176622000016/a2022q1exhibit991.htm",
   "prefix": "A_",
   "period_end": "2022-03-31",
@@ -9226,28 +5178,6 @@
    3
   ],
   "wrong_kind": "year-ago column"
- },
- {
-  "symbol": "UNH",
-  "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176622000016/a2022q1exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2022-03-31",
-  "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "uhc_medicare_supplement_members",
-   "label": "UnitedHealthcare Medicare Supplement Members",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T8",
-  "value": 4355000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "UNH",
@@ -9278,28 +5208,6 @@
   "wrong_kind": "year-ago column"
  },
  {
-  "symbol": "UNH",
-  "company": "UNH",
-  "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176618000037/a2018q3exhibit991.htm",
-  "prefix": "A_",
-  "period_end": "2018-09-30",
-  "fiscal": "Q3 2018",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "uhc_medicaid_members",
-   "label": "UnitedHealthcare Medicaid Members",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T38",
-  "value": 6630000.0,
-  "jump": "changed 1.9x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
   "symbol": "V",
   "company": "V",
   "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316124000053/q42024earningsrelease.htm",
@@ -9330,28 +5238,6 @@
  {
   "symbol": "V",
   "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316124000053/q42024earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2024-09-30",
-  "fiscal": "Q4 2024",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cross_border_volume_growth_total",
-   "label": "Cross-Border Volume Growth Total (Constant Dollars)",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T18",
-  "value": 13.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "V",
-  "company": "V",
   "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316126000126/q42026earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2026-09-30",
@@ -9376,28 +5262,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "V",
-  "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316126000126/q42026earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q4 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cross_border_volume_growth_total",
-   "label": "Cross-Border Volume Growth Total (Constant Dollars)",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T14",
-  "value": 14.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "V",
@@ -9430,28 +5294,6 @@
  {
   "symbol": "V",
   "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316117000041/vex991093017earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2017-09-30",
-  "fiscal": "Q4 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "payments_volume_growth",
-   "label": "Payments Volume Growth (Constant Dollars)",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T55",
-  "value": 9.8,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "V",
-  "company": "V",
   "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316117000036/vex991earningsrelease63017.htm",
   "prefix": "A_",
   "period_end": "2017-06-30",
@@ -9476,28 +5318,6 @@
    1
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "V",
-  "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316117000036/vex991earningsrelease63017.htm",
-  "prefix": "A_",
-  "period_end": "2017-06-30",
-  "fiscal": "Q3 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "processed_transactions",
-   "label": "Processed Transactions",
-   "unit": "count"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T73",
-  "value": 28450000000.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "V",
@@ -9530,28 +5350,6 @@
  {
   "symbol": "V",
   "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316122000009/q12022earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2021-12-31",
-  "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cross_border_volume_growth_total",
-   "label": "Cross-Border Volume Growth Total (Constant Dollars)",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T11",
-  "value": 40.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "V",
-  "company": "V",
   "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316117000036/vex991earningsrelease63017.htm",
   "prefix": "A_",
   "period_end": "2017-06-30",
@@ -9576,28 +5374,6 @@
    6
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "V",
-  "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316117000036/vex991earningsrelease63017.htm",
-  "prefix": "A_",
-  "period_end": "2017-06-30",
-  "fiscal": "Q3 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "payments_volume_growth",
-   "label": "Payments Volume Growth (Constant Dollars)",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T56",
-  "value": 38.4,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
  },
  {
   "symbol": "V",
@@ -9630,28 +5406,6 @@
  {
   "symbol": "V",
   "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316121000056/q42021earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2021-09-30",
-  "fiscal": "Q4 2021",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cross_border_volume_growth_total",
-   "label": "Cross-Border Volume Growth Total (Constant Dollars)",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T13",
-  "value": 38.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "V",
-  "company": "V",
   "url": "https://www.sec.gov/Archives/edgar/data/1403161/000119312516653695/d222651dex991.htm",
   "prefix": "A_",
   "period_end": "2016-06-30",
@@ -9680,28 +5434,6 @@
  {
   "symbol": "V",
   "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000119312516653695/d222651dex991.htm",
-  "prefix": "A_",
-  "period_end": "2016-06-30",
-  "fiscal": "Q3 2016",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "payments_volume_growth",
-   "label": "Payments Volume Growth (Constant Dollars)",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T52",
-  "value": 10.2,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "symbol": "V",
-  "company": "V",
   "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316117000010/vex991123116earningsrelease.htm",
   "prefix": "A_",
   "period_end": "2016-12-31",
@@ -9726,710 +5458,6 @@
    3
   ],
   "wrong_kind": "another row"
- },
- {
-  "symbol": "V",
-  "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316117000010/vex991123116earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2016-12-31",
-  "fiscal": "Q1 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cross_border_volume_growth_total",
-   "label": "Cross-Border Volume Growth Total (Constant Dollars)",
-   "unit": "percent"
-  },
-  "owner_confirmed": false,
-  "purpose": "explain",
-  "table": "A_T57",
-  "value": 140.0,
-  "jump": "changed 0.45x in a quarter",
-  "legitimate": false,
-  "planted": true
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868125000045/agmearningsrelease1q2025.htm",
-  "prefix": "B_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "retirement_services_flows",
-   "group_label": "Retirement Services Flows",
-   "key": "flow_reinsurance",
-   "label": "Flow Reinsurance Inflows",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P20",
-  "value": 4933000000.0,
-  "jump": "changed 4.8x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868123000031/agmearningsrelease3q2023.htm",
-  "prefix": "B_",
-  "period_end": "2023-09-30",
-  "fiscal": "Q3 2023",
-  "kpi": {
-   "group": "retirement_services_flows",
-   "group_label": "Retirement Services Flows",
-   "key": "inflows_attributable_to_athene",
-   "label": "Inflows Attributable to Athene",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P21",
-  "value": 3101000000.0,
-  "jump": "changed 0.21x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961722000313/a1q22erfex992supplement.htm",
-  "prefix": "B_",
-  "period_end": "2022-03-31",
-  "fiscal": "Q1 2022",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "credit_adjustments_other",
-   "label": "Credit Adjustments & Other",
-   "unit": "currency"
-  },
-  "table": "B_T15",
-  "block": null,
-  "value": -524000000.0,
-  "jump": "changed 6x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "BAM",
-  "company": "BAM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1937926/000117184325002778/exh_991.htm",
-  "prefix": "A_",
-  "period_end": "2025-03-31",
-  "fiscal": "Q1 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "real_estate_fundraising",
-   "label": "Real Estate Fundraising",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P10",
-  "value": 7100000000.0,
-  "jump": "changed 10x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "BAM",
-  "company": "BAM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1937926/000117184326005272/exh_991.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fundraising",
-   "label": "Fundraising",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P6",
-  "value": 77000000000.0,
-  "jump": "changed 3.7x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "BAM",
-  "company": "BAM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1937926/000117184326005272/exh_991.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "private_equity_fundraising",
-   "label": "Private Equity Fundraising",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P10",
-  "value": 8600000000.0,
-  "jump": "changed 6.1x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "BAM",
-  "company": "BAM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1937926/000117184326005272/exh_991.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "credit_fundraising",
-   "label": "Credit Fundraising",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P13",
-  "value": 51000000000.0,
-  "jump": "changed 3.9x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "BAM",
-  "company": "BAM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1937926/000117184325005074/exh_991.htm",
-  "prefix": "A_",
-  "period_end": "2025-06-30",
-  "fiscal": "Q2 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "monetizations",
-   "label": "Monetizations",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P13",
-  "value": 36000000000.0,
-  "jump": "changed 3.6x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "BAM",
-  "company": "BAM",
-  "url": "https://www.sec.gov/Archives/edgar/data/1937926/000117184325007121/exh_991.htm",
-  "prefix": "A_",
-  "period_end": "2025-09-30",
-  "fiscal": "Q3 2025",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "energy_fundraising",
-   "label": "Energy Fundraising",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P12",
-  "value": 6300000000.0,
-  "jump": "changed 4.2x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868124000005/agmearningsrelease4q2023.htm",
-  "prefix": "B_",
-  "period_end": "2023-12-31",
-  "fiscal": "Q4 2023",
-  "kpi": {
-   "group": "retirement_services_flows",
-   "group_label": "Retirement Services Flows",
-   "key": "inflows_attributable_to_athene",
-   "label": "Inflows Attributable to Athene",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P20",
-  "value": 13026000000.0,
-  "jump": "changed 4.2x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491226000002/q425earningsrelease_vf.htm",
-  "prefix": "A_",
-  "period_end": "2025-12-31",
-  "fiscal": "Q4 2025",
-  "kpi": {
-   "group": "revenue_by_asset_management_product",
-   "group_label": "Revenue by Asset Management Product",
-   "key": "realized_performance_income",
-   "label": "Realized Performance Income",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P9",
-  "value": 182083000.0,
-  "jump": "changed 0.2x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868122000041/agmearningsrelease2q2022.htm",
-  "prefix": "B_",
-  "period_end": "2022-06-30",
-  "fiscal": "Q2 2022",
-  "kpi": {
-   "group": "retirement_services_flows",
-   "group_label": "Retirement Services Flows",
-   "key": "funding_agreements",
-   "label": "Funding Agreements Inflows",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P24",
-  "value": 1755000000.0,
-  "jump": "changed 0.31x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "U",
-  "company": "U",
-  "url": "https://s205.q4cdn.com/200788659/files/doc_earnings/2026/q2/generic/2026_Q2-Spreadsheet_FINAL.xlsx",
-  "prefix": "A_",
-  "period_end": "2024-06-30",
-  "fiscal": "Q2 2024",
-  "kpi": {
-   "group": "revenue_by_segment",
-   "group_label": "Strategic Revenue",
-   "key": "non_strategic_revenue",
-   "label": "Non-Strategic Revenue",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P4",
-  "value": 122229000.0,
-  "jump": "changed 0.91x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "V",
-  "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316120000043/q32020ex991.htm",
-  "prefix": "A_",
-  "period_end": "2020-06-30",
-  "fiscal": "Q3 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cross_border_volume_growth_total",
-   "label": "Cross-Border Volume Growth Total (Constant Dollars)",
-   "unit": "percent"
-  },
-  "table": null,
-  "block": "A_P14",
-  "value": -37.0,
-  "jump": "changed 18x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "V",
-  "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316120000043/q32020ex991.htm",
-  "prefix": "A_",
-  "period_end": "2020-06-30",
-  "fiscal": "Q3 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cross_border_volume_growth_ex_intra_europe",
-   "label": "Cross-Border Volume Growth Excluding Intra-Europe (Constant Dollars)",
-   "unit": "percent"
-  },
-  "table": null,
-  "block": "A_P14",
-  "value": -47.0,
-  "jump": "changed 9.4x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "V",
-  "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316116000053/vex991093016earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2016-09-30",
-  "fiscal": "Q4 2016",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "payments_volume_growth",
-   "label": "Payments Volume Growth (Constant Dollars)",
-   "unit": "percent"
-  },
-  "table": "A_T47",
-  "block": null,
-  "value": 47.1,
-  "jump": "changed 4.6x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "V",
-  "company": "V",
-  "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316116000053/vex991093016earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2016-09-30",
-  "fiscal": "Q4 2016",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "cross_border_volume_growth_total",
-   "label": "Cross-Border Volume Growth Total (Constant Dollars)",
-   "unit": "percent"
-  },
-  "table": "A_T58",
-  "block": null,
-  "value": 149.0,
-  "jump": "changed 30x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312517126730/d369551dex991.htm",
-  "prefix": "A_",
-  "period_end": "2017-03-31",
-  "fiscal": "Q1 2017",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "long_term_aus_net_inflows",
-   "label": "Long-Term AUS Net Inflows",
-   "unit": "currency"
-  },
-  "table": "A_T19",
-  "block": null,
-  "value": 5000000000000.0,
-  "jump": "changed 2.9e+02x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491226000022/q226earningsrelease_vf.htm",
-  "prefix": "A_",
-  "period_end": "2026-06-30",
-  "fiscal": "Q2 2026",
-  "kpi": {
-   "group": "revenue_by_asset_management_product",
-   "group_label": "Revenue by Asset Management Product",
-   "key": "fee_related_performance_revenues",
-   "label": "Fee Related Performance Revenues",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "A_P9",
-  "value": 254699000.0,
-  "jump": "changed 11x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134420000011/a2020q1earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2020-03-31",
-  "fiscal": "Q1 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_bottling",
-   "label": "Bottling Investments Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "table": "A_T14",
-  "block": null,
-  "value": -5.0,
-  "jump": "changed -0.19x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "KO",
-  "company": "KO",
-  "url": "https://www.sec.gov/Archives/edgar/data/21344/000002134420000037/a2020q2earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2020-06-26",
-  "fiscal": "Q2 2020",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "unit_case_volume_growth_bottling",
-   "label": "Bottling Investments Unit Case Volume Growth",
-   "unit": "percent"
-  },
-  "table": "A_T5",
-  "block": null,
-  "value": -36.0,
-  "jump": "changed 7.2x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000088698226000529/a3q26gsearningsresults.htm",
-  "prefix": "A_",
-  "period_end": "2026-09-30",
-  "fiscal": "Q3 2026",
-  "kpi": {
-   "group": "revenue_by_product_awm",
-   "group_label": "Asset & Wealth Management Revenue by Product",
-   "key": "incentive_fees",
-   "label": "Incentive fees",
-   "unit": "currency"
-  },
-  "table": "A_T36",
-  "block": null,
-  "value": 587000000.0,
-  "jump": "changed 5.2x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868124000044/agmearningsrelease1q2024.htm",
-  "prefix": "B_",
-  "period_end": "2024-03-31",
-  "fiscal": "Q1 2024",
-  "kpi": {
-   "group": "retirement_services_flows",
-   "group_label": "Retirement Services Flows",
-   "key": "funding_agreements",
-   "label": "Funding Agreements Inflows",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P20",
-  "value": 8041000000.0,
-  "jump": "changed 3.5x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868126000021/agmearningsrelease1q2026.htm",
-  "prefix": "B_",
-  "period_end": "2026-03-31",
-  "fiscal": "Q1 2026",
-  "kpi": {
-   "group": "inflows_by_segment",
-   "group_label": "Inflows by Segment",
-   "key": "asset_management",
-   "label": "Asset Management Inflows",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P9",
-  "value": 95000000000.0,
-  "jump": "changed 3.4x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "MS",
-  "company": "MS",
-  "url": "https://www.sec.gov/Archives/edgar/data/895421/000115752322000850/a52777919ex99_2.htm",
-  "prefix": "B_",
-  "period_end": "2022-06-30",
-  "fiscal": "Q2 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "fee_based_asset_flows",
-   "label": "Fee-based Asset Flows",
-   "unit": "currency"
-  },
-  "table": "B_T14",
-  "block": null,
-  "value": 28500000000.0,
-  "jump": "changed 0.29x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "JPM",
-  "company": "JPM",
-  "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961720000362/a2q20erfexhibit992supp.htm",
-  "prefix": "B_",
-  "period_end": "2020-06-30",
-  "fiscal": "Q2 2020",
-  "kpi": {
-   "group": "cib_revenue_by_business",
-   "group_label": "Commercial & Investment Bank Revenue by Business",
-   "key": "investment_banking",
-   "label": "Investment Banking",
-   "unit": "currency"
-  },
-  "table": "B_T69",
-  "block": null,
-  "value": 3401000000.0,
-  "jump": "changed 3.8x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "KKR",
-  "company": "KKR",
-  "url": "https://www.sec.gov/Archives/edgar/data/1404912/000140491219000004/q418earningsrelease.htm",
-  "prefix": "A_",
-  "period_end": "2018-12-31",
-  "fiscal": "Q4 2018",
-  "kpi": {
-   "group": "revenue_by_asset_management_product",
-   "group_label": "Revenue by Asset Management Product",
-   "key": "incentivefees",
-   "label": "Incentive Fees",
-   "unit": "currency"
-  },
-  "table": "A_T19",
-  "block": null,
-  "value": 86271000.0,
-  "jump": "changed 4.8x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "GS",
-  "company": "GS",
-  "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312522195706/d322190dex991.htm",
-  "prefix": "A_",
-  "period_end": "2022-06-30",
-  "fiscal": "Q2 2022",
-  "kpi": {
-   "group": "operating",
-   "group_label": "Operating Metrics",
-   "key": "long_term_aus_net_inflows",
-   "label": "Long-Term AUS Net Inflows",
-   "unit": "currency"
-  },
-  "table": "A_T34",
-  "block": null,
-  "value": 293000000000.0,
-  "jump": "changed 12x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868123000031/agmearningsrelease3q2023.htm",
-  "prefix": "B_",
-  "period_end": "2023-09-30",
-  "fiscal": "Q3 2023",
-  "kpi": {
-   "group": "retirement_services_flows",
-   "group_label": "Retirement Services Flows",
-   "key": "funding_agreements",
-   "label": "Funding Agreements Inflows",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P21",
-  "value": 3245000000.0,
-  "jump": "changed 22x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868123000011/agmearningsrelease1q2023.htm",
-  "prefix": "B_",
-  "period_end": "2023-03-31",
-  "fiscal": "Q1 2023",
-  "kpi": {
-   "group": "inflows_by_segment",
-   "group_label": "Inflows by Segment",
-   "key": "asset_management",
-   "label": "Asset Management Inflows",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P12",
-  "value": 45000000000.0,
-  "jump": "changed 3.2x in a quarter",
-  "legitimate": true,
-  "planted": false
- },
- {
-  "purpose": "explain",
-  "symbol": "APO",
-  "company": "APO",
-  "url": "https://www.sec.gov/Archives/edgar/data/1858681/000185868123000021/agmearningsrelease2q2023.htm",
-  "prefix": "B_",
-  "period_end": "2023-06-30",
-  "fiscal": "Q2 2023",
-  "kpi": {
-   "group": "retirement_services_flows",
-   "group_label": "Retirement Services Flows",
-   "key": "funding_agreements",
-   "label": "Funding Agreements Inflows",
-   "unit": "currency"
-  },
-  "table": null,
-  "block": "B_P21",
-  "value": 148000000.0,
-  "jump": "changed 0.099x in a quarter",
-  "legitimate": true,
-  "planted": false
  },
  {
   "purpose": "select",

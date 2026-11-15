@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from collections import Counter
 
-import math
 import re
 from datetime import date, timedelta
 
@@ -14,14 +13,13 @@ from ..quality.checks import count_jump, parts_add_up, reported_matches
 from ..quality.reasons import (ADDS_TO_XBRL as _ADDS_TO_XBRL, ASIDES, CONFIRMED_LATER as _CONFIRMED_LATER, EQUALS_XBRL as _EQUALS_XBRL,
                               GROUP_HOLDS, NO_REVENUE_NOTE, OTHER_PART_NOTE, PROOFS, RESTATED_LATER as _RESTATED_LATER, TIES_OUT, UNANCHORED,
                               WITHIN_XBRL as _WITHIN_XBRL, has, is_, note_with, only, without)
-from ..readers.extract import _PER_UNIT_KPI, ReadValue, column_header
+from ..readers.extract import ReadValue, column_header
 from ..rules.period import release_unit
-from ..rules.scale import _PER_UNIT
 from ..sources.base import FilingRef
-from .shared import (_rescaled, AI_GROUP_PREFIX, _days, _rounding, _same_chain, _significant,
-                     _year_ago_cells, held_for_later, list_parents, value_key)
+from .shared import (AI_GROUP_PREFIX, _days, _rounding, _significant,
+                     _year_ago_cells, equals_named_line, held_for_later, list_parents, value_key,
+                     xbrl_figures)
 
-MAX_YEAR_RATIO = 3.0
 # A split of part of a reported line (Adobe's two customer groups: 99.5% of its subscription revenue, the rest its
 # advertising business's) covers at least this share of it.
 _MIN_COVERAGE = 0.99
@@ -184,24 +182,19 @@ class SeriesChecks:
 
     def _prove_flagged(self, releases: list[FilingRef], parents: dict[tuple[str, str], str] | None = None) -> list[dict]:
         """Settles flagged release values by evidence, with no AI and no one reviewing them:
-        - a value equal to a figure the company reported in XBRL for the same period is proven;
+        - a value equal to the same line as the company reported it in XBRL for the same period is proven;
         - a breakdown whose parts add up to such a figure is proven whole;
         - the next year's release repeats each figure in its year-ago column: the same number proves it, a single other
           number is the figure as restated and replaces it, and none matching among several rejects it.
         What nothing settles stays unserved. A later release is fetched for a value only until it has been checked."""
         flagged = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] == "needs_review"]
-        official: dict[bool, list[tuple[str, float]]] = {}
-        for v in self.values.values():
-            if (v["method"] in ("xbrl", "derived") and not v["group_key"].startswith(AI_GROUP_PREFIX)
-                    and v["validation_status"] == "verified"):
-                figures = official.setdefault(v["fiscal_period"] == "FY", [])
-                figures.append((v["period_end"], float(v["value"])))
-                if (v.get("locator") or {}).get("total"):
-                    figures.append((v["period_end"], float(v["locator"]["total"])))
+        official = xbrl_figures(self.values.values())
 
         def reported(row: dict, figure: float, tolerance: float) -> bool:
+            """A sum of a breakdown's parts equal to a reported figure: any line or total (parts adding up to a line is
+            no coincidence, and a breakdown's total is often a line of another split)."""
             return any(abs(_days(end, row["period_end"])) <= 12 and abs(other - figure) <= abs(figure) * tolerance
-                       for end, other in official.get(row["fiscal_period"] == "FY", []))
+                       for end, other, _label in official.get(row["fiscal_period"] == "FY", []))
 
         def settle(row: dict, note: str, **fields) -> None:
             settled[value_key(row)] = {**row, "validation_status": "verified", **fields,
@@ -224,7 +217,7 @@ class SeriesChecks:
 
         for v in flagged:
             value = float(v["value"])
-            if v["unit"] == "currency" and _significant(value) and reported(v, value, 1e-4) and whole(v):
+            if v["unit"] == "currency" and _significant(value) and equals_named_line(official, v) and whole(v):
                 settle(v, _EQUALS_XBRL)
         # A restatement far from the figure it replaced was a column of another length (a year for a quarter), and an
         # amount with a fraction of a dollar was scaled off its cell by a restated figure: the figure is restored and
@@ -268,7 +261,7 @@ class SeriesChecks:
             if abs(sum(parts) - stated) > sum(_rounding(value) for value in [*parts, stated]):
                 continue
             if any(abs(_days(end, rows[0]["period_end"])) <= 12 and _MIN_COVERAGE * other <= stated <= other
-                   for end, other in official.get(rows[0]["fiscal_period"] == "FY", [])):
+                   for end, other, _label in official.get(rows[0]["fiscal_period"] == "FY", [])):
                 for v in waiting:
                     settle(v, _WITHIN_XBRL)
         # A breakdown period takes the next year's restated figures whole or not at all: a part the next release no longer
@@ -389,16 +382,13 @@ class SeriesChecks:
                 continue
             notes = v.get("notes") or []
             if only(notes, ["jump"]):
-                key = f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}"
-                before = self._previous(date.fromisoformat(v["period_end"][:10]), annual=True).get(key)
                 siblings = by_filing.get((v.get("source_accession") or "", v["period_end"]), [])
                 parts = sum(float(o["value"]) for o in siblings if o["group_key"] == v["group_key"])
                 total = float((v.get("locator") or {}).get("total") or 0)
+                # A new node ramping 3.5× in a year is growth; the year's table adding up exactly is the check. How far
+                # the year moved from the year before proves nothing either way: the year stays held until a filing does.
                 if total and abs(parts - total) <= abs(total) * 0.001:
-                    # A new node ramping 3.5× in a year is growth; the year's table adding up exactly is the check.
                     cleared.append({**v, "validation_status": "verified", "notes": ["the year's breakdown reconciles"]})
-                elif before is None or 1 / MAX_YEAR_RATIO <= float(v["value"]) / before <= MAX_YEAR_RATIO:
-                    cleared.append({**v, "validation_status": "verified", "notes": ["checked against the prior year"]})
         for (accession, _end), rows in by_filing.items():
             for group_key in {v["group_key"] for v in rows if v["group_kind"] == "revenue_breakdown"}:
                 members = [m for m in rows if m["group_key"] == group_key]
@@ -423,57 +413,8 @@ class SeriesChecks:
                     cleared += [{**m, "validation_status": "verified", "locator": {**m["locator"], "total": parts},
                                  "reconciliation_error_pct": 0, "notes": ["reconciled to another figure in the same report"]}
                                 for m in members]
-        cleared += self._scale_runs()
         cleared += self._outdated_flags()
         return cleared
-
-    def _scale_runs(self) -> list[dict]:
-        """A run of a metric's figures read without their table's scale (Visa's "Processed Transactions (millions)",
-        29,321 for 29.3 billion from Q2 2018 to Q3 2020): the series steps by almost exactly a thousand, a million or a
-        billion where the run starts and ends, so it splits into stretches by those steps, and the stretches off the
-        scale most of its figures share are put back on it. Only the run's edges jump, so a jump check alone flags two
-        quarters and leaves the run between them; an owner's figure is never changed, and percentages have no scale."""
-        series: dict[tuple, list[dict]] = {}
-        for v in self.values.values():
-            # A per-unit amount has no table scale to put back: FedEx's $15.32 composite yield, read right, was raised
-            # a thousandfold to match quarters read wrongly with the table's "in thousands".
-            if (v["method"] == "ai" and v["group_kind"] == "metric" and v["validation_status"] != "rejected"
-                    and v["unit"] != "percent" and float(v["value"]) > 0 and not _PER_UNIT_KPI.search(v.get("kpi_label") or "")
-                    # Nor one whose row states its unit (Exxon's "Brent ($/b)"): $74.35 was cut to 0.000074.
-                    and not _PER_UNIT.search(str((v.get("locator") or {}).get("row_label") or ""))):
-                series.setdefault((v["group_key"], v["kpi_key"], v["fiscal_period"] == "FY"), []).append(v)
-        records = []
-        for rows in series.values():
-            rows.sort(key=lambda v: (v["period_end"], v["fiscal_period"]))
-            levels, level = [], 0
-            for previous, current in zip([None, *rows], rows):
-                if previous is not None:
-                    step = math.log10(float(current["value"]) / float(previous["value"]))
-                    thousands = round(step / 3)
-                    if thousands and abs(step - 3 * thousands) < 0.3:
-                        level += thousands
-                levels.append(level)
-            counts = {item: levels.count(item) for item in set(levels)}
-            if len(counts) < 2:
-                continue
-            main = max(counts, key=lambda item: (counts[item], -abs(item)))
-            if counts[main] * 2 <= len(rows):
-                continue  # no scale most figures share
-            for index, (v, at) in enumerate(zip(rows, levels)):
-                if at == main and v["validation_status"] == "needs_review" and index and levels[index - 1] != main \
-                        and all(is_(note, "jump", "reviewed") for note in v.get("notes") or []):
-                    # Its jump was from the run before it.
-                    records.append({**v, "validation_status": "verified", "notes": ["the figure before it was off its scale"]})
-                if at == main or v.get("owner_decision"):
-                    continue
-                factor = 10 ** (3 * (main - at))
-                notes = without(v.get("notes"), "jump", "reviewed")
-                records.append({**v, "value": round(float(v["value"]) * factor, 6), "locator": _rescaled(v.get("locator"), factor),
-                                "validation_status": "verified" if not notes else v["validation_status"],
-                                "notes": [*notes, f"read without its table's scale: {factor:g}× to match the series"]})
-        if records:
-            self.log(f"{self.symbol}: {len(records)} figures put back on their series' scale")
-        return records
 
     def _outdated_flags(self) -> list[dict]:
         """Flags set by a check that today's checks no longer raise, cleared from the stored figures alone:
