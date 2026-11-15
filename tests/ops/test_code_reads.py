@@ -160,3 +160,9 @@ def test_a_filings_own_period_comes_from_its_record_when_its_figures_are_all_com
     state = [_value("dau", 3.6, period=("2025", "Q2"))]
     rows = score_company("META", state, {}, {"a1"}, {}, held_out=False, filings={"a1": {"period_end": "2026-06-30"}})
     assert rows[0]["why"] == "an earlier period's figure in a later filing"
+
+
+def test_a_learned_rules_reading_is_the_rules_though_traced_like_a_replay():
+    from kpi_extractor.evals.code_reads import reader
+    assert reader({"locator": {"rule": "anchor-phrase", "replayed_from": "a1"}}) == "rule"
+    assert reader({"locator": {"replayed_from": "a1"}}) == "replay"

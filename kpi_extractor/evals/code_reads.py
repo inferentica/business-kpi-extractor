@@ -365,6 +365,8 @@ def score_company(symbol: str, state_values: list[dict], kinds: dict[str, str], 
 def reader(value: dict) -> str:
     """Which code read a figure this run: replay, or the code reader its locator names."""
     locator = value.get("locator") or {}
+    if locator.get("rule"):  # a learned rule's reading is traced like a replay; it is the rule's
+        return "rule"
     if locator.get("replayed_from"):
         return "replay"
     return next((name for name in CODE_READERS if locator.get(name)), "rule" if locator.get("rule") else "other")
