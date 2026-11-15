@@ -73,9 +73,11 @@ def score(folders: list[Path], golden: Path = GOLDEN) -> dict:
         elif line is None:
             outcome = "missing"
         else:
+            # A figure as its filing printed it: a split-adjusted per-share line keeps its printed figure beside it.
+            printed = line.get("printed_value", line["value"])
             tolerance = 0.5 * float(entry.get("scale") or 1) + 1e-9
-            outcome = "correct" if abs(line["value"] - entry["value"]) <= tolerance else "wrong"
-        results.append({**entry, "outcome": outcome, "served": line["value"] if line else None})
+            outcome = "correct" if abs(printed - entry["value"]) <= tolerance else "wrong"
+        results.append({**entry, "outcome": outcome, "served": line.get("printed_value", line["value"]) if line else None})
     return {"results": results, "summary": _summary(results)}
 
 

@@ -23,6 +23,7 @@ from ..readers.xbrl.read import read_filing
 from ..selection.choose import choose
 from ..selection.fourth import derive_fourth_quarters
 from ..selection.identity import apply_identity
+from ..selection.splits import adjust_for_splits, split_ledger
 from ..selection.period_dates import align_dates
 from ..selection.signs import sign_ties
 from ..selection.summaries import choose_summaries, summary_coverage
@@ -154,6 +155,7 @@ def read_company(symbol: str, since: date, out: Path, log=print) -> dict:
     chosen = choose(readings, printed_signs)
     keys = apply_identity(chosen, readings)  # one key per line across the company's eras (selection/identity.py)
     chosen += derive_fourth_quarters(chosen, readings, keys)  # fourth quarters of one vintage (selection/fourth.py)
+    adjust_for_splits(chosen, split_ledger(readings))  # per-share figures on today's share basis (selection/splits.py)
     mark = _phase(phases, "choose", mark)
     summary = summarise(symbol, profile, since, filings, readings, chosen, time.time() - started)
     summary_figures = choose_summaries(summaries, readings, chosen)
