@@ -62,6 +62,18 @@ def _digits(figure: str) -> str:
     return re.sub(r"\D", "", figure)
 
 
+def _marks(text: str, match: re.Match) -> tuple[bool, bool]:
+    """A figure's sign and percent as printed around it: negative when a minus or an opening bracket comes just
+    before it ("(357)", "-30", "−4.1%"), a percent when "%" follows ("12.5%", "12.5 %")."""
+    before, after = text[:match.start()].rstrip()[-1:], text[match.end():].lstrip()[:1]
+    return before in ("(", "-", "−", "–"), after == "%"
+
+
+def _figures(text: str) -> list[tuple[str, bool, bool]]:
+    """Each figure of a text with its sign and percent."""
+    return [(match.group(0), *_marks(text, match)) for match in _FIGURE.finditer(text)]
+
+
 def _alike(ours: str, theirs: str) -> bool:
     """Two readings of one figure: the same digits, and the same separators, or a comma and a point swapped only
     where three digits follow (a thousands group, which RapidOCR reads either way)."""
@@ -74,25 +86,30 @@ def _alike(ours: str, theirs: str) -> bool:
 
 
 def _confirm(text: str, seen: Counter, single: dict[str, str]) -> tuple[str, int]:
-    """The text with each figure that `seen` (the other model's figures in the region) also has: agreed, in the
-    rendering whose separators agree. Every other figure stays as DeepSeek read it and is listed in `single`."""
+    """The text with each figure that `seen` (the other model's figures in the region, with their signs and percent
+    signs) also has, sign and percent sign alike: agreed, in the rendering whose separators agree. Every other figure
+    stays as DeepSeek read it and is listed in `single`."""
     kept = 0
 
-    def check(match: re.Match) -> str:
-        nonlocal kept
-        figure = match.group(0)
-        other = next((theirs for theirs in seen if seen[theirs] > 0 and _alike(figure, theirs)), None)
-        if other is None:
-            single.setdefault(_digits(figure), DEEPSEEK)
-            return figure
-        seen[other] -= 1
-        kept += 1
-        # Swapped separators: the reading whose separators agree with each other ("19,901,959,514", not DeepSeek's
-        # "19,901,959.514"); DeepSeek's when both do, as it swapped them far less often in the probe.
-        return other if len(set(re.sub(r"\d", "", figure))) > 1 and len(set(re.sub(r"\d", "", other))) <= 1 else figure
-    # Only text outside tags is checked: a table's markup never holds a figure.
+    def checked(part: str) -> str:
+        def check(match: re.Match) -> str:
+            nonlocal kept
+            figure, (negative, percent) = match.group(0), _marks(part, match)
+            # The same digits with another sign or no percent sign are another figure: "(357)" is not "357".
+            other = next((theirs for theirs in seen if seen[theirs] > 0 and _alike(figure, theirs[0])
+                          and theirs[1:] == (negative, percent)), None)
+            if other is None:
+                single.setdefault(_digits(figure), DEEPSEEK)
+                return figure
+            seen[other] -= 1
+            kept += 1
+            # Swapped separators: the reading whose separators agree with each other ("19,901,959,514", not DeepSeek's
+            # "19,901,959.514"); DeepSeek's when both do, as it swapped them far less often in the probe.
+            return other[0] if len(set(re.sub(r"\d", "", figure))) > 1 and len(set(re.sub(r"\d", "", other[0]))) <= 1 else figure
+        return _FIGURE.sub(check, part)
+    # Only text outside tags is checked: a table's markup never holds a figure. A cell's sign is the cell's own.
     parts = re.split(r"(<[^>]+>)", text)
-    return "".join(part if part.startswith("<") else _FIGURE.sub(check, part) for part in parts), kept
+    return "".join(part if part.startswith("<") else checked(part) for part in parts), kept
 
 
 def _lines(words: list[tuple[float, float, float, float, str]]) -> list[str]:
@@ -144,8 +161,8 @@ def agreed_page(deepseek: str, words: list[tuple[float, float, float, float, str
             continue
         region = (max(0, x0 - _MARGIN) * width / 1000, max(0, y0 - _MARGIN) * height / 1000,
                   min(1000, x1 + _MARGIN) * width / 1000, min(1000, y1 + _MARGIN) * height / 1000)
-        seen = Counter(figure for w in words if region[0] <= (w[0] + w[2]) / 2 <= region[2]
-                       and region[1] <= (w[1] + w[3]) / 2 <= region[3] for figure in _FIGURE.findall(w[4]))
+        inside = [w for w in words if region[0] <= (w[0] + w[2]) / 2 <= region[2] and region[1] <= (w[1] + w[3]) / 2 <= region[3]]
+        seen = Counter(figure for line in _lines(inside) for figure in _figures(line))
         content = _TOKEN.sub(" ", content)
         if "<table" not in content:
             content = f"<p>{html.escape(re.sub(r'^#+ ', '', content))}</p>"
@@ -160,7 +177,9 @@ def read_image_pages(sources: list[str], fetch: Callable[[str], bytes], deepseek
                      min_side: int = 400, workers: int = _WORKERS) -> tuple[dict[str, str], dict[str, str], dict]:
     """Each page picture as HTML (by its link), the figures one model alone read across them (digits -> the model), and
     what was read: `deepseek` reads a page (its text, and whether it gave regions), `local` gives RapidOCR's words. A
-    logo or an icon is left out. Pages are read a few at a time (a 33-page deck took five minutes one by one)."""
+    logo or an icon is left out, and so is a page that could not be fetched or recognized, counted in "pages not read":
+    one broken link once failed the whole release, three attempts and then given up. Pages are read a few at a time
+    (a 33-page deck took five minutes one by one)."""
     import threading
     from concurrent.futures import ThreadPoolExecutor
 
@@ -168,12 +187,15 @@ def read_image_pages(sources: list[str], fetch: Callable[[str], bytes], deepseek
 
     def read(numbered: tuple[int, str]):
         number, source = numbered
-        data = fetch(source)
-        if min(size_of(data)) < min_side:
-            return source, None, 0, {}, False  # a logo, an icon or a bullet, not a page
-        text, _regions = deepseek(source.rsplit("/", 1)[-1], data)
-        with one_at_a_time:
-            words = [(w.x0, w.y0, w.x1, w.y1, w.text) for w in local(data)]
+        try:
+            data = fetch(source)
+            if min(size_of(data)) < min_side:
+                return source, None, 0, {}, False  # a logo, an icon or a bullet, not a page
+            text, _regions = deepseek(source.rsplit("/", 1)[-1], data)
+            with one_at_a_time:
+                words = [(w.x0, w.y0, w.x1, w.y1, w.text) for w in local(data)]
+        except Exception:  # noqa: BLE001 - a broken link or one failed recognition costs that page, not the release
+            return source, None, 0, {}, None
         page, kept, single = agreed_page(text, words, size_of(data))
         tag = f'<div class="ocr-page" data-page="{number}" data-image="{html.escape(source)}">{page}</div>'
         return source, tag, kept, single, not text.strip()
@@ -182,6 +204,7 @@ def read_image_pages(sources: list[str], fetch: Callable[[str], bytes], deepseek
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
         for source, page, kept, single, empty in pool.map(read, enumerate(sources, 1)):
             if page is None:
+                totals["pages not read"] += int(empty is None)  # left out: no figure on it reaches any reader
                 continue
             totals["pages"] += 1
             totals["empty pages"] += int(empty)
@@ -227,3 +250,26 @@ def hold_single_reads(read: list, document) -> None:
                 continue
             item.status = "needs_review"
             item.notes.append(f"{ONE_READER} ({model})")
+
+
+UNREAD = "[?]"  # a figure one OCR model alone read, as the code readers see it: no figure at all
+
+
+def agreed_only(document):
+    """The document as code readers see it: each figure one OCR model alone read is masked, so no reader without the
+    hold (release statements, quarter tables, quoted rows, release breakdowns and columns) can store it. The AI's
+    reading sees it and holds it (hold_single_reads). The same document when its pages had no single reads."""
+    from .document import Document, Table, TextBlock
+
+    single = getattr(document, "single_reads", None) or {}
+    if not single:
+        return document
+
+    def mask(text: str) -> str:
+        return _FIGURE.sub(lambda match: UNREAD if _digits(match.group(0)) in single else match.group(0), text or "")
+
+    masked = Document(source_url=document.source_url, order=list(document.order), part_urls=dict(document.part_urls))
+    masked.tables = {key: Table(id=table.id, context=mask(table.context), rows=[[mask(cell) for cell in row] for row in table.rows])
+                     for key, table in document.tables.items()}
+    masked.blocks = {key: TextBlock(id=block.id, text=mask(block.text)) for key, block in document.blocks.items()}
+    return masked

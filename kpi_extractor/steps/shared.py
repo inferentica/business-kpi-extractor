@@ -7,7 +7,7 @@ from datetime import date
 from ..ai import Spec
 from ..sources.archive import filing_folder
 from ..quality.checks import _days, _same, _significant  # noqa: F401 - used here and by the steps
-from ..quality.reasons import is_
+from ..quality.reasons import has, is_
 from ..quality.stated import _names
 from ..documents.document import Document, clean, parse_number
 from ..readers.extract import column_header
@@ -137,6 +137,12 @@ def held_for_later(value: dict, cells: list[float], checked: str) -> dict:
     return {**value, "validation_status": "needs_review", "notes": notes}
 
 
+def proof_tolerance(row: dict, usual: float) -> float:
+    """How close a proof's figure must be: a figure one OCR model alone read only digit for digit, since a misread last
+    digit hides inside any rounding (ASE's 21,932,480 read as 21,932,490 is 0.00005% off); any other, as usual."""
+    return 1e-9 if has(row.get("notes"), "one_ocr_reader") else usual
+
+
 def xbrl_figures(values) -> dict[bool, list[tuple[str, float, str | None]]]:
     """The figures the company reported in XBRL, by whether they are full years: each line's period end, value and
     label, and each split's total (labelled None: the company's total, whichever line it is the sum of)."""
@@ -154,7 +160,7 @@ def equals_named_line(official: dict, row: dict) -> bool:
     """Whether a figure equals, to 0.01%, an XBRL line of its period whose label names it (Apple's Services, KKR's
     capital markets fees): the same line, reported twice. A figure that only equals some other line is a coincidence,
     no proof: Wells Fargo's Q4 2024 loss on debt securities, -$448 million, equals its segments' reconciling items."""
-    figure = float(row["value"])
-    return any(abs(_days(end, row["period_end"])) <= 12 and abs(other - figure) <= abs(figure) * 1e-4 and label is not None
+    figure, tolerance = float(row["value"]), proof_tolerance(row, 1e-4)
+    return any(abs(_days(end, row["period_end"])) <= 12 and abs(other - figure) <= abs(figure) * tolerance and label is not None
                and _names(label, row.get("kpi_label"))
                for end, other, label in official.get(row["fiscal_period"] == "FY", []))

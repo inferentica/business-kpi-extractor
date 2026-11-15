@@ -6,7 +6,7 @@ from concurrent.futures import Future
 from datetime import date
 
 from ..documents.document import Document, parse_document
-from ..documents.image_pages import picture_pages, read_image_pages
+from ..documents.image_pages import agreed_only, picture_pages, read_image_pages
 from ..domain.fiscal import learn_year_offset, offset_lead
 from ..readers.trace import untraced
 from ..sources.base import FilingRef
@@ -95,6 +95,7 @@ class FilingLoading:
         key = "+".join(ref.accession for ref in refs)
         if key not in self._documents:
             combined: Document | None = None
+            parts: list[tuple[Document, Document]] = []  # each exhibit as read, and as code readers see it
             exhibits = [exhibit for ref in refs for exhibit in ref.exhibits[:6]][:26]
             for index, exhibit in enumerate(exhibits):
                 raw = self._waiting(self._exhibit(exhibit).result)
@@ -102,6 +103,7 @@ class FilingLoading:
                     continue
                 part = parse_document(self._pictures_read(raw, exhibit.url), exhibit.url, prefix=f"{string.ascii_uppercase[index]}_")
                 part.single_reads = self.__dict__.get("_single_reads", {}).get(exhibit.url, {})
+                parts.append((part, agreed_only(part)))
                 if combined is None:
                     combined = part
                 else:
@@ -109,7 +111,18 @@ class FilingLoading:
             if combined is None:
                 raise ValueError("no readable exhibit")
             self._documents[key] = combined
+            if any(code is not part for part, code in parts):
+                code_view = Document(source_url=combined.source_url)
+                for _part, code in parts:
+                    code_view.extend(code)
+                self.__dict__.setdefault("_code_documents", {})[key] = code_view
         return self._documents[key]
+
+    def _code_document(self, *refs: FilingRef) -> Document:
+        """The document as code readers read it: figures one OCR model alone read are masked (image_pages.agreed_only),
+        so only the AI's reading, which holds them, sees them. The same document for a filing with no picture pages."""
+        combined = self._document(*refs)
+        return self.__dict__.get("_code_documents", {}).get("+".join(ref.accession for ref in refs), combined)
 
     def _pictures_read(self, raw: bytes | str, url: str) -> bytes | str:
         """An exhibit whose pages are only pictures, as two OCR models read it (documents/image_pages.py);

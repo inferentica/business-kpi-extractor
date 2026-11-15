@@ -73,7 +73,7 @@ class ReleaseTableReading:
                     groups.setdefault(value["group_key"], []).append(value)
             past = {(value["group_key"], value["kpi_key"]): float(value["value"]) for value in reported
                     if (value["fiscal_year"], value["fiscal_period"]) == year_ago}
-            document = self._document(latest)
+            document = self._code_document(latest)
             records: list[dict] = []
             tables: dict[str, str] = {}
             # Subtotal groups ("…_levels") last: their lines are looked for in the table their breakdown came from.
@@ -151,7 +151,7 @@ class ReleaseTableReading:
         for quarter in sorted(reach)[-40:]:
             ref = own[quarter]
             try:
-                document = self._document(ref)
+                document = self._code_document(ref)
             except Exception:  # noqa: BLE001 - an unreadable release gives nothing
                 continue
             texts[ref.accession] = [(document.url_of(key), item_text(document, key)) for key in document.order]
@@ -220,7 +220,7 @@ class ReleaseTableReading:
             """The release's exhibits, each searched on its own and kept with its own link."""
             if ref.accession not in loaded and len(loaded) < 250:
                 try:
-                    document = self._document(ref)
+                    document = self._code_document(ref)
                     loaded[ref.accession] = [(document.url_of(key), text) for key, text in exhibit_texts(document)]
                 except Exception:  # noqa: BLE001 - an unreadable release gives nothing
                     loaded[ref.accession] = []
@@ -324,7 +324,7 @@ class ReleaseTableReading:
             if ref.period_end is None:
                 continue
             try:
-                document = self._document(ref)
+                document = self._code_document(ref)
             except Exception:  # noqa: BLE001
                 continue
             own = fiscal_label(ref.period_end, self.profile.fiscal_year_end, year_offset=self.offset)
@@ -351,8 +351,8 @@ class ReleaseTableReading:
                       and v["validation_status"] == "verified" and (v["fiscal_year"], v["fiscal_period"]) == own]:
             locator = value.get("locator") or {}
             label = None
-            if locator.get("table") in self._document(ref).tables and isinstance(locator.get("row"), int):
-                table = self._document(ref).tables[locator["table"]]
+            if locator.get("table") in self._code_document(ref).tables and isinstance(locator.get("row"), int):
+                table = self._code_document(ref).tables[locator["table"]]
                 label = clean(table.rows[locator["row"]][0]) if locator["row"] < len(table.rows) else None
             elif locator.get("quote"):
                 label = re.split(r"\s\$?\(?[\d,.]+\)?(?:\s|$)", clean(locator["quote"]), maxsplit=1)[0]
@@ -373,7 +373,7 @@ class ReleaseTableReading:
                                           for v in self.values.values()):
                     continue
                 records.append({**value, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
-                                "value": figure * scale, "source_url": self._document(ref).url_of(grid.source),
+                                "value": figure * scale, "source_url": self._code_document(ref).url_of(grid.source),
                                 "notes": [f"an earlier column of the release for {own[1]} {own[0]}"],
                                 "locator": {"release_column": end.isoformat(), "row": label, "source": grid.source}})
         return records
@@ -427,7 +427,7 @@ class ReleaseTableReading:
                     line = members[member]
                     records.append({**line, "fiscal_year": quarter[0], "fiscal_period": quarter[1], "period_end": end.isoformat(),
                                     "value": round(figure, 2), "method": CHART_METHOD, "source_accession": ref.accession,
-                                    "source_url": self._document(ref).url_of(sources[member]),
+                                    "source_url": self._code_document(ref).url_of(sources[member]),
                                     "filed_at": ref.filed.isoformat(), "reconciliation_error_pct": 0,
                                     "notes": [f"an earlier column of the release for {own[1]} {own[0]}"],
                                     "locator": {"release_table": "history", "total": total, "member": (line.get("locator") or {}).get("member")}})
@@ -445,7 +445,7 @@ class ReleaseTableReading:
 
     def _release_revenue(self, ref: FilingRef) -> tuple[float, str | None] | None:
         """The quarter's net revenue as its release states it: its income statement, else its summary table."""
-        document = self._document(ref)
+        document = self._code_document(ref)
         for statement in release_statements(document):
             if statement.statement == "income" and abs((statement.period_end - ref.period_end).days) <= 3:
                 revenue = next((line["value"] for line in statement.lines if line["concept"] == "release_Revenues"), None)

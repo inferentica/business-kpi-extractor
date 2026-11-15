@@ -307,7 +307,7 @@ class SeriesIdentity:
                 before = {old: float(v["value"]) for v in quarters for old in ended
                           if v["kpi_key"] == old and abs(_days(v["period_end"], target)) <= 12}
                 try:
-                    cells = _year_ago_cells(self._document(ref), opening["locator"], float(opening["value"]))
+                    cells = _year_ago_cells(self._code_document(ref), opening["locator"], float(opening["value"]))
                 except Exception:  # noqa: BLE001 - an unreadable release links nothing
                     continue
                 matches = [old for old, value in before.items() if any(abs(cell - value) <= abs(value) * 1e-4 for cell in cells)]
