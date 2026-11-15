@@ -441,13 +441,15 @@ class AiReading:
         "$2,187" billion) is read at the full figure's cell, through every check a reading's cell passes; the rounded
         cell stays in the locator. The readers then agree whichever of the two tables each chose."""
         try:
-            quarter = int(fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)[1][1])
+            year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)
+            fiscal_year, quarter = int(year), int(period[1])
         except Exception:  # noqa: BLE001 - no fiscal quarter: a column's quarter name confirms nothing
-            quarter = None
+            fiscal_year, quarter = None, None
         names = company_segments(list(getattr(self, "values", {}).values()))
         kept = []
         for item in read:
-            found = precise_cell(document, item.locator, item.value, item.kpi.label, expected, quarter, names) \
+            found = precise_cell(document, item.locator, item.value, item.kpi.label, expected, quarter, names,
+                                 fiscal_year) \
                 if item.group.kind == "metric" and item.kpi.unit in ("currency", "count") and not item.is_total else None
             if found:
                 table, row, col, label, scale = found
