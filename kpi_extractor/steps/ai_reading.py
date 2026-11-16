@@ -187,7 +187,7 @@ class AiReading:
             # income"), stands beside rows that are confirmed, as in a year's reading (_confirmed_years).
             new = {item.kpi.key for item in parts if whole and any(i.is_total for i in items) and f"{group.key}.{item.kpi.key}" not in listed}
             if all(item.kpi.key in new or self._same_place_as_last(item, expected, document, before := stored.get(f"{group.key}.{item.kpi.key}"))
-                   or self._year_ago_cell_matches(item, document, before) or self._later_column_matches(item, expected)
+                   or self._year_ago_cell_matches(item, document, before) or self._later_column_matches(item, expected, document)
                    for item in parts) and len(new) < len(parts):
                 confirmed.add(group.key)
             elif self._adds_up_to_xbrl(group, parts, expected, items):
@@ -330,7 +330,7 @@ class AiReading:
             if item.is_total or item.kpi.key == item.group.total_kpi:
                 continue
             if self._year_ago_cell_matches(item, document, before := stored.get(f"{item.group.key}.{item.kpi.key}")) \
-                    or self._later_column_matches(item, expected):
+                    or self._later_column_matches(item, expected, document):
                 confirmed += 1
             elif not self._same_place_as_last(item, expected, document, before):
                 return False

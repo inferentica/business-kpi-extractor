@@ -12,6 +12,7 @@ from ..ai import GroupSpec, Located, Spec
 from ..documents.document import Document, clean, parse_number
 from ..readers.period_column import names_period
 from ..rules.numbers import same_figure
+from ..rules.precise_figures import states_average
 from ..rules.segment_tables import company_segments, names_segment, segment_page_of
 from ..rules.period import release_unit
 from ..domain.fiscal import fiscal_label
@@ -30,6 +31,15 @@ from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HE
                      _same_chain, _year_ago_cells)
 
 REPLAYED = "replayed"
+
+
+def _reading_averaged(document: Document | None, locator: dict) -> bool | None:
+    """Whether the cell a reading was read from is stated as an average; None when no table cell is known."""
+    table = document.tables.get(str(locator.get("table"))) if document is not None else None
+    row, col = locator.get("row"), locator.get("col")
+    if table is None or row is None or col is None or int(row) >= len(table.rows):
+        return None
+    return states_average(table, int(row), int(col))
 
 
 def kpi_by_kpi(group: GroupSpec) -> bool:
@@ -168,11 +178,12 @@ class ReplayReading:
                 earlier.setdefault(key, []).append(float(value["value"]))
         return earlier
 
-    def _later_column_matches(self, item: ReadValue, expected: date) -> bool:
+    def _later_column_matches(self, item: ReadValue, expected: date, document: Document | None = None) -> bool:
         """Whether the next quarter's release prints this figure again, digit for digit, on a row of the same label in a
         column headed for this quarter: a bank's supplement shows five quarters side by side, so two filings agree on
         it and a second reading would only repeat that. The release is opened, not read (its figures masked where one
-        OCR model alone read them); one more than about a quarter later, or none, says nothing."""
+        OCR model alone read them); one more than about a quarter later, or none, says nothing. The later cell must be
+        the reading's measure: an average proves only an average, and a period-end figure only one of its own."""
         label = str(item.locator.get("row_label") or "")
         # Two filings printing a figure prove its digits and its column, not its row: Truist's summary "Loans and leases"
         # ($314.0 billion, with loans held for sale) is printed again next quarter as surely as its "Total loans and leases
@@ -186,6 +197,7 @@ class ReplayReading:
                     key=lambda ref: ref.period_end, default=None)
         if not label or later is None or not item.value:
             return False
+        averaged = _reading_averaged(document, item.locator)
         try:
             document = self._code_document(later)
             year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)
@@ -206,7 +218,8 @@ class ReplayReading:
                     cell = parse_number(table.cell(row, col))
                     factor = release_unit(item.value, cell.value) if cell and cell.value else None
                     if factor and same_figure(cell.value * factor, item.value) and names_period(table, row, col, expected, quarter,
-                                                                                                            fiscal_year=fiscal_year):
+                                                                                                            fiscal_year=fiscal_year) \
+                            and averaged in (None, states_average(table, row, col)):
                         return True
         return False
 

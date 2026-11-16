@@ -91,3 +91,13 @@ def test_a_companys_segment_results_table_is_no_one_segments():
     table = Table("A_T9", "", [["KKR SEGMENT RESULTS AND OTHER SELECTED FINANCIAL INFORMATION (UNAUDITED)", ""],
                                ["", "Quarter Ended"], ["Assets Under Management", "191,265,400"]])
     assert segment_of(table, segment_names(["Asset Management", "Insurance", "Capital Markets"])) is None
+
+
+def test_a_heading_joining_the_company_and_its_segments_is_no_one_segments():
+    # The re-check's probe: "Consolidated and Segment Results" took "consolidated and" for a segment's name.
+    for title in ("CONSOLIDATED AND SEGMENT RESULTS", "Total Company and Segment Data", "Firmwide and segment highlights"):
+        table = Table("A_T3", "", [[title, ""], ["", "3Q24"], ["Average loans", "$69,205"]])
+        assert segment_of(table, BNY) is None
+    # A heading naming the one segment before the word still is that segment's.
+    wealth = Table("A_T4", "", [["PRIVATE WEALTH SEGMENT", ""], ["", "3Q24"], ["Average loans", "$9,100"]])
+    assert segment_of(wealth, BNY) == "private wealth"

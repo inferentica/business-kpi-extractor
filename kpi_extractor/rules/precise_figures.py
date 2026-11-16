@@ -125,6 +125,12 @@ def _stated_average(table: Table, label: str, header: str) -> bool:
     return _averaged(label, header, _title(table), _heading_any_case(table.context))
 
 
+def states_average(table: Table, row: int, col: int) -> bool:
+    """Whether a cell is stated as an average: by its row's label, its column's header, the table's title rows or the
+    line above the table."""
+    return _stated_average(table, table.rows[row][0] if table.rows[row] else "", _header_text(table, col))
+
+
 def first_data_row(table: Table) -> int:
     """The first row with a label and a figure: a header's "3Q25" or "2026" is no figure."""
     for index, row in enumerate(table.rows):
