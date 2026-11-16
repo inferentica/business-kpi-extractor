@@ -26,8 +26,17 @@ def _source_document(value) -> bool:
     return accepts_url(value.get("source_url"))
 
 
+def chart_share(value) -> bool:
+    """A slide's share standing in for an amount its quarter's report gives later (TSMC's technology pie)."""
+    return value.get("method") == CHART_METHOD and value.get("unit") == "percent" and "share_of" in (value.get("locator") or {})
+
+
 def _keeps_verified(existing, incoming) -> bool:
-    # A figure read from a slide's chart is kept too against the same filing's unchecked reading of its text.
+    # A figure read from a slide's chart is kept too against the same filing's unchecked reading of its text. A chart's
+    # share never is: it only stands in for the amount, which takes its place served or held (TSMC's Q3 2026 nodes,
+    # whose report was held whole on 2026-11-13 and kept out by the slide's percentages).
+    if chart_share(existing) and not chart_share(incoming):
+        return False
     return (existing["validation_status"] == "verified" and incoming["validation_status"] == "needs_review"
             and (existing.get("source_accession") != incoming.get("source_accession") or existing.get("method") == CHART_METHOD))
 

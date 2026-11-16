@@ -351,3 +351,30 @@ def test_held_writes_are_sent_when_a_later_step_fails():
     except RuntimeError:
         pass
     assert [value["kpi_key"] for value in sent] == ["n3"]
+
+
+def test_a_reports_amounts_take_the_place_of_a_slides_shares_served_or_held():
+    # TSMC's Q3 2026 nodes: the results slide's pie shares (verified, percent) kept the report's amounts out while the
+    # report's reading was held, so the quarter served percentages under the amounts' keys.
+    share = _row("nm3", accession="slide", value=33.0, unit="percent", method="chart",
+                 locator={"image": "x.jpg", "share": 33.0, "share_of": "wafer revenue"})
+    for status in ("needs_review", "verified"):
+        store = _store()
+        store.load([share])
+        store.write([_row("nm3", status=status, accession="report", value=396_618_245_000.0, unit="currency")])
+        stored = store.values[("kpi_x", "nm3", "2026", "Q2")]
+        assert stored["unit"] == "currency" and stored["validation_status"] == status
+    # Another filing's unchecked reading still never replaces a verified amount.
+    store = _store()
+    store.load([_row("nm3", accession="report", value=396_618_245_000.0, unit="currency")])
+    store.write([_row("nm3", status="needs_review", accession="later", value=1.0, unit="currency")])
+    assert store.values[("kpi_x", "nm3", "2026", "Q2")]["value"] == 396_618_245_000.0
+
+
+def test_a_re_read_picks_the_reports_of_quarters_a_slides_shares_stand_in_for():
+    from kpi_extractor.ops.reread import picked_filings
+    share = _row("nm3", accession="slide", value=33.0, unit="percent", method="chart", locator={"share_of": "wafer revenue"})
+    rows = [share, _row("nm20", accession="report", value=774_630_000.0, unit="currency"),
+            _row("china", accession="report", value=8.1e10, unit="currency"), _row("q1", accession="other")]
+    rows[3]["fiscal_period"] = "Q1"
+    assert picked_filings("chart-share-quarters", dict(enumerate(rows))) == {"report"}
