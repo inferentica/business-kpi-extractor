@@ -9,12 +9,11 @@ from .. import ai
 from ..ai import AiResponseError, Located, Locator, Spec
 from ..documents.document import Document, parse_number
 from ..domain.fiscal import fiscal_label
-from ..quality.checks import check_period, far_above_quarter, looks_like_part_of_table, total_label, validate_groups
+from ..quality.checks import check_period, validate_groups
 from ..readers.extract import (ReadValue, describe, header_contradicts, locator_hint,
                        read_values)
 from ..readers.replay import _same_place, _source_template, asked_of, missing_since
 from ..readers.trace import placed_elsewhere, stamp_call
-from ..rules.period import states_quarter
 from ..quality.reasons import PRECISE_FIGURE, SEGMENT_TABLE
 from ..rules.precise_figures import precise_cell
 from ..rules.segment_tables import cell_figure, company_segments, names_segment, segment_page_of
@@ -339,26 +338,6 @@ class AiReading:
         return before is not None and any(abs(cell - before) <= abs(before) * 1e-4
                                           for cell in _year_ago_cells(document, item.locator, item.value))
 
-    def _flag_partial_tables(self, read: list[ReadValue], expected: date, document: Document) -> None:
-        """A breakdown read with fewer rows than in the reference quarter and a total under half of that quarter's is
-        most likely part of its table, with a subtotal taken for the total (TSMC's 2nm and 3nm under "advanced
-        technologies"): its parts add up, so only the comparison shows it. Flagged whole."""
-        history = self._kind_history(expected, _source_template(document.source_url))
-        for group in {item.group.key for item in read if item.group.kind == "revenue_breakdown"}:
-            items = [item for item in read if item.group.key == group]
-            total = next((item.value for item in items if item.is_total or item.kpi.key == item.group.total_kpi), None)
-            parts = [item for item in items if not (item.is_total or item.kpi.key == item.group.total_kpi)]
-            reference = [value for key, value in history.items() if key.split(".", 1)[0] == group]
-            if not reference or total is None:
-                continue
-            newest = max(value["period_end"] for value in reference)
-            before = [value for value in reference if value["period_end"] == newest]
-            before_total = next((float(v["locator"]["total"]) for v in before if (v.get("locator") or {}).get("total")), None)
-            if looks_like_part_of_table(len(parts), total, len(before), before_total, total_label(items)):
-                for item in items:
-                    item.status = "needs_review"
-                    item.notes.append("fewer rows and under half the total of the quarter compared: likely part of the table")
-
     def _ask(self, text: str, purpose: str, schema, thinking_first: bool, model: str = "flash"):
         last_error = None
         for thinking in (thinking_first, True):
@@ -560,32 +539,3 @@ class AiReading:
         newest = max(value["period_end"] for value in history.values())
         return {key: value["locator"] for key, value in history.items()
                 if value["period_end"] == newest and value.get("locator") and value["validation_status"] == "verified"}
-
-    def _far_above_quarters(self, read: list[ReadValue], period_end: date) -> bool:
-        """Whether a breakdown's total is several times the quarter just before it (an annual report read as a
-        quarter). Only the adjacent quarter counts: a fast grower's Q4 is far above its quarters of years ago. Size is only
-        a reason to look: a breakdown whose every column is headed as a quarter states its period, and stands."""
-        breakdown = [item for item in read if item.group.kind == "revenue_breakdown"]
-        if breakdown and all(states_quarter(str(item.locator.get("header") or "")) for item in breakdown):
-            return False
-        for item in read:
-            if item.group.kind != "revenue_breakdown" or not (item.is_total or item.kpi.key == item.group.total_kpi):
-                continue
-            before = self._quarter_total_before(AI_GROUP_PREFIX + item.group.key, period_end.isoformat())
-            if far_above_quarter(item.value, before):
-                return True
-        return False
-
-    def _quarter_total_before(self, group_key: str, period_end: str) -> float | None:
-        """The reported total of the group's latest quarter within 120 days before period_end. In a reading chain, where
-        that quarter may not be read yet, the quarter's own revenue in XBRL (an annual total is about four times it)."""
-        if getattr(self._local, "chained", False):
-            return next((float(v["locator"]["total"]) for v in list(self.values.values())
-                         if v["method"] == "xbrl" and v["fiscal_period"] != "FY" and (v.get("locator") or {}).get("total")
-                         and abs(_days(v["period_end"], period_end)) <= 12), None)
-        candidates = [v for v in self.values.values()
-                      if v["group_key"] == group_key and v["fiscal_period"] in ("Q1", "Q2", "Q3", "Q4")
-                      and v["validation_status"] != "rejected" and (v.get("locator") or {}).get("total")
-                      and 0 < _days(period_end, v["period_end"]) <= 120]
-        latest = max(candidates, key=lambda v: v["period_end"], default=None)
-        return float(latest["locator"]["total"]) if latest else None

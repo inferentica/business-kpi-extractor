@@ -422,8 +422,6 @@ class ReplayReading:
             if not keys <= self._confirmed_years(located, read, part, expected, document):
                 return "not confirmed where it was or by the year-ago column"
             return located, read
-        if self._far_above_quarters(read, expected):
-            return "total far above the quarter before"
         if not keys <= self._confirmed_groups(located, read, part, expected, document):
             return "not confirmed where it was or by the year-ago column"
         # Confirmed where it was, a rounded figure is then read where the filing prints it in full (_prefer_precise).

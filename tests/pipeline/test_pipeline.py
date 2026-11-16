@@ -931,11 +931,16 @@ def test_quarters_read_side_by_side_are_checked_against_each_other_in_date_order
         return {"group_key": "kpi_ops", "group_kind": "metric", "kpi_key": "users", "unit": "count", "fiscal_year": end[:4],
                 "fiscal_period": period, "period_end": end, "method": "ai", "validation_status": "verified", "value": value,
                 "notes": []}
-    values = [row("2026-03-31", 100.0, "Q1"), row("2026-06-30", 900.0, "Q2"), row("2026-09-30", 105.0, "Q3")]
+    # A repeat of the quarter before's significant figure is held (the tell of its column); a jump is not (owner's rule).
+    values = [row("2026-03-31", 100.0, "Q1"), row("2026-06-30", 900.0, "Q2"),
+              {**row("2026-03-31", 12_345e6, "Q1"), "kpi_key": "fees", "unit": "currency"},
+              {**row("2026-06-30", 12_345e6, "Q2"), "kpi_key": "fees", "unit": "currency"},
+              {**row("2026-09-30", 12_345e6, "Q3"), "kpi_key": "fees", "unit": "currency"}]
     pipeline = _pipeline(FakeControl({}), values)
-    pipeline.store.write(pipeline._check_read_series({("kpi_ops", "users", "2026", "Q2")}))
-    assert pipeline.values[("kpi_ops", "users", "2026", "Q2")]["validation_status"] == "needs_review"
-    assert pipeline.values[("kpi_ops", "users", "2026", "Q3")]["validation_status"] == "verified"  # not read now
+    pipeline.store.write(pipeline._check_read_series({("kpi_ops", "users", "2026", "Q2"), ("kpi_ops", "fees", "2026", "Q2")}))
+    assert pipeline.values[("kpi_ops", "users", "2026", "Q2")]["validation_status"] == "verified"
+    assert pipeline.values[("kpi_ops", "fees", "2026", "Q2")]["validation_status"] == "needs_review"
+    assert pipeline.values[("kpi_ops", "fees", "2026", "Q3")]["validation_status"] == "verified"  # not read now
 
 
 def test_a_kpi_list_is_kept_to_the_cap_by_trimming_metrics_first():
@@ -990,22 +995,6 @@ def test_a_breakdown_reading_that_repeats_an_earlier_period_loses():
     pipeline._settle_by_checks(agreed, disputed, date(2026, 6, 30))
     # One adds up only by repeating last quarter's 60, the other does not add up: neither is sound, Pro reviews.
     assert "seg.a" in disputed and agreed[-1].kpi.key != "a"
-
-
-def test_a_breakdown_read_from_part_of_its_table_is_flagged():
-    from kpi_extractor.readers.extract import ReadValue
-    spec = Spec.model_validate({"groups": [{"key": "tech", "label": "Revenue by Technology", "kind": "revenue_breakdown", "total_kpi": "total",
-                                            "kpis": [{"key": k, "label": k, "unit": "currency"} for k in ("n2", "n3", "n5", "n7", "total")]}]})
-    group = spec.groups[0]
-    reference = [{"group_key": "kpi_tech", "kpi_key": k, "fiscal_year": "2026", "fiscal_period": "Q1", "period_end": "2026-03-31",
-                  "method": "ai", "validation_status": "verified", "value": v, "source_url": "https://www.sec.gov/x.htm",
-                  "locator": {"total": 100.0}} for k, v in (("n2", 10.0), ("n3", 30.0), ("n5", 35.0), ("n7", 25.0))]
-    pipeline = _pipeline(FakeControl({}), reference)
-    kpis = {k.key: k for k in group.kpis}
-    read = [ReadValue(group, kpis["n2"], 12.0, None, {}, []), ReadValue(group, kpis["n3"], 30.0, None, {}, []),
-            ReadValue(group, kpis["total"], 42.0, None, {}, [], is_total=True)]  # "advanced technologies" taken for the total
-    pipeline._flag_partial_tables(read, EXPECTED, parse_document("<p>x</p>", "https://www.sec.gov/x.htm"))
-    assert all(item.status == "needs_review" for item in read)
 
 
 def test_a_release_an_older_reader_left_incomplete_is_read_again():
@@ -1551,8 +1540,8 @@ def test_flags_todays_checks_no_longer_raise_are_cleared():
               "revenue_breakdown", 10e6) for kpi, value in (("a", 5e6), ("b", 8e6))),
     ]
     cleared = {(v["kpi_key"], v["validation_status"]) for v in _pipeline(None, values)._outdated_flags()}
-    # A count of 200 to 60 is still a jump; parts still off their total stay flagged.
-    assert cleared == {("used", "verified"), ("systems", "verified"), ("service", "verified")}
+    # No jump holds a figure now, a small count's or another's; parts still off their total stay flagged.
+    assert cleared == {("used", "verified"), ("new", "verified"), ("systems", "verified"), ("service", "verified")}
 
 
 def test_a_note_is_stored_once():
@@ -2161,28 +2150,23 @@ def test_a_percentage_takes_its_sign_from_a_heading_row_above_it():
     assert column_dates(table, 4, 1)[0] == [date(2025, 6, 14)]
 
 
-def test_an_amount_off_by_an_unstated_scale_is_held():
-    from kpi_extractor.readers.extract import ReadValue
-    from kpi_extractor.steps.release_flow import SCALE_OUTLIER
-    group = ai.GroupSpec.model_validate({"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown",
-                                         "kpis": [{"key": "beauty", "label": "Beauty", "unit": "currency"}, {"key": "foods", "label": "Foods", "unit": "currency"}]})
-    beauty, foods = group.kpis
-
-    def stored(group_key, kpi, value, period, end, method="ai", total=None):
-        return {"group_key": group_key, "kpi_key": kpi, "fiscal_year": end[:4], "fiscal_period": period, "period_end": end, "method": method,
-                "validation_status": "verified", "value": value, "unit": "currency", "locator": {"total": total} if total else {}}
-    # A first quarter, nothing stored for the group: revenue (a year's XBRL total over four) shows 3,477 is millions.
-    pipeline = _pipeline(FakeControl({}), [stored("geography", "europe", 20e9, "FY", "2025-12-31", "xbrl", total=60e9)])
-    read = [ReadValue(group, beauty, 3477.0, "EUR", {}), ReadValue(group, foods, 3109.0, "EUR", {})]
-    pipeline._flag_scale_outliers(read, date(2026, 9, 30))
-    assert all(item.status == "needs_review" and SCALE_OUTLIER in item.notes for item in read)
-    # With history, history decides: a dwindling line stays; a figure 10,000 times off its past is held.
-    pipeline = _pipeline(FakeControl({}), [stored("geography", "europe", 20e9, "FY", "2025-12-31", "xbrl", total=60e9),
-                                           stored("kpi_segments", "beauty", 3.4e9, "Q2", "2026-06-30"), stored("kpi_segments", "foods", 9e6, "Q2", "2026-06-30")])
-    read = [ReadValue(group, beauty, 3477.0, "EUR", {}), ReadValue(group, foods, 7e6, "EUR", {})]
-    pipeline._flag_scale_outliers(read, date(2026, 9, 30))
-    assert [item.status for item in read] == ["needs_review", "verified"]
-
+def test_an_amount_no_filing_words_scale_is_held_whatever_its_size():
+    # Unilever's Q3 segment turnover, printed in millions without saying so, was read as EUR 3,477: once held for being
+    # far from its other periods, now held because nothing in the filing states its scale (owner, 2026-11-16). An
+    # amount in a table that states its scale stands, however far it is from its past.
+    from kpi_extractor.ai import Located, Locator
+    from kpi_extractor.rules.scale import SCALE_NOT_STATED
+    spec = Spec.model_validate({"groups": [{"key": "segments", "label": "Revenue by Segment", "kind": "metric",
+                                            "kpis": [{"key": "beauty", "label": "Beauty", "unit": "currency"}]}]})
+    for html, scale, held in (("<table><tr><td></td><td>Q3 2026</td></tr><tr><td>Beauty</td><td>3,477</td></tr></table>", 1, True),
+                              ("<table><tr><td>(in millions)</td><td>Q3 2026</td></tr><tr><td>Beauty</td><td>3,477</td></tr></table>",
+                               1e6, False)):
+        document = parse_document(html, "https://www.sec.gov/x.htm")
+        table = next(iter(document.tables))
+        located = Located(period_end="2026-09-30", values=[Locator(kpi="segments.beauty", table=table, row=1, col=1,
+                                                                   row_label="Beauty", scale=1)])
+        [item], _ = read_values(document, spec, located, "EUR")
+        assert item.value == 3477.0 * scale and (SCALE_NOT_STATED in item.notes) == held
 
 def test_a_breakdown_its_year_ago_column_confirms_needs_no_xbrl_total():
     def row(kpi, value, agrees, group="kpi_streaming", method="ai", kind="revenue_breakdown", total=5486e6, label="Subscription"):

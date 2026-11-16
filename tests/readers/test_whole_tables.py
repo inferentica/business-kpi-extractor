@@ -287,17 +287,17 @@ def test_a_mixs_named_total_row_is_its_check_not_a_share():
     assert all(item.status == "verified" for item in items)
 
 
-def test_small_counts_jump_by_how_far_they_move_not_by_ratio():
+def test_a_count_is_never_held_for_how_far_it_moved():
     from kpi_extractor.readers.extract import ReadValue
     spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Ops", "kind": "metric",
                                             "kpis": [{"key": "used", "label": "Used systems sold", "unit": "count"}]}]})
     group = spec.groups[0]
     item = ReadValue(group, group.kpis[0], 10.0, None, {}, [])
     validate_groups([item], {"ops.used": 3.0})
-    assert item.status == "verified"  # 3 to 10 is a small count moving by 7
+    assert item.status == "verified"
     big = ReadValue(group, group.kpis[0], 45.0, None, {}, [])
     validate_groups([big], {"ops.used": 3.0})
-    assert big.status == "needs_review"
+    assert big.status == "verified"
 
 
 def test_a_metric_reported_as_its_own_total_is_read():

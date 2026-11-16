@@ -233,10 +233,9 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
         notes.extend(scale_notes)
         if scale_from is not None:
             value *= scale_from.factor
-        elif value < 1_000:
-            raise LocateError(f"{value_text!r} has no amount scale")
-        else:
-            scale_from = ScaleFrom(1.0, "units")  # a large amount written out in full
+        else:  # no scale anywhere in the filing: read as printed, and held whatever its size
+            scale_from = ScaleFrom(1.0, "units")
+            notes.append(SCALE_NOT_STATED)
     return value, _currency(f"{value_text} {quote}", kpi, default_currency, block.text), notes, scale_from
 
 

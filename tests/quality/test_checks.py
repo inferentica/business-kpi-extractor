@@ -63,9 +63,9 @@ def test_a_stored_period_missing_rows_is_found_whichever_way_it_was_read():
 
 
 def test_date_order_judges_only_what_it_declares_unless_widened():
-    rows = [_row("a", 100e6, end="2026-03-31", period="Q1"), _row("a", 900e6)]
+    rows = [_row("a", 123.4e6, end="2026-03-31", period="Q1"), _row("a", 123.4e6)]
     assert date_order_findings(rows, None, _key) == {}
-    assert "changed 9.0x" in next(iter(date_order_findings(rows, None, _key, methods=None).values()))
+    assert "the same figure as the quarter before" in next(iter(date_order_findings(rows, None, _key, methods=None).values()))
 
 
 def test_a_figure_says_how_it_was_read():
@@ -83,15 +83,6 @@ def test_parts_add_up_counts_a_parent_once_and_needs_a_stated_total():
     assert not parts_add_up(rows)
     assert parts_add_up(rows, {("kpi_rev", "fee_a"): "fees"})
     assert parts_add_up([_row("a", 1.0), _row("b", 2.0)])
-
-
-def test_a_smaller_breakdown_read_from_the_tables_own_total_is_the_whole_table():
-    from kpi_extractor.quality.checks import looks_like_part_of_table
-    # TSMC's 2nm and 3nm under "advanced technologies": fewer rows, a subtotal for the total, held.
-    assert looks_like_part_of_table(2, 40, 6, 100, "Advanced technologies")
-    # The same shrink read from the row the table calls its total stands: size alone is no reason.
-    assert not looks_like_part_of_table(2, 40, 6, 100, "Total net revenue")
-    assert not looks_like_part_of_table(2, 40, 6, 100, "Net sales")
 
 
 def test_a_repeat_is_held_only_when_its_source_shows_another_period():
@@ -128,19 +119,14 @@ def test_a_cell_read_twice_counts_once():
     assert not parts_add_up(other)
 
 
-def test_one_jump_rule_for_a_reading_and_for_stored_quarters():
-    from kpi_extractor.quality.checks import date_order_findings, jump
-    assert jump("mix", "percent", 20.0, 55.0) == "moved +35.0 points in a quarter"
-    assert jump("metric", "currency", 100.0, 400.0) == "changed 4.0x in a quarter"
-    assert jump("metric", "count", 10.0, 40.0) == "moved +30 in a quarter"  # a small count moves by units
-    # A growth rate and a negative line have no jump: Costco's digital comparable sales, Bank of America's other income.
-    assert jump("metric", "percent", 28.4, 64.5) is None
-    assert jump("revenue_breakdown", "currency", -78e6, -491e6) is None
-
+def test_how_far_a_figure_moved_is_never_a_finding():
+    # The owner's rule (2026-11-09): a figure is judged by its filing alone. Costco's digital comparable sales growing
+    # 28.4% then 64.5%, an amount four times the quarter before, a share moving 35 points: none is held for it.
     def row(value, end, unit="percent", kind="metric"):
         return {"group_key": "kpi_operating", "kpi_key": "digital_comps", "group_kind": kind, "unit": unit, "method": "ai",
                 "validation_status": "verified", "fiscal_period": "Q3", "period_end": end, "value": value, "notes": []}
-    rows = [row(28.4, "2020-05-10"), row(64.5, "2020-08-30")]
-    assert date_order_findings(rows, None, lambda v: v["period_end"]) == {}
-    amounts = [row(100.0, "2020-05-10", "currency"), row(400.0, "2020-08-30", "currency")]
-    assert date_order_findings(amounts, None, lambda v: v["period_end"]) == {"2020-08-30": "changed 4.0x in a quarter"}
+    for unit, kind, before, now in (("percent", "metric", 28.4, 64.5), ("currency", "metric", 100e6, 400e6),
+                                    ("percent", "mix", 20.0, 55.0), ("count", "metric", 10.0, 40.0)):
+        rows = [row(before, "2020-05-10", unit, kind), row(now, "2020-08-30", unit, kind)]
+        assert date_order_findings(rows, None, lambda v: v["period_end"]) == {}
+    assert not any(check.name == "no_sharp_change" for check in READING_CHECKS)

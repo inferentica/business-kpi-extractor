@@ -4,8 +4,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
-from ..quality.reasons import EXPLAINED, SCALE_OUTLIER, note_with
-from ..quality.stated import FILING_SCALES
+from ..quality.reasons import EXPLAINED, note_with
 from .. import ai
 from ..ai import Spec
 from ..documents.image_pages import hold_single_reads
@@ -27,10 +26,6 @@ _READ_BY_REPLAY = "read by replay"
 # stamping began are never re-read by it, so a bump cannot re-read every company's history.
 _RELEASE_READER = "release reader 5"
 # Stamped on a release read without some of the list's groups (see _readable): read again once they are read once more.
-# An amount this many times from the same KPI's other periods, or a breakdown line this many times below revenue, is off
-# by a scale the document did not state.
-_SCALE_GAP = 1e4
-_REVENUE_GAP = 1e5
 _GROUPS_NOT_READ = "groups not read: "
 # Why the AI found no value for each unreported KPI (Locate's reason codes), and what sent a reading to a second reader.
 _MISSING_WHY = "missing reasons: "
@@ -166,16 +161,10 @@ class ReleaseFlow:
             period_problem = check_period(located, expected)
             period_end = expected if period_problem else date.fromisoformat(located.period_end[:10])
             # A document counts as annual only on evidence: its breakdown adds up to the XBRL full year, or its
-            # column says so. A total far above the quarter before is only a reason to look again.
+            # column says so. How far its total is from the quarter before decides nothing.
             if not located.annual and (self._reports_full_year(read, period_end) or _annual_columns(read)):
                 located.annual = True
                 problems.append("breakdown reports the full year: stored as the fiscal year")
-            elif not located.annual and fiscal_period == "Q4" and self._far_above_quarters(read, period_end):
-                # A total far above the quarter before is only a reason to look: a column headed as a quarter stands.
-                for item in read:
-                    if item.group.kind == "revenue_breakdown":
-                        item.status = "needs_review"
-                        item.notes.append("total far above the quarter before: check the period")
             if located.annual:
                 # An annual report: its values are the full year, and Q4 is derived from them.
                 fiscal_year, fiscal_period = fiscal_label(period_end, self.profile.fiscal_year_end, annual=True,
@@ -184,9 +173,7 @@ class ReleaseFlow:
                 problems.extend(dropped)
                 read = year_figures(read)
             validate_groups(read, self._previous(period_end, annual=located.annual))
-            self._flag_scale_outliers(read, period_end, annual=located.annual)
             self._mark_year_ago_agreement(read, document, period_end, annual=located.annual)
-            self._flag_partial_tables(read, period_end, document)
             hold_single_reads(read, document)  # a figure one OCR model alone read, until a check proves it
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
             verified = sum(1 for record in records if record["validation_status"] == "verified")
@@ -205,32 +192,6 @@ class ReleaseFlow:
         except Exception as error:  # noqa: BLE001
             return failed_reading(ref, error, version)
 
-    def _flag_scale_outliers(self, read: list[ReadValue], period_end: date, annual: bool = False) -> None:
-        """Holds an amount off by a scale nobody stated: 10,000 times from the same KPI's other periods, or a breakdown
-        line 100,000 times below the company's revenue for the period. Unilever's Q3 segment turnover, printed in
-        millions without saying so, was served as €3,477 (a group with no earlier quarter had nothing to compare)."""
-        revenue = self._period_revenue(period_end, annual)
-        history: dict[tuple[str, str], list[float]] = {}
-        for value in self.values.values():
-            if value["validation_status"] == "verified" and value.get("unit") == "currency" and float(value["value"] or 0):
-                history.setdefault((value["group_key"], value["kpi_key"]), []).append(abs(float(value["value"])))
-        for item in read:
-            if item.kpi.unit != "currency" or not item.value or item.is_total:
-                continue
-            amount = abs(item.value)
-            others = sorted(history.get((f"{AI_GROUP_PREFIX}{item.group.key}", item.kpi.key), []))
-            typical = others[len(others) // 2] if others else None
-            off = typical and (amount * _SCALE_GAP < typical or amount > typical * _SCALE_GAP)
-            # Revenue decides only for a KPI with no history yet: a line that has dwindled (TSMC's 10-nanometer, NT$0.7
-            # million against NT$700 billion of revenue) is judged against its own past.
-            tiny = not others and item.group.kind == "revenue_breakdown" and revenue and amount * _REVENUE_GAP < revenue
-            # A scale the filing states for this figure (rules.scale.ScaleFrom) stands, however far it is from the past:
-            # only a scale nobody stated is held for its size.
-            stated = (item.locator.get("scale_from") or {}).get("source") in FILING_SCALES
-            if (off or tiny) and not stated:
-                item.status = "needs_review"
-                item.notes.append(SCALE_OUTLIER)
-
     def _mark_year_ago_agreement(self, read: list[ReadValue], document, period_end: date, annual: bool = False) -> None:
         """A breakdown whose every line's year-ago cell equals what last year's release gave for that quarter: two
         filings agree on the table, so its total need not be a figure tagged in XBRL (Disney's Disney+ and Hulu revenue,
@@ -248,23 +209,6 @@ class ReleaseFlow:
                                        for item in items):
                 for item in items:
                     item.locator["year_ago_agrees"] = True
-
-    def _period_revenue(self, period_end: date, annual: bool) -> float | None:
-        """The company's revenue for a period of this length, from its XBRL breakdowns' totals: the quarter's, else a
-        nearby year's divided by four (a foreign filer tags XBRL once a year)."""
-        quarter, year = None, None
-        for value in self.values.values():
-            total = (value.get("locator") or {}).get("total")
-            if value["group_key"].startswith(AI_GROUP_PREFIX) or value["method"] not in ("xbrl", "derived") or not total:
-                continue
-            days = abs(_days(value["period_end"], period_end.isoformat()))
-            if value["fiscal_period"] == "FY" and days <= 400:
-                year = max(year or 0.0, abs(float(total)))
-            elif value["fiscal_period"] != "FY" and days <= 100:
-                quarter = max(quarter or 0.0, abs(float(total)))
-        if annual:
-            return year
-        return quarter or (year / 4 if year else None)
 
     def _reader3_due(self, previous: dict, accession: str) -> bool:
         """A release read before reader 3 that holds a served reading reader 3 would reject (see stored_reading_fails)."""
@@ -396,10 +340,9 @@ class ReleaseFlow:
         return [ref for ref in refs if ref.accession in done]
 
     def _check_read_series(self, keys: set[tuple]) -> list[dict]:
-        """The jump checks of quarters read side by side, run again in date order: each value against the quarter before
-        it (a share against its last share, an amount against three times or a third of its last), and an amount equal
-        to its own figure a year earlier (the tell of a prior-year column). A breakdown or mix is flagged whole. A jump
-        is held until a proof from the filings settles it (steps.series_checks); no reader is asked to explain it."""
+        """The prior-period checks of quarters read side by side, run again in date order: an amount equal to its own
+        figure the quarter before or a year earlier (the tell of a prior-period column). A breakdown or mix is flagged
+        whole. How far a figure moved holds nothing: the owner's rule judges a figure only by its filing."""
         flagged = date_order_findings(self.values.values(), keys, value_key)
         groups = {(k[0], k[2], k[3]) for k in flagged if self.values[k]["group_kind"] != "metric"}
         changed = []

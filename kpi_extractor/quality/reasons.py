@@ -59,6 +59,7 @@ EXPLAINED = "change explained: "
 RESCALED = "to match the series"
 EXPLAINED_UNPROVEN = "its change was explained by the AI; its filing does not state it"
 UNNAMED_XBRL = "it equals no XBRL line that names it"
+SIZE_HOLD_LIFTED = "held only for how far it moved or its size, which holds no figure now"
 
 _REASONS = (
     # The figure's own holds.
@@ -108,6 +109,7 @@ _REASONS = (
     Reason("checked", ASIDE, "checked against ", "start"),
     Reason("explained", ASIDE, EXPLAINED, "start"),
     Reason("rescaled", ASIDE, RESCALED, "within"),
+    Reason("size_lifted", ASIDE, SIZE_HOLD_LIFTED),
 )
 REASONS = {reason.code: reason for reason in _REASONS}
 assert len(REASONS) == len(_REASONS), "a reason code is used twice"
@@ -153,3 +155,5 @@ GROUP_HOLDS = ("parts_differ", "other_part", "no_xbrl_total", "no_revenue")
 UNANCHORED = ("no_xbrl_total", "no_revenue")
 PROOFS = ("equals_xbrl", "adds_to_xbrl", "confirmed_later", "restated_later", "within_xbrl", "ties_out")
 ASIDES = ("reviewed", "settled", "checked")
+# Holds no check raises since 2026-11-16 (the owner's rule: a figure is judged only by its filing), kept to read old notes.
+SIZE_HOLDS = ("jump", "scale_outlier", "part_of_table", "far_above_quarter")
