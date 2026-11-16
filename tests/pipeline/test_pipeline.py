@@ -1604,7 +1604,7 @@ def test_a_breakdown_adding_up_to_a_reported_figure_to_its_rounding_is_proven():
             "fiscal_year": "2024", "fiscal_period": "Q3", "period_end": "2024-09-30", "locator": {}}
     group = {"group_key": "kpi_segment", "group_kind": "revenue_breakdown", "method": "ai", "validation_status": "needs_review",
              "fiscal_year": "2024", "fiscal_period": "Q3", "period_end": "2024-09-30", "unit": "currency", "source_accession": "r",
-             "notes": ["total matches no figure the company reported in XBRL"], "locator": {"total": 447_000_000.0}}
+             "notes": ["total matches no figure the company reported in XBRL"], "locator": {"total": 447_000_000.0, "scale": 1e6}}
     lines = [{**group, "kpi_key": key, "value": value} for key, value in (("grow", 298e6), ("create", 132e6), ("other", 17e6))]
     pipeline = _pipeline(FakeControl({}), [{**xbrl, "kpi_key": "total", "value": 446_523_000.0}, *lines])
     pipeline.store.write(pipeline._prove_flagged([]))
@@ -1615,6 +1615,41 @@ def test_a_breakdown_adding_up_to_a_reported_figure_to_its_rounding_is_proven():
     off.store.write(off._prove_flagged([]))
     off.store.write(off._release_held_breakdowns())
     assert off.values[("kpi_segment", "grow", "2024", "Q3")]["validation_status"] == "needs_review"
+
+
+def test_parts_add_up_only_to_their_own_total_line_to_their_own_places():
+    from kpi_extractor.steps.shared import adds_up_to_reported, printed_half
+    official = {False: [("2026-09-30", 5_940e6, "Wealth"), ("2026-09-30", 1_723e6, "Retail Banking"),
+                        ("2026-09-30", 14_240e6, "Asset & Wealth Management")]}
+    millions = {"scale": 1e6}
+    # The re-check's probe: parts summing to 5,917 are no proof by an unrelated 5,940, 0.4% off.
+    assert not adds_up_to_reported(official, "2026-09-30", False, [(3_000e6, millions), (2_917e6, millions)], 5_917e6)
+    # PNC's revenue by type, 1,724 stated, beside its Retail Banking's 1,723: two roundings of one figure never differ by
+    # both their half places.
+    assert not adds_up_to_reported(official, "2026-09-30", False, [(1_000e6, millions), (724e6, millions)], 1_724e6)
+    # With no total stated, only a sum equal to the line to its place: JPM's AWM businesses and its segment.
+    assert adds_up_to_reported(official, "2026-09-30", False, [(10_000e6, millions), (4_240e6, millions)], None)
+    assert not adds_up_to_reported(official, "2026-09-30", False, [(1_000e6, millions), (722e6, millions)], None)
+    # An XBRL figure's trailing zeros are no place beyond the million: a round 2,000 million proves no 2,479.
+    assert not adds_up_to_reported({False: [("2026-09-30", 2_000e6, "Corporate")]}, "2026-09-30", False,
+                                   [(1_060e6, millions), (921e6, millions), (498e6, millions)], 2_479e6)
+    # A place is the printed one: 1,200 in millions is to the million, "$302 million" too, "$5.9" billion to 100 million.
+    assert printed_half(1_200e6, millions) == 5e5 and printed_half(302e6, {"value_text": "$302 million"}) == 5e5
+    assert printed_half(5.9e9, {"scale": 1e9}) == 5e7
+
+
+def test_a_breakdown_an_earlier_rule_proved_against_another_line_goes_back_to_review():
+    xbrl = {"group_key": "segments", "group_kind": "revenue_breakdown", "method": "xbrl", "validation_status": "verified",
+            "fiscal_year": "2021", "fiscal_period": "Q4", "period_end": "2021-12-31", "locator": {}, "kpi_key": "cib",
+            "kpi_label": "Corporate & Institutional Banking", "value": 2_264e6}
+    group = {"group_key": "kpi_revenue_by_type", "group_kind": "revenue_breakdown", "method": "ai", "validation_status": "verified",
+             "fiscal_year": "2021", "fiscal_period": "Q4", "period_end": "2021-12-31", "unit": "currency", "source_accession": "r",
+             "notes": ["parts add up to a figure reported in XBRL"], "locator": {"total": 2_265e6, "scale": 1e6}}
+    lines = [{**group, "kpi_key": key, "value": value} for key, value in (("fees", 1_265e6), ("interest", 1_000e6))]
+    pipeline = _pipeline(FakeControl({}), [xbrl, *lines])
+    pipeline.store.write(pipeline._prove_flagged([]))
+    row = pipeline.values[("kpi_revenue_by_type", "fees", "2021", "Q4")]
+    assert row["validation_status"] == "needs_review" and "parts add up to a figure reported in XBRL" not in row["notes"]
 
 
 def test_a_metrics_gaps_come_from_rows_the_releases_repeat_in_a_learned_layout():

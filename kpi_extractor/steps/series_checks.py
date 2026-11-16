@@ -16,7 +16,7 @@ from ..quality.reasons import (ADDS_TO_XBRL as _ADDS_TO_XBRL, ASIDES, CONFIRMED_
 from ..readers.extract import ReadValue, column_header
 from ..rules.period import release_unit
 from ..sources.base import FilingRef
-from .shared import (AI_GROUP_PREFIX, _days, _rounding, _significant,
+from .shared import (AI_GROUP_PREFIX, _days, _rounding, _significant, adds_up_to_reported,
                      _year_ago_cells, equals_named_line, held_for_later, list_parents, proof_tolerance, value_key,
                      xbrl_figures)
 
@@ -191,12 +191,6 @@ class SeriesChecks:
         flagged = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] == "needs_review"]
         official = xbrl_figures(self.values.values())
 
-        def reported(row: dict, figure: float, tolerance: float) -> bool:
-            """A sum of a breakdown's parts equal to a reported figure: any line or total (parts adding up to a line is
-            no coincidence, and a breakdown's total is often a line of another split)."""
-            return any(abs(_days(end, row["period_end"])) <= 12 and abs(other - figure) <= abs(figure) * tolerance
-                       for end, other, _label in official.get(row["fiscal_period"] == "FY", []))
-
         def settle(row: dict, note: str, **fields) -> None:
             settled[value_key(row)] = {**row, "validation_status": "verified", **fields,
                                        "notes": [*(row.get("notes") or []), note]}
@@ -240,16 +234,25 @@ class SeriesChecks:
                     if v["validation_status"] == "verified" and has(v.get("notes"), "equals_xbrl", "adds_to_xbrl"):
                         settled[value_key(v)] = {**v, "validation_status": "needs_review",
                                                  "notes": without(v.get("notes"), "equals_xbrl", "adds_to_xbrl")}
+        def adds_up(rows: list[dict]) -> bool:
+            """The parts add up to the line reported as their total, to their own printed places (Unity's release gives
+            its Q3 2024 lines to the million, $447 million in all, its XBRL revenue to the thousand, $446.5 million). A
+            figure one OCR model alone read proves only a sum equal to the line to its place."""
+            stated = None if any(has(v.get("notes"), "one_ocr_reader") for v in rows) else (rows[0].get("locator") or {}).get("total")
+            return adds_up_to_reported(official, rows[0]["period_end"], rows[0]["fiscal_period"] == "FY",
+                                       [(float(v["value"]), v.get("locator") or {}) for v in rows], float(stated) if stated else None)
+
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review" and value_key(v) not in settled]
-            # To the figures' own rounding: Unity's release gives its Q3 2024 lines to the million ($447 million in all),
-            # its XBRL revenue to the thousand ($446.5 million).
-            parts = sum(float(v["value"]) for v in rows)
-            rounding = sum(_rounding(float(v["value"])) for v in rows) / abs(parts) if parts else 0
-            tolerance = min(proof_tolerance(v, max(1e-5, min(rounding, 0.005))) for v in rows)  # one OCR model's: exact
-            if waiting and len(rows) >= 2 and whole(rows[0]) and reported(rows[0], parts, tolerance):
+            proven = len(rows) >= 2 and whole(rows[0]) and adds_up(rows)
+            if waiting and proven:
                 for v in waiting:
                     settle(v, _ADDS_TO_XBRL)
+            # Proven by an earlier version of this rule, against any line of the quarter to 0.5%: back to review.
+            elif not proven:
+                for v in rows:
+                    if v["validation_status"] == "verified" and has(v.get("notes"), "adds_to_xbrl") and value_key(v) not in settled:
+                        settled[value_key(v)] = {**v, "validation_status": "needs_review", "notes": without(v.get("notes"), "adds_to_xbrl")}
         # A split of part of a line (Adobe's customer groups of its subscription revenue, with their own total that XBRL
         # never tags) is proven by a reported figure it nearly fills, when its parts add up to its stated total to their
         # rounding and nothing else is wrong with it.

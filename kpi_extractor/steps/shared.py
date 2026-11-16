@@ -156,6 +156,46 @@ def xbrl_figures(values) -> dict[bool, list[tuple[str, float, str | None]]]:
     return official
 
 
+def printed_half(value: float, locator: dict | None) -> float:
+    """Half the last place a figure was printed to, in its units: "$302 million" quoted is to the million, a table's
+    1,200 in millions to the million (never to the hundred million its trailing zeros would say), "$5.9" billion to
+    the hundred million. A figure with neither its text nor its scale (a recast, a tag) is to the unit."""
+    from ..rules.precise_figures import _printed, printed_step
+    locator = locator or {}
+    text = str(locator.get("value_text") or "")
+    if text and (raw := _printed(text)) and (step := printed_step(text)):
+        return step * abs(value / raw) / 2
+    unit = float(locator.get("scale") or 1)
+    digits = f"{abs(value) / unit:.6f}".rstrip("0").rstrip(".")
+    return unit * 10.0 ** -(len(digits.split(".")[1]) if "." in digits else 0) / 2
+
+
+def adds_up_to_reported(official: dict, period_end: str, full_year: bool, parts: list[tuple[float, dict]],
+                        stated: float | None) -> bool:
+    """Whether a breakdown's parts add up to the line the company reported in XBRL as their total: the XBRL figure is
+    the breakdown's own total as its release states it (two roundings of one figure, apart by less than both their
+    half places), and the parts add up to it to their own printed places. With no total stated, only a sum equal to
+    a line to the place the line is reported in. Never any line of the quarter to a share of the sum: parts adding to
+    5,917 were once proven by an unrelated 5,940, and PNC's revenue by type (1,724) by its Retail Banking (1,723)."""
+    total = sum(value for value, _locator in parts)
+    if len(parts) < 2 or not total:
+        return False
+    places = [printed_half(value, locator) for value, locator in parts]
+    halves, stated_half = sum(places), max(places)  # a stated total is printed to its parts' places
+    for end, other, _label in official.get(full_year, []):
+        if abs(_days(end, period_end)) > 12:
+            continue
+        # The XBRL figure's own place, to the million at the coarsest (TSMC tags its wafer revenue to NT$100,000): a
+        # round 2,000,000,000 is no figure to the billion, and once proved JPM's banking fees of 2,479 million.
+        own = min(_rounding(other), 5e5)
+        if stated:
+            if abs(stated - other) < stated_half + own and abs(total - other) <= halves + own:
+                return True
+        elif abs(total - other) <= own:
+            return True
+    return False
+
+
 def equals_named_line(official: dict, row: dict) -> bool:
     """Whether a figure equals, to 0.01%, an XBRL line of its period whose label names it (Apple's Services, KKR's
     capital markets fees): the same line, reported twice. A figure that only equals some other line is a coincidence,
