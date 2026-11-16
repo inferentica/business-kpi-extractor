@@ -30,7 +30,7 @@ from ...domain.line_fields import printed_fields
 from .scope import statement_scope
 from .side_by_side import column_scopes
 from .captions import caption_only as _caption_only
-from .line_kind import COUNTS, continued_count, line_kind
+from .line_kind import BARE_BASIS, COUNTS, continued_count, line_kind
 from .tables import Table, figure_columns, statement_rows
 from .titled import titled_notes
 
@@ -189,7 +189,8 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
             # "shares used in the" / "calculations of earnings" / "(loss) per share (in thousands)  123,735".
             # Delta's 2003 "WEIGHTED AVERAGE SHARES USED IN BASIC" / "PER SHARE COMPUTATION  123,361,622" too.
             wrapped = f"{last_heading} {row.label}" if row.figures and last_heading and (
-                row.label[:1].islower() or row.label.startswith("(") or COUNTS.search(last_heading)) else row.label
+                row.label[:1].islower() or row.label.startswith("(") or COUNTS.search(last_heading)
+                and not BARE_BASIS.fullmatch(row.label)) else row.label  # a bare "Basic" is its own line (Ross's notes)
             last_heading = None
             if not row.figures and (any(pattern.search(label) for _, pattern in TITLES) or _caption_only(label)):
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line

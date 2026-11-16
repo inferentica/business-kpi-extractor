@@ -22,7 +22,7 @@ _MONEY_AFTER = re.compile(r"^(total\s+)?(other\s+)?(comprehensive|retained|depre
                           r"selling\b|interest\s+(income|expense)|provision\s+for|income\s+tax)", re.I)
 # A rate quoted in a money line's label: Oshkosh's "Class B common ( .500 per share each year)" among its dividends.
 _RATE = re.compile(r"\(\s*\$?\s*\d*\.?\d+\s+(?:per|a)\s+(?:common\s+)?share\b[^)]*\)", re.I)
-_BARE_BASIS = re.compile(r"\W*(basic|diluted)\W*", re.I)
+BARE_BASIS = re.compile(r"\W*(basic|diluted)\W*", re.I)
 # A share class's dividend a share under a dividends heading: Oshkosh's "Cash dividends:" / "Class A Common Stock
 # $ 0.05000" (a class quoting its rate, "Class A common ( .435 per share each year)", is the money paid).
 _DIVIDENDS = re.compile(r"^(cash\s+)?dividends(\s+(declared|paid))?(\s+per\s+(common\s+)?share)?\s*:?$", re.I)
@@ -34,7 +34,7 @@ _CLASS_ROW = re.compile(r"^(class\s+\S+\s+)?(common|preferred|ordinary)(\s+(stoc
 def continued_count(label: str, heading: str, counted_before: bool) -> str:
     """A bare "Basic" or "Diluted" heading after share counts goes on counting: Embraer's "Basic" / Common, Preferred,
     then "Diluted" / the same."""
-    if counted_before and _BARE_BASIS.fullmatch(label) and (COUNTS.search(heading) or SHARE_HEADING.search(heading)):
+    if counted_before and BARE_BASIS.fullmatch(label) and (COUNTS.search(heading) or SHARE_HEADING.search(heading)):
         return f"{heading} {label}"
     return label
 
@@ -53,7 +53,7 @@ def line_kind(kind: str, label: str, wrapped: str, heading: str, has_figures: bo
     under_shares = kind == "income" and (bool(SHARE_HEADING.search(heading) or COUNTS.search(heading)) and re.match(
         r"^(basic|diluted|primary|fully\s+diluted|assuming\s+dilution)\b", label, re.I) is not None and not re.search(
         r"per\s+(common\s+)?share|earnings|income|loss", label, re.I) or bool(COUNTS.search(heading)) and re.match(
-        r"^(common|preferred|ordinary|class)\b", label, re.I) is not None or counted_before and _BARE_BASIS.fullmatch(label) is not None)
+        r"^(common|preferred|ordinary|class)\b", label, re.I) is not None or counted_before and BARE_BASIS.fullmatch(label) is not None)
     # Count words name a count only before any "per": Apple's "…shares used in the calculations of earnings (loss) per
     # share" is a count, Petrobras's "Basic and diluted earnings per weighted-average of common and preferred share"
     # and Ultrapar's "EARNINGS PER SHARE (BASED ON ANNUAL WEIGHTED AVERAGE OF SHARES…)" are figures a share.
