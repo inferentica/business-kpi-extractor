@@ -152,6 +152,11 @@ def _shifted(row, columns: list[tuple[int, ...]]) -> dict | None:
     positions = sorted(row.figures)
     if len(positions) < 2 or any(position in column for column in columns for position in positions):
         return None
+    # Only figures each led by its own currency sign since the figure before it: Crown's share counts three cells off its
+    # EPS columns, with no sign, stay unread.
+    signs = [cell.start for cell in getattr(row, "cells", None) or [] if cell.text in ("$", "€", "£", "¥", "₩", "W", "NT$", "US$", "R$")]
+    if not all(any(before < sign < position for sign in signs) for before, position in zip([0] + positions, positions)):
+        return None
     for offset in (-1, 1, -2, 2, -3, 3, -4, 4):
         placed = [next((column for column in columns if position + offset in column), None) for position in positions]
         if None not in placed and len(set(placed)) == len(placed):
