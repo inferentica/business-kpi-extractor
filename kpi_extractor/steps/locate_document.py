@@ -28,6 +28,14 @@ class LocateDocument:
     def _asked_keys(spec: Spec) -> list[str]:
         return [f"{group.key}.{kpi.key}" for group in spec.groups for kpi in group.kpis if kpi.key != group.total_kpi]
 
+    def _missed_in_narrowed(self, document: Document, read: list, spec: Spec) -> set[str]:
+        """The listed KPIs a reading of a narrowed document did not read: the parts sent may have lost them, so they are
+        read again from the whole document (re-check 2026-11-15). Empty when the document went whole."""
+        if str(id(document)) not in self._narrowed or str(id(document)) in self._whole_documents:
+            return set()
+        found = {f"{item.group.key}.{item.kpi.key}" for item in read}
+        return {key for key in self._asked_keys(spec) if key not in found}
+
     def _locate_document(self, document: Document, spec: Spec) -> str:
         """The document Locate reads, the same for both readings so they share the prompt cache: the tables where each
         KPI sat last (_last_places) in a long document, else the document as any task reads it (_prompt_document);
