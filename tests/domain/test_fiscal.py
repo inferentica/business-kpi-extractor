@@ -153,3 +153,28 @@ def test_the_release_window_also_starts_at_its_first_fiscal_years_q1():
                 release(date(2016, 7, 28), date(2016, 6, 30)), release(date(2016, 10, 27), date(2016, 9, 30))]
     kept = with_first_year(releases, date(2016, 5, 15), "1231")
     assert [item.period_end for item in kept] == [date(2016, 3, 31), date(2016, 6, 30), date(2016, 9, 30)]
+
+
+def test_a_report_whose_index_page_fails_leaves_only_its_own_period_unknown():
+    # SEC answered an error page; edgartools' period_of_report then raised "cannot unpack non-iterable NoneType" and
+    # failed the company. The submissions list's report date is read first, with no request at all.
+    from types import SimpleNamespace
+
+    from kpi_extractor.sources.sec import report_period_ends
+
+    class Broken:
+        report_date = None
+
+        @property
+        def period_of_report(self):
+            raise TypeError("cannot unpack non-iterable NoneType object")
+
+    class Listed:
+        report_date = "2026-09-30"
+
+        @property
+        def period_of_report(self):
+            raise AssertionError("fetched the index page though the submissions list gave the date")
+
+    company = SimpleNamespace(get_filings=lambda **_: [Broken(), Listed()])
+    assert report_period_ends(company, date(2026, 1, 1)) == (date(2026, 9, 30),)
