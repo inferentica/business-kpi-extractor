@@ -149,3 +149,75 @@ def test_a_currency_sign_in_the_figures_own_cell_is_no_part_of_the_label():
     rows = [row for table in parse_html(html) for row in table.rows if row.figures]
     assert rows[0].label == "Acquisitions of short-term financial instruments"
     assert sorted(rows[0].figures.values()) == [-4879919.0, -4465247.0]
+
+
+def test_gains_printed_as_plain_figures_are_taken_away():
+    # Woori's Q3 2012 6-K (0001193125-12-484634), 2011's column in millions: among the adjustments, losses and gains both
+    # print as plain figures; among financing, "Net decrease in hedging derivatives 3,425" too.
+    def statement(gain):
+        return [heading("Cash flows from operating activities:")] + lines(("Net income", 2012071)) + \
+            [heading("Adjustments:")] + \
+            lines(("Income tax expense", 710342), ("Interest income", -11144145), ("Interest expense", 5746246),
+                  ("Dividend income", -160477), ("Impairment loss on credit loss", 1685883),
+                  ("Loss on valuation of associates investments", 12344), ("Loss on foreign exchange translation", 34092),
+                  ("Loss on disposal of premises and equipment and other assets", 5270),
+                  ("Impairment loss of premises and equipment and other assets", 10334), ("Loss on transaction of derivatives", 5140),
+                  ("Loss on valuation of derivatives", 640), ("Loss on fair value hedged items", 185194), ("Provisions", 58199),
+                  ("Retirement benefits", 123945), ("Depreciation and amortization", 200377),
+                  ("Gain on valuation of financial instruments at fair value through profit or loss", 5692),
+                  ("Gain on available-for-sale financial assets", gain), ("Gain on valuation of associates investments", 69250),
+                  ("Gain on foreign exchange translation", 46874),
+                  ("Gain on disposal of investments in jointly controlled entities and associates", 34094),
+                  ("Gain on disposal of premises and equipment and other assets", 15591),
+                  ("Reversal of impairment loss of premises and equipment and other assets", 2148),
+                  ("Gain on transaction of derivatives", 233), ("Gain on valuation of derivatives", 203385),
+                  ("Gain on fair value hedged items", 5206), ("Reversal of provisions", 18388)) + \
+            [heading("Changes in operating assets and liabilities:")] + \
+            lines(("Increase in financial instruments at fair value through profit or loss", -1344340),
+                  ("Increase in loans and receivables", -13989283), ("Increase in other assets", -7123807),
+                  ("Increase in deposits due to customers", 7141807), ("Decrease in provision for guarantee and unused commitment", -28129),
+                  ("Decrease in retirement benefit obligation", -564), ("Increase in other financial liabilities", 10575621),
+                  ("Increase (decrease) in other liabilities", 184341)) + \
+            [heading("Cash received from (paid for) operating activities:")] + \
+            lines(("Interest income received", 11012138), ("Interest expense paid", -5377077), ("Dividends received", 160477),
+                  ("Income tax paid", -484260), ("Net cash used in operating activities", -1229663)) + \
+            [heading("Cash flows from financing activities:")] + \
+            lines(("Increase in borrowings", 68716756), ("Issuance of debentures", 5893361), ("Payment of borrowings", -67591476),
+                  ("Payment of debentures", -5041327), ("Dividends paid", -201503), ("Net decrease in hedging derivatives", 3425),
+                  ("Net decrease in non-controlling interests", -455674),
+                  ("Net cash (used in) provided by financing activities", 1316712))
+    assert section_check(statement(1041181)).result == "pass"
+    assert section_check(statement(1041811)).result == "fail"  # one gain misread
+
+
+def test_the_taxonomy_template_under_other_headings_is_left_untested():
+    # Volaris's 2016 Q1 column in its 2017 6-K (0001157523-17-001082): BMV's template, its payments printed positive.
+    template = [heading("Cash flows (used in) provided by investing activities")] + \
+        lines(("Cash flows from losing control of subsidiaries or other businesses", 0),
+              ("Proceeds from disposals of rotable spare parts and pre-delivery payments", 642776),
+              ("Acquisitions of rotable spare parts furniture and equipment", 196802), ("Acquisitions of intangible assets", 10606),
+              ("Net cash flows from (used in) provided by investing activities", 435368))
+    assert section_check(template).result == "none"
+
+
+def test_a_line_that_only_seems_to_close_the_lines_above_it_hides_no_parts():
+    # Azul's Q4 2025 6-K (0001292814-26-001837), R$ millions to one decimal (the check counts in tenths): "Interest paid
+    # (215.6)" over its six parts, the fifth of which, (49.5), is within rounding of the 14 lines above it.
+    def statement(interest):
+        return [(label, level, None if value is None else round(value * 10)) for label, level, value in millions(interest)]
+
+    def millions(interest):
+        return [heading("Cash flows from operating activities")] + lines(("Net profit (loss) for the period", -1630.3)) + \
+            [heading("Total non-cash adjustments")] + \
+            lines(("Depreciation and amortization", 718.0), ("Unrealized derivatives", -263.2),
+                  ("Exchange gain and (losses) in foreign currency", 1259.9), ("Financial income and expenses, net", 2843.8),
+                  ("Provisions", 842.1), ("Result from modification of lease and provision", -1544.0), ("Other", -2071.0)) + \
+            [heading("Changes in operating assets and liabilities")] + \
+            lines(("Trade and other receivables", -241.7), ("Security deposits and maintenance reserves", 114.7),
+                  ("Other assets", 206.0), ("Derivatives", 0.0), ("Accounts payable", -214.1), ("Salaries and benefits", 59.2),
+                  ("Air traffic liability", 69.9), ("Provisions", -134.6), ("Other liabilities", 426.6), ("Interest paid", interest),
+                  ("Interest on loans and financing", -47.7), ("Interest on leases", -70.1), ("Interest on leases - notes and equity", 0.0),
+                  ("Interest on convertible instruments", -2.7), ("Interest on factoring credit card receivables", -49.5),
+                  ("Other interest", -45.5), ("Net cash generated (used) by operating activities", 225.9))
+    assert section_check(statement(-215.6)).result == "pass"
+    assert section_check(statement(-251.6)).result == "fail"  # its digits misread

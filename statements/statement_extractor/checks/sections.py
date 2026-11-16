@@ -7,7 +7,8 @@ thousands). A statement that does not add up is then served from another filing'
 
 Only a section its own heading opens is tested ("Cash flows from investing activities", then its lines, then its
 total). Releases that print a section's total above its lines, or no headings at all, are left untested, as is the IFRS
-taxonomy's template that BMV's forms print, whose amounts carry their elements' signs rather than the arithmetic."""
+taxonomy's template that BMV's forms print, whose amounts carry their elements' signs rather than the arithmetic. Gains
+and decreases printed as plain figures are read as taken away when that is how the section adds up (Woori's 6-Ks)."""
 from __future__ import annotations
 
 import re
@@ -31,6 +32,13 @@ _DEDUCTIONS = re.compile(r"^(deductions?|less|cash\s+out-?\s?flows?)\b", re.I)
 # The IFRS taxonomy's own headings, as BMV's forms print them (Televisa, Volaris since 2015).
 _TEMPLATE = re.compile(r"^(cash\s+flows\s+from\s+\(used\s+in\)\s+(operating|investing|financing)\s+activities|"
                        r"adjustments\s+to\s+reconcile\s+profit\s+\(loss\))\s*(\[abstract\])?$", re.I)
+# The taxonomy's own element lines, which BMV's forms print under headings worded every way (Volaris's 2017 6-Ks:
+# "Cash flows provided by operating activities", "Adjustments to reconcile income (loss)").
+_TEMPLATE_LINE = re.compile(r"^cash\s+flows\s+(from\s+losing|used\s+in\s+obtaining)\s+control\s+of\s+subsidiaries\s+or\s+"
+                            r"other\s+businesses$", re.I)
+# Lines printed as plain figures that take away (Woori's 6-Ks: "Gain on valuation of derivatives 203,385" among the
+# adjustments, "Net decrease in hedging derivatives 3,425" among financing), read as such in one more sum.
+_TAKEN = re.compile(r"^(gains?|reversals?)\s+(on|of|from)\b|^net\s+decrease\s+in\b", re.I)
 # Subtotals the statement names as such, read through before any other.
 _NAMED = re.compile(r"^$|^(sub-?\s?)?total\b|^net\b|^cash\b|\b(changes?|adjusted|adjustments)\b", re.I)
 _REACH = 40
@@ -43,7 +51,8 @@ def section_total(label: str) -> bool:
 
 def section_check(printed) -> Check:
     """printed: (label, level, value) in printed units, headings with no value, as the printed reader holds them."""
-    if any(value is None and ("[abstract]" in label.lower() or _TEMPLATE.match(label)) for label, _level, value in printed):
+    if any((value is None and ("[abstract]" in label.lower() or _TEMPLATE.match(label))) or _TEMPLATE_LINE.match(label)
+           for label, _level, value in printed):
         return Check("sections", NONE, "the IFRS taxonomy's template")
     printed = _without_parts(_deducted(_headings_with_totals(printed)))
     starts = subtotals(printed)
@@ -91,6 +100,12 @@ def section_check(printed) -> Check:
         skips = [covered, named | same, same] + [set(range(start, end)) | same for end, start in inner]
         sums = [[(label, part) for position, label, part in lines if position not in skip] for skip in skips]
         sums.append([(label, part) for label, _level, part in _parts_first([(label, 0, part) for _p, label, part in own])])
+        # Or every line, each over its own parts: a line that only seems to close the lines above it hides the parts
+        # (Azul's Q4 2025: "Interest on factoring credit card receivables (49.5)" against 14 lines summing to (50.1)).
+        sums.append([(label, part) for label, _level, part in
+                     _parts_first([(label, 0, part) for position, label, part in lines if position not in same])])
+        sums += [[(label, -part if part > 0 and _TAKEN.match(label) else part) for label, part in parts]
+                 for parts in sums if any(part > 0 and _TAKEN.match(label) for label, part in parts)]
         if any(close(abs(sum(_signed(label, part) for label, part in parts)), abs(value), len(parts) + 1) for parts in sums if parts):
             continue
         failures.append(f"{printed[index][0][:50]} {value:,.1f} vs {sum(_signed(label, part) for _p, label, part in own):,.1f}")
