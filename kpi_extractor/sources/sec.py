@@ -17,6 +17,7 @@ from edgar.entity.submissions import create_entity_from_submissions_json
 from edgar.exceptions import IdentityError, http_status
 from edgar.httprequests import is_unreachable
 from edgar.sgml import FilingSGML
+from edgar.sgml.sgml_parser import SECHTMLResponseError
 from edgar.settings import get_identity
 
 from .archive import exhibits_from_record, exhibits_record, filing_folder, xbrl_from_parts, xbrl_parts
@@ -106,6 +107,29 @@ def load_submission(filing, archive=None) -> None:
             except Exception:  # noqa: BLE001 - a damaged copy: SEC's then
                 pass
     _with_retries(filing.sgml, lambda: _read_submission_afresh(filing))
+
+
+_PERIOD = re.compile(r'infoHead">\s*Period of Report\s*</div>\s*<div class="info">\s*([\d-]+)', re.I)
+
+
+def period_of_report(filing, archive=None) -> str | None:
+    """A filing's period of report: its submission header's, else its index page's. SEC can answer the index page with
+    an error page, which edgartools reads as an index without dates and fails on unretried (74 of 120 companies in
+    statements round 134); the page is read again until it is SEC's own index."""
+    load_submission(filing, archive)
+    period = filing.sgml().period_of_report
+    if period:
+        return period
+
+    def read() -> str | None:
+        response = httpx.get(filing.homepage_url, headers={"User-Agent": get_identity()}, timeout=_SUBMISSION_TIMEOUT,
+                             follow_redirects=True)
+        response.raise_for_status()
+        if "formGrouping" not in response.text:
+            raise SECHTMLResponseError(f"no filing index at {filing.homepage_url}")
+        match = _PERIOD.search(response.text)
+        return match.group(1) if match else None
+    return _with_retries(read)
 
 
 def _document_url(filing, known_urls: dict[str, str] | None, archive=None) -> str:

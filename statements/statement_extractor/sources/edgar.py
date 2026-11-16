@@ -15,10 +15,11 @@ from kpi_extractor.sources.sec import (
     company_profile,
     configure_identity,
     load_submission,
+    period_of_report,
     periodic_reports,
 )
 
 __all__ = [
     "PERIODIC_FORMS", "CompanyProfile", "FilingRef", "FiscalCalendarError", "company_profile", "configure_identity",
-    "fiscal_label", "learn_year_offset", "load_submission", "periodic_reports",
+    "fiscal_label", "learn_year_offset", "load_submission", "period_of_report", "periodic_reports",
 ]

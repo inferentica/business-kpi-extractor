@@ -153,3 +153,25 @@ def test_a_report_read_from_edgar_rides_out_a_bad_reply(waits, monkeypatch):
     pipeline = SymbolPipeline(None, "X", quarters=4, force=False, log=lambda *_: None)
     assert pipeline._load_xbrl(SimpleNamespace(filing=filing)) == "read"
     assert filing._sgml.accession_number == "0000000001-26-000001" and waits == [sec._SEC_WAITS[0]]
+
+
+INDEX = """<div class="formGrouping"><div class="infoHead">Filing Date</div><div class="info">1994-12-29</div></div>
+<div class="formGrouping"><div class="infoHead">Period of Report</div><div class="info">1994-09-30</div></div>"""
+
+
+def test_a_period_missing_from_the_header_is_read_from_the_index_past_an_error_page(waits, monkeypatch):
+    # Statements round 134: SEC answered 74 companies' index pages with an error page, which edgartools read as an index
+    # without dates and failed on.
+    filing = _filing()
+    sec._hold_submission(filing, SUBMISSION)  # a header with no period of report
+    pages = ["<html><body>Request Rate Threshold Exceeded</body></html>", INDEX]
+    monkeypatch.setattr(sec.httpx, "get", lambda url, **kwargs: httpx.Response(200, text=pages.pop(0), request=httpx.Request("GET", url)))
+    assert sec.period_of_report(filing) == "1994-09-30"
+    assert waits == [sec._SEC_WAITS[0]]
+
+
+def test_a_period_in_the_header_needs_no_index(monkeypatch):
+    filing = _filing()
+    sec._hold_submission(filing, SUBMISSION.replace("FILED AS OF DATE:", "CONFORMED PERIOD OF REPORT:\t20251231\nFILED AS OF DATE:"))
+    monkeypatch.setattr(sec.httpx, "get", lambda url, **kwargs: pytest.fail("read the index"))
+    assert str(sec.period_of_report(filing))[:10] in ("2025-12-31", "20251231")
