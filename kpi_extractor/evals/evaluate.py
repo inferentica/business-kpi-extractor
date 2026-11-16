@@ -15,7 +15,7 @@ from pathlib import Path
 
 from ..ops.cli import company_pool
 from ..ops.control import ControlPlane, Reply
-from ..readers.extract import labels_agree
+from .list_score import REMOVED, proposed_again, score_lists  # noqa: F401 - scorers, as evaluate's
 from ..pipeline import SymbolPipeline, SymbolResult
 from ..sources.sec import configure_identity
 
@@ -97,67 +97,6 @@ def evaluate_symbol(plane: ControlPlane, symbol: str, quarters: int) -> tuple[Sy
     return result, control.values.get(symbol, []), control.specs.get(symbol)
 
 
-_UNIT_WORDS = re.compile(r"\((?:in )?(?:thousands|millions|billions|%|percent|\$[^)]*|[a-z ]*)\)|\b(?:in )?(?:thousands|millions|billions)\b", re.I)
-
-
-def _kpis(groups: list[dict]) -> list[str]:
-    return [label for group in groups or [] for kpi in group.get("kpis") or [] if kpi.get("key") != group.get("total_kpi")
-            and (label := _UNIT_WORDS.sub("", str(kpi.get("label") or "")).strip())]
-
-
-def _same_kpi(a: str, b: str) -> bool:
-    # Labels written differently for the same KPI ("Non-strategic" and "Non-strategic revenue", "(in thousands)").
-    return labels_agree(a, b) and labels_agree(b, a)
-
-
-REMOVED = Path("evals/removed_groups.json")  # groups the owner took off lists Propose wrote (2026-10)
-
-
-def _same_group(a: str, b: str) -> bool:
-    # Group labels share generic words ("Revenue by ..."), so only the same name, or one inside the other, counts.
-    x, y = re.sub(r"[^a-z0-9]+", "", a.lower()), re.sub(r"[^a-z0-9]+", "", b.lower())
-    return bool(x and y) and (x in y or y in x)
-
-
-def proposed_again(fresh: dict[str, dict], owner: dict[str, dict], removed: list[dict]) -> list[str]:
-    """Groups the owner removed that a fresh list names again: most of a removed group's KPIs, in a group that is not
-    one the owner kept."""
-    again = []
-    for gone in removed:
-        spec = fresh.get(gone["symbol"])
-        if not spec:
-            continue
-        kept = owner.get(gone["symbol"], {}).get("groups") or []
-        for group in spec.get("groups") or []:
-            if any(_same_group(group["label"], other["label"]) for other in kept):
-                continue
-            shared = sum(1 for kpi in group.get("kpis") or [] if any(_same_kpi(kpi["label"], label) for label in gone["kpis"]))
-            if shared >= max(2, (len(gone["kpis"]) + 1) // 2):
-                again.append(f"{gone['symbol']}: {group['label']} (removed {gone['label']})")
-    return again
-
-
-def score_lists(fresh: dict[str, dict], owner: dict[str, dict]) -> dict:
-    """Propose scored against the lists the owner edited by hand: of the owner's KPIs, how many a fresh list names
-    (recall), and of a fresh list's KPIs, how many the owner keeps (precision), matched by label. The owner removed
-    174 groups Propose once listed, so precision is the number to watch."""
-    rows, kept, owned, proposed = {}, 0, 0, 0
-    for symbol, spec in owner.items():
-        if symbol not in fresh:
-            continue
-        mine, theirs = _kpis(spec.get("groups")), _kpis(fresh[symbol].get("groups"))
-        kept_here = [label for label in theirs if any(_same_kpi(label, other) for other in mine)]
-        named = [label for label in mine if any(_same_kpi(label, other) for other in theirs)]
-        rows[symbol] = {"owner": len(mine), "fresh": len(theirs), "kept": len(kept_here), "named": len(named),
-                        "notKept": [label for label in theirs if label not in kept_here][:12],
-                        "notNamed": [label for label in mine if label not in named][:12]}
-        kept, owned, proposed = kept + len(kept_here), owned + len(mine), proposed + len(theirs)
-        rows[symbol]["recall"] = len(named) / len(mine) if mine else None
-    named_total = sum(row["named"] for row in rows.values())
-    return {"companies": len(rows), "recall": named_total / owned if owned else None,
-            "precision": kept / proposed if proposed else None, "byCompany": rows}
-
-
 def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
     """Correct, wrong (found with another value) and missing, per golden value."""
     results = []
@@ -176,6 +115,24 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
             and pattern.search(value["kpi_label"])
             and (group is None or group.search(value["group_label"]))
         ]
+        retitled = None
+        if group is not None and not candidates and not item.get("absent"):
+            # A group is known by its lines as well as its title: a fresh list titles Morgan Stanley's investment banking
+            # breakdown "Revenue by Product". The figure counts when its group holds every golden line of that group,
+            # and the result names the title it came under (p4-stabletitles fixes titles themselves).
+            siblings = [re.compile(other["label"], re.I) for other in golden if other["symbol"] == item["symbol"]
+                        and other.get("group") == item["group"] and other["period_end"] == item["period_end"] and not other.get("absent")]
+            if len(siblings) >= 2:
+                def holds_all(value: dict) -> bool:
+                    labels = [v["kpi_label"] for v in latest.values() if v["group_key"] == value["group_key"]
+                              and v["fiscal_year"] == value["fiscal_year"] and v["fiscal_period"] == value["fiscal_period"]]
+                    return all(any(sibling.search(label) for label in labels) for sibling in siblings)
+                candidates = [value for value in latest.values()
+                              if value["unit"] == item["unit"] and value["validation_status"] == "verified"
+                              and abs((date.fromisoformat(value["period_end"]) - target).days) <= 7
+                              and value["fiscal_period"] == item.get("fiscal_period", value["fiscal_period"])
+                              and pattern.search(value["kpi_label"]) and holds_all(value)]
+                retitled = sorted({value["group_label"] for value in candidates}) or None
         if item.get("absent"):
             # A figure that must not be served: rows a reading once produced that were wrong (a segment's old name
             # beside its new one, a segment taken for a line of a breakdown).
@@ -201,7 +158,8 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
         else:
             outcome = "optional" if item.get("optional") else "missing"
         results.append({**item, "outcome": outcome, "methods": sorted({str(v.get("method")) for v in candidates}),
-                        "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates][:3]})
+                        "found": [f"{float(value['value']):,.6g} {value.get('currency') or ''}".strip() for value in candidates][:3],
+                        **({"retitled": retitled} if retitled else {})})
     counted = [result for result in results if result["outcome"] != "optional"]
     correct = sum(1 for result in counted if result["outcome"] == "correct")
     wrong = sum(1 for result in counted if result["outcome"] == "wrong")
@@ -212,6 +170,8 @@ def score(golden: list[dict], captured: dict[str, list[dict]]) -> dict:
         "total": len(counted),
         "accuracy": correct / (correct + wrong) if correct + wrong else 1.0,
         "recall": correct / len(counted) if counted else 1.0,
+        # Right figures found under another group title: correct, and counted so unstable titles stay visible.
+        "retitled": sum(1 for result in counted if result.get("retitled") and result["outcome"] == "correct"),
         "results": results,
     }
 
@@ -249,10 +209,11 @@ def main(argv: list[str] | None = None) -> int:
     if fresh and os.environ.get("KPI_EVAL_LISTS", "fresh") != "stored":
         owner = {}
         for symbol in fresh:
-            state = plane.call("symbol_state", symbol=symbol).get("spec") or {}
-            if state.get("owner_edited_at"):
-                owner[symbol] = state
-        report["lists"] = score_lists(fresh, owner)
+            state = plane.call("symbol_state", symbol=symbol)
+            spec = state.get("spec") or {}
+            if spec.get("owner_edited_at"):
+                owner[symbol] = {**spec, "values": state.get("values") or []}  # what the company still reports
+        report["lists"] = score_lists(fresh, owner, captured)
         removed = json.loads(REMOVED.read_text()) if REMOVED.exists() else []
         report["lists"]["proposedAgain"] = proposed_again(fresh, owner, removed)
     report["aiCalls"] = sum(result.ai_calls for result in results)
@@ -271,8 +232,10 @@ def main(argv: list[str] | None = None) -> int:
                                               for result in report["results"]]})
     lists = report.get("lists")
     lines = [f"Golden set: {report['correct']}/{report['total']} correct, {report['wrong']} wrong, {report['missing']} missing "
-             f"(accuracy {report['accuracy']:.1%}, recall {report['recall']:.1%}); AI calls {report['aiCalls']}",
-             *([f"Propose against {lists['companies']} hand-edited lists: precision {lists['precision']:.0%}, recall {lists['recall']:.0%}; "
+             f"(accuracy {report['accuracy']:.1%}, recall {report['recall']:.1%}); AI calls {report['aiCalls']}"
+             + (f"; {report['retitled']} right under another group title" if report.get("retitled") else ""),
+             *([f"Propose against {lists['companies']} hand-edited lists, one to one: precision {lists['precision']:.0%}, "
+                f"recall {lists['recall']:.0%} of {lists['current']} lines still reported ({lists['history']} history lines apart); "
                 f"groups the owner removed proposed again: {len(lists.get('proposedAgain') or [])}"
                 + (f" ({'; '.join(lists['proposedAgain'][:5])})" if lists.get("proposedAgain") else "")]
                if lists and lists["companies"] else []),
@@ -286,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
     if summary:
         Path(summary).write_text(text + "\n")
     Path("eval-results").mkdir(exist_ok=True)
-    Path("eval-results/report.json").write_text(json.dumps({**report, "captured": captured}, default=str, indent=1))
+    Path("eval-results/report.json").write_text(json.dumps({**report, "captured": captured, "freshLists": fresh}, default=str, indent=1))
     return 0 if report["wrong"] == 0 and report["missing"] == 0 else 1  # a required value not found fails the run
 
 
