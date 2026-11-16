@@ -300,7 +300,11 @@ def _own_amount_scale(table: Table, row: int, col: int, kpi_label: str) -> Scale
 
 
 def _from_reader(document: Document, part, locator, value: float) -> tuple[ScaleFrom, list[str]]:
-    """The reader's own scale where the document states none nearby: quoted words stand, anything else is held."""
+    """The reader's own scale where the document states none nearby: quoted words stand, anything else is held. An
+    amount read in units where nothing in the filing states a scale is held too, whatever its size (owner, 2026-11-16):
+    Unilever's segment turnover, printed in millions without saying so, was read as €3,477, and only its size showed it."""
+    if locator.scale == 1:
+        return ScaleFrom(1.0, "reader", locator.scale_text), [SCALE_NOT_STATED]
     notes = _ai_scale_notes(document, part, locator.scale_text, locator.scale, value * locator.scale)
     quoted = bool(notes) and notes[0].startswith("scale quoted")
     return ScaleFrom(locator.scale, "quoted" if quoted else "reader", locator.scale_text), notes

@@ -1,8 +1,8 @@
 """Whether a figure's own filing states it where it was read. The owner's rule (2026-11-09): a figure is judged only by
 whether it is faithful to its filing, never by whether it looks reasonable. A sharp change between periods is no
 reason to hold a figure the filing itself states (Palantir's TCV closed went from $248M to $792M, Visa's cross-border
-volume growth from -21% to 53% out of the 2020 slump); a jump stays a misread guard only for figures nothing in the
-filing confirms."""
+volume growth from -21% to 53% out of the 2020 slump). Since 2026-11-16 no jump holds a figure at all; this settles
+figures held for one before."""
 from __future__ import annotations
 
 import re

@@ -12,23 +12,14 @@ from typing import Callable, Iterable
 
 from ..rules.numbers import same_figure
 from .reasons import SHARED_CELL
-from .stated import stated_in_filing
 
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
 BREAKDOWN_TOLERANCE = 0.01
 PERIOD_TOLERANCE_DAYS = 12
-MAX_RATIO_JUMP = 3.0
-MAX_MIX_JUMP = 30.0
-SMALL_COUNT = 50
-SMALL_COUNT_MOVE = 25
 MAX_DERIVED_GAP = 0.001
 # A total this close to a figure reported in XBRL is that figure.
 REPORTED_TOTAL_MATCH = 0.001
 PERIOD_MATCH_DAYS = 12
-# A breakdown row under this share of its total swings wildly and says nothing; the group's total still checks it.
-IMMATERIAL = 0.01
-# A quarter's total this many times the quarter's before it is an annual report read as a quarter.
-FAR_ABOVE_QUARTER = 2.5
 _SERIES_GAP_DAYS = 120
 
 
@@ -169,61 +160,6 @@ def _lines_add_up(figures: list[Figure], **_context) -> list[Finding]:
 
 
 
-def count_jump(unit: str, before: float, now: float) -> str | None:
-    """Small counts move by a few at a time (ASML's used systems sold, 3 one quarter and 10 the next): below SMALL_COUNT
-    a jump is an absolute move, not a ratio. Returns "" when the small-count rule applies and finds no jump."""
-    if unit != "count" or max(abs(before), abs(now)) >= SMALL_COUNT:
-        return None
-    return f"moved {now - before:+g} in a quarter" if abs(now - before) > SMALL_COUNT_MOVE else ""
-
-
-def _ratio_jump(before: float, now: float) -> str | None:
-    ratio = now / before
-    return f"changed {ratio:.1f}x in a quarter" if ratio > MAX_RATIO_JUMP or ratio < 1 / MAX_RATIO_JUMP else None
-
-
-def jump(kind: str, unit: str, before: float | None, now: float) -> str | None:
-    """The one jump rule, for a reading and for stored quarters in date order alike: a share of a mix moving by more
-    than MAX_MIX_JUMP points, a small count by more than SMALL_COUNT_MOVE, any other positive amount or count by more
-    than MAX_RATIO_JUMP times. A percent that is not a share (a growth rate, a ratio) and a negative or zero figure
-    have no jump: Costco's digital comparable sales growing 28.4% then 64.5%, or Bank of America's other income at
-    -$78 million then -$491 million, says nothing about a misread."""
-    if before is None:
-        return None
-    if kind == "mix":
-        return f"moved {now - before:+.1f} points in a quarter" if abs(now - before) > MAX_MIX_JUMP else None
-    if unit == "percent" or before <= 0 or now <= 0:
-        return None
-    small = count_jump(unit, before, now)
-    return (small or None) if small is not None else _ratio_jump(before, now)
-
-
-def _jump(figure: Figure, before: float | None) -> str | None:
-    return jump(figure.kind, figure.unit, before, figure.value)
-
-
-def _no_sharp_change(figures: list[Figure], previous: dict[str, float], **_context) -> list[Finding]:
-    """Against the quarter compared. An immaterial row swings wildly, and growth from an immaterial base is a launch
-    (TSMC's 3nm: NT$0.5B to NT$29B), not an error."""
-    group = figures[0].group
-    parts_total = sum(figure.value for figure in _top_level([figure for figure in figures if not figure.is_total]))
-    previous_total = sum(value for key, value in previous.items() if key.startswith(f"{group}."))
-    found = []
-    for figure in figures:
-        breakdown = figure.kind == "revenue_breakdown"
-        if breakdown and parts_total and abs(figure.value) < IMMATERIAL * abs(parts_total):
-            continue
-        before = previous.get(f"{group}.{figure.key}")
-        if breakdown and before is not None and previous_total and abs(before) < IMMATERIAL * abs(previous_total):
-            continue
-        moved = _jump(figure, before)
-        # A figure is judged by its filing, not by how far it moved: one the filing states where it was read stands.
-        if moved and not stated_in_filing(figure.unit, figure.value, getattr(figure.source, "locator", None),
-                                         getattr(figure.source, "notes", None), figure.label):
-            found.append(Finding("no_sharp_change", [figure], moved))
-    return found
-
-
 _READ = frozenset({"ai"})
 _BREAKDOWN = frozenset({"revenue_breakdown"})
 _ADDS_UP = (Check("breakdown_adds_up", _breakdown_adds_up, _BREAKDOWN, _READ),)
@@ -231,7 +167,6 @@ READING_CHECKS = (
     Check("mix_adds_up", _mix_adds_up, frozenset({"mix"}), _READ),
     *_ADDS_UP,
     Check("lines_add_up", _lines_add_up, frozenset({"revenue_breakdown", "mix"}), _READ),
-    Check("no_sharp_change", _no_sharp_change, None, _READ),
 )
 
 
@@ -295,39 +230,11 @@ def check_period(located, expected: date) -> str | None:
     return None
 
 
-_TOTAL_LABEL = re.compile(r"\btotal\b|^(?:net\s+)?(?:revenues?|sales)$", re.I)
-
-
-def total_label(items) -> str:
-    """The label of the row a whole-table reading took as its total (its parts' locators carry it)."""
-    return next((str(item.locator["total_row_label"]) for item in items if item.locator.get("total_row_label")), "")
-
-
-def looks_like_part_of_table(rows: int, total: float, rows_before: int, total_before: float | None,
-                             total_label: str = "") -> bool:
-    """Fewer rows than the quarter compared and a total under half of its: most likely part of a table, with a subtotal
-    taken for the total (TSMC's 2nm and 3nm under "advanced technologies"). Its parts add up, so only this shows it.
-    Size only prompts the look: a total read from the row the table itself labels as its total ("Total", "Net sales")
-    is the whole table, however it compares with the quarter before."""
-    if re.search(_TOTAL_LABEL, (total_label or "").strip(" :")):
-        return False
-    return bool(total_before) and rows < rows_before and total < 0.5 * total_before
-
-
-def far_above_quarter(total: float, quarter_before: float | None) -> bool:
-    return bool(quarter_before) and total >= FAR_ABOVE_QUARTER * quarter_before
-
-
-def immaterial_row(value: dict) -> bool:
-    """A stored breakdown row under 1% of its total, whose swings say nothing."""
-    total = (value.get("locator") or {}).get("total")
-    return value["group_kind"] == "revenue_breakdown" and bool(total) and abs(float(value["value"])) < IMMATERIAL * abs(float(total))
-
-
 def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of: Callable[[dict], tuple],
                         methods: frozenset[str] | None = _READ) -> dict[tuple, str]:
-    """Each verified quarterly figure against the quarter before it, in date order: a sharp change, or the same significant
-    figure as the quarter before or a year earlier (the tell of a prior-period column). `only`: the figures to judge."""
+    """Each verified quarterly figure against the quarter before it and a year earlier, in date order: the same
+    significant figure as either (the tell of a prior-period column). How far a figure moved is never a finding: the
+    owner's rule (2026-11-09) judges a figure only by its filing. `only`: the figures to judge."""
     series: dict[tuple[str, str], list[dict]] = {}
     for v in values:
         if (methods is None or v["method"] in methods) and v["validation_status"] == "verified" and v["fiscal_period"] != "FY":
@@ -340,11 +247,7 @@ def date_order_findings(values: Iterable[dict], only: set[tuple] | None, key_of:
             if not judged(current) or _days(current["period_end"], previous["period_end"]) > _SERIES_GAP_DAYS:
                 continue
             before, now = float(previous["value"]), float(current["value"])
-            moved = jump(current["group_kind"], current["unit"], before, now)
-            if moved and not immaterial_row(current) and not stated_in_filing(current["unit"], now, current.get("locator"),
-                                                                              current.get("notes"), current.get("kpi_label")):
-                flagged[key_of(current)] = moved
-            elif (current["unit"] == "currency" and _significant(now) and _same(now, before) and not _row_shows(current, before, now)
+            if (current["unit"] == "currency" and _significant(now) and _same(now, before) and not _row_shows(current, before, now)
                   and not states_one_period(current)):
                 flagged[key_of(current)] = "the same figure as the quarter before: check the column"
         by_end = {v["period_end"][:7]: v for v in rows}
@@ -441,7 +344,7 @@ def parts_add_up(rows: list[dict], parents: dict[tuple[str, str], str] | None = 
 
 
 # Run on what is already stored: "no total" and "fewer than two parts" only mean a reading is incomplete.
-_STORED_CHECKS = tuple(check for check in READING_CHECKS if check.name != "no_sharp_change")
+_STORED_CHECKS = READING_CHECKS
 _ONLY_WHEN_READING = ("no total revenue", "fewer than two parts")
 
 

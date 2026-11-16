@@ -110,13 +110,14 @@ def test_a_jump_does_not_hold_a_figure_its_quote_states():
     assert status["n5"] == "verified"
 
 
-def test_a_jump_still_holds_a_figure_its_filing_does_not_state():
+def test_a_jump_holds_no_figure():
+    # How far a figure moved from the quarter before is no check (owner, 2026-11-09; the last such holds went 2026-11-16).
     document = _document()
     values, _ = read_values(document, SPEC, _located(document), "USD")
     for item in values:
-        item.locator = {}  # nothing in the filing shown for it
+        item.locator = {}
     validate_groups(values, previous={"operating.dap": 0.9e9})
-    assert {item.kpi.key: item.status for item in values}["dap"] == "needs_review"
+    assert {item.kpi.key: item.status for item in values}["dap"] == "verified"
 
 
 def test_check_period():

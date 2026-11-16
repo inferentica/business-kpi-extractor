@@ -42,7 +42,7 @@ def test_a_sharp_change_the_filing_states_is_no_finding():
               _row("2022-06-30", 792e6, PALANTIR)]
     assert date_order_findings(stated, None, key) == {}
     unconfirmed = [_row("2022-03-31", 248e6), _row("2022-06-30", 792e6)]
-    assert date_order_findings(unconfirmed, None, key) == {"2022-06-30": "changed 3.2x in a quarter"}
+    assert date_order_findings(unconfirmed, None, key) == {}  # how far it moved holds nothing either
 
 
 class _Company(StatedFigures):

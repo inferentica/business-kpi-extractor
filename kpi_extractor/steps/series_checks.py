@@ -9,9 +9,10 @@ from datetime import date, timedelta
 from ..ai import Spec
 from ..domain.derive import derive_periods, same_derivation
 from ..documents.document import Document, parse_number
-from ..quality.checks import count_jump, parts_add_up, reported_matches
+from ..quality.checks import parts_add_up, reported_matches
 from ..quality.reasons import (ADDS_TO_XBRL as _ADDS_TO_XBRL, ASIDES, CONFIRMED_LATER as _CONFIRMED_LATER, EQUALS_XBRL as _EQUALS_XBRL,
-                              GROUP_HOLDS, NO_REVENUE_NOTE, OTHER_PART_NOTE, PROOFS, RESTATED_LATER as _RESTATED_LATER, TIES_OUT, UNANCHORED,
+                              GROUP_HOLDS, NO_REVENUE_NOTE, OTHER_PART_NOTE, PROOFS, RESTATED_LATER as _RESTATED_LATER, SIZE_HOLD_LIFTED,
+                              SIZE_HOLDS, TIES_OUT, UNANCHORED,
                               WITHIN_XBRL as _WITHIN_XBRL, has, is_, note_with, only, without)
 from ..readers.extract import ReadValue, column_header
 from ..rules.period import release_unit
@@ -374,7 +375,6 @@ class SeriesChecks:
 
     def _recheck_flagged(self) -> list[dict]:
         """Clears flags that stored figures themselves disprove, without reading anything again:
-        - a full year flagged for jumping against a quarter is compared with the year before instead;
         - a table read whole without its total row reconciles to a figure the same filing reports for the same period
           (TSMC's geography to its net revenue, its nodes to wafer revenue), to within 0.001%."""
         cleared = []
@@ -382,27 +382,7 @@ class SeriesChecks:
         for v in self.values.values():
             if v["method"] == "ai" and v["validation_status"] != "rejected":
                 by_filing.setdefault((v.get("source_accession") or "", v["period_end"]), []).append(v)
-        for v in self.values.values():
-            if v["method"] != "ai" or v["validation_status"] != "needs_review" or v["fiscal_period"] != "FY":
-                continue
-            notes = v.get("notes") or []
-            if only(notes, ["jump"]):
-                siblings = by_filing.get((v.get("source_accession") or "", v["period_end"]), [])
-                parts = sum(float(o["value"]) for o in siblings if o["group_key"] == v["group_key"])
-                total = float((v.get("locator") or {}).get("total") or 0)
-                # A new node ramping 3.5× in a year is growth; the year's table adding up exactly is the check. How far
-                # the year moved from the year before proves nothing either way: the year stays held until a filing does.
-                if total and abs(parts - total) <= abs(total) * 0.001:
-                    cleared.append({**v, "validation_status": "verified", "notes": ["the year's breakdown reconciles"]})
         for (accession, _end), rows in by_filing.items():
-            for group_key in {v["group_key"] for v in rows if v["group_kind"] == "revenue_breakdown"}:
-                members = [m for m in rows if m["group_key"] == group_key]
-                total = sum(float(m["value"]) for m in members)
-                for m in members:
-                    notes = m.get("notes") or []
-                    if (m["validation_status"] == "needs_review" and only(notes, ["jump"])
-                            and total and abs(float(m["value"])) < 0.01 * abs(total)):
-                        cleared.append({**m, "validation_status": "verified", "notes": ["immaterial row; the total checks it"]})
             groups: dict[str, list[dict]] = {}
             for v in rows:
                 groups.setdefault(v["group_key"], []).append(v)
@@ -423,29 +403,27 @@ class SeriesChecks:
 
     def _outdated_flags(self) -> list[dict]:
         """Flags set by a check that today's checks no longer raise, cleared from the stored figures alone:
-        - a small count's ratio jump (ASML's used systems sold, 10 to 3), flagged before small counts moved by units;
+        - a hold for how far a figure moved or for its size (a jump, an amount far from its other periods, a total far
+          above the quarter before, fewer rows than the quarter compared), which since 2026-11-16 holds nothing: a figure
+          is judged only by its filing. A breakdown or mix clears whole, when every held line of it was held only so;
         - a breakdown's parts off their total (ASML's 2023 quarters, read twice over while two keys named each line),
           now that its parts add up to the release's stated total."""
         aside = ("reviewed", "checked")  # a check's own mark ("settled by the checks") is not set aside here
         cleared = []
-        series: dict[tuple[str, str], list[dict]] = {}
-        for v in self.values.values():
-            if v["method"] == "ai" and v["validation_status"] == "verified" and v["fiscal_period"] != "FY":
-                series.setdefault((v["group_key"], v["kpi_key"]), []).append(v)
         groups: dict[tuple, list[dict]] = {}
         for v in self.values.values():
             if v["method"] == "ai" and v["group_kind"] == "revenue_breakdown" and v["validation_status"] != "rejected":
                 groups.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"], v.get("source_accession")), []).append(v)
+        sized: dict[tuple, list[dict]] = {}
         for v in self.values.values():
-            if v["method"] != "ai" or v["validation_status"] != "needs_review" or v["fiscal_period"] == "FY":
-                continue
-            if v["unit"] != "count" or not only(v.get("notes"), ["ratio_jump"], ignoring=aside):
-                continue
-            before = max((o for o in series.get((v["group_key"], v["kpi_key"]), [])
-                          if 0 < _days(v["period_end"], o["period_end"]) <= 120), key=lambda o: o["period_end"], default=None)
-            if before is not None and count_jump(v["unit"], float(before["value"]), float(v["value"])) == "":
-                cleared.append({**v, "validation_status": "verified",
-                                "notes": [*(v.get("notes") or []), "a small count's move, within the rule for small counts"]})
+            if v["method"] == "ai" and v["validation_status"] == "needs_review":
+                alone = v["kpi_key"] if v["group_kind"] == "metric" else None  # a metric stands on its own
+                sized.setdefault((v["group_key"], alone, v["fiscal_year"], v["fiscal_period"], v.get("source_accession")), []).append(v)
+        for held in sized.values():
+            if all(not v.get("owner_decision") and only(v.get("notes"), [*SIZE_HOLDS, "other_part"], ignoring=(*aside, *PROOFS))
+                   for v in held) and any(has(v.get("notes"), *SIZE_HOLDS) for v in held):
+                cleared += [{**v, "validation_status": "verified",
+                             "notes": [*without(v.get("notes"), *SIZE_HOLDS, "other_part"), SIZE_HOLD_LIFTED]} for v in held]
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review"]
             stated = float((rows[0].get("locator") or {}).get("total") or 0)
