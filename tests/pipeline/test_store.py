@@ -164,6 +164,21 @@ def test_a_held_figure_flagged_and_stood_back_is_not_sent():
     assert len(control.calls) == 1
 
 
+def test_held_steps_that_fail_part_way_store_nothing():
+    # The re-check's probe: quarters re-keyed or restated, then a failure before Q4 is derived from them. All of the
+    # steps' results or none: the figures stay as loaded, in memory too, and nothing goes out.
+    control = Control()
+    store = _store(control)
+    store.load([_row("q1", value=1.0), _row("q4", value=4.0)])
+    store.hold()
+    store.write([_row("q1", value=1.5), _row("new")])
+    store.discard()
+    assert control.calls == []
+    assert store.values[("kpi_x", "q1", "2026", "Q2")]["value"] == 1.0 and ("kpi_x", "new", "2026", "Q2") not in store.values
+    store.release()  # nothing held is left to send
+    assert control.calls == []
+
+
 def test_a_reading_recorded_while_held_goes_out_at_once():
     control = Control()
     store = _store(control)

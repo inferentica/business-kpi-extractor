@@ -282,13 +282,16 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.store.write(self._fill_tagged_metrics(reports, spec))
             self.store.write(self._fill_quarter_tables(releases))
             self.store.write(self._fill_quoted_rows(releases))
-        # Across periods, in this order: each step sees what the one before wrote, in memory; what changed is sent once,
-        # also when a step fails part way (the run still fails): what the steps before it settled is never lost.
+        # Across periods, in this order: each step sees what the one before wrote, in memory; what changed is sent once.
+        # The steps build on each other, so they store all of their results or none: a step failing part way (the run
+        # fails) sends nothing, never re-keyed quarters without the Q4 derived from them.
         self.store.hold()
         try:
             self._cross_period(releases, spec)
-        finally:
-            self.store.release()
+        except BaseException:
+            self.store.discard()
+            raise
+        self.store.release()
         self.result.q4_gaps = self._q4_gaps()
         self.result.served_changes = self.store.served_changes()
         if self.result.served_changes:

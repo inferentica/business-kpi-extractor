@@ -71,6 +71,7 @@ class CompanyStore:
         self._remote: dict[tuple, MappingProxyType] = {}
         self._holding = False
         self._touched: set[tuple] = set()
+        self._before: dict[tuple, MappingProxyType] = {}
         self._owner_rejected: set[tuple] = set()
         self.values = MappingProxyType(self._values)
         self.filings = MappingProxyType(self._filings)
@@ -95,7 +96,15 @@ class CompanyStore:
         """From here, written rows change the company's figures in memory only, until release(). Steps that each settle
         a part of the figures (one flags a breakdown, a later one stands it back) were each a stored change: every run
         left dated versions that lasted seconds (KKR 835 in a day). Readings recorded per filing are never held."""
-        self._holding, self._touched = True, set()
+        self._holding, self._touched, self._before = True, set(), dict(self._values)
+
+    def discard(self) -> None:
+        """Drops every row written since hold(), sending nothing: the figures are as they were before it. Steps that
+        build on each other (quarters re-keyed or restated, then Q4 derived from them) store all of their results or
+        none, so a step failing part way never leaves an old derived Q4 served on inputs since changed."""
+        self._holding, self._touched = False, set()
+        self._values.clear()
+        self._values.update(self._before)
 
     def release(self) -> None:
         """Sends each held row whose final state differs from what the control plane holds, once."""
