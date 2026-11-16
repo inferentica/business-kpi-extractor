@@ -138,9 +138,21 @@ def _reports_without_segments(values: dict) -> set[str]:
     return {accession for accession, keys in groups.items() if "segment_income" in keys and "segments" not in keys}
 
 
+def _chart_share_quarters(values: dict) -> set[str]:
+    """The other filings of a quarter whose figures a slide's shares still stand in for: its report, whose amounts the
+    shares kept out while they blocked an unchecked reading (TSMC's Q3 2026 technology nodes, 2026-11-13)."""
+    from ..store import chart_share
+    held = {(value["fiscal_year"], value["fiscal_period"]): value.get("source_accession") for value in values.values()
+            if chart_share(value) and value.get("validation_status") != "rejected"}
+    return {value["source_accession"] for value in values.values()
+            if value.get("source_accession") and (value["fiscal_year"], value["fiscal_period"]) in held
+            and value["source_accession"] != held[(value["fiscal_year"], value["fiscal_period"])] and not chart_share(value)}
+
+
 # Selectors that pick filings by what all their figures together lack.
 SET_SELECTORS: dict[str, tuple[str, Callable[[dict], set[str]]]] = {
     "reports-without-segments": ("periodic reports with segment income from XBRL but no revenue by segment", _reports_without_segments),
+    "chart-share-quarters": ("the reports of quarters a slide's shares still stand in for", _chart_share_quarters),
 }
 
 
