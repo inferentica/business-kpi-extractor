@@ -16,6 +16,7 @@ import re
 from datetime import date, timedelta
 
 from ...checks.printed import balance_check, cash_check, income_check, total_check
+from ...checks.sections import section_check
 from ...domain.model import Reading
 from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA
@@ -252,7 +253,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
     if kind == "balance":
         checks.insert(0, balance_check(figures))
     elif kind == "cash_flow":
-        checks.insert(0, cash_check(figures))
+        checks[0:0] = [cash_check(figures), section_check(printed)]
     else:
         checks.insert(0, income_check(figures))
     return Reading(statement=kind, duration=duration, fiscal_year=fiscal_year, fiscal_period=fiscal_period,

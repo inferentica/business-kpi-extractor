@@ -22590,6 +22590,34 @@
    "era": "xbrl",
    "checked": "read by hand",
    "note": "hand check PLTR-xbrl-17, 2026-11-09: the filing's own printed row"
+  },
+  {
+   "symbol": "OSK",
+   "statement": "income",
+   "fiscal_year": "2003",
+   "fiscal_period": "Q1",
+   "duration": "quarter",
+   "label": "^net sales$",
+   "value": 426336000.0,
+   "scale": 1000,
+   "source_accession": "0000897069-04-000227",
+   "era": "text",
+   "checked": "read by hand",
+   "note": "s7-sectionsums 2026-11-16, review T1e: the 10-Q's printed row, in thousands; was served as USD/share before s7-printedunits (PR 129)"
+  },
+  {
+   "symbol": "OSK",
+   "statement": "income",
+   "fiscal_year": "2003",
+   "fiscal_period": "Q1",
+   "duration": "quarter",
+   "label": "^selling, general and administrative$",
+   "value": 35675000.0,
+   "scale": 1000,
+   "source_accession": "0000897069-04-000227",
+   "era": "text",
+   "checked": "read by hand",
+   "note": "s7-sectionsums 2026-11-16, review T1e: the 10-Q's printed row, in thousands; was served as USD/share before s7-printedunits (PR 129)"
   }
  ]
 }
