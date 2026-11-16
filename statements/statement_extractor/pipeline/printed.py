@@ -25,6 +25,7 @@ from ..readers.slides.read import read_document as read_slides
 from ..readers.text.parse import parse_text
 from ..readers.text.read import read_document as read_text
 from ..sources.documents import PRINTED_DOCUMENTS, release_documents
+from ..sources.edgar import period_of_report
 from .company_names import (_NAMES, _cover_text, _other_companies, _other_issuers, another_registrant,  # noqa: F401
                             same_name_others)
 from .unstated_scale import with_proven_scale
@@ -48,7 +49,7 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
     found, notes, kinds = [], [], []
     release = ref.form == "6-K"
     if document_end is None and not release:
-        raw_end = getattr(ref.filing, "period_of_report", None)
+        raw_end = period_of_report(ref.filing)
         try:
             document_end = date.fromisoformat(str(raw_end)[:10]) if raw_end else None
         except ValueError:

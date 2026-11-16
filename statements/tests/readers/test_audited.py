@@ -39,6 +39,8 @@ def test_each_table_carries_the_company_its_auditors_report_names():
     assert [table.audited_of for table in tables] == ["", "Heineken N.V."]
 
 
+_HEADER = SimpleNamespace(period_of_report="2020-12-31")  # the submission header's period
+
 def test_an_annual_reports_other_company_is_left_out_against_its_cover():
     # The reader keeps one table per statement in a document, so the 20-F here carries Heineken's balance sheet only, as
     # FEMSA's FY2011 20-F did in effect (its own balance sheet unread, "no single scale stated").
@@ -46,7 +48,7 @@ def test_an_annual_reports_other_company_is_left_out_against_its_cover():
     document = SimpleNamespace(document="fmx-20201231x20f.htm", document_type="20-F", extension=".htm",
                                content=_COVER + _FEMSA.split("<p>FOMENTO")[0] + _NOTE + _HEINEKEN)
     filing = SimpleNamespace(attachments=[document], cik=1061736, company="MEXICAN ECONOMIC DEVELOPMENT INC",
-                             period_of_report="2020-12-31")
+                             _sgml=_HEADER, sgml=lambda: _HEADER)
     ref = SimpleNamespace(form="20-F", accession="0001558370-21-004287", filed=date(2021, 4, 23), filing=filing)
     readings, notes, _kinds = printed.read_printed(ref, "1231", 0)
     assert any("another company's statements left out (Heineken N.V.)" in note for note in notes)
@@ -85,7 +87,7 @@ def test_another_companys_fuller_statement_never_takes_the_companys_periods():
     document = SimpleNamespace(document="d333867d20f.htm", document_type="20-F", extension=".htm",
                                content=_COVER + _FEMSA + _NOTE + fuller)
     filing = SimpleNamespace(attachments=[document], cik=1061736, company="MEXICAN ECONOMIC DEVELOPMENT INC",
-                             period_of_report="2020-12-31")
+                             _sgml=_HEADER, sgml=lambda: _HEADER)
     ref = SimpleNamespace(form="20-F", accession="0001193125-12-191729", filed=date(2021, 4, 23), filing=filing)
     readings, _notes, _kinds = printed.read_printed(ref, "1231", 0)
     assert {(reading.period_end, reading.currency) for reading in readings} == {(date(2020, 12, 31), "MXN"),

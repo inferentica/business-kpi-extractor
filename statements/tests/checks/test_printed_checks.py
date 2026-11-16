@@ -151,3 +151,22 @@ def test_copels_net_income_and_cash_balances_by_their_words():
     from statement_extractor.domain.printed_labels import CLOSING, NET_INCOME, OPENING
     assert NET_INCOME.search("Income (loss) after taxes") and OPENING.search("Opening balance") and CLOSING.search("Closing balance")
     assert not NET_INCOME.search("Income after taxes on the sale")
+
+
+def test_each_printed_check_rejects_a_reading_that_does_not_add_up():
+    # Review T1a: every case above adds up; these do not, one figure misread in each.
+    from statement_extractor.checks.printed import balance_check, cash_check, income_check
+    balance = lines(("Total current assets", 10087), ("Property and equipment, net", 10498), ("Other assets", 719),
+                    ("Total assets", 21304), ("Total liabilities", 12000), ("Total equity", 9294),
+                    ("Total liabilities and equity", 21294))
+    assert balance_check(balance).result == "fail"  # 12,000 + 9,294 is 21,294 against assets of 21,304
+    costco = lines(("Total current assets", 10087), ("Land", 3241), ("Buildings", 8014), ("Equipment", 3238),
+                   ("Construction in progress", 307), ("Less accumulated depreciation and amortization", -4302),
+                   ("Net property and equipment", 10598), ("Other assets", 719), ("Total assets", 21404))
+    assert total_check(costco).result == "fail"  # 10,598 for 10,498
+    income = lines(("Income before income taxes", 4403), ("Income tax expense", 1248), ("Net income", 3255))
+    assert income_check(income).result == "fail"  # 4,403 - 1,248 is 3,155
+    cash = lines(("Net cash provided by operating activities", 900), ("Net cash used by investing activities", -500),
+                 ("Net cash used by financing activities", -400), ("Net increase in cash", 0),
+                 ("Cash and cash equivalents beginning of year", 242), ("Cash and cash equivalents end of year", 342))
+    assert cash_check(cash).result == "fail"

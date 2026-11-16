@@ -35,6 +35,10 @@ def _row(cells: list[Cell]) -> Row | None:
         if text in ("$", "%", "€", "NT$", "US$", "£", "¥", "₩", "R$") or text == "W" and label_parts \
                 or text.endswith("%") and number(text.rstrip("%")) is not None:
             continue
+        # A currency sign in the figure's own cell: POSCO's Q1 2026 6-K, "W   (4,465,247)" (round 132).
+        signed = re.match(r"^(?:W|₩|￦|\$|NT\$|US\$|R\$|€|£|¥)\s+(\(?[\d,.]+\)?)$", text)
+        if signed and label_parts and number(signed.group(1)) is not None:
+            text = signed.group(1)
         value = number(text.rstrip(")")) if text.endswith(")") and not text.startswith("(") else number(text)
         if value is not None and not label_parts and re.fullmatch(r"\d{1,2}", text):
             continue  # a note reference, not a figure

@@ -13,7 +13,7 @@ from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period
 from ..readers.xbrl.read import read_filing
 from ..readers.xbrl.taxonomy import tag_taxonomies, taxonomy_versions
-from ..sources.edgar import learn_year_offset, load_submission
+from ..sources.edgar import learn_year_offset, load_submission, period_of_report
 from ..sources.retry import with_network_retries
 from .prefetch import load_all
 from .printed import read_printed
@@ -163,10 +163,10 @@ def _period_end(ref) -> date | None:
     """The filing's period, as SEC's index states it. A period ending within a week of the filing date is no report
     period but the index's mistake (Helix's 10-Ks of 2014 and 2015 'end' on the day they were filed, which made
     February 21 its fiscal year end and every column of 2013-15 fall off the calendar): unknown."""
-    try:  # SEC can answer with an error page for a filing's header; its period is then unknown, not fatal
-        raw = getattr(ref.filing, "period_of_report", None)
+    raw = period_of_report(ref.filing)  # an SEC error page is read again, never taken for an unknown period
+    try:
         end = date.fromisoformat(str(raw)[:10]) if raw else None
-    except Exception:  # noqa: BLE001
+    except ValueError:
         return None
     return None if end is not None and (ref.filed - end).days < 7 else end
 

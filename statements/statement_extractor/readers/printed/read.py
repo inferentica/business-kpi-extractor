@@ -16,6 +16,7 @@ import re
 from datetime import date, timedelta
 
 from ...checks.printed import balance_check, cash_check, income_check, total_check
+from ...checks.sections import section_check
 from ...domain.model import Reading
 from ...domain.periods import label_period
 from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA
@@ -135,10 +136,31 @@ def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> flo
     for position in column:
         if position in row.figures:
             return row.figures[position]
+    shifted = _shifted(row, columns)
+    if shifted is not None:
+        return shifted.get(column)
     for position, value in row.figures.items():
         nearest = min(columns, key=lambda other: min(abs(p - position) for p in other))
         if nearest == column and min(abs(p - position) for p in column) <= 2:
             return value
+    return None
+
+
+def _shifted(row, columns: list[tuple[int, ...]]) -> dict | None:
+    """A row whose figures all sit off the columns by one offset, each on a column of its own: TSMC's Q1 2024 6-K prints
+    "$ - $ (121,692)" on a continued page's first line, its "$" cells pushing both figures three cells right (round 132)."""
+    positions = sorted(row.figures)
+    if len(positions) < 2 or any(position in column for column in columns for position in positions):
+        return None
+    # Only figures each led by its own currency sign since the figure before it: Crown's share counts three cells off its
+    # EPS columns, with no sign, stay unread.
+    signs = [cell.start for cell in getattr(row, "cells", None) or [] if cell.text in ("$", "€", "£", "¥", "₩", "W", "NT$", "US$", "R$")]
+    if not all(any(before < sign < position for sign in signs) for before, position in zip([0] + positions, positions)):
+        return None
+    for offset in (-1, 1, -2, 2, -3, 3, -4, 4):
+        placed = [next((column for column in columns if position + offset in column), None) for position in positions]
+        if None not in placed and len(set(placed)) == len(placed):
+            return {column: row.figures[position] for column, position in zip(placed, positions)}
     return None
 
 
@@ -252,7 +274,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
     if kind == "balance":
         checks.insert(0, balance_check(figures))
     elif kind == "cash_flow":
-        checks.insert(0, cash_check(figures))
+        checks[0:0] = [cash_check(figures), section_check(printed)]
     else:
         checks.insert(0, income_check(figures))
     return Reading(statement=kind, duration=duration, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
