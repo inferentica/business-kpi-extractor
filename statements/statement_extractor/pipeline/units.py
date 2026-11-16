@@ -30,16 +30,23 @@ PACKAGE = Path(__file__).resolve().parents[1]
 # The KPI extractor's modules the reader reaches (sources/edgar.py) and the libraries that shape what it reads.
 _BRIDGED = ("kpi_extractor.domain.fiscal", "kpi_extractor.sources.sec")
 _LIBRARIES = ("edgartools", "lxml", "pdfplumber", "arelle-release", "pyarrow")
+# Code that runs only once every unit is kept, or never in a read: uploading, the served snapshot (built again on
+# every read), the command line, hand-check rows, the AI pilot, golden scores and reports. A change to it reads no
+# unit again (tests/pipeline/test_units.py keeps the read path from importing it).
+AFTER_READING = ("__main__.py", "pipeline/cli.py", "pipeline/store.py", "pipeline/served.py", "pipeline/handcheck.py",
+                 "quality/golden.py", "quality/report.py", "assist/")
 
 
 @lru_cache(maxsize=1)
 def reader_version() -> str:
-    """The reader's own version: a hash of the package's files, the KPI modules it reaches and its libraries' versions.
-    Any change to them reads every unit again (a narrower rule per era is s7-versions)."""
+    """The reader's own version: a hash of the package's files that a read runs, the KPI modules it reaches and its
+    libraries' versions. Any change to them reads every unit again (a narrower rule per era is s7-versions)."""
     digest = hashlib.sha256()
     for path in sorted(PACKAGE.rglob("*")):
-        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
-            digest.update(str(path.relative_to(PACKAGE)).encode() + b"\0" + path.read_bytes() + b"\0")
+        name = path.relative_to(PACKAGE).as_posix()
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc" and \
+                not name.startswith(AFTER_READING):
+            digest.update(name.encode() + b"\0" + path.read_bytes() + b"\0")
     for name in _BRIDGED:
         spec = util.find_spec(name)
         digest.update(name.encode() + b"\0" + (Path(spec.origin).read_bytes() if spec and spec.origin else b"") + b"\0")

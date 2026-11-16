@@ -79,3 +79,32 @@ def test_the_newest_filings_can_be_set_aside(tmp_path):
 def test_a_unit_holds_only_json_values(tmp_path):
     with pytest.raises(TypeError):
         Units(tmp_path).keep("report", "0001", {"when": date(2026, 1, 1)}, {}, [])
+
+
+def test_code_left_out_of_the_reader_version_is_not_on_the_read_path():
+    import subprocess
+    import sys
+    script = ("import sys; import statement_extractor.pipeline.company; "
+              "print('\\n'.join(name for name in sys.modules if name.startswith('statement_extractor')))")
+    loaded = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=True).stdout.split()
+    for path in units_module.AFTER_READING:
+        module = "statement_extractor." + path.removesuffix(".py").removesuffix("/").replace("/", ".")
+        if path == "pipeline/served.py":
+            continue  # imported by the pipeline, run only once every unit is kept
+        assert module not in loaded and not any(name.startswith(module + ".") for name in loaded), module
+
+
+def test_a_change_after_reading_keeps_the_reader_version(tmp_path, monkeypatch):
+    import shutil
+    copy = tmp_path / "statement_extractor"
+    shutil.copytree(units_module.PACKAGE, copy, ignore=shutil.ignore_patterns("__pycache__"))
+    monkeypatch.setattr(units_module, "PACKAGE", copy)
+    units_module.reader_version.cache_clear()
+    before = units_module.reader_version()
+    (copy / "pipeline" / "store.py").write_text("# changed\n")
+    units_module.reader_version.cache_clear()
+    assert units_module.reader_version() == before
+    (copy / "pipeline" / "reports.py").write_text("# changed\n")
+    units_module.reader_version.cache_clear()
+    assert units_module.reader_version() != before
+    units_module.reader_version.cache_clear()
