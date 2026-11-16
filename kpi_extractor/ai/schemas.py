@@ -295,20 +295,29 @@ class Curation(BaseModel):
     members: list[str] = Field(default_factory=list)
 
 
-def normalize_spec(spec: Spec) -> Spec:
+def normalize_spec(spec: Spec, cap: bool = True) -> Spec:
     """A list whose every breakdown can be checked: a revenue breakdown needs at least two parts, a mix two shares.
     Anything less can never reconcile (Broadcom's lone "AI Semiconductor" amount was a one-row breakdown, hidden every
-    quarter), so its KPIs become metrics, which are checked one by one."""
+    quarter), so its KPIs become metrics, which are checked one by one. With `cap`, a list over the limits loses
+    operating metrics from the end and groups past the eighth; a list the owner edited is never capped (Apollo's
+    Pension Group Annuities Inflows and KKR's Transaction Fees - Capital Markets, each added by the owner, were dropped
+    by the cap minutes later)."""
     groups, loose = [], []
     for group in spec.groups:
         parts = [kpi for kpi in group.kpis if kpi.key != group.total_kpi]
         # A breakdown without a named total still reconciles: reading the table whole finds its total row by the sum.
-        if group.kind == "revenue_breakdown" and len(parts) < 2:
+        if group.kind in ("revenue_breakdown", "mix") and len(parts) < 2 and not cap:
+            # An owner's group keeps its place and title, read line by line as metrics.
+            groups.append({**group.model_dump(), "kind": "metric", "total_kpi": None})
+        elif group.kind == "revenue_breakdown" and len(parts) < 2:
             loose += parts or group.kpis
         elif group.kind == "mix" and len(parts) < 2:
             loose += group.kpis
         else:
             groups.append(group.model_dump())
+    if not cap:
+        # An owner's list is never capped: only a one-part breakdown changed kind, in its place.
+        return spec if groups == [g.model_dump() for g in spec.groups] else Spec.model_validate({"groups": groups, "names": spec.names})
     if loose:
         metrics = next((group for group in groups if group["kind"] == "metric"), None)
         if metrics is None:
