@@ -36,11 +36,31 @@ SCALE_WORDS = {"thousands": 1e3, "millions": 1e6, "billions": 1e9, "trillions": 
 
 # A row priced per unit ("Starlink consumer ARPU ($ per month)") in a table "in millions (except where noted)" is in units.
 # A row stating its amount per unit: "(per share)", "($ per month)", or a price's own unit, Exxon's "Brent ($/b)",
-# "Henry Hub ($/mbtu)", "Natural Gas ($/kcf)" (a "($ in millions)" caption names no unit after the slash), or a row naming
-# its currency alone: American Express's "Average proprietary basic Card Member spending (dollars)" $6,110 in a table
-# "(Millions, except percentages and where indicated)" was read as $6.1 billion ("(dollars in millions)" is a caption).
+# "Henry Hub ($/mbtu)", "Natural Gas ($/kcf)" (a "($ in millions)" caption names no unit after the slash).
 _PER_UNIT = re.compile(r"\([^()]*\bper\s+(?:month|year|quarter|day|user|subscriber|member|customer|share|unit|system)\b[^()]*\)"
-                       r"|\(\s*(?:US)?[$€£¥]\s*/\s*[A-Za-z]+\s*\)|\(\s*(?:in\s+)?(?:U\.?S\.?\s+)?(?:dollars|euros|pounds|yen)\s*\)", re.I)
+                       r"|\(\s*(?:US)?[$€£¥]\s*/\s*[A-Za-z]+\s*\)", re.I)
+# A row naming its currency alone names no scale ("(dollars in millions)" is a caption): "Revenue (U.S. dollars)" in a
+# table "(in millions)" may be either. It is in units only where the table's caption says rows may state otherwise:
+# American Express's "Average proprietary basic Card Member spending (dollars)" $6,110 under "(Millions, except
+# percentages and where indicated)", never $6.1 billion. Anywhere else its scale is not stated.
+_CURRENCY_ALONE = re.compile(r"\(\s*(?:in\s+)?(?:U\.?S\.?\s+)?(?:dollars|euros|pounds|yen)\s*\)", re.I)
+_WHERE_INDICATED = re.compile(r"\bexcept\b[^()]*\b(?:where|as|unless)\s+(?:otherwise\s+)?(?:indicated|noted|stated|specified)\b", re.I)
+
+
+def currency_alone(table: Table, text: str) -> tuple[float, str] | bool | None:
+    """For a row naming its currency alone ("(dollars)"): its units and the words, when the table's caption lets rows
+    state otherwise ("except ... where indicated"); False when nothing states its scale; None for any other row."""
+    if _row_scale_words(text) or not (alone := _CURRENCY_ALONE.search(text)):
+        return None
+    caption = " ".join([(table.context or "")[-300:], *(" ".join(row) for row in table.rows[:3])])
+    return (1.0, alone.group(0)) if _WHERE_INDICATED.search(caption) else False
+
+
+def row_amount_words(table: Table, text: str) -> tuple[float, str] | bool | None:
+    """An amount row's own scale and its words: its "(in billions)", or a currency named alone where the caption lets
+    rows state otherwise; False when the row names its currency alone and nothing states its scale."""
+    alone = currency_alone(table, text)
+    return _row_scale_words(text) if alone is None else alone
 
 
 def _preceding_scale(text: str, at: int) -> float | None:
@@ -327,6 +347,11 @@ def cell_amount_scale(document: Document, table: Table, row: int, col: int, kpi_
 
 def _cell_amount_scale(document: Document, table: Table, row: int, col: int, kpi_label: str, locator,
                        value: float) -> tuple[ScaleFrom | None, list[str]]:
+    if not _PER_UNIT_KPI.search(kpi_label) and (alone := currency_alone(table, " ".join(table.rows[row]))) is not None:
+        if alone:
+            return ScaleFrom(alone[0], "row", alone[1]), []
+        held = locator.scale if locator.scale in (1, 1e3, 1e6, 1e9) else 1.0
+        return ScaleFrom(held, "reader", locator.scale_text), [SCALE_NOT_STATED]
     own = _own_amount_scale(table, row, col, kpi_label)
     declared = own or (ScaleFrom(found[0], "table", found[1]) if (found := table_scale_words(table)) else None) \
         or (ScaleFrom(found[0], "document", found[1]) if (found := document_scale_words(document)) else None)
