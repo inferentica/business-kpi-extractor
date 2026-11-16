@@ -38,6 +38,27 @@ def test_parts_flagged_off_their_total_are_cleared_once_they_add_up_to_the_relea
     assert {v["notes"][-1] for v in cleared} == {"the parts add up to the release's total"}
 
 
+def test_a_breakdown_with_a_line_the_owner_confirmed_clears_once_its_parts_add_up():
+    # JPMorgan's Q4 2020 client segments: the owner rejected a "Commercial Banking" copy of Middle Market Banking and
+    # confirmed the line as Commercial & Specialized Industries; the rest were held off the total the copy made.
+    stated, off = {"total": 2463.0}, "parts differ from the total by -25.6%"
+    q4 = dict(period="Q4", end="2020-12-31")
+    rows = [value("csi", 947.0, status="verified", **q4, notes=["confirmed by the owner"], locator=stated),
+            value("ccb", 856.0, **q4, notes=[off], locator=stated),
+            value("cre", 630.0, **q4, notes=[off, "lines differ from Commercial Banking by -33.5%"], locator=stated),
+            value("other", 30.0, **q4, notes=[off], locator=stated),
+            value("Commercial Banking", 947.0, status="rejected", **q4, locator=stated)]
+    rows[0]["owner_decision"], rows[4]["owner_decision"] = "confirmed", "rejected"
+    cleared = run(rows)._outdated_flags()
+    assert sorted(v["kpi_key"] for v in cleared) == ["ccb", "cre", "other"]
+    assert [v["notes"] for v in cleared if v["kpi_key"] == "cre"] == [[off, "the parts add up to the release's total"]]
+    # A parent still served keeps its lines' hold, and so does a line no one confirmed.
+    rows[4]["validation_status"], rows[4]["owner_decision"] = "verified", None
+    assert run(rows)._outdated_flags() == []
+    rows[4]["validation_status"], rows[0]["owner_decision"] = "rejected", None
+    assert run(rows)._outdated_flags() == []
+
+
 def test_a_figure_equal_only_to_another_xbrl_line_is_no_proof():
     from kpi_extractor.steps.shared import equals_named_line, xbrl_figures
     xbrl = [{"group_key": "segments", "kpi_key": "reconciling", "kpi_label": "Reconciling Items", "method": "xbrl",
