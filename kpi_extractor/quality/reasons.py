@@ -11,7 +11,7 @@ from typing import Iterable
 
 from ..documents.image_pages import ONE_READER, SUMS_TO_AGREED_TOTAL
 from ..rules.identity import PLACE_NOT_NAMED, ROW_NAMED_TWICE
-from ..rules.scale import SCALE_NOT_STATED
+from ..rules.scale import SCALE_HEADING_UNSURE, SCALE_NOT_STATED
 from ..rules.wording import SIGN_NOT_STATED
 
 HOLD, GROUP, PROOF, ASIDE = "hold", "group", "proof", "aside"
@@ -69,6 +69,7 @@ _REASONS = (
     Reason("same_as_earlier", HOLD, r"^the same figure as .*: check the column$", "pattern"),
     Reason("scale_outlier", HOLD, SCALE_OUTLIER, "start"),
     Reason("scale_not_stated", HOLD, SCALE_NOT_STATED),
+    Reason("scale_heading_unsure", HOLD, SCALE_HEADING_UNSURE, "start"),
     Reason("sign_not_stated", HOLD, SIGN_NOT_STATED),
     Reason("place_not_named", HOLD, PLACE_NOT_NAMED, "start"),
     Reason("row_named_twice", HOLD, ROW_NAMED_TWICE, "start"),
