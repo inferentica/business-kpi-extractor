@@ -125,6 +125,9 @@ FILING_SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
     # KKR's Q3 2018 release failed four times on 2026-11-09 when the AI's reading outran the control plane's time limit,
     # before Quotiva's own project allowed longer calls; past its attempts, no run reads it again unless picked.
     "failed-filings": ("filings that failed to read and are no longer retried", lambda filing: filing.get("status") == "failed"),
+    # Picture pages that went unread (past the page cap, or a page that could not be fetched or recognized).
+    "pages-not-read": ("filings whose picture pages were not all read", lambda filing: any(
+        str(note).startswith("pages not read: ") for note in filing.get("notes") or [])),
 }
 
 

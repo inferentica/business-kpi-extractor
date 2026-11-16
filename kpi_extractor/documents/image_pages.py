@@ -80,20 +80,42 @@ def _figures(text: str) -> list[tuple[str, bool, bool]]:
     return [(match.group(0), *_marks(text, match)) for match in _FIGURE.finditer(text)]
 
 
-def _alike(ours: str, theirs: str) -> bool:
+def _alike(ours: str, theirs: str, thousands: str | None = None) -> bool:
     """Two readings of one figure: the same digits, and the same separators, or a comma and a point swapped only
-    where three digits follow (a thousands group, which RapidOCR reads either way)."""
+    where three digits follow (a thousands group, which RapidOCR reads either way). A swap is one figure only when
+    something says which mark groups thousands: the figure's other separators ("19,901,959,514" beside
+    "19,901,959.514"), or the page's own (`thousands`, _thousands_mark). Otherwise "1,574" and "1.574" are two
+    figures, one a thousand times the other."""
     # A scale glued on or set apart is one figure: RapidOCR's "$2billion" is DeepSeek's "$2 billion".
     ours, theirs = (re.sub(r"[A-Za-z]+$", "", figure) for figure in (ours, theirs))
     if _digits(ours) != _digits(theirs) or len(ours) != len(theirs):
         return False
     for index, (a, b) in enumerate(zip(ours, theirs)):
-        if a != b and ({a, b} != {",", "."} or not re.match(r"\d{3}(?!\d)", ours[index + 1:])):
+        if a != b and ({a, b} != {",", "."} or not re.match(r"\d{3}(?!\d)", ours[index + 1:])
+                       or (len(re.findall(r"[.,]", ours)) < 2 and thousands is None)):
             return False
     return True
 
 
-def _confirm(text: str, seen: Counter, single: dict[str, str]) -> tuple[str, int]:
+# A page's own decimals and long groupings say which mark separates thousands on it: "12.5%" and "19,901,959" a comma,
+# Bradesco's "12,5%" and "1.574.320" a point.
+_DECIMAL = {".": re.compile(r"(?<![\d.,])\d+\.\d{1,2}(?![\d.,])"), ",": re.compile(r"(?<![\d.,])\d+,\d{1,2}(?![\d.,])")}
+_GROUPED = {",": re.compile(r"(?<![\d.,])\d{1,3}(?:,\d{3}){2,}(?![\d,])|\d,\d{3}\.\d"),
+            ".": re.compile(r"(?<![\d.,])\d{1,3}(?:\.\d{3}){2,}(?![\d.])|\d\.\d{3},\d")}
+
+
+def _thousands_mark(text: str) -> str | None:
+    """The mark that groups thousands on a page, when its figures say so clearly (twice as often as the other)."""
+    comma = len(_DECIMAL["."].findall(text)) + len(_GROUPED[","].findall(text))
+    point = len(_DECIMAL[","].findall(text)) + len(_GROUPED["."].findall(text))
+    if comma and comma >= 2 * point:
+        return ","
+    if point and point >= 2 * comma:
+        return "."
+    return None
+
+
+def _confirm(text: str, seen: Counter, single: dict[str, str], thousands: str | None = None) -> tuple[str, int]:
     """The text with each figure that `seen` (the other model's figures in the region, with their signs and percent
     signs) also has, sign and percent sign alike: agreed, in the rendering whose separators agree. Every other figure
     stays as DeepSeek read it and is listed in `single`."""
@@ -104,7 +126,7 @@ def _confirm(text: str, seen: Counter, single: dict[str, str]) -> tuple[str, int
             nonlocal kept
             figure, (negative, percent) = match.group(0), _marks(part, match)
             # The same digits with another sign or no percent sign are another figure: "(357)" is not "357".
-            other = next((theirs for theirs in seen if seen[theirs] > 0 and _alike(figure, theirs[0])
+            other = next((theirs for theirs in seen if seen[theirs] > 0 and _alike(figure, theirs[0], thousands)
                           and theirs[1:] == (negative, percent)), None)
             if other is None:
                 single.setdefault(_digits(figure), DEEPSEEK)
@@ -112,7 +134,11 @@ def _confirm(text: str, seen: Counter, single: dict[str, str]) -> tuple[str, int
             seen[other] -= 1
             kept += 1
             # Swapped separators: the reading whose separators agree with each other ("19,901,959,514", not DeepSeek's
-            # "19,901,959.514"); DeepSeek's when both do, as it swapped them far less often in the probe.
+            # "19,901,959.514"); with one separator, the reading in the page's own (Bradesco's "1.574" where RapidOCR
+            # read "1,574"); DeepSeek's when both do, as it swapped them far less often in the probe.
+            marks, their_marks = (re.sub(r"[\dA-Za-z]", "", reading) for reading in (figure, other[0]))
+            if len(marks) == 1 and thousands and {marks, their_marks} == {",", "."}:
+                return figure if marks == thousands else other[0]
             return other[0] if len(set(re.sub(r"\d", "", figure))) > 1 and len(set(re.sub(r"\d", "", other[0]))) <= 1 else figure
         return _FIGURE.sub(check, part)
     # Only text outside tags is checked: a table's markup never holds a figure. A cell's sign is the cell's own.
@@ -158,6 +184,7 @@ def agreed_page(deepseek: str, words: list[tuple[float, float, float, float, str
     if not blocks:
         return _local_only(words, single), 0, single
     out, kept = [], 0
+    thousands = _thousands_mark(_TOKEN.sub(" ", deepseek))
     for kind, (x0, y0, x1, y1), content in blocks:
         if kind == "image":
             # A chart or a picture: DeepSeek reads no words in it, RapidOCR's stand alone (strictly inside its region).
@@ -174,7 +201,7 @@ def agreed_page(deepseek: str, words: list[tuple[float, float, float, float, str
         content = _TOKEN.sub(" ", content)
         if "<table" not in content:
             content = f"<p>{html.escape(re.sub(r'^#+ ', '', content))}</p>"
-        confirmed, block_kept = _confirm(content, seen, single)
+        confirmed, block_kept = _confirm(content, seen, single, thousands)
         out.append(confirmed)
         kept += block_kept
     return "\n".join(out), kept, single
