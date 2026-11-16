@@ -175,11 +175,24 @@ def _ai_scale_notes(document: Document, part, scale_text: str | None, scale: flo
     return [SCALE_NOT_STATED]
 
 
+_YEAR = re.compile(r"\s*(?:FY\s*)?(?:19|20)\d{2}\s*")
+
+
+def _first_figures_row(table: Table) -> int:
+    """The first row with a label and a figure: a header's years ("2026") are no figures."""
+    for index, cells in enumerate(table.rows):
+        if cells and cells[0].strip() and any(parse_number(cell) is not None and not _YEAR.fullmatch(cell)
+                                              and not re.search(r"[A-Za-z]", cell) for cell in cells[1:]):
+            return index
+    return len(table.rows)
+
+
 def table_scale_words(table: Table) -> tuple[float, str] | None:
     """The multiplier a table's own header or caption declares for its amounts, e.g. "(in millions)", and its words. A
     header that declares one scale for counts and another for amounts ("(Units in thousands, Revenue in millions)",
-    Apple's summary data to 2018) gives amounts the scale named for them."""
-    header = " ".join(" ".join(row) for row in table.rows[:4])
+    Apple's summary data to 2018) gives amounts the scale named for them. The header ends at the first row of figures:
+    a heading among the rows ("($ billions)" under "Revenue 4,100") heads only its own rows (_body_scale)."""
+    header = " ".join(" ".join(row) for row in table.rows[:min(4, _first_figures_row(table))])
     text = f"{table.context[-160:]} {header}"
     found = [(text[max(0, match.start() - 24):match.start()], _SCALE_WORDS[match.group("word").lower().rstrip("s")], match.group(0).strip())
              for match in _TABLE_SCALE.finditer(text)]
@@ -242,35 +255,46 @@ def _heading_scale_words(text: str) -> tuple[float, str] | None:
     return None
 
 
-def _body_scale(table: Table, row: int, col: int) -> tuple[float, str] | None:
+def _body_scale(table: Table, row: int, col: int) -> tuple[tuple[float, str] | None, tuple[float, str] | None]:
     """The scale the nearest heading inside the table above a row states: a row with no figures, below the table's
     first row of figures, in its label ("($ billions)") or repeated as a header in the figure's own column (ServiceNow's
     "Amount ($ billions)" over cRPO and RPO, under "Amount ($ millions)" at the top). It holds for every row under it
-    until the next; never the table's own header, whose cells head columns with scales of their own."""
+    until the next heading; never the table's own header, whose cells head columns with scales of their own. A heading
+    that states no scale ("Non-GAAP results:") starts rows of its own: a scale heading above it reaches no further, and
+    comes back second, as one that may or may not head the row."""
     def figures(cells: list[str]) -> bool:  # a header's footnote mark, "Amount ($ billions)(2)", is no figure
         return any(parse_number(cell) and not re.search(r"[A-Za-z]{3}", cell) for cell in cells[1:])
 
     first = next((i for i, cells in enumerate(table.rows) if figures(cells)), len(table.rows))
+    section = False
     for index in range(row - 1, first, -1):
         cells = table.rows[index]
-        if not figures(cells) and (found := _heading_scale_words(
-                f"{cells[0] if cells else ''} {_heading(cells, col) if col < len(cells) else ''}")):
-            return found
-    return None
+        if figures(cells):
+            continue
+        if found := _heading_scale_words(f"{cells[0] if cells else ''} {_heading(cells, col) if col < len(cells) else ''}"):
+            return (None, found) if section else (found, None)
+        if cells and cells[0].strip():
+            section = True
+    return None, None
+
+
+SCALE_HEADING_UNSURE = "a scale heading further up the table may head this row"
 
 
 def _own_amount_scale(table: Table, row: int, col: int, kpi_label: str) -> ScaleFrom | None:
     """An amount's own scale: its row's (JPM's "Debit and credit card sales volume (in billions)" in a table "(in
     millions)"), the heading row just above it inside the table (ServiceNow's results, a column "Amount ($ millions)"
     with "($ billions)" over its cRPO and RPO rows: $5.7 billion, never $5.7 million), its column's, or none for a
-    per-unit amount (a price keeps its units)."""
+    per-unit amount (a price keeps its units). A per-unit amount never takes a heading row's scale, as it never takes a
+    caption's: "(in millions, except per share amounts)" over FedEx's "Revenue per package" 2.15 is no $2.15 million."""
+    per_unit = _PER_UNIT_KPI.search(kpi_label)
     if found := _row_scale_words(" ".join(table.rows[row])):
         return ScaleFrom(found[0], "row", found[1])
-    if found := _body_scale(table, row, col):
+    if not per_unit and (found := _body_scale(table, row, col)[0]):
         return ScaleFrom(found[0], "heading", found[1])
     if found := _column_scale_words(table, row, col):
         return ScaleFrom(found[0], "column", found[1])
-    if per_unit := _PER_UNIT_KPI.search(kpi_label):
+    if per_unit:
         return ScaleFrom(1.0, "per-unit", per_unit.group(0))
     return None
 
@@ -288,6 +312,17 @@ def cell_amount_scale(document: Document, table: Table, row: int, col: int, kpi_
     document's one scale; wording the reader quotes from beside the table beats a caption the table only inherits from
     the one before it (Goldman's "$ in billions" assets under supervision after its VaR table "$ in millions"). None when
     nothing states a scale and the reader gave none."""
+    scale, notes = _cell_amount_scale(document, table, row, col, kpi_label, locator, value)
+    # A scale heading a later heading may have ended ("($ billions)" above "Non-GAAP results:") that disagrees with the
+    # scale found: which rows it heads the table does not say, so the figure is held, never served on either.
+    passed = _body_scale(table, row, col)[1]
+    if scale is not None and passed and passed[0] != scale.factor and scale.source not in ("row", "per-unit", "heading", "number"):
+        notes = [*notes, f"{SCALE_HEADING_UNSURE}: {clean(passed[1])[:40]!r}"]
+    return scale, notes
+
+
+def _cell_amount_scale(document: Document, table: Table, row: int, col: int, kpi_label: str, locator,
+                       value: float) -> tuple[ScaleFrom | None, list[str]]:
     own = _own_amount_scale(table, row, col, kpi_label)
     declared = own or (ScaleFrom(found[0], "table", found[1]) if (found := table_scale_words(table)) else None) \
         or (ScaleFrom(found[0], "document", found[1]) if (found := document_scale_words(document)) else None)

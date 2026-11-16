@@ -121,7 +121,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
             problems.append(f"{locator.kpi}: {error}")
             continue
         seen.add(locator.kpi)
-        held = has(notes, "scale_not_stated", "sign_not_stated", "place_not_named", "row_named_twice")
+        held = has(notes, "scale_not_stated", "scale_heading_unsure", "sign_not_stated", "place_not_named", "row_named_twice")
         record = _locator_record(document, locator, located.period_end, value)
         if scale_from is not None:
             record["scale_from"] = scale_from.record()  # why the figure is in units, thousands or millions

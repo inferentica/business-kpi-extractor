@@ -127,3 +127,30 @@ def test_a_header_repeated_inside_the_table_states_the_scale_of_its_column_below
     assert cell_amount_scale(doc, table, 4, 1, "RPO", reader(), 11.5)[0].factor == 1e9  # every row under the heading
     assert cell_amount_scale(doc, table, 6, 1, "Subscription gross profit", reader(), 1241)[0].factor == 1e6
     assert cell_amount_scale(doc, table, 1, 1, "Total revenues", reader(), 1614)[0].factor == 1e6
+
+
+def test_a_heading_scale_ends_at_the_next_heading():
+    # The re-check's probe: "($ billions)" heads the AUM rows; "Non-GAAP results:" starts rows of their own.
+    table = Table(id="T1", context="($ in millions)", rows=[["", "Q3 2026"], ["Revenue", "4,100"], ["($ billions)", ""],
+                                                             ["Assets under management", "908"], ["Non-GAAP results:", ""],
+                                                             ["Free cash flow", "500"]])
+    doc = document(table)
+    assert cell_amount_scale(doc, table, 3, 1, "Assets under management", reader(), 908)[0].factor == 1e9
+    found, notes = cell_amount_scale(doc, table, 5, 1, "Free cash flow", reader(), 500)
+    # The caption's millions, held: whether "($ billions)" still heads the row the table does not say.
+    assert found.factor == 1e6 and notes == ["a scale heading further up the table may head this row: '($ billions)'"]
+    # A heading row of the caption's own scale leaves no doubt.
+    same = Table(id="T2", context="($ in millions)", rows=[["", "Q3 2026"], ["Revenue", "4,100"], ["($ in millions)", ""],
+                                                           ["Opex", "908"], ["Non-GAAP results:", ""], ["Free cash flow", "500"]])
+    assert cell_amount_scale(document(same), same, 5, 1, "Free cash flow", reader(), 500) == (ScaleFrom(1e6, "table", "($ in millions"), [])
+
+
+def test_a_per_unit_amount_never_takes_a_heading_rows_scale():
+    # The re-check's probe: a caption row inside the table over FedEx's revenue per package.
+    table = Table(id="T1", context="", rows=[["", "Q3 2026"], ["Packages", "16,000"],
+                                             ["(in millions, except per share amounts)", ""], ["Revenue per package", "2.15"],
+                                             ["Revenue", "22,200"]])
+    doc = document(table)
+    found, notes = cell_amount_scale(doc, table, 3, 1, "Revenue per package", reader(), 2.15)
+    assert (found.factor, found.source) == (1.0, "per-unit") and not notes
+    assert cell_amount_scale(doc, table, 4, 1, "Revenue", reader(), 22200)[0].factor == 1e6
