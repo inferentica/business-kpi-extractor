@@ -66,10 +66,10 @@ def asked_of(last: dict[str, dict], spec) -> dict[str, dict]:
 
 
 def replay(document: Document, last: dict[str, dict], expected: date, quarter: int | None = None,
-           as_table: bool | None = None) -> Located | str:
+           as_table: bool | None = None, fiscal_year: int | None = None) -> Located | str:
     """A reading built from last quarter's locators, or, when any of them cannot be found again, why not (counted in the
     run summary, so the reasons code most often fails on show where it should learn next). `quarter` is the filing's
-    fiscal quarter: a column headed with a quarter's name must name it. `as_table` overrides how a group read partly
+    fiscal quarter: a column headed with a quarter's name must name it (and `fiscal_year`, when known, its year). `as_table` overrides how a group read partly
     whole is replayed (True: its whole rows as a table; False: every row alone)."""
     tables: dict[str, list[tuple[str, dict]]] = {}
     values: list[Locator] = []
@@ -81,14 +81,15 @@ def replay(document: Document, last: dict[str, dict], expected: date, quarter: i
         if locator.get("whole_table") and (whole[key.split(".", 1)[0]] > alone[key.split(".", 1)[0]] if as_table is None else as_table):
             tables.setdefault(key.split(".", 1)[0], []).append((key, locator))
             continue
-        found = _replay_value(document, key, locator, quarter, alone=len(last) == 1, expected=expected)
+        found = _replay_value(document, key, locator, quarter, alone=len(last) == 1, expected=expected,
+                              fiscal_year=fiscal_year)
         if isinstance(found, str) and not (len(last) > 1 and shows_dash(document, locator)):  # a dash: nothing reported
             return found
         if not isinstance(found, str):
             values.append(found)
     table_locators = []
     for group, rows in tables.items():
-        found = _replay_table(document, group, [locator for _key, locator in rows], quarter, expected)
+        found = _replay_table(document, group, [locator for _key, locator in rows], quarter, expected, fiscal_year)
         if isinstance(found, str):
             return found
         # Each row keyed as last quarter's reading keyed it, where its label does not name a listed KPI by itself.
@@ -116,7 +117,7 @@ LABEL_CUT = 80  # how long a stored row label was before 2026-11-15; longer labe
 
 
 def _replay_value(document: Document, key: str, locator: dict, quarter: int | None = None, alone: bool = False,
-                  expected: date | None = None) -> Locator | str:
+                  expected: date | None = None, fiscal_year: int | None = None) -> Locator | str:
     if "quote" in locator:
         return _replay_quote(document, key, locator)
     label = clean(locator.get("row_label") or "").lower()
@@ -141,7 +142,8 @@ def _replay_value(document: Document, key: str, locator: dict, quarter: int | No
             rows = [int(locator["row"])]
         newest = bool(rows) and current_column(table, rows[0], col)
         held = newest and _same_header(table, rows[0], col, locator, quarter)
-        moved = None if len(rows) != 1 or held or expected is None else period_column(table, rows[0], col, locator, expected, quarter)
+        moved = None if len(rows) != 1 or held or expected is None \
+            else period_column(table, rows[0], col, locator, expected, quarter, fiscal_year)
         if len(rows) > 1:
             misses.append("row label found more than once")
         elif rows and (held or moved is not None):
@@ -207,7 +209,7 @@ def missing_since(last: dict[str, dict], keys: set[str], group: str, whole: bool
 
 
 def _replay_table(document: Document, group: str, parts: list[dict], quarter: int | None = None,
-                  expected: date | None = None) -> TableLocator | str:
+                  expected: date | None = None, fiscal_year: int | None = None) -> TableLocator | str:
     first = parts[0]
     col = first.get("col")
     if col is None or "total_row_label" not in first:
@@ -236,7 +238,7 @@ def _replay_table(document: Document, group: str, parts: list[dict], quarter: in
         if total_row is not None:
             first_row = _with_rows_above(table, first_row, total_row, col)
         column = col if current_column(table, first_row, col) and _same_header(table, first_row, col, first, quarter) else \
-            period_column(table, first_row, col, first, expected, quarter) if expected is not None else None
+            period_column(table, first_row, col, first, expected, quarter, fiscal_year) if expected is not None else None
         if column is None:
             misses.append("column header changed" if "header" in first else "column header not recorded")
             continue
