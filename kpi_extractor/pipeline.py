@@ -87,8 +87,10 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
 
     def __init__(self, control, symbol: str, quarters: int, force: bool, today: date | None = None, log=print,
                  wait_for_lock: bool = False, report_quarters: int | None = None, source: FilingSource | None = None,
-                 retrace: bool = False, reread: str | None = None):
+                 retrace: bool = False, reread: str | None = None, lists_only: bool = False):
         self.control = control
+        # An evaluation of KPI lists alone (evals/lists_eval.py): the run stops once the list is written.
+        self.lists_only = lists_only
         # A selective re-read reads again only the filings its selector picks (ops/reread.py), and leaves the KPI list
         # as it is; a retrace is the selector for figures read before AI calls were traced.
         self.reread = reread or ("untraced" if retrace else None)
@@ -230,6 +232,10 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             if ref.accession not in self.filings:
                 self.store.record(FilingReading(ref, "skipped", notes=[_PASSED_OVER], counted=False))
         self._newest_release = max((ref.period_end for ref in releases if ref.period_end), default=None)
+        if self.lists_only:
+            # Only the list: Propose reads the latest quarter's documents beside the XBRL breakdowns just read.
+            self._spec(state.get("spec"), releases)
+            return self.result
         self._store_release_statements(reports, releases)
         if self._no_quarterly_reports(reports):
             self._write_extra(self._read_titled_pies(releases), "pie figures")

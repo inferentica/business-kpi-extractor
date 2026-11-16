@@ -16,6 +16,7 @@ on:
           - classify
           - code-reads
           - ocr-probe
+          - lists
       symbols:
         description: For a trial - comma-separated tickers to read as new companies (nothing is stored); for code-reads, the companies whose releases code reads again with no AI
         required: false
@@ -174,8 +175,14 @@ jobs:
           LISTS=""
           if [ -n "$LISTS_FROM" ]; then LISTS="--lists-from $(find lists-from -name trial.json | head -1)"; fi
           python -m kpi_extractor.evals.trial --symbols "$SYMBOLS" --quarters "$QUARTERS" $LISTS
+      - name: Draft and score KPI lists alone (Propose, no reading)
+        if: inputs.suite == 'lists'
+        env:
+          KPI_AI_PROFILE: ${{ inputs.ai_profile || 'flash-high' }}
+          SYMBOLS: ${{ inputs.symbols }}
+        run: python -m kpi_extractor.evals.lists_eval --symbols "$SYMBOLS"
       - name: Score against the golden set
-        if: inputs.suite != 'prompts' && inputs.suite != 'trial' && inputs.suite != 'classify' && inputs.suite != 'code-reads' && inputs.suite != 'ocr-probe'
+        if: inputs.suite != 'prompts' && inputs.suite != 'trial' && inputs.suite != 'classify' && inputs.suite != 'code-reads' && inputs.suite != 'ocr-probe' && inputs.suite != 'lists'
         env:
           QUARTERS: ${{ inputs.quarters || '6' }}
           KPI_EVAL_LISTS: ${{ inputs.lists || (github.event_name == 'schedule' && 'fresh' || 'stored') }}
