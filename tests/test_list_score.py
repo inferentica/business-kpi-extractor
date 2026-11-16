@@ -53,3 +53,29 @@ def test_a_golden_figure_under_another_group_title_counts_when_its_group_holds_e
     # A lone line under another title proves nothing about its group.
     lone = score(golden, {"MS": [captured["MS"][0]]})
     assert lone["correct"] == 0 and lone["missing"] == 2
+
+
+def test_a_list_draft_runs_the_pipeline_lists_only(monkeypatch):
+    from kpi_extractor.evals import lists_eval
+    from kpi_extractor.pipeline import SymbolResult
+    seen = {}
+
+    class Pipeline:
+        def __init__(self, control, symbol, quarters, force, log=None, lists_only=False):
+            seen.update(symbol=symbol, force=force, lists_only=lists_only)
+            control.specs[symbol] = {"groups": []}
+
+        def run(self):
+            return SymbolResult("X")
+    monkeypatch.setattr(lists_eval, "SymbolPipeline", Pipeline)
+    _result, spec, values = lists_eval.draft_list(object(), "X", 4)
+    assert seen == {"symbol": "X", "force": True, "lists_only": True} and spec == {"groups": []} and values == []
+
+
+def test_the_lists_summary_line_names_both_measures():
+    from kpi_extractor.evals.lists_eval import _line
+    scored = {"companies": 2, "recall": 0.6, "current": 10, "named": 5, "fromXbrl": 1, "history": 2, "precision": 0.9,
+              "kept": 9, "fresh": 10}
+    assert _line("Held out", scored) == ("Held out: 2 companies, recall 60.0% of 10 lines still reported (5 named, 1 from XBRL; "
+                                         "2 history apart), precision 90.0% (9/10)")
+    assert _line("Held out", {"companies": 0}) == "Held out: no companies"
