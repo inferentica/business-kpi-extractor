@@ -23,11 +23,13 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 URL = os.environ.get("STATEMENTS_STORE_URL", "https://gplrniwqomrrufkkxqjh.supabase.co/functions/v1/statements-store")
 AUDIENCE = "quotiva-statements"
 _BATCH = 500  # links asked for at once (the gate signs up to 1,000)
+_THREADS = 16  # uploads and downloads at once: one at a time, a company of 4,000 units took about 20 minutes
 
 
 def _packed(value) -> bytes:
@@ -65,32 +67,40 @@ def store(folder: Path, dry_run: bool = False, allow_withdraw: bool = False, pos
     files = evidence(folder)
     if dry_run:
         files = {"candidate.json.gz": files["served.json.gz"]}
-    # The snapshot last, so the gate never serves a snapshot whose evidence is not written yet.
-    names = sorted(files, key=lambda name: name == "served.json.gz")
-    for start in range(0, len(names), _BATCH):
-        batch = names[start:start + _BATCH]
-        links = post({"operation": "uploads", "cik": cik,
-                      "files": [{"name": name, "size": len(files[name])} for name in batch]})["links"]
-        for name in batch:
-            put(links[name], files[name])
+    # In stages: the units and the other evidence, then the units' index, then the snapshot. A failed upload stops
+    # the company before its index or snapshot names anything not written.
+    last = ("units/index.json.gz", "served.json.gz")
+    stages = [sorted(name for name in files if name not in last)] + [[name] for name in last if name in files]
+    with ThreadPoolExecutor(_THREADS) as pool:
+        for names in stages:
+            for start in range(0, len(names), _BATCH):
+                batch = names[start:start + _BATCH]
+                links = post({"operation": "uploads", "cik": cik,
+                              "files": [{"name": name, "size": len(files[name])} for name in batch]})["links"]
+                list(pool.map(lambda name: put(links[name], files[name]), batch))  # raises the first failed upload
     result = post({"operation": "store", "cik": cik, "dry_run": dry_run, "allow_withdraw": allow_withdraw})
     return {**result, "files": len(files), "bytes": sum(len(body) for body in files.values())}
 
 
 def fetch_units(folder: Path, cik: int, post=None, get=None) -> int:
-    """The company's units as its last stored read left them, into `folder`/units for `read --previous`; how many."""
+    """The company's units as its last stored read left them, into `folder`/units for `read --previous`; how many.
+    The index is written last, once every unit is: a download that fails part way leaves no index, so the read is a
+    full one rather than one that finds a unit missing."""
     post, get = post or _post, get or _get
     links = post({"operation": "downloads", "cik": cik})["links"]
     units = folder / "units"
     units.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for name, link in sorted(links.items()):
-        if name == "units/index.json.gz":
-            (units / "index.json").write_bytes(gzip.decompress(get(link)))
-        elif re.fullmatch(r"units/[A-Za-z0-9][A-Za-z0-9._-]*\.json\.gz", name):
-            (units / name.split("/", 1)[1]).write_bytes(get(link))
-            count += 1
-    return count
+    names = sorted(name for name in links if name != "units/index.json.gz"
+                   and re.fullmatch(r"units/[A-Za-z0-9][A-Za-z0-9._-]*\.json\.gz", name))
+
+    def fetch(name: str) -> None:
+        (units / name.split("/", 1)[1]).write_bytes(get(links[name]))
+
+    with ThreadPoolExecutor(_THREADS) as pool:
+        list(pool.map(fetch, names))
+    if "units/index.json.gz" in links:
+        (units / "index.json").write_bytes(gzip.decompress(get(links["units/index.json.gz"])))
+    return len(names)
 
 
 def _get(link: str) -> bytes:

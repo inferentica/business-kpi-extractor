@@ -53,6 +53,60 @@ def _folder(tmp_path):
     return tmp_path
 
 
+def _uploads(posted):
+    return [[file["name"] for file in body["files"]] for body in posted if body["operation"] == "uploads"]
+
+
+def _stored_units(tmp_path, count):
+    from statement_extractor.pipeline.units import Units
+    (tmp_path / "read").mkdir()
+    folder = _folder(tmp_path / "read")
+    units = Units(folder)
+    for number in range(count):
+        units.keep("report", f"000{number}", {"offset": 0}, {}, [], accession=f"000{number}", filed="2024-11-01")
+    units.finish()
+    return folder
+
+
+def test_a_failed_unit_upload_writes_no_index_or_snapshot(tmp_path):
+    import pytest
+    folder = _stored_units(tmp_path, 40)
+
+    def post(body):
+        if body["operation"] == "uploads":
+            return {"links": {file["name"]: f"https://r2/{file['name']}" for file in body["files"]}}
+        raise AssertionError("stored although an upload failed")
+
+    written = {}
+
+    def put(link, body):
+        if link.endswith("report-00017.json.gz"):
+            raise RuntimeError("evidence upload failed")
+        written[link] = body
+
+    with pytest.raises(RuntimeError):
+        store(folder, post=post, put=put)
+    assert "https://r2/units/index.json.gz" not in written and "https://r2/served.json.gz" not in written
+
+
+def test_a_failed_unit_download_leaves_no_index_so_the_read_is_a_full_one(tmp_path):
+    import pytest
+    from statement_extractor.pipeline.store import fetch_units
+    from statement_extractor.pipeline.units import Units
+    links = {f"units/report-000{number}.json.gz": f"https://r2/{number}" for number in range(40)}
+    links["units/index.json.gz"] = "https://r2/index"
+
+    def get(link):
+        if link == "https://r2/17":
+            raise RuntimeError("unit download failed")
+        return gzip.compress(b"[]") if link == "https://r2/index" else b"unit"
+
+    with pytest.raises(RuntimeError):
+        fetch_units(tmp_path / "previous", 1, post=lambda body: {"links": links}, get=get)
+    assert not (tmp_path / "previous" / "units" / "index.json").exists()
+    assert Units(tmp_path / "next", previous=tmp_path / "previous").reuse("report-0001", {"offset": 0}) is None
+
+
 def test_a_write_uploads_the_evidence_then_serves_the_snapshot(tmp_path):
     posted, written = [], {}
 
@@ -63,10 +117,11 @@ def test_a_write_uploads_the_evidence_then_serves_the_snapshot(tmp_path):
         return {"new": 0}
 
     result = store(_folder(tmp_path), post=post, put=lambda link, body: written.setdefault(link, body))
-    names = [file["name"] for file in posted[0]["files"]]
-    assert names == ["readings/0000320193-24-000123.json.gz", "readings/archive-TSM-20-F-2000-12-31.json.gz",
-                     "filings.json.gz", "summary.json.gz", "served.json.gz"]  # the snapshot last
-    assert all(file["size"] == len(written[f"https://r2/{file['name']}"]) for file in posted[0]["files"])
+    assert _uploads(posted) == [["filings.json.gz", "readings/0000320193-24-000123.json.gz",
+                                 "readings/archive-TSM-20-F-2000-12-31.json.gz", "summary.json.gz"],
+                                ["served.json.gz"]]  # the snapshot last, once the rest is written
+    assert all(file["size"] == len(written[f"https://r2/{file['name']}"])
+               for body in posted if body["operation"] == "uploads" for file in body["files"])
     assert json.loads(gzip.decompress(written["https://r2/served.json.gz"])) == {"cik": 320193, "periods": []}
     assert posted[-1] == {"operation": "store", "cik": 320193, "dry_run": False, "allow_withdraw": False}
     assert result["files"] == 5 and evidence_name("archive:ASML:ARS:2000-12-31") == "readings/archive-ASML-ARS-2000-12-31.json.gz"
@@ -109,9 +164,9 @@ def test_a_read_with_units_stores_them_and_the_next_read_gets_them_back(tmp_path
         return {"new": 0}
 
     store(folder, post=post, put=lambda link, body: written.setdefault(link, body))
-    names = [file["name"] for file in posted[0]["files"]]
-    assert names == ["units/report-0000320193-24-000123.json.gz", "units/index.json.gz", "filings.json.gz",
-                     "summary.json.gz", "served.json.gz"]  # units in place of readings/, the snapshot last
+    # Units in place of readings/; their index once they are written, then the snapshot.
+    assert _uploads(posted) == [["filings.json.gz", "summary.json.gz", "units/report-0000320193-24-000123.json.gz"],
+                                ["units/index.json.gz"], ["served.json.gz"]]
     later = tmp_path / "previous"
     assert fetch_units(later, 320193, post=post, get=lambda link: written[link]) == 1
     assert posted[-1] == {"operation": "downloads", "cik": 320193}
