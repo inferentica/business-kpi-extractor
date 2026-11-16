@@ -106,7 +106,18 @@ def load_submission(filing, archive=None) -> None:
                 return
             except Exception:  # noqa: BLE001 - a damaged copy: SEC's then
                 pass
-    _with_retries(filing.sgml, lambda: _read_submission_afresh(filing))
+    _with_retries(lambda: _submission(filing), lambda: _read_submission_afresh(filing))
+
+
+def _submission(filing) -> None:
+    """edgartools' read of the submission. On an error page it does not fail but holds a stand-in built from the filing's
+    index page, with an empty header; with that page an error page too, no documents at all, and the filing was read as
+    one without XBRL or statements (31 filings in statements round 135). The stand-in is an error page to read again."""
+    submission = filing.sgml()
+    header = getattr(submission, "header", None)
+    if header is not None and not header.text:
+        filing._sgml = None
+        raise SECHTMLResponseError(f"SEC answered no submission for {filing.accession_no}")
 
 
 _PERIOD = re.compile(r'infoHead">\s*Period of Report\s*</div>\s*<div class="info">\s*([\d-]+)', re.I)

@@ -175,3 +175,17 @@ def test_a_period_in_the_header_needs_no_index(monkeypatch):
     sec._hold_submission(filing, SUBMISSION.replace("FILED AS OF DATE:", "CONFORMED PERIOD OF REPORT:\t20251231\nFILED AS OF DATE:"))
     monkeypatch.setattr(sec.httpx, "get", lambda url, **kwargs: pytest.fail("read the index"))
     assert str(sec.period_of_report(filing))[:10] in ("2025-12-31", "20251231")
+
+
+def test_edgartools_stand_in_for_an_error_page_is_read_again(waits, monkeypatch):
+    # Statements round 135: SEC's error pages left 31 filings holding edgartools' stand-in from the index page, with no
+    # documents, read as filings without XBRL.
+    from edgar.sgml import FilingSGML
+    from edgar.sgml.sgml_header import FilingHeader
+    filing = _filing()
+    stand_in = FilingSGML(header=FilingHeader(text="", filing_metadata={}), documents={})
+    monkeypatch.setattr(type(filing), "sgml", lambda self: self._sgml or setattr(self, "_sgml", stand_in) or stand_in)
+    monkeypatch.setattr(sec.httpx, "get", lambda url, **kwargs: httpx.Response(200, text=SUBMISSION, request=httpx.Request("GET", url)))
+    sec.load_submission(filing)
+    assert waits == [sec._SEC_WAITS[0]]
+    assert [attachment.document for attachment in filing._sgml.attachments] == ["report.htm"]
