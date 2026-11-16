@@ -9,7 +9,7 @@ from datetime import date
 from types import MappingProxyType
 
 from .ai import KpiSpec
-from .quality.reasons import REREAD_NOTE
+from .quality.reasons import REREAD_NOTE, SCALE_BY_ROUNDING, has, without
 from .quality.stated import stated_in_filing
 from .sources import accepts_url
 from .sources.base import FilingRef
@@ -212,8 +212,12 @@ class CompanyStore:
                 continue
             if rounding_of(now["value"], before["value"]):
                 # The same figure rounded (the release's headline for its table's cell: KKR's uncalled commitments,
-                # 107,592 then 108,000 million): the exact one is kept.
-                rows.append(dict(before))
+                # 107,592 then 108,000 million): the exact one is kept. Its scale, once fitted to its series, is now the
+                # filing's: Visa's 39,213 under "Processed Transactions (millions)" is the text's "39.2 billion".
+                kept = dict(before)
+                if has(kept.get("notes"), "rescaled") and (said := (now.get("locator") or {}).get("value_text")):
+                    kept["notes"] = [*without(kept["notes"], "rescaled"), f"{SCALE_BY_ROUNDING} {said}"]
+                rows.append(kept)
             elif not rounding_of(before["value"], now["value"]) and _differs(now["value"], before["value"]):
                 rows.append({**now, "validation_status": "needs_review",
                              "notes": [*(now.get("notes") or []), f"{REREAD_NOTE} {_figure(before['value'])}"]})
