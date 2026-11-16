@@ -188,7 +188,8 @@ class ReplayReading:
             return False
         try:
             document = self._code_document(later)
-            quarter = int(fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)[1][1])
+            year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=self.offset)
+            fiscal_year, quarter = int(year), int(period[1])
         except Exception:  # noqa: BLE001 - an unreadable release, or no fiscal quarter, confirms nothing
             return False
         names = company_segments(list(getattr(self, "values", {}).values()))
@@ -204,7 +205,8 @@ class ReplayReading:
                 for col in range(1, len(cells)):
                     cell = parse_number(table.cell(row, col))
                     factor = release_unit(item.value, cell.value) if cell and cell.value else None
-                    if factor and same_figure(cell.value * factor, item.value) and names_period(table, row, col, expected, quarter):
+                    if factor and same_figure(cell.value * factor, item.value) and names_period(table, row, col, expected, quarter,
+                                                                                                            fiscal_year=fiscal_year):
                         return True
         return False
 
@@ -312,8 +314,10 @@ class ReplayReading:
 
     def _replay_once(self, document: Document, part: Spec, locators: dict[str, dict], expected: date,
                      currency: str | None, annual: bool = False, as_table: bool | None = None) -> tuple[Located, list[ReadValue]] | str:
-        _year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=getattr(self, "offset", 0))
-        located = replay(document, locators, expected, int(period[1]) if period.startswith("Q") and not annual else None, as_table)
+        year, period = fiscal_label(expected, self.profile.fiscal_year_end, year_offset=getattr(self, "offset", 0))
+        quarterly = period.startswith("Q") and not annual
+        located = replay(document, locators, expected, int(period[1]) if quarterly else None, as_table,
+                         int(year) if quarterly else None)
         if isinstance(located, AmbiguousQuote) and len(locators) == 1:
             return self._one_of(document, part, next(iter(locators)), located, expected, currency, annual)
         if isinstance(located, str):

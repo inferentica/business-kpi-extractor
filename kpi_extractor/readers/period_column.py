@@ -111,10 +111,12 @@ def current_column(table: Table, first_data_row: int, col: int) -> bool:
     return bool(column) and max(column) == max(every)
 
 
-def names_period(table: Table, row: int, col: int, expected: date, quarter: int | None, allowed: set[str] = frozenset()) -> bool:
+def names_period(table: Table, row: int, col: int, expected: date, quarter: int | None, allowed: set[str] = frozenset(),
+                 fiscal_year: int | None = None) -> bool:
     """Whether a column's header names the quarter ending `expected`: a quarter's span or none (never a change, a half,
     nine months, a year or a year to date), no word changing the measure (non-GAAP, adjusted) beyond `allowed`, and a
-    date within the period tolerance of its end, or this fiscal quarter's name with this year or the next."""
+    date within the period tolerance of its end, or this fiscal quarter's name with exactly `fiscal_year` when it is
+    known (for fiscal Q1 2025 ending 30 September 2024, "1Q25" and never "1Q24"), else this year or the next."""
     header = column_header(table, row, col, DEEP_HEADER_ROWS)
     if _spans(comparable_header(header)) - {"quarter"} or any(
             _OTHER_MEASURE.match(word) and word not in allowed for word in re.findall(r"[a-z][a-z-]*[a-z]", header)):
@@ -123,16 +125,19 @@ def names_period(table: Table, row: int, col: int, expected: date, quarter: int 
     if dates:
         return any(abs((day - expected).days) <= PERIOD_TOLERANCE_DAYS for day in dates)
     named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(header)}
-    return bool(quarter and named == {quarter} and years and set(years) <= {expected.year, expected.year + 1})
+    allowed_years = {fiscal_year} if fiscal_year else {expected.year, expected.year + 1}
+    return bool(quarter and named == {quarter} and years and set(years) <= allowed_years)
 
 
-def period_column(table: Table, row: int, col: int, locator: dict, expected: date, quarter: int | None) -> int | None:
+def period_column(table: Table, row: int, col: int, locator: dict, expected: date, quarter: int | None,
+                  fiscal_year: int | None = None) -> int | None:
     """The one column of a row whose header names the filing's own period, when last quarter's column fails the tests
     above: a bank's supplement moves its quarters one column on each quarter ("3Q23 2Q23 1Q23 4Q22 3Q22"), and a table
     recorded under "Quarter Ended September 30" may head its columns "3Q23" the next. A column qualifies when it holds
     a figure, its header names a quarter's span or none (never a change, a half, nine months, a year or a year to
     date), gains no word that changes the measure (non-GAAP, adjusted), and names the period: a date within the period
-    tolerance of its end, or this fiscal quarter's name with this year or the next (a fiscal year named for its end).
+    tolerance of its end, or this fiscal quarter's name with this fiscal year (`fiscal_year`; when unknown, this year or
+    the next, as a fiscal year may be named for its end).
     Of two that qualify, the newest stands; otherwise none does. Last quarter's column must have been a quarter's."""
     before = comparable_header(locator.get("header") or "")
     if "header" not in locator or _spans(before) - {"quarter"}:
@@ -140,7 +145,7 @@ def period_column(table: Table, row: int, col: int, locator: dict, expected: dat
     words_before = set(re.findall(r"[a-z][a-z-]*[a-z]", before))
     # Last quarter's own column too: its header may only be reworded.
     found = [index for index in range(1, len(table.rows[row]))
-             if parse_number(table.cell(row, index)) and names_period(table, row, index, expected, quarter, words_before)]
+             if parse_number(table.cell(row, index)) and names_period(table, row, index, expected, quarter, words_before, fiscal_year)]
     if len(found) > 1:
         found = [index for index in found if current_column(table, row, index)]
     return found[0] if len(found) == 1 else None

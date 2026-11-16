@@ -56,3 +56,18 @@ def test_no_column_is_chosen_when_two_name_the_period_or_last_quarters_was_no_qu
     year = {**last, "header": "year ended @ #"}
     assert period_column(TRUIST.tables["A_T1"], 4, 2, year, date(2023, 9, 30), 3) is None
     assert period_column(TRUIST.tables["A_T1"], 4, 2, {k: v for k, v in last.items() if k != "header"}, date(2023, 9, 30), 3) is None
+
+
+def test_a_quarter_name_must_carry_this_fiscal_year_when_it_is_known():
+    # The re-check's probe: fiscal Q1 2025 ends 30 September 2024, so "1Q24" is the year before's first quarter. With
+    # this year's "1Q25" cell blank, "1Q24" was the one column left and was read as this quarter's.
+    blank = doc(["(Dollars in millions)", "1Q25", "1Q24"], ["Card fees", "", "238"])
+    last = {"row_label": "Card fees", "table": "A_T1", "row": 1, "col": 2, "header": "quarter ended @ #"}
+    end = date(2024, 9, 30)
+    assert period_column(blank.tables["A_T1"], 1, 2, last, end, 1) == 2  # unknown fiscal year: this year or the next
+    assert period_column(blank.tables["A_T1"], 1, 2, last, end, 1, fiscal_year=2025) is None
+    found = _replay_value(blank, "fees.card", {**last, "col": 9}, quarter=1, expected=end, fiscal_year=2025)
+    assert isinstance(found, str)
+    # This fiscal year's own column stands.
+    named = doc(["(Dollars in millions)", "1Q25", "1Q24"], ["Card fees", "241", "238"])
+    assert period_column(named.tables["A_T1"], 1, 9, last, end, 1, fiscal_year=2025) == 1
