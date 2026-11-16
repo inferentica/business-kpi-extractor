@@ -188,3 +188,36 @@ def test_a_scale_caption_with_its_audit_status_first_is_a_caption():
     assert _caption_only("(unaudited, in millions EUR, except per share data)")
     assert _caption_only("(In thousands, except per share amounts)") and _caption_only("per share amounts)")
     assert not _caption_only("Shares used in computing earnings (loss) per share (in thousands):")
+
+
+# Chase's 2000 10-K (0000950123-01-002499): its reconciliation of reported to operating results, the steps' names
+# wrapped below the scale caption into its first rows. Read as money since round 128, its "Special Items" column
+# passed as a 2000 income statement with net income of 200, and cost the derived 2001 fourth quarter.
+CHASE_STEPS = """
+The following table provides a reconciliation between JPMorgan Chase's reported
+and operating results.
+
+<TABLE>
+<CAPTION>
+                                                         2000                                           1999
+Year Ended December 31,
+(in millions, except                 Reported     Credit     Special     Operating  Reported     Credit     Special     Operating
+per share data)                       Results(a)    Card(b)    Items(c)      Basis   Results(a)    Card(b)    Items(c)      Basis
+- ---------------------------------------------------------------------------------------------------------------------------------
+<S>                                  <C>          <C>        <C>         <C>        <C>          <C>        <C>         <C>
+INCOME STATEMENT
+Revenue                              $32,934       $ 990     $(1,131)      $32,793   $30,930      $ 993     $  (228)      $31,695
+Cash Expense                          20,865          --          --        20,865    17,643         --        (100)       17,543
+Operating Margin                      11,541         990      (1,131)       11,400    12,958        993        (128)       13,823
+Credit Costs                           1,377         990          --         2,367     1,446        993          --         2,439
+Income before Income Tax Expense       8,733          --         300         9,033    11,489         --        (105)       11,384
+Tax Expense                            3,006          --         100         3,106     3,988         --         (37)        3,951
+Net Income                           $ 5,727       $  --     $   200       $ 5,927   $ 7,501      $  --     $   (68)      $ 7,433
+</TABLE>
+"""
+
+
+def test_a_reconciliation_whose_steps_wrap_into_its_first_rows_is_no_statement():
+    readings, _ = read_text(CHASE_STEPS, accession="a", form="10-K", filed=date(2001, 3, 22),
+                            document_end=date(2000, 12, 31), fiscal_year_end="1231", year_offset=0)
+    assert not [reading for reading in readings if reading.statement == "income"]
