@@ -239,10 +239,13 @@ def report_period_ends(company: Company, since: date) -> tuple[date, ...]:
         return ()
     ends = set()
     for filing in filings:
-        raw = getattr(filing, "period_of_report", None) or getattr(filing, "report_date", None)
         try:
+            # The submissions list's report date needs no request; period_of_report fetches the filing's index page,
+            # and an error page from SEC broke it inside edgartools ("cannot unpack non-iterable NoneType"), failing
+            # the whole company (seven at once in the 2026-11-16 lists-only run).
+            raw = getattr(filing, "report_date", None) or getattr(filing, "period_of_report", None)
             ends.add(raw if isinstance(raw, date) else date.fromisoformat(str(raw)[:10]))
-        except ValueError:
+        except Exception:  # noqa: BLE001 - one report's period unknown: the month-end guess covers it
             continue
     return tuple(sorted(ends))
 
