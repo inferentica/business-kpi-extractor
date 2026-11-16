@@ -980,6 +980,36 @@ def test_the_cap_never_drops_a_breakdown():
     assert len(spec.groups[2].kpis) == 8  # fewer than the kept minimum: none trimmed
 
 
+def test_a_list_the_owner_edited_is_never_capped():
+    # Apollo v8 and KKR v2: the owner's eleventh metric in a group of a list over 24 lines was dropped by the cap
+    # minutes after the edit. An owner's list keeps every line and every group; only a one-part breakdown still
+    # becomes metrics.
+    from kpi_extractor.ai import MAX_GROUPS, normalize_spec
+    def group(key, n, kind="metric"):
+        return {"key": key, "label": key, "kind": kind,
+                "kpis": [{"key": f"{key}{i}", "label": f"{key} {i}", "unit": "count" if kind == "metric" else "currency"}
+                         for i in range(n)]}
+    owner = Spec.model_validate({"groups": [group("flows", 11), *(group(f"g{i}", 4) for i in range(MAX_GROUPS - 2)),
+                                            group("lone", 1, "revenue_breakdown")]})
+    lines = sum(len(g.kpis) for g in owner.groups)
+    kept = normalize_spec(owner, cap=False)
+    assert sum(len(g.kpis) for g in kept.groups) == lines and len(kept.groups) == len(owner.groups)
+    assert next(g for g in kept.groups if g.key == "lone").kind == "metric"  # kept in place, read as a metric
+    capped = normalize_spec(owner)
+    assert sum(len(g.kpis) for g in capped.groups) < lines
+    pipeline = _pipeline(FakeControl({}), [])
+    stored = []
+    pipeline._store_spec = lambda spec, names, version, accession: stored.append(version)
+    spec, version, _ = pipeline._spec({"groups": [g.model_dump() for g in owner.groups if g.key != "lone"], "version": 8,
+                                       "owner_edited_at": "2026-11-06T04:23:09Z"}, [])
+    assert version == 8 and not stored and sum(len(g.kpis) for g in spec.groups) == lines - 1
+    # The audit's additions to an owner's list are not capped either.
+    answer = ai.Maintenance.model_validate({"add_kpis": {"flows": [{"key": "pga", "label": "Pension Group Annuities Inflows",
+                                                                    "unit": "currency"}]}})
+    added = apply_maintenance(spec, answer, cap=False)
+    assert any(k.key == "pga" for g in added.groups for k in g.kpis) and len(added.groups) == len(spec.groups)
+
+
 def test_a_jump_alone_never_settles_a_dispute():
     from kpi_extractor.readers.extract import ReadValue
     spec = Spec.model_validate({"groups": [{"key": "ops", "label": "Ops", "kind": "metric",

@@ -68,7 +68,7 @@ def without_xbrl_repeats(spec: Spec, covered: list[set[str]], keep: Spec | None 
     return Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names})
 
 
-def apply_maintenance(spec: Spec, answer: ai.Maintenance, covered: list[set[str]] = ()) -> Spec | None:
+def apply_maintenance(spec: Spec, answer: ai.Maintenance, covered: list[set[str]] = (), cap: bool = True) -> Spec | None:
     """The list with the audit's additions and retirements, or None when nothing changes. Existing keys keep their
     meaning; a new key that collides with an existing one is ignored; a group that repeats a breakdown the company
     still tags in XBRL is not added."""
@@ -106,7 +106,7 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance, covered: list[set[str]
             changed = True
     if not changed:
         return None
-    return ai.normalize_spec(Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names}))
+    return ai.normalize_spec(Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names}), cap=cap)
 
 
 def _dimension(label: str) -> str:
@@ -189,7 +189,7 @@ class KpiListUpkeep:
         # A list the owner edited (Quotiva Review) is kept as edited, even on a forced run.
         if row and (not self.force or row.get("owner_edited_at")):
             stored = Spec.model_validate({"groups": row["groups"], "names": row.get("names") or {}})
-            spec, version = self._capped(stored), int(row["version"])
+            spec, version = self._capped(stored, owner=bool(row.get("owner_edited_at"))), int(row["version"])
             if not row.get("owner_edited_at"):
                 # A group the extractor listed from a release read before its report (Microsoft's new segments, listed
                 # an hour before the 10-Q tagged them) goes once the report's XBRL gives the same rows.
@@ -271,9 +271,10 @@ class KpiListUpkeep:
             self.log(f"{self.symbol}: {len(aside)} values of {', '.join(sorted(dropped))} set aside (repeats XBRL)")
         return aside
 
-    def _capped(self, spec: Spec) -> Spec:
-        """normalize_spec, with any KPI the cap took off recorded for the run summary."""
-        normalized = ai.normalize_spec(spec)
+    def _capped(self, spec: Spec, owner: bool = False) -> Spec:
+        """normalize_spec, with any KPI the cap took off recorded for the run summary. A list the owner edited keeps
+        every line: only its one-part breakdowns become metrics."""
+        normalized = ai.normalize_spec(spec, cap=not owner)
         kept = {(g.key, k.key) for g in normalized.groups for k in g.kpis}
         trimmed = [f"{g.key}.{k.key}" for g in spec.groups for k in g.kpis
                    if (g.key, k.key) not in kept and not any(k.key == other.key for other in
@@ -303,7 +304,7 @@ class KpiListUpkeep:
                 # One quarter without a KPI (a table left out, a reading missed) is not the company dropping it.
                 answer = answer.model_copy(update={"retire": self._long_absent(answer.retire, period_end)})
             covered = [] if self.profile.foreign else self._current_xbrl_members()
-            updated = apply_maintenance(spec, answer, covered)
+            updated = apply_maintenance(spec, answer, covered, cap=not getattr(self, "_owner_edited", False))
             if not getattr(self, "_owner_edited", False):
                 # The extractor's own repeats of an XBRL breakdown go, whether or not the audit changed anything else.
                 cleaned = without_xbrl_repeats(updated or spec, covered)
@@ -313,7 +314,8 @@ class KpiListUpkeep:
             return None
         if updated is None:
             return None
-        updated = self._capped(updated)  # the audit's additions are kept to the cap like any list
+        # The audit's additions are kept to the cap like any list, except on a list the owner edited.
+        updated = self._capped(updated, owner=getattr(self, "_owner_edited", False))
         if updated.model_dump() == spec.model_dump():
             return None
         self.store.write(self._set_aside_dropped(spec, updated))
