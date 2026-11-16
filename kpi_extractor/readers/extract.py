@@ -226,7 +226,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
     if parsed.scale_word is not None and kpi.unit in ("count", "currency"):
         scale_from = number_scale(parsed.scale_word)
     if kpi.unit == "count" and parsed.scale_word is None:
-        scale_from = passage_count_scale(quote[:quote.find(value_text)])
+        scale_from = passage_count_scale(before, block.text[:block.text.find(quote)], kpi.label)
         value *= scale_from.factor
     if kpi.unit == "currency" and parsed.scale_word is None:
         scale_from, scale_notes = passage_amount_scale(document, block, block.text.find(quote), kpi.label, locator, value)
