@@ -60,6 +60,7 @@ class SymbolResult:
     second_reads: int = 0
     # Why each second read was needed: period, annual, repeats_earlier, checks_failed, not_placed, missing_now, moved.
     second_read_reasons: dict = field(default_factory=dict)
+    cache_waits: int = 0  # second readings that waited for the first's prompt to enter the cache
     flash_only_reads: int = 0
     replayed_reads: int = 0
     replay_outcomes: dict = field(default_factory=dict)  # per group: "replayed", or why the AI read it

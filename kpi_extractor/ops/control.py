@@ -18,13 +18,21 @@ class ControlError(RuntimeError):
 
 
 class Reply(str):
-    """An AI reply with the id of the call that produced it (logged with the reply and its prompt version)."""
+    """An AI reply with the id of the call that produced it (logged with the reply and its prompt version), and how much
+    of its prompt the provider's cache held (None when the control plane does not say)."""
     call_id: str | None = None
+    cache_share: float | None = None
 
-    def __new__(cls, text: str, call_id: str | None = None):
+    def __new__(cls, text: str, call_id: str | None = None, cache_share: float | None = None):
         reply = super().__new__(cls, text)
-        reply.call_id = call_id
+        reply.call_id, reply.cache_share = call_id, cache_share
         return reply
+
+
+def cache_share(response: dict) -> float | None:
+    """The share of a call's prompt the cache held, from the control plane's reply."""
+    hit, total = response.get("cacheHitTokens"), response.get("inputTokens")
+    return None if hit is None or not total else float(hit) / float(total)
 
 
 class ControlPlane:
@@ -78,7 +86,7 @@ class ControlPlane:
                                  # again (the weekly run, so the model's own drift still shows).
                                  **({"fresh": True} if os.environ.get("KPI_FRESH_ANSWERS") == "1" else {}))
             if not response.get("error"):
-                return Reply(str(response.get("content") or ""), response.get("callId"))
+                return Reply(str(response.get("content") or ""), response.get("callId"), cache_share(response))
             if attempt == 2:
                 raise ControlError(f"ai failed: {str(response['error'])[:300]}")
             time.sleep(5)
