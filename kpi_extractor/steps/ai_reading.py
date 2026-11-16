@@ -20,7 +20,7 @@ from ..rules.precise_figures import precise_cell
 from ..rules.segment_tables import cell_figure, company_segments, names_segment, segment_page_of
 from .replay_reading import in_full_groups, left_for_ai
 from ..quality.stated import _names
-from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _identity_text, _rounding, xbrl_figures,
+from .shared import (AI_GROUP_PREFIX, _READ_BY_AI, _days, _identity_text, adds_up_to_reported, xbrl_figures,
                      _later_place, _same, _same_chain, _year_ago_cells)
 
 # About 30k tokens: enough for any earnings release, and for the revenue sections of a full financial report.
@@ -188,23 +188,20 @@ class AiReading:
                    or self._year_ago_cell_matches(item, document, before) or self._later_column_matches(item, expected)
                    for item in parts) and len(new) < len(parts):
                 confirmed.add(group.key)
-            elif self._adds_up_to_xbrl(group, parts, expected):
+            elif self._adds_up_to_xbrl(group, parts, expected, items):
                 confirmed.add(group.key)
         return confirmed
 
-    def _adds_up_to_xbrl(self, group, parts: list[ReadValue], expected: date) -> bool:
+    def _adds_up_to_xbrl(self, group, parts: list[ReadValue], expected: date, items: list[ReadValue] = ()) -> bool:
         """A breakdown no earlier quarter places: every part on a row its own label names, passing the checks above, and
-        the parts adding up to a figure the company reported in XBRL for the quarter, to the parts' own rounding. The
-        same proof settles a held breakdown after reading (series_checks, "parts add up to a figure reported in XBRL"),
-        so a second reader would only repeat it: a company's first quarters, read in a backfill after its reports."""
+        the parts adding up to the line the company reported in XBRL as their total (shared.adds_up_to_reported). The
+        same proof settles a held breakdown after reading (series_checks), so a second reader would only repeat it."""
         if group.kind != "revenue_breakdown" or len(parts) < 2 or not all(
                 _names(str(item.locator.get("row_label") or ""), item.kpi.label) for item in parts):
             return False
-        total = sum(item.value for item in parts)
-        rounding = sum(_rounding(item.value) for item in parts) / abs(total) if total else 0
-        tolerance = max(1e-5, min(rounding, 0.005))
-        return any(abs(_days(end, expected.isoformat())) <= 12 and abs(other - total) <= abs(total) * tolerance
-                   for end, other, _label in xbrl_figures(self.values.values()).get(False, []))
+        stated = next((item.value for item in items if item not in parts), None) or parts[0].locator.get("total")
+        return adds_up_to_reported(xbrl_figures(self.values.values()), expected.isoformat(), False,
+                                   [(item.value, item.locator) for item in parts], float(stated) if stated else None)
 
     def _settle_by_checks(self, agreed: list[ReadValue], disputed: dict[str, tuple], expected: date) -> None:
         """Two readings of a group that disagree, settled without a reasoning review only on structural evidence: one adds up
