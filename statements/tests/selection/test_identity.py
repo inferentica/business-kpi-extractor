@@ -67,3 +67,17 @@ def test_lines_of_one_name_and_printed_cash_balances_share_keys():
     keys = line_identity(readings)
     assert keys[("income", "printed_issued_1_710_shares_at_june_30", "")] == keys[("income", "printed_issued_3_429_shares_at_december_31", "")]
     assert keys.get(("income", "printed_provisions_note_5", ""), "printed_provisions_note_5") == "printed_provisions_note_5"
+
+
+def test_of_two_names_as_new_the_standard_tag_is_the_key_in_every_process():
+    # Ambev: CVM's account and the 6-K's IFRS tag for gross profit, both last filed the same day. The key took
+    # whichever a set listed first, which changes with each process's string hashing (round 120).
+    readings = [
+        reading("c1", date(2026, 11, 12), "2025", [("cvm_3.03", "Lucro Bruto", 41_000e6)], basis="IFRS"),
+        reading("x1", date(2026, 11, 12), "2025", [("ifrs-full_GrossProfit", "Gross profit", 41_000e6)], basis="IFRS"),
+        reading("c2", date(2025, 11, 12), "2024", [("cvm_3.03", "Lucro Bruto", 39_000e6)], basis="IFRS"),
+        reading("x2", date(2025, 11, 12), "2024", [("ifrs-full_GrossProfit", "Gross profit", 39_000e6)], basis="IFRS"),
+    ]
+    keys = line_identity(readings)
+    assert keys[("income", "cvm_3.03", "")] == keys[("income", "ifrs-full_GrossProfit", "")] == "ifrs-full_GrossProfit"
+    assert line_identity(list(reversed(readings))) == keys

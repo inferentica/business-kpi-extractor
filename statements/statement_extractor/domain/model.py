@@ -85,3 +85,18 @@ class Reading:
             data.pop("lines")
             data["line_count"] = len(self.lines)
         return data
+
+    def to_raw(self) -> dict:
+        """Every field as read, the pipeline's own too: a read unit's readings (pipeline/units.py), back by from_raw."""
+        data = asdict(self)
+        for name in ("period_end", "period_start", "filed"):
+            data[name] = data[name].isoformat() if data[name] else None
+        return data
+
+    @classmethod
+    def from_raw(cls, data: dict) -> "Reading":
+        data = dict(data)
+        for name in ("period_end", "period_start", "filed"):
+            data[name] = date.fromisoformat(data[name]) if data[name] else None
+        data["checks"] = [Check(**check) for check in data["checks"]]
+        return cls(**data)

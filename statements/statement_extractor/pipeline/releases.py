@@ -18,25 +18,44 @@ from ..sources.listing import list_releases
 from .empty_releases import names_a_statement, remember, remembered
 from .prefetch import ahead
 from .printed import read_printed
+from .units import Units, readings_of, record_of, unit_id
 
 
 def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_offset: int, log=print,
-                  phases: dict | None = None, predecessors: list = ()):
-    """(filing records, readings) of every release since `since`."""
+                  phases: dict | None = None, predecessors: list = (), units: Units | None = None):
+    """(filing records, readings) of every release since `since`; with `units`, one read before in the same context
+    (its quarter, the company's year end and year naming) is taken as it was (pipeline/units.py)."""
     records, readings = [], []
     refs = list_releases(company, since, lambda day: quarter_end_before(day, fiscal_year_end), predecessors)
     folder = os.environ.get("STATEMENTS_ARCHIVE_CACHE")
     known, empty = remembered(folder), set()
     log(f"{symbol}: {len(refs)} 6-Ks in the release window, {len(known & {ref.accession for ref in refs})} remembered empty")
-    # The next releases download while one is read (pipeline/prefetch.py); those remembered empty are not fetched.
-    for ref in ahead(refs, lambda ref: None if ref.accession in known else load_submission(ref.filing)):
+    stored = {}
+    for ref in refs:
+        context = {"fiscal_year_end": fiscal_year_end, "offset": year_offset, "quarter_end": ref.period_end.isoformat()}
+        # A unit first, remembered empty or not: what the runner's cache remembers differs from run to run.
+        unit = units.reuse(unit_id("release", ref.accession), context) if units is not None else None
+        stored[ref.accession] = (unit, context)
+    # The next releases download while one is read (pipeline/prefetch.py); those remembered empty or read before are
+    # not fetched.
+    for ref in ahead(refs, lambda ref: None if ref.accession in known or (stored.get(ref.accession) or (None,))[0]
+                     else load_submission(ref.filing)):
+        unit, context = stored.get(ref.accession, (None, None))
+        if unit is not None:
+            records.append(record_of(unit))
+            readings.extend(readings_of(unit))
+            if unit["extra"].get("empty"):
+                empty.add(ref.accession)
+            ref.filing = None
+            continue
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
                   "accepted": ref.accepted,
                   "release_quarter": _quarter(ref.period_end, fiscal_year_end, year_offset), "period_end": ref.period_end.isoformat()}
         if ref.accession in known:  # names no statement (pipeline/empty_releases.py): not fetched again
             empty.add(ref.accession)
-            records.append({**record, "note": "release", "printed": [], "titled": [], "columns": 0,
-                            "notes": ["names no statement (remembered)"], "own": [], **own_period([], ref.form)})
+            records.append(_kept(units, ref, context, {
+                **record, "note": "release", "printed": [], "titled": [], "columns": 0,
+                "notes": ["names no statement (remembered)"], "own": [], **own_period([], ref.form)}, [], True))
             continue
         try:
             with_network_retries(lambda: load_submission(ref.filing))
@@ -56,7 +75,7 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
         except Exception as error:  # noqa: BLE001 - one unreadable release never stops the company
             record["note"] = f"unreadable ({type(error).__name__}: {str(error)[:120]})"
             log(f"{symbol}: 6-K {ref.filed} {record['note']}")  # in the job's log: round 93 lost every release unseen
-            records.append(record)
+            records.append(_kept(units, ref, context, record, [], False, complete=False))
             continue
         finally:
             ref.filing = None
@@ -65,6 +84,10 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
         record.update({"note": "release", "printed": kinds, "titled": sorted(titled), "columns": len(found), "notes": notes[:10],
                        "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
                        **own_period(own, ref.form)})
+        if units is not None:
+            unit = units.keep("release", ref.accession, context, record, found, extra={"empty": ref.accession in empty},
+                              accession=ref.accession, filed=ref.filed.isoformat())
+            record, found = record_of(unit), readings_of(unit)
         records.append(record)
         readings.extend(found)
         if found:
@@ -72,6 +95,13 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
                 f"{[f'{s}/{d}:{st}' for s, d, st in record['own']]}")
     remember(folder, empty)
     return records, readings
+
+
+def _kept(units: Units | None, ref, context: dict, record: dict, found: list, empty: bool, complete: bool = True) -> dict:
+    if units is None or context is None:
+        return record
+    return record_of(units.keep("release", ref.accession, context, record, found, extra={"empty": empty},
+                                accession=ref.accession, filed=ref.filed.isoformat(), complete=complete))
 
 
 def _quarter(end: date, fiscal_year_end: str, year_offset: int) -> list | None:

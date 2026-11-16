@@ -176,7 +176,9 @@ Under `sec-filings/statements/v1/<cik>/` (a foreign filer without a CIK uses its
 
 | Key | Content |
 |---|---|
-| `readings/<accession>.json.gz` | Every column read from that filing, each with its lines, checks and Arelle's verdicts (the readings.jsonl rows of that accession) |
+| `units/<unit>.json.gz` (proposed, s7-incremental) | One read unit: a report, release, regulator year or second look, its columns as read with their checks and Arelle's verdicts, its record and the context it was read in |
+| `units/index.json.gz` (proposed) | Every unit of the company's last stored read: id, kind, reader version, context |
+| `readings/<accession>.json.gz` | Every column read from that filing, each with its lines, checks and Arelle's verdicts (the readings.jsonl rows of that accession); replaced by `units/` once approved |
 | `readings/<source>-<id>.json.gz` | The same for a regulator's form or an archived report (`CVM-ITR-162068-v1`, `DART-20260814002198`, `archive-TSM-6-K-2000-06-30`) |
 | `filings.json.gz` | Every filing considered and what its reading noted |
 | `served.json.gz` | The served statements as written to Quotiva, for bulk downloads and an edge cache |
@@ -185,6 +187,47 @@ Under `sec-filings/statements/v1/<cik>/` (a foreign filer without a CIK uses its
 
 Readings are written once per filing and reader version; a reader change re-writes only the filings its era covers
 (s7-versions). Nothing in R2 is served directly to clients before Phase 8's serving step.
+
+## Incremental reads (s7-incremental)
+
+A company is read again only where something is new. Each source is a **read unit** (`pipeline/units.py`): one EDGAR
+report (10-K, 10-Q, 20-F, 40-F, an XBRL 6-K), one 6-K release, one year of a home regulator's form (CVM ITR 2024,
+DART's half-year report of 2023), or the printed second look at an XBRL filing. A unit keeps:
+
+- its readings exactly as its source gave them, every field, before anything looks across filings;
+- its filing record, and what else its read produced (summary figures, printed signs, the year end it settled on);
+- facts that do not depend on the reader (the report's period on EDGAR, the year naming its XBRL states);
+- the context it was read in: the reader version, the fiscal year end and year naming it was read with, the quarter
+  a release was read as, whether Arelle ran.
+
+A read lists the company's filings as a full read does (about a second), works out each unit's context as a full read
+would, and takes a stored unit only when its context and reader version are the same; any other unit is read again.
+Everything that looks across filings then runs over all units' readings, reused and new alike, from the same stored
+form: release bases, currencies, line fields, period dates, the choice, fourth quarters, splits. So an incremental
+read gives what a full read of the same filings gives; the incremental round proves it company by company.
+
+Read again every time:
+
+- a unit read in another context: a new annual report that moves a year end, a newest XBRL filing that states
+  another year naming, a release now read as another quarter;
+- a filing that could not be read, or that Arelle had no time for;
+- a regulator's this and last year (their files still change as forms arrive and are refiled);
+- Mexico's BMV and Chile's CMF data, and archived reports (each read in seconds);
+- every unit, when the reader version changes. The version is a hash of the package's files, the KPI extractor's
+  modules it reaches and the versions of edgartools, lxml, pdfplumber, Arelle and pyarrow; s7-versions narrows that to
+  the eras a change touches.
+
+Each read writes its units beside its other files (`out/<SYMBOL>/units/<unit>.json.gz` and `units/index.json`).
+`statement-extractor read --previous <an earlier read's folder>` builds on them; `--drop-newest N` sets the newest
+filings' units aside, as if those filings were new (the test). A run given `previous_run` builds each company on
+that run's read; on main its units come from R2 (below, once approved).
+
+Proposed for R2 (needs the owner's approval, with the gate's new `downloads` operation): `units/<unit>.json.gz` and
+`units/index.json.gz` in place of `readings/`. The units hold the same columns, as read rather than settled; the
+settled figures are in `served.json.gz`. One copy, about the size `readings/` takes today. The gate signs read links
+for a company's units for main's statements workflow only, as it signs uploads. On main, a run with `incremental`
+fetches each company's units first (`statement-extractor fetch-units`), reads only what is new, and stores the new
+read's units in their place; a company never stored is read in full.
 
 ## Approvals this design needs
 
