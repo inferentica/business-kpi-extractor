@@ -689,6 +689,19 @@ def test_the_next_years_release_confirms_or_restates_a_flagged_value():
     assert _flagged_fixture(html, {"client": 2499.0, "gaming": 500.0})["gaming"]["validation_status"] == "needs_review"
 
 
+def test_a_restatement_is_read_only_from_the_later_releases_column_for_that_quarter():
+    # Truist's 2025 Q3 total deposits were "restated" from a later supplement's 2Q26 column ($409,379M for $394,907M).
+    html = """<table><tr><td>(Dollars in millions)</td><td>2Q26</td><td>1Q26</td></tr>
+      <tr><td>Client</td><td>3,062</td><td>2,900</td></tr><tr><td>Gaming</td><td>779</td><td>760</td></tr></table>"""
+    settled = _flagged_fixture(html, {"client": 2499.0, "gaming": 700.0})
+    assert settled["gaming"]["validation_status"] == "needs_review" and settled["gaming"]["value"] == 700.0
+    assert settled["gaming"]["notes"][-1] == "checked against later"
+    named = html.replace("1Q26", "2Q25").replace("2,900", "2,499").replace(">760<", ">720<")
+    settled = _flagged_fixture(named, {"client": 2499.0, "gaming": 700.0})
+    assert settled["client"]["validation_status"] == "verified"
+    assert settled["gaming"]["validation_status"] == "verified" and settled["gaming"]["value"] == 720.0
+
+
 def test_a_flagged_value_no_column_of_the_next_years_release_shows_stays_held():
     html = """<table><tr><td></td><td>Three Months Ended June 30, 2026</td><td>Three Months Ended March 31, 2026</td>
       <td>Three Months Ended June 30, 2025</td></tr>

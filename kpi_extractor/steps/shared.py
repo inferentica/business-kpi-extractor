@@ -11,7 +11,9 @@ from ..quality.reasons import has, is_
 from ..quality.stated import _names
 from ..documents.document import Document, clean, parse_number
 from ..readers.extract import column_header
-from ..rules.period import release_unit
+from ..rules.period import DEEP_HEADER_ROWS, column_dates, release_unit
+from ..readers.period_column import _QUARTER_NAME, _QUARTERS
+from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from ..readers.quoted_rows import row_line_others
 from ..sources.base import FilingRef
 
@@ -50,9 +52,12 @@ def _annual_header(header: str) -> bool:
     return bool(_ANNUAL_HEADER.search(header)) and not _QUARTER_HEADER.search(header)
 
 
-def _year_ago_cells(document: Document, locator: dict, value: float) -> list[float]:
+def _year_ago_cells(document: Document, locator: dict, value: float,
+                    period: tuple[date, int | None] | None = None) -> list[float]:
     """The other cells of a value's row in columns headed for the same length of period ("three months ended"), in the
-    value's own units: the year-ago figure (and the quarter before, where a release shows it)."""
+    value's own units: the year-ago figure (and the quarter before, where a release shows it). With `period` (a
+    quarter's end and its number), never a column naming another period: Truist's supplement lists five quarters, and
+    its 2Q26 column is no figure for 3Q25."""
     table = document.tables.get(str(locator.get("table")))
     if table is None and locator.get("quote") and (parsed := parse_number(locator.get("value_text") or "")) and parsed.value:
         # A table row quoted as a line of text: its other figures (the year-ago one among them, where it shows one).
@@ -69,14 +74,27 @@ def _year_ago_cells(document: Document, locator: dict, value: float) -> list[flo
         return []
     first = next((i for i, r in enumerate(table.rows) if r and any(parse_number(c) for c in r[1:])
                   and re.search(r"[A-Za-z]", r[0]) and not all(re.fullmatch(r"(19|20)\d{2}", c.strip()) for c in r[1:] if c)), 1)
-    period = column_header(table, first, col)  # "three months ended @ # #": years blanked, duration kept
-    cells = []
+    span = column_header(table, first, col)  # "three months ended @ # #": years blanked, duration kept
+    cells = {}
     for other in range(len(table.rows[row])):
         text = table.cell(row, other) or ""
         cell = parse_number(text) if other != col and not re.search(r"[A-Za-z]", text) else None  # not the label's "(1)"
-        if cell is not None and column_header(table, first, other) == period:
-            cells.append(cell.value * factor)
-    return cells
+        if cell is not None and column_header(table, first, other) == span:
+            cells[other] = cell.value * factor
+    if period is not None:
+        cells = {other: cell for other, cell in cells.items() if not _another_period(table, first, other, *period)}
+    return list(cells.values())
+
+
+def _another_period(table, row: int, col: int, expected: date, quarter: int | None) -> bool:
+    """Whether a column's header names some other period than the quarter ending `expected`: a date away from its end,
+    or another quarter by number ("2Q26" for a third quarter). A header that cannot tell (a supplement's "4Q20" read
+    as "fourth quarter" without its year) rules nothing out."""
+    dates, _years = column_dates(table, row, col)
+    if dates:
+        return not any(abs((day - expected).days) <= PERIOD_TOLERANCE_DAYS for day in dates)
+    named = {_QUARTERS[match.group(1)] for match in _QUARTER_NAME.finditer(column_header(table, row, col, DEEP_HEADER_ROWS))}
+    return bool(quarter and named and quarter not in named)
 
 
 def _chain_of(day: date) -> int:
