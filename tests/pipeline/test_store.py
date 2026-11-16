@@ -282,6 +282,17 @@ def test_a_re_read_keeps_the_exact_figure_over_its_rounding():
     assert written == {"uncalled": 107_592_000_000.0, "credit": 5.25, "raised_q3": 25_171_000_000.0}
 
 
+def test_an_exact_figure_once_fitted_to_its_series_takes_its_scale_from_the_filings_rounding():
+    # Visa's Q1 2021 processed transactions: 39,213 (millions) was put on its series' scale; the release's "39.2 billion"
+    # states it.
+    store = _store()
+    store.load([_row("processed", value=39_213_000_000.0, notes=["read without its table's scale: 1e+06× to match the series"])])
+    store.write([_row("processed", value=39_200_000_000.0, locator={"block": "A_P2", "value_text": "39.2 billion"})])
+    [kept] = store.reread_disagreements()
+    assert kept["value"] == 39_213_000_000.0
+    assert kept["notes"] == ["its scale as the filing states it rounded: 39.2 billion"]
+
+
 def test_a_found_row_on_a_listed_kpis_cell_is_set_aside_as_its_copy():
     from kpi_extractor.store import cell_copies
     record = lambda key, value, row=16: {"group_key": "kpi_customers", "kpi_key": key, "kpi_label": key, "fiscal_year": "2016",

@@ -57,6 +57,7 @@ STATED = "stated in its filing"
 REVIEWED = "confirmed by review"
 EXPLAINED = "change explained: "
 RESCALED = "to match the series"
+SCALE_BY_ROUNDING = "its scale as the filing states it rounded:"
 EXPLAINED_UNPROVEN = "its change was explained by the AI; its filing does not state it"
 UNNAMED_XBRL = "it equals no XBRL line that names it"
 SIZE_HOLD_LIFTED = "held only for how far it moved or its size, which holds no figure now"
@@ -109,6 +110,7 @@ _REASONS = (
     Reason("checked", ASIDE, "checked against ", "start"),
     Reason("explained", ASIDE, EXPLAINED, "start"),
     Reason("rescaled", ASIDE, RESCALED, "within"),
+    Reason("scale_by_rounding", ASIDE, SCALE_BY_ROUNDING, "start"),
     Reason("size_lifted", ASIDE, SIZE_HOLD_LIFTED),
 )
 REASONS = {reason.code: reason for reason in _REASONS}
