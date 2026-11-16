@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import re
+import time
 from datetime import date
 
 from .. import ai
@@ -31,6 +32,9 @@ _OWN_6K_DOCUMENT = re.compile(r"6-?k", re.I)
 _CELL_KEYS = {"table", "row", "col", "row_label", "context", "scale", "scale_text", "header", "row_numbers", "scale_from",
               "block", "quote", "value_text", "whole_table", "total", "total_row_label"}
 _INVALID_POINTER = re.compile(r"unknown (table|text block)|quote not found|not inside the quote|no number in|combined line|row mismatch")
+# A first reading that found under this share of its prompt in the cache leaves its second reading to wait for it.
+CACHE_MISSED = 0.2
+CACHE_FORMS_S = 10.0
 
 def _explain_pointer(problem: str, document: Document) -> str:
     """Retry feedback that names the fix: a text block cited as a table (ASML's statements are slide images whose
@@ -113,6 +117,7 @@ class AiReading:
         # was found before: given them, it could repeat the first reading's mistake instead of catching it. The hints sit
         # after the document, so the prompt cache the two readings share is unchanged.
         second_text = build((spec if partial else None) if subset is spec else subset, hints=False)
+        self._wait_for_cache(flash)
         pro, pro_read, pro_problems = self._locate(second_text, document, subset, currency, model="flash", thinking_first=True)
         pro_read, pro_problems = self._drop_wrong_columns(pro_read, pro_problems, document, pro, expected)
         pro_read = self._prefer_precise(pro_read, document, subset, pro, currency, expected)
@@ -357,8 +362,25 @@ class AiReading:
             if getattr(answer, "call_id", None):
                 calls = self.__dict__.setdefault("_ai_calls", {})
                 calls[id(parsed)] = (parsed, answer.call_id)  # the answer is kept, so its id is never reused
+            if getattr(answer, "cache_share", None) is not None:
+                self.__dict__.setdefault("_cached", {})[id(parsed)] = (parsed, answer.cache_share, time.monotonic())
             return parsed
         raise last_error
+
+    def _wait_for_cache(self, first) -> None:
+        """A second reading of the same document waits until the first's prompt is in DeepSeek's cache, when the first
+        found none of it there: the cache forms within seconds of a reply. Over 30 days (to 2026-11-16) a second reading
+        asked at once hit 14% of its prompt; 5-8 s after the first reply, 89%; 8-12 s, 99%. Most first readings find
+        the document cached already, and theirs do not wait."""
+        _answer, share, replied = self.__dict__.get("_cached", {}).get(id(first)) or (None, None, None)
+        if share is None or share >= CACHE_MISSED:
+            return
+        if (wait := CACHE_FORMS_S - (time.monotonic() - replied)) > 0:
+            self._sleep(wait)
+            self.result.cache_waits += 1
+
+    def _sleep(self, seconds: float) -> None:
+        time.sleep(seconds)
 
     def _call_of(self, answer) -> str | None:
         """The id of the AI call an answer came from: stored with the figures it located, reviewed or explained."""

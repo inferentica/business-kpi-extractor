@@ -258,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     report["aiCalls"] = sum(result.ai_calls for result in results)
     report["flashOnlyReads"] = sum(result.flash_only_reads for result in results)
     report["secondReads"] = sum(result.second_reads for result in results)
+    report["cacheWaits"] = sum(result.cache_waits for result in results)
     report["secondReadReasons"] = {reason: sum(r.second_read_reasons.get(reason, 0) for r in results)
                                    for reason in sorted({k for r in results for k in r.second_read_reasons})}
     report["replayedReads"] = sum(result.replayed_reads for result in results)
