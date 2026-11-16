@@ -108,6 +108,9 @@ class Document:
     part_urls: dict[str, str] = field(default_factory=dict)
     # Figures on page pictures that one OCR model alone read (documents/image_pages.py): digits -> the model.
     single_reads: dict[str, str] = field(default_factory=dict)
+    # Page pictures no reader saw (past the page cap, or not fetched or recognized): a metric missing from the document
+    # may sit on one, so the filing says so rather than noting it not reported.
+    pages_unread: list[str] = field(default_factory=list)
 
     def url_of(self, item_id: str | None) -> str:
         """The link of the exhibit holding a table or text block, by its id's prefix; the document's own link otherwise."""
@@ -205,6 +208,7 @@ class Document:
         self.order.extend(other.order)
         self.part_urls.update(other.part_urls)
         self.single_reads.update(other.single_reads)
+        self.pages_unread.extend(other.pages_unread)
 
 
 @dataclass(frozen=True)

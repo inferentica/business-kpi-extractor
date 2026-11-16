@@ -103,6 +103,7 @@ class FilingLoading:
                     continue
                 part = parse_document(self._pictures_read(raw, exhibit.url), exhibit.url, prefix=f"{string.ascii_uppercase[index]}_")
                 part.single_reads = self.__dict__.get("_single_reads", {}).get(exhibit.url, {})
+                part.pages_unread = list(self.__dict__.get("_pages_unread", {}).get(exhibit.url, []))
                 parts.append((part, agreed_only(part)))
                 if combined is None:
                     combined = part
@@ -141,11 +142,17 @@ class FilingLoading:
                     return found, purpose == "rich_layout_recognition"
             return "", False
 
+        past_cap = len(pictures) - _MAX_PICTURE_PAGES
         pictures = pictures[:_MAX_PICTURE_PAGES]
         pages, single, totals = read_image_pages([source for _tag, source in pictures], _fetch_page, deepseek,
                                                  lambda data: ocr_words(data, (0, 0), 2), _picture_size, _MIN_PAGE_PIXELS)
         # Figures one model alone read: a value read from one is held until a check proves it (hold_single_reads).
         self.__dict__.setdefault("_single_reads", {})[url] = single
+        name = url.rsplit("/", 1)[-1]
+        self.__dict__.setdefault("_pages_unread", {})[url] = (
+            ([f"{PAGES_UNREAD}{name}: {past_cap} picture pages past the first {_MAX_PICTURE_PAGES}"] if past_cap > 0 else [])
+            + ([f"{PAGES_UNREAD}{name}: {totals['pages not read']} pages could not be fetched or recognized"]
+               if totals.get("pages not read") else []))
         self.log(f"{self.symbol}: picture pages of {url.rsplit('/', 1)[-1]} read by two OCR models: {totals}")
         # Each page's agreed text stands where its picture stood, so the exhibit's own words keep their order.
         for tag, source in pictures:
@@ -167,8 +174,10 @@ class FilingLoading:
         return cache[key]
 
 
-# A deck of picture pages is read to this many pages (Itaú's quarterly book runs to 494 pictures).
+# A deck of picture pages is read to this many pages (Itaú's quarterly book runs to 494 pictures); the filing records
+# the pages left (PAGES_UNREAD).
 _MAX_PICTURE_PAGES = 60
+PAGES_UNREAD = "pages not read: "
 # Pictures smaller than this are logos, icons and bullets, never a page.
 _MIN_PAGE_PIXELS = 400
 

@@ -66,6 +66,14 @@ def spec_kind(spec: Spec, key: str) -> str | None:
     return next((group.kind for group in spec.groups if group.key == key.split(".", 1)[0]), None)
 
 
+def missing_notes(unreported: list[str], unread_pages: list[str]) -> list[str]:
+    """What a filing says of the metrics a reading did not find. One whose picture pages went unread names those pages
+    instead: a metric may sit on one, and "not reported" stops later readings from looking for it."""
+    if unread_pages:
+        return unread_pages[:5]
+    return [_NOT_REPORTED + ", ".join(unreported)] if unreported else []
+
+
 def _unreported(spec: Spec, read: list[ReadValue]) -> list[str]:
     """The listed KPIs a document did not report, apart from breakdowns read as whole tables (their rows vary)."""
     whole = {item.group.key for item in read if item.locator.get("whole_table")}
@@ -183,7 +191,7 @@ class ReleaseFlow:
             reasons = {key: located.missing_reasons.get(key, "unstated") for key in unreported} if how == _READ_BY_AI else {}
             reasons.update(dict.fromkeys(self._left_out_naming(document, spec, list(reasons)), "left_out_names_it"))
             second = getattr(self._local, "second_read", None) if how == _READ_BY_AI else None
-            notes = [how, _RELEASE_READER, *([_NOT_REPORTED + ", ".join(unreported)] if unreported else []),
+            notes = [how, _RELEASE_READER, *missing_notes(unreported, getattr(document, "pages_unread", [])),
                      *([_MISSING_WHY + ", ".join(f"{key}={code}" for key, code in reasons.items())] if reasons else []),
                      *([_SECOND_READ + second] if second else []),
                      *([_GROUPS_NOT_READ + ", ".join(skipped)] if skipped else []), *problems[:20]]

@@ -182,3 +182,39 @@ def test_masking_never_leaves_a_different_number():
     # The hold looks up the whole figure's digits: "R$1,574m" is 1574, not 1.
     item = SimpleNamespace(locator={"table": table.id, "row": 0, "col": 1})
     assert printed_digits(item, document) == "1574"
+
+
+def test_a_comma_and_a_point_agree_only_as_the_pages_own_figures_group_thousands():
+    # The re-check's probe: "1,574" and "1.574" are a thousand times apart. A page whose decimals use a point groups
+    # thousands with a comma, so RapidOCR's "1,574" stands over DeepSeek's "1.574"; with nothing to tell, no agreement.
+    with_decimals = BOX.format(kind="text", x0=0, y0=0, x1=1000, y1=1000, content="Clients 1.574 Margin 12.5% Ratio 3.25")
+    words = [(10, 10, 90, 20, "1,574"), (100, 10, 150, 20, "12.5%"), (200, 10, 250, 20, "3.25")]
+    page, kept, single = agreed_page(with_decimals, words, (1000, 1000))
+    assert kept == 3 and not single and "1,574" in page and "1.574" not in page
+    # Bradesco's own convention: "12,5%" decimals, so the point groups thousands and DeepSeek's "1.574" stands.
+    decimal_comma = BOX.format(kind="text", x0=0, y0=0, x1=1000, y1=1000, content="Clientes 1.574 Margem 12,5% Taxa 3,25")
+    page, kept, _single = agreed_page(decimal_comma, [(10, 10, 90, 20, "1,574"), (100, 10, 150, 20, "12,5%"),
+                                                      (200, 10, 250, 20, "3,25")], (1000, 1000))
+    assert "1.574" in page and kept == 3
+    bare = BOX.format(kind="text", x0=0, y0=0, x1=1000, y1=1000, content="Clients 1.574")
+    _page, kept, single = agreed_page(bare, [(10, 10, 90, 20, "1,574")], (1000, 1000))
+    assert kept == 0 and single == {"1574": DEEPSEEK}
+
+
+def test_a_filings_unread_picture_pages_are_named_and_picked_for_a_re_read():
+    from kpi_extractor.documents.document import Document
+    from kpi_extractor.ops.reread import picked_filings
+    first, second = Document(source_url="https://x/a.htm"), Document(source_url="https://x/b.htm")
+    second.pages_unread = ["pages not read: book.htm: 434 picture pages past the first 60"]
+    first.extend(second)
+    assert first.pages_unread == second.pages_unread
+    filings = {"a": {"notes": ["read by AI", *second.pages_unread]}, "b": {"notes": ["read by AI"]}}
+    assert picked_filings("pages-not-read", {}, filings) == {"a"}
+
+
+def test_a_metric_missing_from_a_filing_with_unread_pages_is_never_noted_not_reported():
+    from kpi_extractor.steps.release_flow import missing_notes
+    unread = ["pages not read: book.htm: 2 pages could not be fetched or recognized"]
+    assert missing_notes(["operating.clients"], unread) == unread
+    assert missing_notes(["operating.clients"], []) == ["not reported: operating.clients"]
+    assert missing_notes([], []) == []
