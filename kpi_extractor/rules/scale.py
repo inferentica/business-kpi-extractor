@@ -367,11 +367,31 @@ def _cell_amount_scale(document: Document, table: Table, row: int, col: int, kpi
     return None, []
 
 
-def passage_count_scale(before: str) -> ScaleFrom:
+def passage_count_scale(before: str, preceding: str = "", kpi_label: str = "") -> ScaleFrom:
     """A count in a passage takes its label's own scale, as a table row's does: "Starlink Subscribers (#, in millions)
-    12.0"."""
-    found = _row_scale_words(before)
-    return ScaleFrom(found[0], "row", found[1]) if found else ScaleFrom(1.0, "units")
+    12.0". A table set as text puts that label in the column heading just before the quote: Visa's "Processed
+    Transactions (millions) Growth 3 Months Ended Dec 31, 2020 39,213" counts 39.2 billion transactions."""
+    if found := _row_scale_words(before):
+        return ScaleFrom(found[0], "row", found[1])
+    if found := _own_heading_scale(preceding[-_HEADING_REACH:], kpi_label):
+        return ScaleFrom(found[0], "heading", found[1])
+    return ScaleFrom(1.0, "units")
+
+
+# How far before a quote its column heading may be: Visa's "Processed Transactions (millions) Growth" is 32 characters.
+_HEADING_REACH = 120
+
+
+def _own_heading_scale(text: str, kpi_label: str) -> tuple[float, str] | None:
+    """The scale printed right after the last place a text names the label itself, with the heading's words; only the
+    label's own heading counts, never another column's ("Payments Transactions (millions)" scales no accounts)."""
+    words = re.findall(r"\w+", kpi_label)
+    if not words:
+        return None
+    named = list(re.finditer(r"\b" + r"\W+".join(map(re.escape, words)) + r"\b\s*", text, re.I))
+    if not named or not (scale := _ROW_SCALE.match(text, named[-1].end())):
+        return None
+    return SCALE_WORDS[(scale.group("word") or scale.group("within")).lower()], f"{named[-1].group(0)}{scale.group(0)}"
 
 
 def passage_amount_scale(document: Document, block: TextBlock, at: int, kpi_label: str, locator,

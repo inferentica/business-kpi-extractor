@@ -93,6 +93,17 @@ def test_a_passage_takes_the_last_heading_before_its_quote():
     assert passage_count_scale("Customers ") == ScaleFrom(1.0, "units")
 
 
+def test_a_count_in_a_table_set_as_text_takes_its_own_column_headings_scale():
+    page = "Period Processed Transactions (millions) Growth "
+    assert passage_count_scale("3 Months Ended Dec 31, 2020 ", page, "Processed Transactions") == \
+        ScaleFrom(1e6, "heading", "Processed Transactions (millions)")
+    # Another column's heading, or the label's far up the page, scales nothing.
+    other = "Payments Transactions (millions) Cash Volume ($ billions) Accounts Cards "
+    assert passage_count_scale("Visa Inc. ", other, "Accounts") == ScaleFrom(1.0, "units")
+    far = "Processed Transactions (millions) " + "x " * 80
+    assert passage_count_scale("39,213 ", far, "Processed Transactions") == ScaleFrom(1.0, "units")
+
+
 def test_a_whole_table_needs_a_stated_or_quoted_scale():
     table = Table(id="T1", context="(in thousands)", rows=[["", "Q3"], ["Americas", "1,200"], ["Europe", "800"]])
     found, problem = reading_scale(document(table), table, 1, 1, reader())
