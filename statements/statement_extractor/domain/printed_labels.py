@@ -28,7 +28,7 @@ class Widened:
 # Copel's "Earnings (loss) per thousand outstanding shares", in reais as printed (served at the thousands scale to round 96).
 PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+|series\s+\W?\w+\W?\s*)?share|per\s+ads|per\s+american\s+depositary\s+(share|receipt)|"
                        r"per\s+(?:one\s+)?thousand\s+(?:\w+\s+){0,2}shares|"
-                       r"^(basic|diluted)\b|earnings?(?:\s*\((?:loss|losses)\))?\s+per|\beps\b", re.I)
+                       r"^(basic|diluted)\b(?!\s+ebitda\b)|earnings?(?:\s*\((?:loss|losses)\))?\s+per|\beps\b", re.I)  # Braskem's "Basic EBITDA"
 
 
 # Operating data a release prints atop its income statement, in units of its own (Coca-Cola FEMSA's "Volume (million
@@ -36,8 +36,13 @@ PER_SHARE = re.compile(r"per\s+(common\s+|ordinary\s+|series\s+\W?\w+\W?\s*)?sha
 OPERATING_DATA = re.compile(r"\((?:in\s+)?(?:millions?|thousands?)\s+(?:of\s+)?(?:unit\s+cases|transactions)\)|\bper\s+unit\s+case\b", re.I)
 
 
-# Not money about shares: FEMSA's 2010 "Income from the exchange of shares with Heineken, net of taxes".
-SHARE_COUNT = re.compile(r"^(?!(?:income|gain|loss|profit|proceeds|net\s+income)\b).*?(?:\bshares\b|weighted[-\s]average)", re.I)
+# A count names what it counts: weighted, average, number, outstanding, in issue, used in, basic or diluted, or its
+# scale. Not money about shares: FEMSA's 2010 "Income from the exchange of shares with Heineken, net of taxes", GDS's
+# "Dividends on cumulative preferred shares", Grupo Financiero's "(-) Repurchase of shares" (round 125's review).
+SHARE_COUNT = re.compile(r"^(?!(?:income|gain|loss|profit|proceeds|net\s+income)\b)(?=.*?(?:\bshares\b|weighted[-\s]average))"
+                         r".*?(?:weight(?:ed)?[-\s]+average|\baverage\b|\bnumber\b|\boutstanding\b|\bin\s+issue\b|\bused\b|\bcomputing\b|"
+                         r"\bdenominator\b|\b(?:basic|diluted|primary|dilution|equivalents?)\b|\bissued\b|\bper\s+ad[rs]\b|"
+                         r"\(\s*'?0{3}'?s?\s*\)|\(?\s*in\s+(?:thousands|millions)\b|\((?:thousands|millions)\b)", re.I)
 
 
 # Lines a statement's checks and later eras pair by: the concept XBRL gives the same line.

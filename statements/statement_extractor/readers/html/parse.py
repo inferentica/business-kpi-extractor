@@ -17,14 +17,18 @@ from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CEL
 
 def _row(cells: list[Cell]) -> Row | None:
     """A row's label (the text before its first figure) and figures. A closing bracket in a cell of its own makes the
-    figure before it negative; "$" and "%" cells are not figures."""
+    figure before it negative; "$" cells are not figures, and a "%" cell makes the figure before it a percentage, left out."""
     label_parts, figures, level = [], {}, None
     last_figure = None
     for cell in cells:
         text = cell.text
         if not text:
             continue
-        if text in (")", ")%") and last_figure is not None:
+        if text in ("%", ")%") and last_figure is not None:
+            del figures[last_figure]  # a percentage in a cell of its own: Andina's "Net margin 7.4 %", no figure
+            last_figure = None
+            continue
+        if text == ")" and last_figure is not None:
             figures[last_figure] = -abs(figures[last_figure])
             continue
         # A currency sign in a cell of its own, KEPCO's won sign printed "W" included: no part of the label.
@@ -49,7 +53,10 @@ def _row(cells: list[Cell]) -> Row | None:
             last_figure = cell.start
             continue
         if figures:
-            continue  # text after the figures (a footnote mark)
+            # Text after the figures (a footnote mark, Volaris's variance ">100"): a "%" after it is that text's, never
+            # the figure's before it (Volaris's Q3 2012 tax of (4) was left out for ">100 %").
+            last_figure = None
+            continue
         if re.fullmatch(r"\d{1,2}(\s*,\s*\d{1,2})*", text):
             continue  # a note reference before or after the label (ASML's and TSMC's "Notes" columns)
         if level is None:

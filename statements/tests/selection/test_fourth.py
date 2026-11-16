@@ -51,3 +51,17 @@ def test_a_year_recast_after_the_nine_months_or_a_misdated_nine_months_derives_n
     three = reading("q3", date(2019, 7, 31), "Q3", "ytd", "income", [("us-gaap_Revenues", "Revenues", 60e9)])
     three.period_start, own_year.period_start = date(2019, 3, 31), date(2018, 9, 30)
     assert derive_fourth_quarters(chosen, [three, own_year], {}) == []
+
+
+def test_a_share_count_by_its_unit_gives_no_fourth_quarter():
+    # Coca-Cola's "Effect of dilutive securities (in shares)": a count by its unit, though its label names no count.
+    nine = reading("q3", date(2019, 10, 28), "Q3", "ytd", "income", [("us-gaap_Revenues", "Net sales", 28_000e6),
+                                                                     ("us-gaap_Dilutive", "Effect of dilutive securities", 30e6)])
+    year = reading("k", date(2020, 2, 24), "FY", "year", "income", [("us-gaap_Revenues", "Net sales", 37_266e6),
+                                                                    ("us-gaap_Dilutive", "Effect of dilutive securities", 30e6)])
+    for item in (nine, year):
+        item.lines[1]["unit"] = "shares"
+    chosen = [{"statement": "income", "fiscal_year": "2019", "fiscal_period": "FY", "duration": "year", "status": "kept",
+               "period_end": "2019-09-28", "basis": "US GAAP", "currency": "USD", "lines": year.lines}]
+    [q4] = derive_fourth_quarters(chosen, [nine, year], {})
+    assert [line["label"] for line in q4["lines"]] == ["Net sales"]
