@@ -57,3 +57,16 @@ def test_the_next_releases_column_for_this_quarter_confirms_a_reading_digit_for_
 def test_two_filings_printing_a_figure_prove_its_row_only_when_it_is_the_kpis_accepted_row():
     # Truist's summary "Loans and leases" ($314.0 billion) is printed again next quarter as surely as the KPI's own row.
     assert not run(supplement("$129,741"), accepted_row="Total deposits")._later_column_matches(reading(129_741e6), date(2023, 3, 31))
+
+
+def test_the_next_releases_figure_proves_a_reading_only_in_the_readings_own_measure():
+    # The re-check's probe: label, period and digits matched, but in any table. An average proves only an average.
+    def own(title: str) -> Document:
+        document = Document(source_url="https://www.sec.gov/q1.htm")
+        document.tables["A_T1"] = Table(id="A_T1", context="", rows=[
+            [title, "", ""], ["($ in millions)", "", ""], ["", "1Q 2023", "4Q 2022"],
+            ["Noninterest-bearing deposits", "$129,741", "$120,827"]])
+        return document
+    q1 = date(2023, 3, 31)
+    assert run(supplement("$129,741"))._later_column_matches(reading(129_741e6), q1, own("AVERAGE DEPOSITS"))
+    assert not run(supplement("$129,741"))._later_column_matches(reading(129_741e6), q1, own("PERIOD-END DEPOSITS"))

@@ -79,8 +79,16 @@ def segment_of(table: Table, names: list[str]) -> str | None:
         # "Results by offering and segment" lists every segment; "Wealth Management segment" is one.
         # The words before "segment" name it; one word is the company's own ("KKR SEGMENT RESULTS": every segment's).
         named = _words(_SEGMENT_WORD.split(heading(table))[0])[-60:]
+        # "Consolidated and Segment Results", "Total Company and Segment Data": the company's figures with its segments'.
+        if not named or named.split()[-1] in _JOINING or _COMPANY_WIDE & set(named.split()):
+            return None
         return named if len(named.split()) >= 2 else None
     return None
+
+
+# Words before "segment" that join it to the company's figures rather than name one segment.
+_JOINING = {"and", "or", "by", "per", "each", "all", "other"}
+_COMPANY_WIDE = {"consolidated", "total", "company", "firmwide"}
 
 
 def names_segment(segment: str, *labels: str) -> bool:
