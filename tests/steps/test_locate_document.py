@@ -1,4 +1,5 @@
 """Locate reads the parts of a long document where each KPI sat last, and the whole of it once that missed one."""
+from datetime import date
 from types import SimpleNamespace
 
 from kpi_extractor.ai import Spec
@@ -57,3 +58,33 @@ def test_a_short_document_a_kpi_never_read_or_a_missed_kpi_sends_the_whole_one()
     narrowed = pipeline._locate_document(doc, SPEC)
     pipeline._whole_documents.add(str(id(doc)))  # what _read_ai does once the narrowed reading missed a KPI
     assert pipeline._locate_document(doc, SPEC) != narrowed and "Other line 5" in pipeline._locate_document(doc, SPEC)
+
+
+def test_a_metric_a_narrowed_reading_missed_is_read_again_from_the_whole_document():
+    # The re-check's probe: underwriting moved more than a table from its last place, Flash's narrowed reading missed it,
+    # and advisory confirmed on its own: the reading stood and underwriting was noted not reported. Now its group is read
+    # again by the second reader, from the whole document.
+    from kpi_extractor.ai import Located
+    from kpi_extractor.readers.extract import ReadValue
+    doc = supplement()
+    pipeline = run([("advisory", "Advisory"), ("underwriting", "Underwriting")])
+    group = SPEC.groups[0]
+    advisory = ReadValue(group, group.kpis[0], 771e6, "USD", {"table": "A_T60", "row": 1, "col": 1})
+    underwriting = ReadValue(group, group.kpis[1], 692e6, "USD", {"table": "A_T60", "row": 2, "col": 1})
+    sent = []
+
+    def locate(text, document, spec, currency, model, thinking_first):
+        sent.append(pipeline._locate_document(document, spec))
+        return Located(period_end="2026-12-31"), [advisory, underwriting] if thinking_first else [advisory], []
+
+    pipeline._locate = locate
+    pipeline._why_not_alone = lambda *_: None  # the narrowed reading passes every check
+    pipeline._confirmed_groups = lambda *_: {"fees"}
+    pipeline._drop_wrong_columns = lambda read, problems, *_: (read, problems)
+    pipeline._prefer_precise = lambda read, *_: read
+    pipeline._settle_by_checks = lambda agreed, disputed, _expected: (agreed.extend(b for _a, b in disputed.values()), disputed.clear())
+    read, _problems, _located = pipeline._read_ai(lambda *_a, **_k: pipeline._locate_document(doc, SPEC), doc, SPEC,
+                                                  date(2026, 12, 31), None, "USD")
+    assert {item.kpi.key for item in read} == {"advisory", "underwriting"}
+    assert "Other line 5" not in sent[0] and "Other line 5" in sent[1]  # the second reading had the whole document
+    assert pipeline.result.second_read_reasons == {"narrowed_missed": 1}

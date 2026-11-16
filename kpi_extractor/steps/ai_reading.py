@@ -87,12 +87,16 @@ class AiReading:
         flash_read = self._prefer_precise(flash_read, document, spec, flash, currency, expected)
         self._local.second_read = None
         why = self._why_not_alone(flash, flash_read, spec, expected, document)
-        if why is None or (
-                not flash.tables and not flash.values and self._kind_reports_nothing(document, expected, version)):
+        # A narrowed document may have lost a metric that moved more than a table from its last place: one the reading
+        # missed is never noted "not reported" on it, but read again from the whole document with its group.
+        missed = self._missed_in_narrowed(document, flash_read, spec)
+        if not missed and (why is None or (
+                not flash.tables and not flash.values and self._kind_reports_nothing(document, expected, version))):
             self.result.flash_only_reads += 1
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
+        why = why or "narrowed_missed"
         # Groups Flash's reading confirms on their own stand; the reasoning reader reads only the rest of the list.
-        confirmed = self._confirmed_groups(flash, flash_read, spec, expected, document)
+        confirmed = self._confirmed_groups(flash, flash_read, spec, expected, document) - {key.split(".", 1)[0] for key in missed}
         open_groups = [group for group in spec.groups if group.key not in confirmed]
         kept = [item for item in flash_read if item.group.key in confirmed]
         if not open_groups:
@@ -100,8 +104,7 @@ class AiReading:
             return flash_read, [f"flash {problem}" for problem in flash_problems], flash
         subset = spec if not confirmed else Spec.model_validate({"groups": [g.model_dump() for g in open_groups],
                                                                  "names": {}})
-        if str(id(document)) in self._narrowed and any(key not in {f"{i.group.key}.{i.kpi.key}" for i in flash_read}
-                                                       for key in self._asked_keys(subset)):
+        if missed:
             self._whole_documents.add(str(id(document)))  # a KPI the narrowed reading missed: the second reads it all
         self.result.second_reads += 1
         self._local.second_read = why
