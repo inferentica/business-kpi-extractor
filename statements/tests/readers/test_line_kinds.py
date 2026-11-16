@@ -146,6 +146,9 @@ def test_share_counts_name_what_they_count_and_basic_ebitda_is_money():
                   "Number of shares", "Shares per ADR"):
         assert SHARE_COUNT.search(count), count
     assert not PER_SHARE.search("Basic EBITDA") and PER_SHARE.search("Basic") and PER_SHARE.search("Diluted earnings")
+    # A figure a share is no count, its count word (basic) beside it or not: Microchip's EPS were multiplied by its
+    # 2021 split as if they were counts in round 125.
+    assert not SHARE_COUNT.search("Basic net income per common share attributable to Microchip Technology")
 
 
 # Andina's Q3 2026 release (0001104659-26-119205): a margin printed with "%" in a cell of its own, stored as money.

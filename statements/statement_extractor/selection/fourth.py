@@ -31,8 +31,10 @@ def _keyed(reading, keys: dict) -> dict[tuple, list]:
 
 
 def _additive(line: dict) -> bool:
-    label = str(line.get("label") or "")
-    return not (PER_SHARE.search(label) or SHARE_COUNT.search(label))
+    """A line a year less its nine months gives the fourth quarter of: never a figure a share or a share count, by its
+    unit (Coca-Cola's "Effect of dilutive securities (in shares)", a count its label alone does not name) or label."""
+    label, unit = str(line.get("label") or ""), str(line.get("unit") or "")
+    return not (unit == "shares" or unit.endswith("/share") or PER_SHARE.search(label) or SHARE_COUNT.search(label))
 
 
 def _agree(left, right, keys: dict) -> bool:

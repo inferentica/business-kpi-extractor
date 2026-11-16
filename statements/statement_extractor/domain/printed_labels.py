@@ -39,7 +39,7 @@ OPERATING_DATA = re.compile(r"\((?:in\s+)?(?:millions?|thousands?)\s+(?:of\s+)?(
 # A count names what it counts: weighted, average, number, outstanding, in issue, used in, basic or diluted, or its
 # scale. Not money about shares: FEMSA's 2010 "Income from the exchange of shares with Heineken, net of taxes", GDS's
 # "Dividends on cumulative preferred shares", Grupo Financiero's "(-) Repurchase of shares" (round 125's review).
-SHARE_COUNT = re.compile(r"^(?!(?:income|gain|loss|profit|proceeds|net\s+income)\b)(?=.*?(?:\bshares?\b|weighted[-\s]average))"
+SHARE_COUNT = re.compile(r"^(?!(?:income|gain|loss|profit|proceeds|net\s+income)\b)(?=.*?(?:\bshares\b|weighted[-\s]average))"
                          r".*?(?:weight(?:ed)?[-\s]+average|\baverage\b|\bnumber\b|\boutstanding\b|\bin\s+issue\b|\bused\b|\bcomputing\b|"
                          r"\bdenominator\b|\b(?:basic|diluted|primary|dilution|equivalents?)\b|\bissued\b|\bper\s+ad[rs]\b|"
                          r"\(\s*'?0{3}'?s?\s*\)|\(?\s*in\s+(?:thousands|millions)\b|\((?:thousands|millions)\b)", re.I)
