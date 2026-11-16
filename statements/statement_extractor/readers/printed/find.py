@@ -66,9 +66,9 @@ _RUNNING_LINK = re.compile(r"\b(index\s+to\s+(consolidated\s+)?financial\s+state
 # IFRS 17 2022 movements | Other changes | Restated".
 _NOT_A_PERIOD = re.compile(r"^(reported|operating|adjustments?|special|as\s+adjusted)\b|"
                            r"\b(adjustments|movements|impact\s+of|other\s+changes|as\s+previously\s+reported)\b", re.I)
-# Or its steps wrapped into its first rows, two to a row (Chase's 2000 10-K: "(in millions, except Reported Credit Special
-# Operating …", its adjustment columns once kept as years); a cash flow's "OPERATING ACTIVITIES" names none.
-_STEPS = re.compile(r"\b(reported|special|adjust\w*|basis)\b", re.I)
+# Or its steps wrapped into its first rows (Chase's 2000 10-K: "(in millions, except Reported Credit Special Operating …",
+# its adjustment columns once kept as years); restated columns "as adjusted" are a statement's own (Sabesp, Ambev).
+_STEPS = re.compile(r"\breported\b.*\bspecial\b|\boperating\s+basis\b", re.I)
 
 
 # Statements of the set that are none of the three: a table under one of these titles never continues another.
@@ -128,7 +128,7 @@ def find_statements(all_tables: list[Table], release: bool = False) -> list[tupl
                 or len([r for r in table.rows if r.figures]) < 4:
             continue
         if any(_NOT_A_PERIOD.search(cell.text) for cells in table.header for cell in cells if cell.start > 0) or \
-                any(len(_STEPS.findall(row.label)) >= 2 for row in _leading(table)):
+                any(_STEPS.search(row.label) for row in _leading(table)):
             continue
         if sum(1 for row in table.rows if row.figures and number(row.label)) >= 3:  # not a scale's "( 000)" (Ross)
             # Its labels are figures: the table lost its label column (Petrobras's 2005 6-K runs its annual statement

@@ -221,3 +221,8 @@ def test_a_reconciliation_whose_steps_wrap_into_its_first_rows_is_no_statement()
     readings, _ = read_text(CHASE_STEPS, accession="a", form="10-K", filed=date(2001, 3, 22),
                             document_end=date(2000, 12, 31), fiscal_year_end="1231", year_offset=0)
     assert not [reading for reading in readings if reading.statement == "income"]
+    # Restated columns are a statement's own, round 130: Sabesp's 2008 20-F, Ambev's 2014, Welltower's 2009 10-K, GDS's.
+    from statement_extractor.readers.printed.find import _STEPS
+    for restated in ("(As adjusted -Note 2(c)) (As adjusted -Note 2(c))", "Adjusted Previously reported Adjusted Previously reported",
+                     "Reported Adjustment Adjustment Adjusted", "Adjusted(1) Adjusted", "OPERATING ACTIVITIES"):
+        assert not _STEPS.search(restated), restated
