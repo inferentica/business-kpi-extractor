@@ -154,3 +154,31 @@ def test_code_readers_see_no_figure_one_model_alone_read():
     assert "3,155" not in masked.render() and "21,932,490" in document.render()  # the AI's reading still sees it
     plain = parse_document("<table><tr><td>Revenue</td><td>512</td></tr></table>", "https://x/z.htm")
     assert agreed_only(plain) is plain
+
+
+def test_a_figure_with_its_scale_glued_on_is_compared_whole():
+    # The re-check's probe: "R$1,514m" and "R$1,574m" once agreed, both read as their leading "1".
+    deepseek = BOX.format(kind="text", x0=0, y0=0, x1=1000, y1=1000, content="Net revenue R$1,514m, EBITDA 12bn")
+    _page, kept, single = agreed_page(deepseek, [(10, 10, 90, 20, "R$1,574m"), (100, 10, 140, 20, "12 BN")], (1000, 1000))
+    assert kept == 1 and single == {"1514": DEEPSEEK}
+    # Quarter and year labels stay labels.
+    _page, kept, single = agreed_page(BOX.format(kind="text", x0=0, y0=0, x1=1000, y1=1000, content="3Q26 FY25 1H25 4T25"),
+                                      [], (1000, 1000))
+    assert kept == 0 and not single
+
+
+def test_masking_never_leaves_a_different_number():
+    from kpi_extractor.documents.image_pages import UNREAD, agreed_only, printed_digits
+    document = parse_document("<html><body><table><tr><td>Net revenue</td><td>R$1,574m</td><td>1 574</td><td>2 315</td></tr>"
+                              "</table></body></html>", "https://x/y.htm")
+    # A "1" one model alone read elsewhere: "1,574m" is another figure, and "1 574" is masked whole, never "[?] 574".
+    document.single_reads = {"1": DEEPSEEK, "315": LOCAL}
+    table = next(iter(agreed_only(document).tables.values()))
+    assert table.rows[0][1:] == ["R$1,574m", UNREAD, UNREAD]
+    assert all(parse_number(cell) is None for cell in table.rows[0][2:])
+    document.single_reads = {"1574": DEEPSEEK}
+    table = next(iter(agreed_only(document).tables.values()))
+    assert table.rows[0][1] == f"R${UNREAD}" and parse_number(table.rows[0][1]) is None
+    # The hold looks up the whole figure's digits: "R$1,574m" is 1574, not 1.
+    item = SimpleNamespace(locator={"table": table.id, "row": 0, "col": 1})
+    assert printed_digits(item, document) == "1574"
