@@ -18,7 +18,7 @@ from datetime import date, timedelta
 from ...checks.printed import balance_check, cash_check, income_check, total_check
 from ...domain.model import Reading
 from ...domain.periods import label_period
-from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA, PER_SHARE, SHARE_COUNT
+from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA
 from .company_title import titled_company
 from .currency import column_currencies, reporting_currency, split_by_sign, translations
 from .ranges import without_repeats
@@ -29,6 +29,7 @@ from .scales import line_scale, share_scale, statement_scale, states_two
 from ...domain.line_fields import printed_fields
 from .scope import statement_scope
 from .side_by_side import column_scopes
+from .line_kind import COUNTS, SHARE_HEADING, continued_count, line_kind
 from .tables import Table, figure_columns, statement_rows
 from .titled import titled_notes
 
@@ -147,8 +148,13 @@ _CAPTION = re.compile(r"\(\s*(?:[A-Za-z]+\s+){0,2}(?:in|amounts\s+in|dollars\s+i
                       r"^\(?unaudited\)?$|^amounts\s+expressed\s+in\s+(thousands|millions|billions)\b|"  # Coca-Cola FEMSA's 20-Fs
                       # A caption's second line: TSMC's "Except for Per Share Amounts and Shares Outstanding)".
                       r"^\(?\s*except\s+(for\s+)?(per\s+share|share|earnings\s+per)|"
-                      # Ross's "($000, except per share data)"; Woori's 2010 "per common share data) per common share data)".
-                      r"^(?:(?:income\s+)?per\s+(?:common\s+)?share\s+data\)\s*)+$", re.I)
+                      # A caption's wrapped tail: Ross's "($000, except per share data)"; Woori's 2010 "per common share data)
+                      # per common share data)"; Oshkosh's "(In thousands, except" / "per share amounts)", which as a heading
+                      # made Net sales a figure a share (round 125's review).
+                      r"^(?:(?:and\s+|except\s+(?:for\s+)?)?(?:shares?\s+and\s+)?(?:income\s+)?per[-\s](?:common\s+)?share\s+"
+                      r"(?:data|amounts?|figures|information)\)\s*)+$|"
+                      # Embraer's 2003 releases: "in thousands of U.S. dollars except per share data", no bracket.
+                      r"^in\s+(?:thousands|millions|billions)\s+of\b[^()]*\bexcept\s+(?:for\s+)?per\s+share\b", re.I)
 
 
 # A cash flow section's heading: "Cash flows from operating activities".
@@ -179,11 +185,7 @@ def _caption_only(label: str) -> bool:
     Apple's "Shares used in computing earnings (loss) per share (in thousands):", whose "Basic" and "Diluted" below
     are share counts in thousands, not figures a share."""
     match = _CAPTION.search(label)
-    return bool(match) and not _SHARE_HEADING.search(label[:match.start()])
-
-
-_SHARE_CLASS = re.compile(r"^(ordinary|common|preferred|class\s+\S+)\b.*\bshares?$", re.I)
-_SHARE_HEADING = re.compile(r"\bshares\b|weighted[-\s]average|\baverage\s+(number|common)", re.I)
+    return bool(match) and not SHARE_HEADING.search(label[:match.start()])
 
 
 def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
@@ -193,6 +195,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
     printed: list[tuple[str, int, float | None]] = []  # label, level, figure as printed (None: a heading)
     named = unlabelled_totals([table for table, _column, _columns in layout]) if kind == "balance" else {}
     heading, section, section_total = "", None, None
+    counted_before = False  # the last figure row was a share count: BCBP's "…shares outstanding- basic" / "diluted"
     for table, column, columns in layout:
         base = min((row.level for row in table.rows if row.label), default=0)
         last_heading = None
@@ -202,13 +205,21 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
             # A heading wrapped onto a second line: Apple's "Shares used in computing earnings (loss)" / "per common
             # share (in thousands):".
             # Copel's "Basic and diluted net earning per share attributed" / "To parent company shareholders - in reais".
+            # A share count's heading over two or three rows: Century Aluminum's "WEIGHTED AVERAGE COMMON SHARES" /
+            # "OUTSTANDING", Embraer's "WEIGHT AVERAGE SHARES" / "(thousands of shares)" / "Basic".
             label = f"{last_heading} {row.label}" if not row.figures and last_heading and (row.label[:1].islower() or re.search(
-                r"\b(attributed|attributable|of|to|per|for)$", last_heading, re.I)) else row.label
+                r"\b(attributed|attributable|of|to|per|for)$", last_heading, re.I) or COUNTS.search(last_heading)) else row.label
+            # A figure row that ends a label wrapped over the headings above it: Apple's "Common and common equivalent" /
+            # "shares used in the" / "calculations of earnings" / "(loss) per share (in thousands)  123,735".
+            wrapped = f"{last_heading} {row.label}" if row.figures and last_heading and (
+                row.label[:1].islower() or row.label.startswith("(")) else row.label
             last_heading = None
             if not row.figures and (any(pattern.search(label) for _, pattern in TITLES) or _caption_only(label)):
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line
             if not row.figures:
+                label = continued_count(label, heading, counted_before)
                 heading = last_heading = label
+                counted_before = False
                 opened = _SECTION_HEADING.match(row.label)
                 if opened or CASH_HEADING.match(row.label):
                     _close_section(printed, section, section_total)
@@ -223,19 +234,11 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 # … Forward Looking Statements … 2026" (and the slide's page number). Not a line.
                 continue
             # A balance sheet has no per-share lines; "per share" there is a par value in a stock line's label (Kroger's
-            # "Common stock, $1 par per share … 955").
-            # A line under a per-share heading is per share too: Coca-Cola's "INCOME PER SHARE" / "Before change in
-            # accounting principle  $ .55".
-            per_share = kind != "balance" and bool(PER_SHARE.search(row.label) or kind == "income" and row.figures and PER_SHARE.search(
-                heading) and (not _SHARE_HEADING.search(row.label) or _SHARE_CLASS.match(row.label)))
-            under_shares = kind == "income" and bool(_SHARE_HEADING.search(heading)) and \
-                re.match(r"^(basic|diluted|primary|fully\s+diluted|assuming\s+dilution)\b", row.label, re.I) is not None
-            counted = re.match(r"^(shares|weighted|average|number\s+of\s+shares)\b", row.label, re.I) is not None
-            # A share class under a per-share heading is that class's amount per share (Copel's "Class \"B\" Preferred shares").
-            if not (per_share and _SHARE_CLASS.match(row.label)) and (under_shares or counted or re.search(r"\bshares\b", row.label, re.I) and not re.search(
-                    r"per\s+(common\s+)?share\b|earnings|income|loss", row.label, re.I)):
-                per_share = False  # TSMC's "BASIC WEIGHTED AVERAGE SHARES OUTSTANDING (THOUSANDS)"
-            shares = not per_share and kind == "income" and (under_shares or counted or bool(SHARE_COUNT.search(row.label)))
+            # "Common stock, $1 par per share … 955"). How a line under a per-share or share-count heading reads is
+            # line_kind's (Coca-Cola's "INCOME PER SHARE" / "Before change in accounting principle  $ .55").
+            per_share, shares, under_shares, heading = line_kind(kind, row.label, wrapped, heading, bool(row.figures), counted_before)
+            if row.figures:
+                counted_before = shares
             factor = 1.0 if per_share else (line_scale(row.label, heading if under_shares else "") or shares_scale) if shares else scale
             amount = None if value is None else value * factor
             lines.append({"line": len(lines), "concept": _concept(row.label, kind), "label": row.label[:300],
