@@ -12,7 +12,7 @@ from ..documents.document import _DECLARED_CURRENCIES, Document, Table, TextBloc
 from ..xbrl import member_key, remove_subtotals
 from ..rules.scale import (  # noqa: F401 - re-exported for callers of extract
     _ai_scale_notes, _ANY_SCALE, _BARE_SCALE, _COLUMN_SCALE, _column_scale, _PER_UNIT,
-    _PER_UNIT_KPI, _preceding_scale, _ROW_SCALE, _row_scale, _ROW_SCALE_SHORT, _SCALE_OF,
+    _PER_UNIT_KPI, _preceding_scale, _ROW_SCALE, _row_scale, _ROW_SCALE_SHORT, _SCALE_OF, row_amount_words,
     _row_scale_words, _scale_quoted, _scale_word, _SCALE_WORDS_OF, SCALE_NOT_STATED, ScaleFrom, cell_amount_scale, cell_count_scale,
     number_scale, passage_amount_scale, passage_count_scale, reading_scale)
 from ..rules.table import (  # noqa: F401 - re-exported for callers of extract
@@ -273,15 +273,16 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
 
     def read_row(index: int, source: Table | None = None, col: int | None = None) -> tuple[str, float, str] | None:
         source, col = source or table, locator.col if col is None else col
-        text = source.cell(index, col)
-        parsed = parse_number(text)
+        parsed = parse_number(text := source.cell(index, col))
         if parsed is None or index >= len(source.rows):
             return None
         label = _row_label(source.rows[index], col)
         if unit == "percent" and not parsed.percent and "%" not in header and "percent" not in header.lower():
             raise LocateError(f"{text!r} in row {index} is not a percentage")
-        own = _row_scale(" ".join(source.rows[index])) if unit == "currency" else None  # a row's own "(in billions)" wins
-        value = parsed.value if parsed.scale_word or unit == "percent" else parsed.value * (own or scale)
+        own = row_amount_words(source, " ".join(source.rows[index])) if unit == "currency" else None  # its own "(in billions)" wins
+        if own is False and not parsed.scale_word:  # "Revenue (U.S. dollars)" under "(in millions)": either may be meant
+            raise LocateError(f"row {index} names its currency alone; nothing states its scale")
+        value = parsed.value if parsed.scale_word or unit == "percent" else parsed.value * (own[0] if own else scale)
         return label, value, text
 
     parts: dict[str, tuple[str, float, int]] = {}
@@ -381,7 +382,7 @@ def _read_table(document: Document, locator: TableLocator, group: GroupSpec, def
             if parsed_cell is not None and parsed_cell.scale_word:
                 row_from = number_scale(parsed_cell.scale_word)
             else:
-                own = _row_scale_words(row_text)  # a row's own "(in billions)" wins, as read_row reads it
+                own = row_amount_words(row_table, row_text) if row_table is not None else _row_scale_words(row_text)  # as read_row
                 row_from = ScaleFrom(own[0], "row", own[1]) if own else reading_from
             record["scale_from"] = row_from.record()
         values.append(ReadValue(group, _listed_kpi(group, label) or kept_key(group, locator, label)

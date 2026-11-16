@@ -16,7 +16,7 @@ from ..quality.checks import PERIOD_TOLERANCE_DAYS
 from ..readers.period_column import _OTHER_MEASURE, _spans, comparable_header
 from .numbers import same_figure
 from .period import DEEP_HEADER_ROWS, column_dates, column_header
-from .scale import _row_scale_words, document_scale_words, table_scale_words
+from .scale import _row_scale_words, currency_alone, document_scale_words, table_scale_words
 from .segment_tables import _heading_line, _label_key, segment_of
 from .table import _heading
 
@@ -163,6 +163,8 @@ def names_quarter(table: Table, col: int, expected: date, quarter: int | None, f
 def _cell_scale(document: Document, table: Table, row: int, number) -> float | None:
     if number.scale_word is not None:
         return 1.0
+    if (alone := currency_alone(table, table.rows[row][0] if table.rows[row] else "")) is not None:
+        return alone[0] if alone else None  # a row naming its currency alone, in units only where the caption says so
     found = _row_scale_words(table.rows[row][0] if table.rows[row] else "") or table_scale_words(table) \
         or document_scale_words(document)
     return found[0] if found else None

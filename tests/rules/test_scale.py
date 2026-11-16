@@ -63,6 +63,19 @@ def test_a_row_naming_its_currency_alone_is_in_units_under_a_table_in_millions()
     assert cell_amount_scale(doc, table, 3, 1, "Total revenues", reader(), 16635)[0].factor == 1e6
 
 
+def test_a_row_naming_its_currency_alone_states_no_scale_unless_the_caption_lets_it():
+    # The re-check's probe: "Revenue (U.S. dollars) 1,340" in a table "(in millions)" was read in units. The word names
+    # a currency, not a scale, and the caption makes no exception: held, never served on either scale.
+    from kpi_extractor.rules.scale import SCALE_NOT_STATED, currency_alone
+    table = Table(id="T1", context="(in millions)", rows=[["", "Q3 2026"], ["Revenue (U.S. dollars)", "1,340"],
+                                                          ["Revenue (in billions)", "1.3"]])
+    own, notes = cell_amount_scale(document(table), table, 1, 1, "Revenue", reader(), 1340)
+    assert own.source == "reader" and notes == [SCALE_NOT_STATED]
+    assert currency_alone(table, "Revenue (in billions)") is None and currency_alone(table, "Revenue (U.S. dollars)") is False
+    # A per-unit KPI keeps its units whatever its row says.
+    assert cell_amount_scale(document(table), table, 1, 1, "Revenue per member", reader(), 1340)[0].source == "per-unit"
+
+
 def test_a_count_takes_no_table_caption():
     table = Table(id="T1", context="(in millions, except employee data)", rows=[["", "Q3"], ["Employees", "12,400"],
                                                                                  ["Paid memberships (in millions)", "301"]])

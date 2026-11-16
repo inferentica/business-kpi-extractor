@@ -387,3 +387,15 @@ def test_a_row_the_list_names_as_a_line_is_never_dropped_as_a_subtotal_by_chance
     read = {item.kpi.key: item.value / 1e6 for item in values if not item.is_total}
     assert problems == [] and set(read) == {key for key, _label in lines} | {"noninterest_revenue", "net_interest_income"}
     assert read["principal_transactions"] == 6_790 and read["noninterest_revenue"] == 18_852 and read["net_interest_income"] == 23_082
+
+
+def test_a_whole_table_row_naming_its_currency_alone_is_never_read_on_a_guessed_scale():
+    # "Other (U.S. dollars)" under "(in millions)": the row names a currency, not a scale, so the reading stops.
+    html = REPORT.replace("<tr><td>Others</td>", "<tr><td>Others (U.S. dollars)</td>").replace(
+        "(Amounts in Thousands of New Taiwan Dollars)", "(in millions)")
+    document = parse_document(html, "https://www.sec.gov/x.htm")
+    table = next(iter(document.tables))
+    located = ai.Located.model_validate({"period_end": "2026-06-30", "tables": [
+        {"group": "technology", "table": table, "col": 1, "first_row": 2, "last_row": 6, "total_row": 7}]})
+    values, problems = read_values(document, SPEC, located, "TWD")
+    assert not values and any("names its currency alone" in problem for problem in problems)
