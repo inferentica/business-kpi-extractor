@@ -122,6 +122,8 @@ Weighted average number of common shares
 outstanding- basic                                127,989           124,532
 diluted                                           139,839           124,532
 Basic weighted average common                     127,989           124,532
+Basic and diluted earnings per weighted-average
+of common and preferred share                     $  0.36           $ (0.56)
 </TABLE>
 """
 
@@ -135,6 +137,9 @@ def test_count_labels_wrapped_or_named_by_their_words_are_counts():
     counts = [value for label, kind, value in kinds if kind == "shares"]
     assert counts == [139_839_000, 127_989_000, 139_839_000, 127_989_000], kinds
     assert not [label for label, kind, value in kinds if kind == "per_share" and value > 1]
+    # Petrobras's: what it is a share of comes before its count words.
+    assert ("of common and preferred share", "per_share", 0.36) in kinds or any(
+        kind == "per_share" and value == 0.36 for label, kind, value in kinds), kinds
 
 
 def test_share_counts_name_what_they_count_and_basic_ebitda_is_money():
@@ -161,6 +166,7 @@ MARGIN = """<html><body>
 <tr><td>Gross margin</td><td>39.5</td><td>%</td><td>40.1</td><td>%</td></tr>
 <tr><td>Net income</td><td>46,820</td><td></td><td>44,260</td><td></td></tr>
 <tr><td>Net margin</td><td>7.4</td><td>%</td><td>7.4</td><td>%</td></tr>
+<tr><td>Income tax</td><td>(4</td><td>)</td><td>(3</td><td>)</td><td>&gt;100</td><td>%</td></tr>
 </table></body></html>"""
 
 
@@ -170,3 +176,13 @@ def test_a_figure_before_a_percent_cell_is_no_figure():
     by_label = {row.label: row.figures for row in rows if row.label}
     assert len(by_label["Net sales"]) == 2
     assert by_label["Gross margin"] == {} and by_label["Net margin"] == {}
+    # Volaris's Q3 2012 release: a "%" after a variance printed as text is no reason to drop the figure before it.
+    assert sorted(by_label["Income tax"].values()) == [-4.0, -3.0]
+
+
+def test_a_scale_caption_with_its_audit_status_first_is_a_caption():
+    from statement_extractor.readers.printed.captions import caption_only as _caption_only
+    # ASML's Q3 2020 6-K: once served with net system sales of 2,325.6 a share.
+    assert _caption_only("(unaudited, in millions EUR, except per share data)")
+    assert _caption_only("(In thousands, except per share amounts)") and _caption_only("per share amounts)")
+    assert not _caption_only("Shares used in computing earnings (loss) per share (in thousands):")

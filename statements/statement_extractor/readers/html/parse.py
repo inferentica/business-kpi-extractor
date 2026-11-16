@@ -53,7 +53,10 @@ def _row(cells: list[Cell]) -> Row | None:
             last_figure = cell.start
             continue
         if figures:
-            continue  # text after the figures (a footnote mark)
+            # Text after the figures (a footnote mark, Volaris's variance ">100"): a "%" after it is that text's, never
+            # the figure's before it (Volaris's Q3 2012 tax of (4) was left out for ">100 %").
+            last_figure = None
+            continue
         if re.fullmatch(r"\d{1,2}(\s*,\s*\d{1,2})*", text):
             continue  # a note reference before or after the label (ASML's and TSMC's "Notes" columns)
         if level is None:

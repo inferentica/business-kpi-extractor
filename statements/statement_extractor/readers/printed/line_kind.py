@@ -54,7 +54,12 @@ def line_kind(kind: str, label: str, wrapped: str, heading: str, has_figures: bo
         r"^(basic|diluted|primary|fully\s+diluted|assuming\s+dilution)\b", label, re.I) is not None and not re.search(
         r"per\s+(common\s+)?share|earnings|income|loss", label, re.I) or bool(COUNTS.search(heading)) and re.match(
         r"^(common|preferred|ordinary|class)\b", label, re.I) is not None or counted_before and _BARE_BASIS.fullmatch(label) is not None)
-    counted = re.match(r"^(shares|weighted|average|number\s+of\s+shares)\b", label, re.I) is not None or bool(COUNTS.search(wrapped))
+    # Count words name a count only before any "per": Apple's "…shares used in the calculations of earnings (loss) per
+    # share" is a count, Petrobras's "Basic and diluted earnings per weighted-average of common and preferred share"
+    # and Ultrapar's "EARNINGS PER SHARE (BASED ON ANNUAL WEIGHTED AVERAGE OF SHARES…)" are figures a share.
+    words, per = COUNTS.search(wrapped), re.search(r"\bper\b", wrapped, re.I)
+    counted = re.match(r"^(shares|weighted|average|number\s+of\s+shares)\b", label, re.I) is not None or bool(
+        words and (per is None or words.start() < per.start()))
     # A share class under a per-share heading is that class's amount per share (Copel's "Class \"B\" Preferred shares").
     if not (per_share and _SHARE_CLASS.match(label) and not under_shares) and (
             under_shares or counted or re.search(r"\bshares\b", label, re.I) and not re.search(

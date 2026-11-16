@@ -29,7 +29,8 @@ from .scales import line_scale, share_scale, statement_scale, states_two
 from ...domain.line_fields import printed_fields
 from .scope import statement_scope
 from .side_by_side import column_scopes
-from .line_kind import COUNTS, SHARE_HEADING, continued_count, line_kind
+from .captions import caption_only as _caption_only
+from .line_kind import COUNTS, continued_count, line_kind
 from .tables import Table, figure_columns, statement_rows
 from .titled import titled_notes
 
@@ -141,22 +142,6 @@ def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> flo
     return None
 
 
-# A row that only states the scale or the audit status: "Notes (in thousands, except per share data) EUR EUR".
-# Woori's "(Korean Won in millions, except per share data)": the currency named before its scale.
-_CAPTION = re.compile(r"\(\s*(?:[A-Za-z]+\s+){0,2}(?:in|amounts\s+in|dollars\s+in|expressed\s+in)\s+(?:[A-Z]{2,3}\s+)?(thousands|millions|billions)\b|"
-                      r"^\(\s*\$?\s*000(?:,000)?(?:'?s)?(?:\s+omitted)?\s*(?:[,)]|except\b)|\(\s*\$\s*in\s+(thousands|millions|billions)\b|"
-                      r"^\(?unaudited\)?$|^amounts\s+expressed\s+in\s+(thousands|millions|billions)\b|"  # Coca-Cola FEMSA's 20-Fs
-                      # A caption's second line: TSMC's "Except for Per Share Amounts and Shares Outstanding)".
-                      r"^\(?\s*except\s+(for\s+)?(per\s+share|share|earnings\s+per)|"
-                      # A caption's wrapped tail: Ross's "($000, except per share data)"; Woori's 2010 "per common share data)
-                      # per common share data)"; Oshkosh's "(In thousands, except" / "per share amounts)", which as a heading
-                      # made Net sales a figure a share (round 125's review).
-                      r"^(?:(?:and\s+|except\s+(?:for\s+)?)?(?:shares?\s+and\s+)?(?:income\s+)?per[-\s](?:common\s+)?share\s+"
-                      r"(?:data|amounts?|figures|information)\)\s*)+$|"
-                      # Embraer's 2003 releases: "in thousands of U.S. dollars except per share data", no bracket.
-                      r"^in\s+(?:thousands|millions|billions)\s+of\b[^()]*\bexcept\s+(?:for\s+)?per\s+share\b", re.I)
-
-
 # A cash flow section's heading: "Cash flows from operating activities".
 _SECTION_HEADING = re.compile(r"^(?:cash\s+flows?\s+(?:from|used\s+in|provided\s+by|\(used\s+in\))?.*?\b)?(operat|invest|financ)ing"
                               r"(?:\s+activities)?\b", re.I)
@@ -177,15 +162,6 @@ _YEAR_ROW_LABEL = re.compile(r"\bstatements?\s+of\b|\bfor\s+the\s+(years?|quarte
 # A memo line inside the line above it, served but never summed: UBS's "of which: assets pledged as collateral which
 # may be sold or repledged by counterparties", within its trading portfolio assets.
 _MEMO = re.compile(r"^\s*(of\s+which|thereof)\b", re.I)
-
-
-def _caption_only(label: str) -> bool:
-    """A row that is a scale caption ("(In millions, except share amounts)", ASML's "For the year ended December 31
-    (Amounts in thousands, except per share data)"). One that names share counts before their scale is a heading:
-    Apple's "Shares used in computing earnings (loss) per share (in thousands):", whose "Basic" and "Diluted" below
-    are share counts in thousands, not figures a share."""
-    match = _CAPTION.search(label)
-    return bool(match) and not SHARE_HEADING.search(label[:match.start()])
 
 
 def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
