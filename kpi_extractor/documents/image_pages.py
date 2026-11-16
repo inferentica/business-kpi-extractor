@@ -20,9 +20,15 @@ from collections import Counter
 from typing import Callable
 from urllib.parse import urljoin
 
-# A figure as printed: "1,148", "(357)", "-30", "12.5%", "$0.93", "R$3.8". Digits glued to letters ("3Q26", "FY25")
-# are labels, never figures.
-_FIGURE = re.compile(r"(?<![A-Za-z\d.,])\d{1,3}(?:[,.]\d{3})+(?:[.,]\d+)?(?![A-Za-z\d])|(?<![A-Za-z\d.,])\d+(?:[.,]\d+)?(?![A-Za-z\d])")
+# A figure as printed, whole: "1,148", "(357)", "-30", "12.5%", "$0.93", "R$3.8", with its scale glued on ("R$1,574m",
+# "12bn", "R$3,8bi"). Digits glued to other letters ("3Q26", "FY25", "1H25", "4T25") are labels, never figures. A figure is
+# never part of one: "1,574m" once matched as its leading "1", so masking a "1" left ",574m" (574 million) and
+# "R$1,514m" agreed with "R$1,574m".
+_UNIT = r"(?i:thousands?|millions?|billions?|trillions?|mm|mn|bn|bi|mil|mi|tn|m|b|k|t|x)"
+_FIGURE = re.compile(r"(?<![A-Za-z\d.,])\d+(?:[.,]\d+)*(?:" + _UNIT + r")?(?![A-Za-z\d]|[.,]\d)")
+# Thousands groups a model split with a space ("1 574"): masked whole, so neither group is left as a figure.
+_SPACED = re.compile(r"(?<![A-Za-z\d.,])\d{1,3}(?:[ \u00a0\u2009\u202f]\d{3})+(?:[.,]\d+)?(?:" + _UNIT
+                     + r")?(?![A-Za-z\d]|[.,]\d)")
 _IMG = re.compile(r"<img\b[^>]*?\bsrc\s*=\s*[\"']?([^\"' >]+)[^>]*>", re.I)
 _BLOCK = re.compile(r"<｜ref｜>(\w+)<｜/ref｜><｜box｜>\[\[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\]\]<｜/box｜>")
 _TOKEN = re.compile(r"<｜[^｜]*｜>")
@@ -77,6 +83,8 @@ def _figures(text: str) -> list[tuple[str, bool, bool]]:
 def _alike(ours: str, theirs: str) -> bool:
     """Two readings of one figure: the same digits, and the same separators, or a comma and a point swapped only
     where three digits follow (a thousands group, which RapidOCR reads either way)."""
+    # A scale glued on or set apart is one figure: RapidOCR's "$2billion" is DeepSeek's "$2 billion".
+    ours, theirs = (re.sub(r"[A-Za-z]+$", "", figure) for figure in (ours, theirs))
     if _digits(ours) != _digits(theirs) or len(ours) != len(theirs):
         return False
     for index, (a, b) in enumerate(zip(ours, theirs)):
@@ -265,8 +273,13 @@ def agreed_only(document):
     if not single:
         return document
 
+    def masked_spaced(match: re.Match) -> str:
+        parts = _FIGURE.findall(match.group(0))
+        return UNREAD if _digits(match.group(0)) in single or any(_digits(part) in single for part in parts) else match.group(0)
+
     def mask(text: str) -> str:
-        return _FIGURE.sub(lambda match: UNREAD if _digits(match.group(0)) in single else match.group(0), text or "")
+        text = _SPACED.sub(masked_spaced, text or "")
+        return _FIGURE.sub(lambda match: UNREAD if _digits(match.group(0)) in single else match.group(0), text)
 
     masked = Document(source_url=document.source_url, order=list(document.order), part_urls=dict(document.part_urls))
     masked.tables = {key: Table(id=table.id, context=mask(table.context), rows=[[mask(cell) for cell in row] for row in table.rows])
