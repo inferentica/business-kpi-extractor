@@ -34,6 +34,8 @@ def draft_list(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolR
     try:
         result = SymbolPipeline(control, symbol, quarters, True, log=lambda line: print(line, flush=True), lists_only=True).run()
     except Exception as error:  # noqa: BLE001
+        import traceback
+        print(f"{symbol}: {traceback.format_exc()}", flush=True)  # the cause, not only its message
         result = SymbolResult(symbol, errors=[f"{type(error).__name__}: {error}"[:300]])
     return result, control.specs.get(symbol), control.values.get(symbol, [])
 
