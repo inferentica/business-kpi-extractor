@@ -119,3 +119,29 @@ def test_layouts_it_cannot_read_are_left_untested():
     release = lines(("Purchase of property, plant and equipment", -100), ("Loans granted", -20),
                     ("Net cash used in investing activities", -150))
     assert section_check(release).result == "none"
+
+
+def test_a_row_pushed_off_its_columns_by_dollar_cells_is_read():
+    # TSMC's Q1 2024 6-K (0001046179-24-000061): "$ - $ (121,692)" sits three cells right of the columns; the line was
+    # dropped and the investing section failed by 121,692 (round 132).
+    from types import SimpleNamespace
+    from statement_extractor.readers.printed.read import _figure, _shifted
+    columns = [(9,), (24,)]
+    row = SimpleNamespace(figures={12: 0.0, 27: -121692.0})
+    assert _shifted(row, columns) == {(9,): 0.0, (24,): -121692.0}
+    assert _figure(row, (24,), columns) == -121692.0
+    assert _shifted(SimpleNamespace(figures={9: 5.0, 27: 1.0}), columns) is None  # one already on its column
+
+
+def test_a_currency_sign_in_the_figures_own_cell_is_no_part_of_the_label():
+    # POSCO's Q1 2026 6-K (0001193125-26-246188): "W&#8195;&#8195;(4,465,247)" in one cell; the 2026 figure was dropped and
+    # its investing section failed (round 132).
+    from statement_extractor.readers.html.parse import parse_html
+    html = ("<table><tr><td>Cash flows from investing activities</td><td></td><td></td></tr>"
+            "<tr><td>Acquisitions of short-term financial instruments</td><td>W&#8195;&#8195;(4,465,247)</td>"
+            "<td>(4,879,919)</td></tr>"
+            "<tr><td>Proceeds from disposal of short-term financial instruments</td><td>5,005,638</td>"
+            "<td>4,299,071</td></tr></table>")
+    rows = [row for table in parse_html(html) for row in table.rows if row.figures]
+    assert rows[0].label == "Acquisitions of short-term financial instruments"
+    assert sorted(rows[0].figures.values()) == [-4879919.0, -4465247.0]
