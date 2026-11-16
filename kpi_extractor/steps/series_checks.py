@@ -310,7 +310,9 @@ class SeriesChecks:
                 document = self._code_document(by_accession[later["source_accession"]])
             except Exception:  # noqa: BLE001 - an unreadable release settles nothing
                 continue
-            cells = _year_ago_cells(document, later["locator"], float(later["value"]))
+            # The later release's column for this figure's own quarter, never another quarter it also lists.
+            quarter = None if v["fiscal_period"] == "FY" else (date.fromisoformat(v["period_end"][:10]), int(v["fiscal_period"][1]))
+            cells = _year_ago_cells(document, later["locator"], float(later["value"]), quarter)
             value = float(v["value"])
             named = _period_headed(document, later["locator"])
             if any(abs(cell - value) <= max(abs(value) * proof_tolerance(v, 1e-4), 1e-9) for cell in cells):
@@ -320,7 +322,7 @@ class SeriesChecks:
                     restatements.setdefault(period_of(v), []).append((v, round(cells[0], 2), checked))
                 else:
                     settle(v, f"{_RESTATED_LATER} (was {value:.15g})", value=round(cells[0], 2))
-            elif named and len(cells) > 1:
+            elif named and cells:  # another figure for the quarter, or several: its own filing decides
                 settled[value_key(v)] = held_for_later(v, cells, checked)
             else:
                 settled[value_key(v)] = {**v, "notes": [*(v.get("notes") or []), checked]}
