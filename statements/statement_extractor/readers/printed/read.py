@@ -187,8 +187,9 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 r"\b(attributed|attributable|of|to|per|for)$", last_heading, re.I) or COUNTS.search(last_heading)) else row.label
             # A figure row that ends a label wrapped over the headings above it: Apple's "Common and common equivalent" /
             # "shares used in the" / "calculations of earnings" / "(loss) per share (in thousands)  123,735".
+            # Delta's 2003 "WEIGHTED AVERAGE SHARES USED IN BASIC" / "PER SHARE COMPUTATION  123,361,622" too.
             wrapped = f"{last_heading} {row.label}" if row.figures and last_heading and (
-                row.label[:1].islower() or row.label.startswith("(")) else row.label
+                row.label[:1].islower() or row.label.startswith("(") or COUNTS.search(last_heading)) else row.label
             last_heading = None
             if not row.figures and (any(pattern.search(label) for _, pattern in TITLES) or _caption_only(label)):
                 continue  # the statement's title or scale printed as a row of its own table (PepsiCo, ASML), not a line

@@ -122,6 +122,8 @@ Weighted average number of common shares
 outstanding- basic                                127,989           124,532
 diluted                                           139,839           124,532
 Basic weighted average common                     127,989           124,532
+WEIGHTED AVERAGE SHARES USED IN BASIC
+PER SHARE COMPUTATION                             127,989           124,532
 Basic and diluted earnings per weighted-average
 of common and preferred share                     $  0.36           $ (0.56)
 </TABLE>
@@ -135,7 +137,7 @@ def test_count_labels_wrapped_or_named_by_their_words_are_counts():
     kinds = [(line["label"], line.get("unit_kind"), line["value"]) for line in reading.lines if line["value"] is not None]
     assert ("Basic earnings (loss) per share", "per_share", 0.37) in kinds
     counts = [value for label, kind, value in kinds if kind == "shares"]
-    assert counts == [139_839_000, 127_989_000, 139_839_000, 127_989_000], kinds
+    assert counts == [139_839_000, 127_989_000, 139_839_000, 127_989_000, 127_989_000], kinds
     assert not [label for label, kind, value in kinds if kind == "per_share" and value > 1]
     # Petrobras's: what it is a share of comes before its count words.
     assert ("of common and preferred share", "per_share", 0.36) in kinds or any(
