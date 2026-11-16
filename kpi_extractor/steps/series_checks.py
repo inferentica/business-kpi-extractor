@@ -426,15 +426,24 @@ class SeriesChecks:
                              "notes": [*without(v.get("notes"), *SIZE_HOLDS, "other_part"), SIZE_HOLD_LIFTED]} for v in held]
         for rows in groups.values():
             waiting = [v for v in rows if v["validation_status"] == "needs_review"]
+            # A line the owner confirmed is one of the parts; only the held ones clear.
+            confirmed = [v for v in rows if v["validation_status"] == "verified" and v.get("owner_decision") == "confirmed"]
             stated = float((rows[0].get("locator") or {}).get("total") or 0)
-            if not waiting or len(rows) < 2 or not stated or len(waiting) != len(rows):
+            if not waiting or len(rows) < 2 or not stated or len(waiting) + len(confirmed) != len(rows):
                 continue
-            if not all(only(v.get("notes"), ["parts_differ"], ignoring=aside) for v in waiting):
+            # A parent the owner rejected is no line's parent now: JPMorgan's Q4 2020 "Commercial Banking", a copy of
+            # Middle Market Banking, once took Commercial Real Estate Banking for its line and its parts off by 25.6%.
+            parents = {v.get("kpi_label") for v in rows} - {None}
+            gone = [[n for n in v.get("notes") or [] if is_(n, "lines_differ")
+                     and not any(n.startswith(f"lines differ from {label} by") for label in parents)] for v in waiting]
+            if not all(only([n for n in v.get("notes") or [] if n not in stale], ["parts_differ"], ignoring=aside)
+                       for v, stale in zip(waiting, gone)):
                 continue
             parts = [float(v["value"]) for v in rows]
             if abs(sum(parts) - stated) <= abs(stated) * 0.001:
                 cleared += [{**v, "validation_status": "verified", "reconciliation_error_pct": (sum(parts) - stated) / stated,
-                             "notes": [*(v.get("notes") or []), "the parts add up to the release's total"]} for v in rows]
+                             "notes": [*(n for n in v.get("notes") or [] if n not in stale), "the parts add up to the release's total"]}
+                            for v, stale in zip(waiting, gone)]
         return cleared
 
     def _release_held_breakdowns(self) -> list[dict]:
