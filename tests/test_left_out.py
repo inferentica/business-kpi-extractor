@@ -44,3 +44,9 @@ def test_merge_keeps_each_line_once_and_none_the_list_holds():
                 {"group": "operating", "key": "margin", "label": "Gross margin", "source": "propose"},  # the same line
                 {"group": "operating", "key": "nim", "label": "Net Interest Margin", "source": "owner"}, "junk"]
     assert [line["key"] for line in left_out.merge(new, previous, spec)] == ["margin", "nim"]
+
+
+def test_a_label_over_80_characters_is_cut_at_a_word_not_failed():
+    long = "Allowance for Credit Losses as a Percent of Portfolio Loans and Leases, Excluding Loans Held for Sale"
+    spec = _spec(("operating", "Operating Metrics", "metric", [("acl", long)]))
+    assert spec.groups[0].kpis[0].label == "Allowance for Credit Losses as a Percent of Portfolio Loans and Leases"

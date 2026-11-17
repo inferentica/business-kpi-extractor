@@ -48,10 +48,24 @@ def _check_key(value: str) -> str:
     return repaired
 
 
+MAX_LABEL = 80
+
+
+def _fit_label(value):
+    """A label over MAX_LABEL characters is cut at a word, so one long name never fails a whole list (Fifth Third's
+    "Allowance for Credit Losses as a Percent of ..." rejected its draft on 2026-11-17); the owner can rename it."""
+    if isinstance(value, str) and len(value.strip()) > MAX_LABEL:
+        text = value.strip()[:MAX_LABEL + 1]
+        return (text[:text.rfind(" ")] if " " in text else text[:MAX_LABEL]).rstrip(" ,;:-(")
+    return value
+
+
 class KpiSpec(BaseModel):
     key: str
     label: str = Field(min_length=1, max_length=80)
     unit: Unit
+
+    _label = field_validator("label", mode="before")(classmethod(lambda cls, value: _fit_label(value)))
     # The KPI of its own group it is a line of (UnitedHealth's Optum Health under Total Optum; Alphabet's Search under
     # Google advertising, under Google Services), set by the owner: lines add up to it, and it is a part of the group.
     parent: str | None = None
@@ -97,6 +111,8 @@ class GroupSpec(BaseModel):
     key: str
     label: str = Field(min_length=1, max_length=80)
     kind: GroupKind
+
+    _label = field_validator("label", mode="before")(classmethod(lambda cls, value: _fit_label(value)))
     total_kpi: str | None = None
     # The name the owner gave the view on /kpi-templates, shown wherever the view is (the label stays what the readers
     # are told, so renaming a view never changes a prompt).
