@@ -49,14 +49,16 @@ class LocateDocument:
         return text
 
     def _last_places(self, document: Document, spec: Spec) -> set[str] | None:
-        """The parts of a document sent whole today (40,000 to 120,000 characters: a bank's or an asset manager's
-        supplement) where each listed KPI is: the tables with a row its label or latest row label starts, the two
+        """The parts of a long document (over 40,000 characters: a bank's or an asset manager's supplement, JPMorgan's
+        past 120,000 too) where each listed KPI is: the tables with a row its label or latest row label starts, the two
         nearest the one it was read from when the label recurs ("Total net revenue" on page after page), the passages
         naming it, and the part it was last read from with its neighbours when nothing names it (Apollo's highlight
-        bullets). None when the document is short or long (Select already narrows it), a KPI was never read, or the
-        parts are not under 60% of it: the usual document then goes."""
+        bullets). None when the document is short, a KPI was never read or is nowhere like where it was (a KPI noted
+        not reported keeps the whole document: Truist's margin went unread when it did not, p4-finpages round 2), or the
+        parts are not under 60% of what goes today (the whole document, or Select's choice of at most 120,000
+        characters): the usual document then goes. A narrowed reading that misses a KPI reads the whole one again."""
         whole = len(document.render())
-        if whole <= NARROW_ABOVE_CHARS or not document.fits(MAX_DOCUMENT_CHARS):
+        if whole <= NARROW_ABOVE_CHARS:
             return None
         history = self._ai_history(date.max)
         found: set[str] = set()
@@ -77,4 +79,4 @@ class LocateDocument:
                 continue
             found |= {*sorted(tables, key=lambda t: _table_distance(t, str(last.get("table") or "")))[:2], *blocks[:3]}
         chosen = sum(len((document.tables.get(key) or document.blocks[key]).render()) for key in found)
-        return found if chosen <= whole * 0.6 else None
+        return found if chosen <= min(whole, MAX_DOCUMENT_CHARS) * 0.6 else None
