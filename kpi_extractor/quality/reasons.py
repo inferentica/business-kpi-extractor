@@ -41,6 +41,7 @@ REREAD_NOTE = "a new reading of this filing differs from the figure served befor
 SHARED_CELL = "read from the same table cell as another listed metric"
 SIGN_TURNED = "sign turned: the row states the line's convention the other way round"
 OUTSIDE_SEGMENT_ERA = "names a segment the company did not report in this period"
+METRIC_TOTAL = "its group's lines do not add up to a total they add up to in most quarters"
 OFF_ROW = "read from another row than the group's other lines"
 SEGMENT_TABLE = "read from a table headed for one segment"
 PRECISE_FIGURE = "the full figure, printed rounded elsewhere"
