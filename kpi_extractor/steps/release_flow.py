@@ -162,6 +162,7 @@ class ReleaseFlow:
                                  ai.locate_data(period_hint, subset or spec, self._hints(expected) if hints else {}))
 
             self._local.accession, self._local.rule_candidates = ref.accession, {}
+            self._local.period = expected  # a line stopped is judged against the quarter read (locate_document.py)
             read, problems, located = self._read(text, document, spec, expected, version)
             self._settle_rule_evidence(ref.accession, read)
             self._keep_listed_series(read)

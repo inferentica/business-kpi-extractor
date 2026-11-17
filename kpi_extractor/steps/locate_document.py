@@ -60,12 +60,14 @@ class LocateDocument:
         return {key: (newest[key], placed.get(key, ("", {}))[1]) for key in newest}
 
     def _stopped_keys(self, spec: Spec) -> set[str]:
-        """Listed KPIs the company stopped reporting: newest reading STOPPED_DAYS before the list's newest."""
+        """Listed KPIs the company had stopped reporting by the quarter read: newest reading STOPPED_DAYS before it (or
+        before the list's newest, outside a reading). A 2019 filing still asks for Treasury Services, last read 2019."""
         history = self._placed_history()
         ends = [end for end, _locator in history.values()]
         if not ends:
             return set()
-        latest = date.fromisoformat(max(ends)[:10])
+        period = getattr(getattr(self, "_local", None), "period", None)
+        latest = period if isinstance(period, date) else date.fromisoformat(max(ends)[:10])
         return {key for key in self._asked_keys(spec) if key in history
                 and (latest - date.fromisoformat(history[key][0][:10])).days > STOPPED_DAYS}
 
