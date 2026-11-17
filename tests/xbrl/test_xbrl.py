@@ -526,3 +526,31 @@ def test_a_completing_member_tagged_coarsely_takes_the_exact_rest_it_rounds_to()
     rows = [fact(24_996_056e3), *regions, fact(100_000_000, "nflx:DVDMember")]  # 239.4 does not round to 0.1 billion
     assert not [g for g in extract_breakdowns(pd.DataFrame(rows), entity, "10-K", lambda _q: None, {}).groups
                 if g.key == "geography"]
+
+
+def test_a_split_inside_a_segment_completes_with_the_segments_own_unnamed_figure():
+    # Alphabet's Q1 2018 10-Q: Google properties, Network and their Advertising subtotal on the product axis inside the
+    # Google segment, its other revenues (4,354) tagged on the segment alone, Other Bets a segment. The split was refused
+    # (its rows, the subtotal counted, came to 53,284 of 31,146), so 2018 Q1 and Q4 had no product split.
+    seg = "dim_us-gaap_StatementBusinessSegmentsAxis"
+    concept = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+    def both(value, product):
+        return {**_fact(concept, value, product, axis="dim_us-gaap_ProductOrServiceAxis"), seg: "goog:GoogleInc.Member"}
+    facts = pd.DataFrame([
+        _fact("us-gaap:Revenues", 31_146.0),
+        _fact("us-gaap:Revenues", 30_996.0, "goog:GoogleInc.Member", axis=seg),
+        _fact("us-gaap:Revenues", 150.0, "us-gaap:AllOtherSegmentsMember", axis=seg),
+        _fact(concept, 31_146.0),
+        both(26_642.0, "goog:AdvertisingRevenueMember"),
+        both(21_998.0, "goog:GooglePropertiesMember"),
+        both(4_644.0, "goog:GoogleNetworkMembersPropertiesMember"),
+        _fact(concept, 4_354.0, "goog:GoogleInc.Member", axis=seg),
+        _fact(concept, 150.0, "us-gaap:AllOtherSegmentsMember", axis=seg),
+    ])
+    groups = {group.key: group for group in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
+    rows = {key: value for key, _label, value in groups["products"].members}
+    assert rows == {"googleproperties": 21_998.0, "googlenetworkmembersproperties": 4_644.0, "unallocated": 4_354.0,
+                    "other": 150.0}  # the last named from the report's table when stored (reports._name_remainders)
+    # Without the segment's own figure the split is still refused, never closed by a worked-out gap alone.
+    facts = facts[~((facts["concept"] == concept) & (facts["numeric_value"] == 4_354.0))]
+    assert "products" not in {group.key for group in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}

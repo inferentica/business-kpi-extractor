@@ -460,8 +460,12 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
             rejected.append(XbrlCandidate(key, title, order, concept, total, currencies.get(concept),
                                           {k: (n, v) for k, n, v in named(members)}, prior, elements(members),
                                           ytd, ytd_total, prior_ytd, prior_ytd_total))
+    # A segment's own figure of a concept, tagged with that segment alone: the part of it no product line names
+    # (Alphabet's Q1 2018 and Q1 2019 10-Qs tag Google's other revenues, 4,354m, on the Google segment only).
+    segment_only = {(concept, dims[axis]): value for concept, dims, value, _level in tagged
+                    if len(dims) == 1 and (axis := next(iter(dims))) in _SEGMENT_AXES}
     for candidate in list(rejected):
-        completed = _completed_by_segments(candidate, groups)
+        completed = _completed_by_segments(candidate, groups, segment_only)
         if completed is not None:
             groups.append(completed)
             rejected.remove(candidate)
@@ -491,24 +495,36 @@ def _name_regional_views(groups: list[XbrlGroup]) -> None:
             group.label = "Revenue by Country"
 
 
-def _completed_by_segments(candidate: XbrlCandidate, groups: list[XbrlGroup]) -> XbrlGroup | None:
+def _completed_by_segments(candidate: XbrlCandidate, groups: list[XbrlGroup],
+                           segment_only: dict[tuple[str, str], float] | None = None) -> XbrlGroup | None:
     """A split tagged inside one segment only (Alphabet's Search, YouTube, Network and subscriptions add up to Google
     Services, while Cloud and Other Bets appear only as segments), completed by the company's other segments and its
     balancing rows, when its lines add up exactly to that segment and the whole then adds up to revenue."""
     segments = next((group for group in groups if group.key == "segments"), None)
     if segments is None or candidate.key == "segments" or any(group.key == candidate.key for group in groups):
         return None
+    from ..readers.segment_income import _LEFT_OVER, LEFT_OVER_KEY
+
     rows = {key: value for key, (_label, value) in candidate.members.items()}
+    names = {key: label for key, (label, _value) in candidate.members.items()}
     for key, label, part in segments.members:
         if not part:
             continue
         leaves = drop_overlaps(remove_subtotals(rows, part), part)
+        gap = part - sum(leaves.values())
+        # The segment's lines short of it by exactly the segment's own figure no line names: that figure is the
+        # segment's last line, named from the report's table (reports.py, _name_remainders).
+        own = (segment_only or {}).get((candidate.concept, segments.elements.get(key) or ""))
+        if len(leaves) >= 2 and gap > 0 and own is not None and abs(own - gap) <= max(abs(part) * 1e-5, 0.5) \
+                and LEFT_OVER_KEY not in leaves:
+            leaves = {**leaves, LEFT_OVER_KEY: gap}
+            names[LEFT_OVER_KEY] = _LEFT_OVER
         if len(leaves) < 2 or abs(sum(leaves.values()) - part) > abs(part) * 1e-5:
             continue
         others = [(k, n, v) for k, n, v in segments.members if k != key]
         if any(k in leaves for k, _n, _v in others):
             return None  # a line and a segment under one name: not one split
-        members = [(k, candidate.members[k][0], v) for k, v in sorted(leaves.items(), key=lambda item: -item[1])] + others
+        members = [(k, names[k], v) for k, v in sorted(leaves.items(), key=lambda item: -item[1])] + others
         error = (sum(v for _k, _n, v in members) - segments.total) / segments.total if segments.total else None
         if error is None or abs(error) > MAX_RECONCILIATION_ERROR:
             return None
