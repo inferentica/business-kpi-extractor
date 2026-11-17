@@ -23,6 +23,9 @@ Never track: total revenue on its own, growth of total revenue, of a segment's r
 organic, FX-neutral or constant-currency growth), costs, margins, operating or net income, EPS, cash flow or balance sheet lines, content, purchase or lease \
 obligations, non-GAAP adjustments, guidance or outlook, dividends and buybacks, or anything not given as a number for \
 the reported quarter. Industry hints, when given after this task, lift this list only for the measures they name.
+A monthly report (an insurer's monthly results) is read the same way: track only what it gives for the whole quarter, \
+in a quarter or three-month column or as a count at the quarter's end, never a figure it gives only for the month or \
+the year to date.
 
 When the documents give a breakdown as amounts (for example a financial report's revenue by technology in NT$), track \
 the amounts as a revenue_breakdown and do not also track its percentage shares: shares are computed from amounts. \
