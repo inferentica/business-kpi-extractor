@@ -18,16 +18,20 @@ Unit = Literal["currency", "percent", "count", "ratio"]
 _KEY = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
 
 
-MAX_GROUPS = 8
+# A company's revenue views, its operating metrics and the tables that break one metric down (Apollo's AUM by asset
+# class, a bank's loans by type, Boeing's deliveries by program), each a group of its own.
+MAX_GROUPS = 12
 
 
 # A breakdown keeps its history: TSMC lists today's merged node buckets beside the finer nodes they replaced (17).
 MAX_KPIS_PER_GROUP = 24
 
 
-# A focused list: every KPI is read, and possibly disputed, every quarter. Propose is told these limits; the code
-# keeps any list to this many KPIs in all, trimming operating metrics from the end of their group (see normalize_spec).
-MAX_LISTED_KPIS = 24
+# Every KPI is read, and possibly disputed, every quarter, so a list has a ceiling: Propose is told these limits, and
+# the code keeps a list to this many KPIs in all by trimming operating metrics from the end of their groups (breakdowns
+# and mixes are checked by their own sums and never cut; see normalize_spec). The held-out lists the owner reviewed in
+# 2026-11 run to 60 lines at banks and Johnson & Johnson; 24 cut a third of a bank's.
+MAX_LISTED_KPIS = 60
 
 
 MIN_KEPT_METRICS = 10
@@ -344,7 +348,9 @@ def normalize_spec(spec: Spec, cap: bool = True) -> Spec:
         # An owner's list is never capped: only a one-part breakdown changed kind, in its place.
         return spec if groups == [g.model_dump() for g in spec.groups] else Spec.model_validate({"groups": groups, "names": spec.names})
     if loose:
-        metrics = next((group for group in groups if group["kind"] == "metric"), None)
+        # Loose lines join Operating Metrics, never a titled metric group (AUM by Asset Class) that breaks one metric down.
+        metrics = next((group for group in groups if group["kind"] == "metric" and group["key"] == "operating"),
+                       next((group for group in groups if group["kind"] == "metric"), None))
         if metrics is None:
             metrics = {"key": "operating", "label": "Operating Metrics", "kind": "metric", "total_kpi": None, "kpis": []}
             groups.append(metrics)
