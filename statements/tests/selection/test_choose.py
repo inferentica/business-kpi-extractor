@@ -282,3 +282,14 @@ def test_without_its_own_filing_a_period_takes_its_xbrl_dates():
     printed.source, printed.period_end, printed.period_start = "html", date(2009, 1, 1), date(2008, 1, 1)
     aligned = {r.accession: r for r in align_dates([tagged, printed])}
     assert aligned["6k"].period_end == date(2008, 12, 31)  # CSN's 2011 6-K dates 2008 to January 1, 2009
+
+
+def test_a_start_of_its_own_never_splits_a_period():
+    # Lucid's own 10-K for 2020 opens its year on April 30 (the shell's first day); its 2023 10-K presents the full
+    # calendar year 2020, the newest presentation.
+    own = reading("fy20", date(2021, 3, 1), 1, own=True)
+    own.period_end, own.period_start = date(2020, 12, 31), date(2020, 4, 30)
+    newest = reading("fy22", date(2023, 2, 28), 2, own=False)
+    newest.period_end, newest.period_start = date(2020, 12, 31), date(2020, 1, 1)
+    [chosen] = choose([own, newest])
+    assert (chosen["source_accession"], chosen["period_start"]) == ("fy22", "2020-01-01") and "other_periods" not in chosen

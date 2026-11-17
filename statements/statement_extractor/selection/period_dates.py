@@ -45,9 +45,9 @@ def _reference(group: list[Reading]):
 
 
 def same_period(group: list[Reading]) -> tuple[list[Reading], list[Reading]]:
-    """(the presentations of the period, those of another period under its label). The period is its best dated
-    presentation's, else the end most presentations share, the newest filing's on a tie; a presentation a week or more
-    off it is another period: CSN's 2013 20-F dates a column April 27, 2012 under its first quarter of 2012, Delta's
+    """(the presentations of the period, those of another period under its label). The period ends on its best dated
+    presentation's end, else the one most presentations share, the newest filing's on a tie; a presentation ending a week
+    or more off it is another period: CSN's 2013 20-F dates a column April 27, 2012 under its first quarter of 2012, Delta's
     2007 10-Qs present April 30 and May 1 balance sheets after its first quarter, and Gildan's 2015 releases recast its
     fiscal 2014 quarters in calendar months a week before its own."""
     reference = _reference(group)
@@ -58,10 +58,9 @@ def same_period(group: list[Reading]) -> tuple[list[Reading], list[Reading]]:
             entry[0] += 1
             entry[1] = max(entry[1] or reading.filed, reading.filed)
         reference = max(counts, key=lambda dates: tuple(counts[dates]))
-    end, start = reference
-
-    def near(reading: Reading) -> bool:
-        if abs(reading.period_end - end) > SLACK:
-            return False
-        return start is None or reading.period_start is None or abs(reading.period_start - start) <= SLACK
-    return [reading for reading in group if near(reading)], [reading for reading in group if not near(reading)]
+    end = reference[0]
+    # By its end alone: a period's start differs where a company's first year was short (Lucid's own 10-K for 2020
+    # opens on April 30, its later ones on January 1) or a reader counted it short (Costco's 12-week third quarter of
+    # 2010 read from February 8); the winner's own start is served.
+    near = [reading for reading in group if abs(reading.period_end - end) <= SLACK]
+    return near, [reading for reading in group if abs(reading.period_end - end) > SLACK]
