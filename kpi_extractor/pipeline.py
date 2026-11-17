@@ -339,6 +339,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.write(self._stand_tied_rows())
         self.store.write(self._join_custom_axes())
         self.store.write(self._unify_series())
+        self.store.write(self._join_year_remainders())
         self.store.write(self._unify_release_series(releases))
         self.store.write(self._adopt_restated_quarters())
         for rows in self._fix_mislabelled_quarters():

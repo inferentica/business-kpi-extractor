@@ -166,17 +166,6 @@ class SeriesIdentity:
                     union(node, by_element[(v["group_key"], element)])
                 else:
                     by_element[(v["group_key"], element)] = node
-        # A key the series once continued under another (Alphabet's "googleotherrevenues", continued as "Google
-        # subscriptions, platforms, and devices" in 2018 Q2) is that series wherever it turns up again: Q1 2018's
-        # "Google other revenues", completed from the Google segment's own figure, carries no element and no prior.
-        current = {(v["group_key"], v["kpi_key"]) for v in rows}
-        for v in list(self.values.values()):
-            if v.get("method") != "xbrl" or v.get("validation_status") != "rejected":
-                continue
-            for note in v.get("notes") or []:
-                if note.startswith("continued as ") and (v["group_key"], v["kpi_key"]) in current \
-                        and (v["group_key"], (target := note.removeprefix("continued as ").strip())) in current:
-                    union((v["group_key"], v["kpi_key"]), (v["group_key"], target))
         for v in rows:
             index.setdefault((v["group_key"], v["fiscal_period"] == "FY"), []).append(v)
         for v in rows:
@@ -211,6 +200,43 @@ class SeriesIdentity:
         if rekeyed:
             self.log(f"{self.symbol}: {len(rekeyed) // 2} XBRL values joined to their series")
         return rekeyed
+
+    def _join_year_remainders(self) -> list[dict]:
+        """A quarter's line that names no XBRL element (a split completed from its segment's own figure: Alphabet's Q1
+        2018 "Google other revenues") is the one line its year lists that the quarter lacks: the year's report and other
+        quarters list Google properties, Network, subscriptions, platforms and devices, and Other Bets, and Q1 2018 lacks
+        only the third. Without it the year's Q4 (the year less three quarters) cannot be worked out. Only a line found in
+        no other period of its year, with exactly one of the year's lines missing from its quarter."""
+        rows = [v for v in self.values.values() if v["method"] == "xbrl" and v["validation_status"] != "rejected"]
+        by_year: dict[tuple[str, str], list[dict]] = {}
+        for v in rows:
+            by_year.setdefault((v["group_key"], v["fiscal_year"]), []).append(v)
+        joined = []
+        for (_group, _year), year_rows in by_year.items():
+            periods: dict[str, set[str]] = {}
+            for v in year_rows:
+                periods.setdefault(v["fiscal_period"], set()).add(v["kpi_key"])
+            for v in year_rows:
+                if v["fiscal_period"] == "FY" or (v.get("locator") or {}).get("member"):
+                    continue
+                key, own = v["kpi_key"], periods[v["fiscal_period"]]
+                if any(key in keys for period, keys in periods.items() if period != v["fiscal_period"]):
+                    continue
+                others = [keys for period, keys in periods.items() if period != v["fiscal_period"]]
+                if not others:
+                    continue
+                # The line every other period of the year lists and this quarter lacks (a subtotal one period adds, such
+                # as Alphabet's FY2018 "Google advertising revenues", is not a line of every period).
+                missing = set.intersection(*others) - own
+                if len(missing) != 1 or own - set.union(*others) != {key}:
+                    continue
+                target = missing.pop()
+                label = next(o["kpi_label"] for o in year_rows if o["kpi_key"] == target)
+                joined.append({**v, "kpi_key": target, "kpi_label": label})
+                joined.append({**v, "validation_status": "rejected", "notes": [f"continued as {target}"]})
+        if joined:
+            self.log(f"{self.symbol}: {len(joined) // 2} XBRL lines joined to the line their year lists")
+        return joined
 
     def _adopt_restated_quarters(self) -> list[dict]:
         """A year's quarter that is missing or lacks a row of the year's own 10-K (Alphabet's 2019 10-Qs grouped Search
