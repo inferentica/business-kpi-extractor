@@ -57,22 +57,37 @@ def _balance(line: dict) -> bool:
         OPENING.search(label) or CLOSING.search(label) or DATED_CASH.search(label))
 
 
+def _words(label) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", str(label or "").lower()))
+
+
+def _likeness(left, right) -> float:
+    """Words two labels share, of all their words: "Profit for the year" and "Profit for the period", 0.6."""
+    mine, theirs = _words(left), _words(right)
+    return len(mine & theirs) / len(mine | theirs) if mine | theirs else 0.0
+
+
 def _counterpart(line: dict, mine: list, others: list) -> dict | None:
     """The nine months' line the year's line pairs with: the one line of its key on each side (a line keyed across
-    eras, XBRL beside print); where a key holds more, the line of the same concept, else of the same label, of the same
-    occurrence (JPMorgan's three "Net income" lines in 2007; EOG's 2020 cash flow keys three investing lines as its
-    section total). None where no such line is printed."""
+    eras, XBRL beside print); where a key holds more, the line of the same concept, else of the closest label (at
+    least 0.6 alike: Gerdau's "Net income" and "NET INCOME", KEPCO's "Net cash flows from operating activities" and
+    "Net cash from operating activities" beside "Cash generated from operations"), of the same occurrence (JPMorgan's
+    three "Net income" lines in 2007). None where no such line is printed (EOG's 2020 section total keyed with two of
+    its investing lines)."""
     if len(mine) == 1 and len(others) == 1:
         return others[0]
-    for field in ("concept", "label"):
-        mark = line.get(field)
-        if mark:
-            same = [other for other in others if other.get(field) == mark]
-            index = next((position for position, item in enumerate(item for item in mine if item.get(field) == mark)
-                          if item is line), 0)
-            if same:
-                return same[index] if index < len(same) else None
-    return None
+    concept = line.get("concept")
+    same = [other for other in others if concept and other.get("concept") == concept]
+    peers = [item for item in mine if concept and item.get("concept") == concept]
+    if not same:
+        scores = [_likeness(line.get("label"), other.get("label")) for other in others]
+        best = max(scores, default=0.0)
+        if best < 0.6:
+            return None
+        same = [other for other, score in zip(others, scores) if score == best]
+        peers = [item for item in mine if _words(item.get("label")) == _words(line.get("label"))]
+    index = next((position for position, item in enumerate(peers) if item is line), 0)
+    return same[index] if index < len(same) else None
 
 
 def _quarter(line: dict, occurrence: int, others: list, statement: str, mine: list | None = None):

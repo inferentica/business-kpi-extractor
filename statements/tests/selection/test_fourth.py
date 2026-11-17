@@ -114,3 +114,16 @@ def test_a_key_holding_several_lines_pairs_them_by_concept():
     mine = [other, total]
     assert _quarter(other, 0, nine, "cash_flow", mine) is None
     assert _quarter(total, 1, nine, "cash_flow", mine) == -636.9
+
+
+def test_a_key_across_eras_pairs_the_closest_label():
+    from statement_extractor.selection.fourth import _quarter
+    # KEPCO 2017: the nine months key two lines with the year's one; "Cash generated from operations" is not it.
+    year = {"label": "Net cash flows from operating activities", "concept": "ifrs-full_CashFlowsFromUsedInOperatingActivities", "unit": "KRW", "value": 10.0}
+    nine = [{"label": "Cash generated from operations", "concept": "us-gaap_NetCashProvidedByUsedInOperatingActivities", "unit": "KRW", "value": 13.0},
+            {"label": "Net cash from operating activities", "concept": "us-gaap_NetCashProvidedByUsedInOperatingActivities", "unit": "KRW", "value": 9.0}]
+    assert _quarter(year, 0, nine, "cash_flow", [year]) == 1.0
+    # Gerdau 2022: "Net income" printed twice in the year, once in the nine months as "NET INCOME".
+    first, second = ({"label": "Net income", "concept": "ifrs-full_ProfitLoss", "unit": "BRL", "value": 12.0} for _ in range(2))
+    ytd = [{"label": "NET INCOME", "concept": "us-gaap_NetIncomeLoss", "unit": "BRL", "value": 10.0}]
+    assert (_quarter(first, 0, ytd, "income", [first, second]), _quarter(second, 1, ytd, "income", [first, second])) == (2.0, None)
