@@ -139,7 +139,8 @@ class GroupSpec(BaseModel):
 
 
 class BreakdownName(BaseModel):
-    label: str = Field(min_length=1, max_length=60)
+    # None: the breakdown keeps the title its axis gives (rules/titles.py); only member labels are renamed.
+    label: str | None = Field(default=None, min_length=1, max_length=60)
     members: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("members")
