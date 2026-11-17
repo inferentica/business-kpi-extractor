@@ -22737,6 +22737,20 @@
    "era": "html",
    "checked": "printed row",
    "note": "s7-fourthunits 2026-11-17, review D5: derived (the year less nine months); the FY2008 10-K's quarterly table prints 4th quarter 2007 income before extraordinary gain 2,971 and no extraordinary gain. EPS is never derived for a fourth quarter."
+  },
+  {
+   "symbol": "AAPL",
+   "statement": "income",
+   "fiscal_year": "2013",
+   "fiscal_period": "FY",
+   "duration": "year",
+   "label": "^cash dividends declared per (common )?share$",
+   "value": 1.64,
+   "scale": 0.01,
+   "source_accession": "0001193125-15-356351",
+   "era": "xbrl",
+   "checked": "printed row",
+   "note": "s7-splitsunits 2026-11-18, review D6: printed after the 2014 seven-for-one; served divided by 4 for the 2020 four-for-one (0.41), beside EPS on the same basis."
   }
  ]
 }
