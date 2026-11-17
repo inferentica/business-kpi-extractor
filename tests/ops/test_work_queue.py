@@ -128,3 +128,9 @@ def test_a_one_company_run_stops_when_its_company_finishes_the_run(monkeypatch):
     with ThreadPoolExecutor(max_workers=1) as pool:
         assert cli.work_queue(queue, pool, 1, 4, False, False, log=lambda *_: None) == "succeeded"
     assert queue.calls == ["claim", "complete"]
+
+
+def test_an_onboarding_backfill_waits_for_off_peak_and_a_scheduled_run_does_not():
+    # Wave 2 (8 companies, 40 quarters, trigger "backfill") ran in DeepSeek's peak hours for 32.66 yuan.
+    assert cli.waits_for_offpeak("manual") and cli.waits_for_offpeak("backfill")
+    assert not cli.waits_for_offpeak("scheduled") and not cli.waits_for_offpeak("watchlist_add")
