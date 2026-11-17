@@ -23,11 +23,11 @@ class Sector:
 SECTORS = {
     "bank": Sector("bank", "Banks",
                    "net interest margin, average or ending loans and deposits (totals and by type), loan-to-deposit "
-                   "ratio, net charge-off ratio, nonperforming assets, allowance coverage, CET1 and other capital "
-                   "ratios, efficiency ratio, assets under management or administration, wealth or trust assets, "
+                   "ratio, net charge-off ratio, nonperforming assets, allowance coverage, the CET1 ratio, "
+                   "efficiency ratio, assets under management or administration, wealth or trust assets, "
                    "branch and ATM counts, employees, noninterest (fee) income by type",
-                   "net interest margin, net charge-off and nonperforming ratios, efficiency ratio, capital ratios "
-                   "(CET1, Tier 1, leverage), loan, deposit and client asset balances, and fee income by type (a "
+                   "net interest margin, net charge-off and nonperforming ratios, efficiency ratio, the CET1 ratio "
+                   "(never the Tier 1, leverage or tangible common equity ratios), loan, deposit and client asset balances, and fee income by type (a "
                    "breakdown of noninterest income whose parts add up to its total)"),
     "insurance": Sector("insurance", "Insurers",
                         "premiums written or earned by line, combined or loss ratio, medical cost ratio, policies or "
