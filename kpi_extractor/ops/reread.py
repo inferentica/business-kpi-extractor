@@ -157,8 +157,15 @@ def _reports_missing_split(values: dict) -> set[str]:
         if value.get("group_kind") == "revenue_breakdown" and value.get("validation_status") == "verified" \
                 and not key.endswith("_levels"):
             periods.setdefault(key, set()).add(end)
-    return {accession for accession, end in report_period.items()
-            if any(end not in ends and min(ends) < end < max(ends) for ends in periods.values())}
+    from ..readers.segment_income import LEFT_OVER_KEY
+
+    # A report whose split holds a line still unnamed ("Unallocated"): its name comes from the report's table, once a
+    # reader can find it (Alphabet's Q1 2018 "Google other revenues", in the column after the year-ago one).
+    unnamed = {value["source_accession"] for value in values.values() if value.get("method") == "xbrl"
+               and value.get("kpi_key") == LEFT_OVER_KEY and value.get("validation_status") != "rejected"
+               and value.get("source_accession") and value.get("group_kind") == "revenue_breakdown"}
+    return unnamed | {accession for accession, end in report_period.items()
+                      if any(end not in ends and min(ends) < end < max(ends) for ends in periods.values())}
 
 
 def _chart_share_quarters(values: dict) -> set[str]:
@@ -176,7 +183,8 @@ def _chart_share_quarters(values: dict) -> set[str]:
 SET_SELECTORS: dict[str, tuple[str, Callable[[dict], set[str]]]] = {
     "reports-without-segments": ("periodic reports with segment income from XBRL but no revenue by segment", _reports_without_segments),
     "chart-share-quarters": ("the reports of quarters a slide's shares still stand in for", _chart_share_quarters),
-    "reports-missing-split": ("periodic reports whose quarter is missing from an XBRL revenue split held before and after it",
+    "reports-missing-split": ("periodic reports whose quarter is missing from an XBRL revenue split held before and after it, "
+                              "or whose split holds a line still unnamed",
                               _reports_missing_split),
 }
 
