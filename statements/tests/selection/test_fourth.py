@@ -127,3 +127,11 @@ def test_a_key_across_eras_pairs_the_closest_label():
     first, second = ({"label": "Net income", "concept": "ifrs-full_ProfitLoss", "unit": "BRL", "value": 12.0} for _ in range(2))
     ytd = [{"label": "NET INCOME", "concept": "us-gaap_NetIncomeLoss", "unit": "BRL", "value": 10.0}]
     assert (_quarter(first, 0, ytd, "income", [first, second]), _quarter(second, 1, ytd, "income", [first, second])) == (2.0, None)
+
+
+def test_a_balance_printed_without_cash_in_its_label_is_a_balance():
+    # Coca-Cola's 1997 cash flow: "Balance at beginning of year" and "Balance at end of year" under its cash heading.
+    from statement_extractor.selection.fourth import _quarter
+    nine = [{"label": "Balance at beginning of year", "unit": "USD", "value": 1_433.0}, {"label": "Balance at end of year", "unit": "USD", "value": 1_798.0}]
+    opening, closing = {"label": "Balance at beginning of year", "unit": "USD", "value": 1_433.0}, {"label": "Balance at end of year", "unit": "USD", "value": 1_737.0}
+    assert (_quarter(opening, 0, nine, "cash_flow"), _quarter(closing, 0, nine, "cash_flow")) == (1_798.0, 1_737.0)

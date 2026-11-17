@@ -50,11 +50,21 @@ _CASH_CONCEPTS = ("us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEqu
                   "us-gaap_Cash", "us-gaap_CashAndDueFromBanks", "ifrs-full_CashAndCashEquivalents")
 
 
+# Opening and closing cash printed under a cash heading without the word: Coca-Cola's "Balance at beginning of year".
+_BALANCE_LINE = re.compile(r"^balances?,?\s+(?:at\s+)?(?:the\s+)?(beginning|start|end)\b", re.I)
+
+
 def _balance(line: dict) -> bool:
     """Opening or closing cash: the one balance in a cash flow statement, never another line its key repeats."""
     label = str(line.get("label") or "")
     return str(line.get("concept") or "") in _CASH_CONCEPTS or bool(
-        OPENING.search(label) or CLOSING.search(label) or DATED_CASH.search(label))
+        OPENING.search(label) or CLOSING.search(label) or DATED_CASH.search(label) or _BALANCE_LINE.search(label))
+
+
+def _opening(line: dict) -> bool:
+    label = str(line.get("label") or "")
+    found = _BALANCE_LINE.search(label)
+    return bool(OPENING.search(label) or found and found.group(1).lower() in ("beginning", "start"))
 
 
 def _words(label) -> set[str]:
@@ -94,8 +104,8 @@ def _quarter(line: dict, occurrence: int, others: list, statement: str, mine: li
     """The fourth quarter's figure for the year's line: less the nine months' line it pairs with (_counterpart), only
     where both are amounts in one unit; a cash balance opens on the nine months' closing cash."""
     if statement == "cash_flow" and _balance(line):
-        closing = [other for other in others if _balance(other)]
-        opening = OPENING.search(str(line.get("label") or "")) or (len(closing) > 1 and occurrence == 0)
+        closing = [other for other in others if _balance(other) and not _opening(other)] or [other for other in others if _balance(other)]
+        opening = _opening(line) or (len(closing) > 1 and occurrence == 0 and not any(_opening(other) for other in others))
         return (closing[-1]["value"] if closing else None) if opening else line["value"]
     if mine is None:
         other = others[occurrence] if occurrence < len(others) else None
