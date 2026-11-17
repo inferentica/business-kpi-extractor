@@ -22722,6 +22722,21 @@
    "era": "html",
    "checked": "read by hand",
    "note": "s7-yearnaming 2026-11-17, review D3, D4: the year ended May 31, 2008 (EX-13: Consolidated $3,643,791 thousand); labelled 2007 before."
+  },
+  {
+   "symbol": "JPM",
+   "statement": "income",
+   "fiscal_year": "2007",
+   "fiscal_period": "Q4",
+   "duration": "quarter",
+   "concept": "us-gaap_NetIncomeLoss",
+   "label": "Net income",
+   "value": 2971000000.0,
+   "scale": 1000000.0,
+   "source_accession": "0000950123-09-003840",
+   "era": "html",
+   "checked": "printed row",
+   "note": "s7-fourthunits 2026-11-17, review D5: derived (the year less nine months); the FY2008 10-K's quarterly table prints 4th quarter 2007 income before extraordinary gain 2,971 and no extraordinary gain. EPS is never derived for a fourth quarter."
   }
  ]
 }

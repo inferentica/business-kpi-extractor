@@ -65,3 +65,26 @@ def test_a_share_count_by_its_unit_gives_no_fourth_quarter():
                "period_end": "2019-09-28", "basis": "US GAAP", "currency": "USD", "lines": year.lines}]
     [q4] = derive_fourth_quarters(chosen, [nine, year], {})
     assert [line["label"] for line in q4["lines"]] == ["Net sales"]
+
+
+def test_repeated_keys_pair_by_occurrence_and_only_amounts_are_subtracted():
+    # JPMorgan's 2007 income statement keys three lines "Net income": the amount, then basic and diluted EPS.
+    from statement_extractor.selection.fourth import _quarter
+    year = [{"label": "Net income", "unit": "USD", "value": 15_365e6}, {"label": "Net income", "unit": "USD/share", "value": 4.51},
+            {"label": "Net income", "unit": "USD/share", "value": 4.38}]
+    nine = [{"label": "Net income", "unit": "USD", "value": 12_394e6}, {"label": "Net income", "unit": "USD/share", "value": 3.63},
+            {"label": "Net income", "unit": "USD/share", "value": 3.52}]
+    assert [_quarter(line, index, nine, "income") for index, line in enumerate(year)] == [2_971e6, None, None]
+    assert _quarter({"label": "Net income", "unit": "USD", "value": 1.0}, 0, [{"label": "Net income", "unit": "EUR", "value": 0.5}], "income") is None
+
+
+def test_only_cash_is_a_balance_in_a_cash_flow():
+    from statement_extractor.selection.fourth import _quarter
+    nine = [{"label": "Cash at beginning of period", "unit": "USD", "value": 10.0},
+            {"label": "Cash at end of period", "unit": "USD", "value": 14.0}]
+    opening, closing = {"label": "Cash at beginning of period", "unit": "USD", "value": 10.0}, {"label": "Cash at end of period", "unit": "USD", "value": 20.0}
+    assert (_quarter(opening, 0, nine, "cash_flow"), _quarter(closing, 1, nine, "cash_flow")) == (14.0, 20.0)
+    # A flow whose key repeats (two "Other" lines) is a flow: each less the nine months' line of its occurrence.
+    others = [{"label": "Other", "unit": "USD", "value": 3.0}, {"label": "Other", "unit": "USD", "value": 5.0}]
+    year = [{"label": "Other", "unit": "USD", "value": 4.0}, {"label": "Other", "unit": "USD", "value": 9.0}]
+    assert [_quarter(line, index, others, "cash_flow") for index, line in enumerate(year)] == [1.0, 4.0]
