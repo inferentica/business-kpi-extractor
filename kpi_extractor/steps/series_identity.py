@@ -201,6 +201,36 @@ class SeriesIdentity:
             self.log(f"{self.symbol}: {len(rekeyed) // 2} XBRL values joined to their series")
         return rekeyed
 
+    def _merge_own_report_duplicates(self) -> list[dict]:
+        """A quarter's figure held twice under two keys: once from a later report's year-ago column (the series' key) and
+        once from the quarter's own report, the same number to the unit (Alphabet's Q2 2018 Network, 4,825, read again
+        from its own 10-Q as "Google Network Members' properties" beside the 2019 10-Q's "Google Network"). It is one
+        line: the own report's figure takes the series' key and stands in the year-ago figure's place, so the period no
+        longer holds two keys of one series and Q4 = year − quarters can be worked out. Only when exactly one figure on
+        each side has that value."""
+        by_period: dict[tuple[str, str, str], list[dict]] = {}
+        for v in self.values.values():
+            if v["method"] == "xbrl" and v["validation_status"] != "rejected" and v["fiscal_period"] != "FY":
+                by_period.setdefault((v["group_key"], v["fiscal_year"], v["fiscal_period"]), []).append(v)
+        merged = []
+        for period_rows in by_period.values():
+            year_ago = [v for v in period_rows if (v.get("locator") or {}).get("year_ago")]
+            own = [v for v in period_rows if not (v.get("locator") or {}).get("year_ago")]
+            year_ago_keys, own_keys = {v["kpi_key"] for v in year_ago}, {v["kpi_key"] for v in own}
+            for row in own:
+                value = float(row["value"])
+                if row["kpi_key"] in year_ago_keys or not value:
+                    continue
+                twins = [v for v in year_ago if v["kpi_key"] not in own_keys and _same(float(v["value"]), value)]
+                if len(twins) != 1 or sum(_same(float(o["value"]), value) for o in own) != 1:
+                    continue
+                target = twins[0]
+                merged.append({**row, "kpi_key": target["kpi_key"], "kpi_label": target["kpi_label"]})
+                merged.append({**row, "validation_status": "rejected", "notes": [f"continued as {target['kpi_key']}"]})
+        if merged:
+            self.log(f"{self.symbol}: {len(merged) // 2} figures from their own report merged with their year-ago reading")
+        return merged
+
     def _join_year_remainders(self) -> list[dict]:
         """A quarter's line that names no XBRL element (a split completed from its segment's own figure: Alphabet's Q1
         2018 "Google other revenues") is the one line its year lists that the quarter lacks: the year's report and other

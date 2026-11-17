@@ -55,3 +55,29 @@ def test_a_quarters_unnamed_line_is_the_one_line_its_year_lacks():
     # A line with its own element, or a year whose other periods disagree, is left alone.
     tagged = rows[:-1] + [line("googleotherrevenues", "Google other revenues", "Q1", member="goog:OtherMember")]
     assert run(tagged)._join_year_remainders() == []
+
+
+def test_a_quarters_own_report_figure_joins_its_year_ago_reading():
+    # Alphabet Q2 2018 after its own 10-Q was read again: the 2019 10-Q's year-ago column holds "Google Network" and
+    # "subscriptions, platforms and devices"; the 2018 10-Q holds the same figures as "Google Network Members'
+    # properties" and an untagged "Google other revenues". Each own figure takes the series' key in its place.
+    def line(key, label, amount, member, year_ago):
+        return {**value("products", key, label, "2018-06-30", year="2018", period="Q2"), "value": amount,
+                "locator": {"member": member, **({"year_ago": True} if year_ago else {})}}
+
+    rows = [line("googlenetwork", "Google Network", 4_825e6, "goog:NetworkMember", True),
+            line("googlesubscriptionsplatformsanddevices", "Subscriptions, platforms and devices", 4_425e6, "goog:OtherMember", True),
+            line("googlenetworkmembersproperties", "Google Network Members' properties", 4_825e6, "goog:NetworkMember", False),
+            line("googleotherrevenues", "Google other revenues", 4_425e6, None, False),
+            line("googleproperties", "Google properties", 23_262e6, "goog:PropertiesMember", False)]
+    written = run(rows)._merge_own_report_duplicates()
+    assert [(v["kpi_key"], v["validation_status"], v["value"]) for v in written] == [
+        ("googlenetwork", "verified", 4_825e6), ("googlenetworkmembersproperties", "rejected", 4_825e6),
+        ("googlesubscriptionsplatformsanddevices", "verified", 4_425e6), ("googleotherrevenues", "rejected", 4_425e6)]
+    assert written[0]["locator"] == {"member": "goog:NetworkMember"}  # the own report's reading stands
+    # A figure the own report gives twice, or that differs from the year-ago reading, is left alone.
+    twice = rows + [line("otherbets", "Other Bets", 4_425e6, "goog:OtherBetsMember", False)]
+    assert [v["kpi_key"] for v in run(twice)._merge_own_report_duplicates()] == [
+        "googlenetwork", "googlenetworkmembersproperties"]
+    differs = [rows[0], {**rows[2], "value": 4_826e6}]
+    assert run(differs)._merge_own_report_duplicates() == []
