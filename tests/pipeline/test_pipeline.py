@@ -2327,3 +2327,18 @@ def test_loose_lines_join_operating_metrics_not_a_metric_breakdown():
     lone = {"key": "ai_revenue", "label": "AI Revenue", "kind": "revenue_breakdown", "kpis": [{"key": "ai", "label": "AI Revenue", "unit": "currency"}]}
     spec = normalize_spec(Spec.model_validate({"groups": [aum, operating, lone]}))
     assert [(g.key, [k.key for k in g.kpis]) for g in spec.groups] == [("aum_by_asset_class", ["credit", "equity"]), ("operating", ["aum", "ai"])]
+
+
+def test_rates_named_like_an_xbrl_breakdown_measure_something_else():
+    # Caterpillar's Construction Industries dealer retail sales growth, by the regions its XBRL sales are tagged by.
+    from kpi_extractor.steps.kpi_list import repeats_xbrl
+    regions = [("north_america", "North America"), ("latin_america", "Latin America"), ("eame", "EAME"), ("asia_pacific", "Asia/Pacific")]
+    covered = [{"northamerica", "latinamerica", "eame", "asiapacific"}]
+
+    def group(kind, unit):
+        return ai.GroupSpec.model_validate({"key": "ci", "label": "Construction Industries Retail Sales Growth", "kind": kind,
+                                            "kpis": [{"key": k, "label": label, "unit": unit} for k, label in regions]})
+
+    assert not repeats_xbrl(group("metric", "percent"), covered)
+    assert repeats_xbrl(group("metric", "currency"), covered)
+    assert repeats_xbrl(group("mix", "percent"), covered)  # shares of the tagged breakdown add nothing
