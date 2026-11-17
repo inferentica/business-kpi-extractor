@@ -84,3 +84,15 @@ def test_the_lists_summary_line_names_both_measures():
 def test_nanometer_nodes_match_however_written():
     from kpi_extractor.evals.list_score import match_one_to_one
     assert match_one_to_one(["7nm", "16nm", "2nm"], ["2-nanometer", "7 nanometer", "16-nanometer"]) == {0: 1, 1: 2, 2: 0}
+
+
+def test_a_line_named_only_by_its_row_matches_with_its_groups_title():
+    from kpi_extractor.evals.list_score import _contexts, _kpis, match_one_to_one
+    owner = [{"key": "ops", "label": "Operating Metrics", "kind": "metric", "kpis": [
+        {"key": "us", "label": "U.S. Net Oil-Equivalent Production", "unit": "count"},
+        {"key": "ri", "label": "Real Estate Inflows", "unit": "currency"}, {"key": "ra", "label": "Real Estate AUM", "unit": "currency"}]}]
+    fresh = [{"key": "aum", "label": "AUM by Segment", "kind": "metric", "kpis": [{"key": "re", "label": "Real Estate", "unit": "currency"}]},
+             {"key": "inflows", "label": "Inflows by Segment", "kind": "metric", "kpis": [{"key": "re", "label": "Real Estate", "unit": "currency"}]},
+             {"key": "boe", "label": "Net Oil-Equivalent Production by Region", "kind": "metric", "kpis": [{"key": "us", "label": "United States", "unit": "count"}]}]
+    labels = lambda groups: [label for _g, _k, label in _kpis(groups)]
+    assert match_one_to_one(labels(owner), labels(fresh), _contexts(owner), _contexts(fresh)) == {0: 2, 1: 1, 2: 0}
