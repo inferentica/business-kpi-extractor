@@ -37,11 +37,12 @@ def _shift(fiscal_year_end: str) -> int:
 
 
 class Naming:
-    def __init__(self, annual_ends, usual: str, samples=()):
+    def __init__(self, annual_ends, usual: str, samples=(), proven=()):
         self.usual = usual
         self.annual_ends = sorted({end for end in annual_ends if end is not None})
+        self.proven = sorted(set(proven))  # ends of the years annual reports print as their own
         self.samples: list[tuple[date, str, bool]] = []
-        self.eras, self.closing = _eras(self.annual_ends, usual)
+        self.eras, self.closing = _eras(self.annual_ends, usual, self.proven)
         for sample in samples:
             self.add(sample)
 
@@ -52,8 +53,10 @@ class Naming:
             self._learn()
 
     def with_ends(self, ends) -> Naming:
-        """The same naming over more annual reports' ends (printed annual reports EDGAR gives no period for)."""
-        return Naming([*self.annual_ends, *ends], self.usual, self.samples)
+        """The same naming over the years annual reports print as their own: their ends close eras too (printed annual
+        reports EDGAR gives no period for), and prove an era one annual report closes."""
+        ends = list(ends)
+        return Naming([*self.annual_ends, *ends], self.usual, self.samples, ends)
 
     def year_end(self, end: date) -> str:
         """The year end of the annual report that closes the period's year; before the first one EDGAR holds, the
@@ -130,9 +133,11 @@ class Naming:
                  "naming": era.naming, "learnt": era.learnt} for era in self.eras]
 
 
-def _eras(annual_ends: list[date], usual: str) -> tuple[list[Era], list[date]]:
-    """Runs of annual reports closing on about the same day each year, oldest first; one report on another day is no
-    era of its own unless it is the newest, a year end the company has just moved to."""
+def _eras(annual_ends: list[date], usual: str, proven=()) -> tuple[list[Era], list[date]]:
+    """Runs of annual reports closing on about the same day each year, oldest first. One report on another day is an
+    era only where its own year closes then (Morgan Stanley's fiscal 2008 to November 30, the one in a window from
+    2009), or as the newest, a year end the company has just moved to: Alcon's 20-F with 2003-03-18 for its period on
+    EDGAR closes a December year."""
     runs: list[list[date]] = []
     for end in annual_ends:
         if runs and _gap(_mmdd(end), _mmdd(runs[-1][-1])) <= _SAME:
@@ -141,8 +146,8 @@ def _eras(annual_ends: list[date], usual: str) -> tuple[list[Era], list[date]]:
             runs.append([end])
     merged: list[list[date]] = []
     for index, run in enumerate(runs):
-        if len(run) == 1 and index < len(runs) - 1:
-            continue  # only the newest year end may have closed one year yet (Alcon's 2003-03-18 on EDGAR is no era)
+        if len(run) == 1 and index < len(runs) - 1 and not any(abs(run[0] - end) <= _SLACK for end in proven):
+            continue
         if merged and _gap(_mmdd(merged[-1][-1]), _mmdd(run[0])) <= _SAME:
             merged[-1].extend(run)
         else:

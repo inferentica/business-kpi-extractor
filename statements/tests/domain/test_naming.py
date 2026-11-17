@@ -93,3 +93,13 @@ def test_periods_before_the_first_annual_report_take_the_oldest_era():
     naming = Naming(ends, "1231")
     assert naming.label(Period(date(1993, 1, 2), date(1992, 10, 4)))[0] == ("1993", "Q1", "quarter")
     assert naming.label(Period(date(1993, 6, 30), date(1993, 4, 1)))[0] == ("1993", "Q3", "quarter")
+
+
+def test_one_annual_report_whose_own_year_closes_then_is_an_era():
+    # Morgan Stanley's 10-K for fiscal 2008 closes November 30, 2008, the one November year in a window from 2009.
+    ends = [date(2008, 11, 30)] + [date(year, 12, 31) for year in range(2009, 2013)]
+    naming = Naming(ends, "1231", proven=[date(2008, 11, 30), date(2009, 12, 31)])
+    assert len(naming.eras) == 2
+    assert naming.label(Period(date(2008, 11, 30), date(2007, 12, 1)))[0] == ("2008", "FY", "year")
+    assert naming.label(Period(date(2008, 8, 29), date(2007, 12, 1)))[0] == ("2008", "Q3", "ytd")
+    assert naming.label(Period(date(2008, 12, 31), date(2008, 1, 1))) == (None, "recast")
