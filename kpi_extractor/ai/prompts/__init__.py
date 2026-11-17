@@ -30,8 +30,8 @@ def propose_data(covered: list[str], to_name: list[str], current: "Spec | None" 
     covered_text = "\n".join(f"- {label}" for label in covered) or "- none"
     naming_text = "\n".join(to_name) or "- none"
     current_text = ("" if current is None or not current.groups else
-                    "\n\nCurrent list (keep every group and key the documents still report; improve labels and add "
-                    f"what is missing, but never rename a key):\n{kpi_lines(current)}")
+                    "\n\nCurrent list (keep every group, key and title the documents still report and add what is "
+                    f"missing; never rename a key or retitle a group):\n{kpi_lines(current)}")
     return ((f"{industry}\n\n" if industry else "") + f"Already covered by XBRL (do not repeat):\n{covered_text}\n\n"
             f"Name these XBRL breakdowns (key: current title; member key = current label):\n{naming_text}{current_text}")
 

@@ -16,6 +16,7 @@ from ..quality.reasons import (ADDS_TO_XBRL as _ADDS_TO_XBRL, ASIDES, CONFIRMED_
                               WITHIN_XBRL as _WITHIN_XBRL, has, is_, note_with, only, without)
 from ..readers.extract import ReadValue, column_header
 from ..rules.period import release_unit
+from ..rules.titles import names_segment
 from ..sources.base import FilingRef
 from .shared import (AI_GROUP_PREFIX, _days, _rounding, _significant, adds_up_to_reported,
                      _year_ago_cells, equals_named_line, held_for_later, list_parents, proof_tolerance, value_key,
@@ -178,7 +179,7 @@ class SeriesChecks:
                 continue
             member = members.pop()
             for v in self.values.values():
-                if v["group_key"] == group and v["validation_status"] != "rejected" and member not in v["group_label"]:
+                if v["group_key"] == group and v["validation_status"] != "rejected" and not names_segment(v["group_label"], member):
                     flagged.append({**v, "group_label": f"{member} {v['group_label']}"[:80]})
         return flagged
 

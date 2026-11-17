@@ -14,6 +14,7 @@ from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from ..documents.image_pages import picture_pages
 from ..quality.reasons import OUTSIDE_REPORTED_PERIODS, has, without
 from ..rules.classify import classify_by_rules
+from ..rules.titles import OWN_AXIS_PREFIX, breakdown_names, keep_titles
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
 from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds
@@ -32,14 +33,17 @@ _PICTURE_EXCERPT_PAGES = 2
 
 def keep_current_groups(proposed: Spec, current: Spec) -> Spec:
     """A re-proposed list never silently drops a group the current list tracks (TSMC's platform and geography once
-    vanished on a re-read); only the quarterly audit retires what a company stopped reporting."""
+    vanished on a re-read); only the quarterly audit retires what a company stopped reporting. A group it tracks keeps
+    its title (rules/titles.py)."""
     keys = {group.key for group in proposed.groups}
     labels = {(group.kind, group.label.lower()) for group in proposed.groups}
     kept = [group for group in current.groups
             if group.key not in keys and (group.kind, group.label.lower()) not in labels]
-    if not kept:
+    proposed_groups = [group.model_dump() for group in proposed.groups]
+    titled = keep_titles(proposed_groups, [group.model_dump() for group in current.groups])
+    if not kept and titled == proposed_groups:
         return proposed
-    groups = [*(group.model_dump() for group in proposed.groups), *(group.model_dump() for group in kept)]
+    groups = [*titled, *(group.model_dump() for group in kept)]
     return Spec.model_validate({"groups": groups[:ai.MAX_GROUPS], "names": proposed.names})
 
 _REVENUE_SUFFIX = re.compile(r"(?<=.)(netrevenues?|revenues?|netsales|sales)$")
@@ -221,7 +225,8 @@ class KpiListUpkeep:
             f"{group['label']}: {', '.join(group['members'].values())}" for group in breakdowns.values()
         ]
         to_name = [
-            f"- {key}: {group['label']} (" + "; ".join(f"{member} = {label}" for member, label in group["members"].items()) + ")"
+            f"- {key}: {group['label']}{'' if key.startswith(OWN_AXIS_PREFIX) else ' [title fixed; rows only]'} ("
+            + "; ".join(f"{member} = {label}" for member, label in group["members"].items()) + ")"
             for key, group in breakdowns.items()
         ]
         try:
@@ -242,11 +247,8 @@ class KpiListUpkeep:
                                     keep=current if getattr(self, "_owner_edited", False) else None)
         self.store.write(self._set_aside_dropped(current, spec))
         spec = self._capped(spec)
-        # Names may only rename breakdowns and members that exist.
-        names = {
-            key: {"label": name.label, "members": {m: l for m, l in name.members.items() if m in breakdowns[key]["members"]}}
-            for key, name in spec.names.items() if key in breakdowns
-        }
+        # Names may only rename breakdowns and members that exist; titles follow rules/titles.py, and stored ones stay.
+        names = breakdown_names(spec.names, breakdowns, (row or {}).get("names"))
         version = (int(row["version"]) if row else 0) + 1
         self._store_spec(spec, names, version, latest.accession)
         self.names = names
