@@ -34,6 +34,21 @@ def test_a_cvm_quarter_keeps_its_codes_names_and_scale_and_its_tree_adds_up():
     assert (revenue["code"], revenue["concept"], revenue["value"]) == ("3.01", "cvm_Revenue", 4_309_126_000.0)
 
 
+def test_cvm_earnings_per_share_are_reais_a_share_whatever_the_forms_scale():
+    # Ambev's Q2 2026 ITR (thousands of reais), six months: net income 7,155,178 thousand, EPS 0.45837 and 0.45643,
+    # as its 6-K 0001292814-26-003969 prints them (0.4584 basic, 0.4564 diluted).
+    rows = [cvm_row("3.11", "Lucro/Prejuízo Consolidado do Período", 7155178, "2018-01-01"),
+            cvm_row("3.99", "Lucro por Ação - (Reais / Ação)", 0, "2018-01-01"),
+            cvm_row("3.99.01", "Lucro Básico por Ação", 0, "2018-01-01"),
+            cvm_row("3.99.01.01", "ON", 0.45837, "2018-01-01", fixed="N"),
+            cvm_row("3.99.02", "Lucro Diluído por Ação", 0, "2018-01-01"),
+            cvm_row("3.99.02.01", "ON", 0.45643, "2018-01-01", fixed="N")]
+    [reading] = cvm_readings("ITR", {"index": INDEX, "DRE_con": rows}, "1231", 0)
+    found = {line["code"]: (line["value"], line["decimals"]) for line in reading.lines}
+    assert found["3.11"] == (7_155_178_000.0, -3)
+    assert found["3.99.01.01"] == (0.45837, 5) and found["3.99.02.01"] == (0.45643, 5)
+
+
 def test_a_cvm_account_whose_parts_do_not_add_up_is_rejected_and_a_company_detail_is_not_summed():
     wrong = [cvm_row(*row) for row in COPEL_Q3]
     wrong[4] = cvm_row("3.04.01", "Despesas com Vendas", -40580)
