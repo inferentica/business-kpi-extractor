@@ -166,6 +166,17 @@ class SeriesIdentity:
                     union(node, by_element[(v["group_key"], element)])
                 else:
                     by_element[(v["group_key"], element)] = node
+        # A key the series once continued under another (Alphabet's "googleotherrevenues", continued as "Google
+        # subscriptions, platforms, and devices" in 2018 Q2) is that series wherever it turns up again: Q1 2018's
+        # "Google other revenues", completed from the Google segment's own figure, carries no element and no prior.
+        current = {(v["group_key"], v["kpi_key"]) for v in rows}
+        for v in list(self.values.values()):
+            if v.get("method") != "xbrl" or v.get("validation_status") != "rejected":
+                continue
+            for note in v.get("notes") or []:
+                if note.startswith("continued as ") and (v["group_key"], v["kpi_key"]) in current \
+                        and (v["group_key"], (target := note.removeprefix("continued as ").strip())) in current:
+                    union((v["group_key"], v["kpi_key"]), (v["group_key"], target))
         for v in rows:
             index.setdefault((v["group_key"], v["fiscal_period"] == "FY"), []).append(v)
         for v in rows:
