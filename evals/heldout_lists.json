@@ -45,11 +45,28 @@
       "key": "first_time_bookers_growth",
       "label": "First-Time Bookers Growth",
       "unit": "percent"
+     },
+     {
+      "key": "travel_insurance_revenue_growth",
+      "label": "Guest Travel Insurance Revenue Growth",
+      "unit": "percent"
+     },
+     {
+      "key": "ai_resolved_support_share",
+      "label": "AI-Resolved Support Issues Share",
+      "unit": "percent"
      }
     ]
    }
   ],
-  "note": "All draft lines are stated for the quarter and the letter gives no revenue breakdown. Uncertain: the two added growth lines (nights booked on app, first-time bookers) are prose figures that may not recur every quarter."
+  "note": "All draft lines are stated for the quarter and the letter gives no revenue breakdown. Uncertain: the two added growth lines (nights booked on app, first-time bookers) are prose figures that may not recur every quarter.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 2,
+   "removed": 0,
+   "note": "Both kept as growth or share figures stated for the quarter, but each is an approximate prose figure ('nearly 70%', 'nearly 40%') that may not recur."
+  }
  },
  "BA": {
   "name": "Boeing",
@@ -182,6 +199,11 @@
       "key": "defense_space_security_backlog_from_cust",
       "label": "Defense, Space & Security Backlog From Customers Outside the U.S.",
       "unit": "percent"
+     },
+     {
+      "key": "production_rate_787",
+      "label": "787 Production Rate per Month",
+      "unit": "count"
      }
     ]
    },
@@ -240,7 +262,14 @@
     ]
    }
   ],
-  "note": "All draft lines are stated; Net Orders appears only in prose. Uncertain: the added per-program defense deliveries (P-8 is a dash this quarter) and the prose-only non-U.S. share of defense backlog; the two added revenue breakdowns share the same total."
+  "note": "All draft lines are stated; Net Orders appears only in prose. Uncertain: the added per-program defense deliveries (P-8 is a dash this quarter) and the prose-only non-U.S. share of defense backlog; the two added revenue breakdowns share the same total.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 1,
+   "removed": 0,
+   "note": "The 787 rate of 8 per month is stated in prose for the quarter; kept as a unit rate Boeing restates each quarter."
+  }
  },
  "BKNG": {
   "name": "Booking Holdings",
@@ -277,6 +306,16 @@
      {
       "key": "alternative_accommodation_room_nights_gr",
       "label": "Alternative Accommodation Room Nights Growth at Booking.com",
+      "unit": "percent"
+     },
+     {
+      "key": "rental_car_days_growth",
+      "label": "Rental Car Days Growth",
+      "unit": "percent"
+     },
+     {
+      "key": "flight_tickets_growth",
+      "label": "Flight Tickets Growth",
       "unit": "percent"
      }
     ]
@@ -326,7 +365,14 @@
     ]
    }
   ],
-  "note": "All draft lines are stated. Uncertain: the added Total Revenues includes a one-off FTC matter reduction of $900 million, so the three revenue-type lines sum to Adjusted Revenue rather than to the total."
+  "note": "All draft lines are stated. Uncertain: the added Total Revenues includes a one-off FTC matter reduction of $900 million, so the three revenue-type lines sum to Adjusted Revenue rather than to the total.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 2,
+   "removed": 2,
+   "note": "Alternative accommodation growth is already held as 'Alternative Accommodation Room Nights Growth at Booking.com'. Uncertain: constant-currency ADR growth ('about 3%') is removed as growth of a price rate, not of a unit count."
+  }
  },
  "BLK": {
   "name": "BlackRock",
@@ -597,9 +643,97 @@
       "unit": "currency"
      }
     ]
+   },
+   {
+    "key": "aum_by_asset_class",
+    "label": "AUM by Asset Class",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "liquid_alternatives",
+      "label": "Liquid alternatives",
+      "unit": "currency"
+     },
+     {
+      "key": "digital_assets",
+      "label": "Digital assets",
+      "unit": "currency"
+     },
+     {
+      "key": "currency_commodities",
+      "label": "Currency and commodities",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "net_flows_by_asset_class",
+    "label": "Net Flows by Asset Class",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "equity",
+      "label": "Equity",
+      "unit": "currency"
+     },
+     {
+      "key": "fixed_income",
+      "label": "Fixed income",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset",
+      "label": "Multi-asset",
+      "unit": "currency"
+     },
+     {
+      "key": "liquid_alternatives",
+      "label": "Liquid alternatives",
+      "unit": "currency"
+     },
+     {
+      "key": "digital_assets",
+      "label": "Digital assets",
+      "unit": "currency"
+     },
+     {
+      "key": "currency_commodities",
+      "label": "Currency and commodities",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "net_flows_by_region",
+    "label": "Net Flows by Region",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "americas",
+      "label": "Americas",
+      "unit": "currency"
+     },
+     {
+      "key": "emea",
+      "label": "EMEA",
+      "unit": "currency"
+     },
+     {
+      "key": "apac",
+      "label": "APAC",
+      "unit": "currency"
+     }
+    ]
    }
   ],
-  "note": "All draft lines are stated for the quarter. Uncertain: the two base-fee totals and the two Cash Management lines are the same figures in both breakdowns and are kept as rows of their own breakdown; private markets fundraising and deployment come from supplement chart text with ambiguous label order."
+  "note": "All draft lines are stated for the quarter. Uncertain: the two base-fee totals and the two Cash Management lines are the same figures in both breakdowns and are kept as rows of their own breakdown; private markets fundraising and deployment come from supplement chart text with ambiguous label order.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 12,
+   "removed": 0,
+   "note": "All twelve are in the AUM and net flows tables for the quarter; none repeats a held-out line."
+  }
  },
  "BX": {
   "name": "Blackstone",
@@ -709,6 +843,11 @@
       "key": "invested_performance_eligible_aum",
       "label": "Invested Performance Eligible AUM",
       "unit": "currency"
+     },
+     {
+      "key": "capital_committed_not_yet_deployed",
+      "label": "Capital Committed Not Yet Deployed",
+      "unit": "currency"
      }
     ]
    },
@@ -735,6 +874,21 @@
      {
       "key": "realized_principal_investment_income",
       "label": "Realized Principal Investment Income",
+      "unit": "currency"
+     },
+     {
+      "key": "incentive_fees",
+      "label": "Incentive Fees",
+      "unit": "currency"
+     },
+     {
+      "key": "interest_and_dividend_revenue",
+      "label": "Interest and Dividend Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "other",
+      "label": "Other",
       "unit": "currency"
      }
     ]
@@ -792,9 +946,124 @@
       "unit": "currency"
      }
     ]
+   },
+   {
+    "key": "net_flows_by_segment",
+    "label": "Net Flows by Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "real_estate_net_flows",
+      "label": "Real Estate",
+      "unit": "currency"
+     },
+     {
+      "key": "private_equity_net_flows",
+      "label": "Private Equity",
+      "unit": "currency"
+     },
+     {
+      "key": "credit_insurance_net_flows",
+      "label": "Credit & Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset_investing_net_flows",
+      "label": "Multi-Asset Investing",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "capital_deployed_by_segment",
+    "label": "Capital Deployed by Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "real_estate_capital_deployed",
+      "label": "Real Estate",
+      "unit": "currency"
+     },
+     {
+      "key": "private_equity_capital_deployed",
+      "label": "Private Equity",
+      "unit": "currency"
+     },
+     {
+      "key": "credit_insurance_capital_deployed",
+      "label": "Credit & Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset_investing_capital_deployed",
+      "label": "Multi-Asset Investing",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "realizations_by_segment",
+    "label": "Realizations by Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "real_estate_realizations",
+      "label": "Real Estate",
+      "unit": "currency"
+     },
+     {
+      "key": "private_equity_realizations",
+      "label": "Private Equity",
+      "unit": "currency"
+     },
+     {
+      "key": "credit_insurance_realizations",
+      "label": "Credit & Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset_investing_realizations",
+      "label": "Multi-Asset Investing",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "fee_related_earnings_by_segment",
+    "label": "Fee-Related Earnings by Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "real_estate_fee_related_earnings",
+      "label": "Real Estate",
+      "unit": "currency"
+     },
+     {
+      "key": "private_equity_fee_related_earnings",
+      "label": "Private Equity",
+      "unit": "currency"
+     },
+     {
+      "key": "credit_insurance_fee_related_earnings",
+      "label": "Credit & Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset_investing_fee_related_earnings",
+      "label": "Multi-Asset Investing",
+      "unit": "currency"
+     }
+    ]
    }
   ],
-  "note": "Removed Distributable Earnings (profit measure) and Net Accrued Performance Revenues (balance-sheet carry figure; uncertain, some treat it as a backlog metric). Fee Related Earnings is kept because the filing makes it a headline measure (first item of the quarter's highlights and the top subtotal of every segment table); flip it if the usual removal should win."
+  "note": "Removed Distributable Earnings (profit measure) and Net Accrued Performance Revenues (balance-sheet carry figure; uncertain, some treat it as a backlog metric). Fee Related Earnings is kept because the filing makes it a headline measure (first item of the quarter's highlights and the top subtotal of every segment table); flip it if the usual removal should win.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 20,
+   "removed": 8,
+   "note": "Inflows by segment are already held (added in the first review). Uncertain: net accrued performance revenues by segment removed to match the first review's removal of the total; Fee Related Earnings by segment kept under the owner's rule; the three GAAP revenue lines (incentive fees, interest and dividend, other) are kept though the held-out revenue-by-type lines are on the segment basis."
+  }
  },
  "CME": {
   "name": "CME Group",
@@ -882,6 +1151,11 @@
       "key": "metals_rpc",
       "label": "Metals RPC",
       "unit": "currency"
+     },
+     {
+      "key": "trading_days",
+      "label": "Trading Days",
+      "unit": "count"
      }
     ]
    },
@@ -935,7 +1209,14 @@
     ]
    }
   ],
-  "note": "All draft lines are stated; added the revenue breakdown from the income statement and ADV by venue. Uncertain: Non-U.S. ADV is kept though stated only in release text as a rounded 9 million contracts."
+  "note": "All draft lines are stated; added the revenue breakdown from the income statement and ADV by venue. Uncertain: Non-U.S. ADV is kept though stated only in release text as a rounded 9 million contracts.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 1,
+   "removed": 1,
+   "note": "Trading Days is in the statistics table and kept. Uncertain: the $100 billion average daily capital efficiencies is a 'new high' in the CEO quote, not a recurring table measure."
+  }
  },
  "CVX": {
   "name": "Chevron",
@@ -1032,7 +1313,14 @@
     ]
    }
   ],
-  "note": "All draft lines match the segment tables and the exhibit has no revenue breakdown to add. Uncertain: U.S. Refinery Crude Unit Utilization is stated only in prose and may not appear every quarter."
+  "note": "All draft lines match the segment tables and the exhibit has no revenue breakdown to add. Uncertain: U.S. Refinery Crude Unit Utilization is stated only in prose and may not appear every quarter.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 0,
+   "removed": 6,
+   "note": "All six are the same figures as held-out lines under the Operating Metrics group (U.S. and total production, U.S. refinery inputs and product sales), regrouped by region."
+  }
  },
  "ELV": {
   "name": "Elevance Health",
@@ -1230,7 +1518,14 @@
     ]
    }
   ],
-  "note": "The owner keeps insurers' expense ratios (2026-11-17), so the operating expense ratio and its adjusted form stay; the benefit expense ratio is kept as the insurer's loss ratio. Uncertain: Days in Claims Payable is kept though stated only in prose, and Total Health Benefits Operating Revenue equals the Health Benefits segment line but is kept as its breakdown's total."
+  "note": "The owner keeps insurers' expense ratios (2026-11-17), so the operating expense ratio and its adjusted form stay; the benefit expense ratio is kept as the insurer's loss ratio. Uncertain: Days in Claims Payable is kept though stated only in prose, and Total Health Benefits Operating Revenue equals the Health Benefits segment line but is kept as its breakdown's total.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 0,
+   "removed": 1,
+   "note": "Individual membership (1,348) is already held, added in the first review."
+  }
  },
  "FITB": {
   "name": "Fifth Third Bancorp",
@@ -1642,11 +1937,23 @@
       "key": "comparable_sales_in_the_u_s",
       "label": "Comparable Sales in the U.S.",
       "unit": "percent"
+     },
+     {
+      "key": "associates",
+      "label": "Associates",
+      "unit": "count"
      }
     ]
    }
   ],
-  "note": "All draft lines are stated. Uncertain: SRS Locations is stated only as 'over 1,340', not an exact count."
+  "note": "All draft lines are stated. Uncertain: SRS Locations is stated only as 'over 1,340', not an exact count.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 1,
+   "removed": 0,
+   "note": "Uncertain: associates is stated only as 'over 470,000' in the company description, kept as headcount."
+  }
  },
  "INTU": {
   "name": "Intuit",
@@ -1720,9 +2027,28 @@
       "unit": "currency"
      }
     ]
+   },
+   {
+    "key": "revenue_by_type",
+    "label": "Revenue by Type",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "product_and_other",
+      "label": "Product and other",
+      "unit": "currency"
+     }
+    ]
    }
   ],
-  "note": "Removed all three TurboTax unit lines: the unit table has only full-fiscal-year columns. Uncertain: the added segment amounts come from prose rounded to $0.1B, Online Ecosystem is a subset of Global Business Solutions, and the two added growth lines are for named products."
+  "note": "Removed all three TurboTax unit lines: the unit table has only full-fiscal-year columns. Uncertain: the added segment amounts come from prose rounded to $0.1B, Online Ecosystem is a subset of Global Business Solutions, and the two added growth lines are for named products.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 1,
+   "removed": 1,
+   "note": "Product and Other revenue (571) is on the income statement for the quarter; Desktop Units is stated only for the full fiscal year."
+  }
  },
  "ISRG": {
   "name": "Intuitive Surgical",
@@ -1785,6 +2111,16 @@
       "key": "ion_procedure_growth",
       "label": "Ion Procedure Growth",
       "unit": "percent"
+     },
+     {
+      "key": "davinci_installed_base_growth",
+      "label": "da Vinci Installed Base Growth",
+      "unit": "percent"
+     },
+     {
+      "key": "ion_installed_base_growth",
+      "label": "Ion Installed Base Growth",
+      "unit": "percent"
      }
     ]
    },
@@ -1816,7 +2152,14 @@
     ]
    }
   ],
-  "note": "All draft lines are stated; added revenue by type and procedure growth. Uncertain: procedure growth is stated only as an approximate percentage with no procedure count, kept as growth of a named unit count."
+  "note": "All draft lines are stated; added revenue by type and procedure growth. Uncertain: procedure growth is stated only as an approximate percentage with no procedure count, kept as growth of a named unit count.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 2,
+   "removed": 1,
+   "note": "Installed base growth (12% and 21%) is stated and kept as unit-count growth. Uncertain: 'over 10,000 procedures per day' is a CEO-quote approximation, removed."
+  }
  },
  "JNJ": {
   "name": "Johnson & Johnson",
@@ -2439,6 +2782,11 @@
       "key": "commercial_mortgage_loans_serviced_for_o",
       "label": "Commercial Mortgage Loans Serviced for Others (Total)",
       "unit": "currency"
+     },
+     {
+      "key": "accruing_loans_past_due_90_days",
+      "label": "Accruing Loans Past Due 90 Days or More",
+      "unit": "currency"
      }
     ]
    },
@@ -2519,9 +2867,60 @@
       "unit": "currency"
      }
     ]
+   },
+   {
+    "key": "loans_by_type",
+    "label": "Loans by Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "commercial_and_industrial",
+      "label": "Commercial and industrial",
+      "unit": "currency"
+     },
+     {
+      "key": "real_estate_commercial",
+      "label": "Real estate - commercial",
+      "unit": "currency"
+     },
+     {
+      "key": "real_estate_residential",
+      "label": "Real estate - residential",
+      "unit": "currency"
+     },
+     {
+      "key": "consumer",
+      "label": "Consumer",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "deposits_by_type",
+    "label": "Deposits by Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "noninterest_bearing_deposits",
+      "label": "Noninterest-bearing deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "interest_bearing_deposits",
+      "label": "Interest-bearing deposits",
+      "unit": "currency"
+     }
+    ]
    }
   ],
-  "note": "Removed Tier 1 and TCE/TA; CET1, net interest margin and the efficiency ratio are kept at the owner's decision as core measures of a bank's business, and credit-quality ratios and nonperforming assets are kept as operating measures. Uncertain: Net Interest Income is added as a revenue component, and criticized loans is read from presentation chart text; the filing states no AUM."
+  "note": "Removed Tier 1 and TCE/TA; CET1, net interest margin and the efficiency ratio are kept at the owner's decision as core measures of a bank's business, and credit-quality ratios and nonperforming assets are kept as operating measures. Uncertain: Net Interest Income is added as a revenue component, and criticized loans is read from presentation chart text; the filing states no AUM.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 7,
+   "removed": 1,
+   "note": "Uncertain: the four loans-by-type lines are kept on the period-end table (the held-out list has the averages; the draft labels do not say which), and the allowance amount is removed as a balance-sheet reserve though its ratio is held."
+  }
  },
  "MU": {
   "name": "Micron Technology",
@@ -2623,11 +3022,23 @@
       "key": "large_load_hubs_in_development",
       "label": "Large-Load Hubs in Development",
       "unit": "count"
+     },
+     {
+      "key": "fpl_regulatory_capital_employed_growth",
+      "label": "FPL Regulatory Capital Employed Growth",
+      "unit": "percent"
      }
     ]
    }
   ],
-  "note": "Removed the recontracting line, stated only year to date. Uncertain: Large-Load Hubs in Development is kept on its current count (the year-end figure is a forecast) though it is a prose pipeline figure, and Projects Placed Into Service is measured since the last earnings call, not the calendar quarter."
+  "note": "Removed the recontracting line, stated only year to date. Uncertain: Large-Load Hubs in Development is kept on its current count (the year-end figure is a forecast) though it is a prose pipeline figure, and Projects Placed Into Service is measured since the last earnings call, not the calendar quarter.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 1,
+   "removed": 4,
+   "note": "Uncertain: FPL regulatory capital employed growth (about 9.2%) is kept because the release headlines it each quarter, though it is growth of a capital base; the federal hub total (16.5 GW) and transmission capital ($12.7 billion since December) are cumulative prose figures."
+  }
  },
  "PGR": {
   "name": "Progressive",
@@ -2692,9 +3103,58 @@
       "unit": "count"
      }
     ]
+   },
+   {
+    "key": "policies_in_force_growth",
+    "label": "Policies in Force Growth",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "agency_auto",
+      "label": "Agency Auto",
+      "unit": "percent"
+     },
+     {
+      "key": "direct_auto",
+      "label": "Direct Auto",
+      "unit": "percent"
+     },
+     {
+      "key": "special_lines",
+      "label": "Special Lines",
+      "unit": "percent"
+     },
+     {
+      "key": "property",
+      "label": "Property",
+      "unit": "percent"
+     },
+     {
+      "key": "total_personal_lines",
+      "label": "Total Personal Lines",
+      "unit": "percent"
+     },
+     {
+      "key": "commercial_lines",
+      "label": "Commercial Lines",
+      "unit": "percent"
+     },
+     {
+      "key": "total",
+      "label": "Total",
+      "unit": "percent"
+     }
+    ]
    }
   ],
-  "note": "This is the September monthly release: only net premiums written, net premiums earned and the combined ratio have a Quarter column, so the segment premiums and the loss/LAE, expense and catastrophe ratios (month and year-to-date only) are removed. Uncertain: the draft's Companywide total did not say written or earned, so it is removed and Net Premiums Earned added."
+  "note": "This is the September monthly release: only net premiums written, net premiums earned and the combined ratio have a Quarter column, so the segment premiums and the loss/LAE, expense and catastrophe ratios (month and year-to-date only) are removed. Uncertain: the draft's Companywide total did not say written or earned, so it is removed and Net Premiums Earned added.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 7,
+   "removed": 1,
+   "note": "Total policies in force (40,489) is already held; the seven growth lines are the table's % Change column and kept as unit-count growth."
+  }
  },
  "PLD": {
   "name": "Prologis",
@@ -2819,11 +3279,136 @@
       "key": "operating_portfolio_leased",
       "label": "Operating Portfolio Leased",
       "unit": "percent"
+     },
+     {
+      "key": "development_portfolio_tei",
+      "label": "Development Portfolio (TEI, Prologis Share)",
+      "unit": "currency"
+     },
+     {
+      "key": "top_25_customer_share",
+      "label": "Top 25 Customer Share of Net Effective Rent",
+      "unit": "percent"
+     }
+    ]
+   },
+   {
+    "key": "leasing_activity",
+    "label": "Leasing Activity",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "renewals",
+      "label": "Renewals",
+      "unit": "count"
+     },
+     {
+      "key": "properties_under_development",
+      "label": "Properties under Development",
+      "unit": "count"
+     }
+    ]
+   },
+   {
+    "key": "operating_portfolio_square_feet",
+    "label": "Operating Portfolio Square Feet by Region",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "us",
+      "label": "U.S.",
+      "unit": "count"
+     },
+     {
+      "key": "other_americas",
+      "label": "Other Americas",
+      "unit": "count"
+     },
+     {
+      "key": "europe",
+      "label": "Europe",
+      "unit": "count"
+     },
+     {
+      "key": "asia",
+      "label": "Asia",
+      "unit": "count"
+     }
+    ]
+   },
+   {
+    "key": "occupancy_by_region",
+    "label": "Occupancy by Region",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "us",
+      "label": "U.S.",
+      "unit": "percent"
+     },
+     {
+      "key": "other_americas",
+      "label": "Other Americas",
+      "unit": "percent"
+     },
+     {
+      "key": "europe",
+      "label": "Europe",
+      "unit": "percent"
+     },
+     {
+      "key": "asia",
+      "label": "Asia",
+      "unit": "percent"
+     }
+    ]
+   },
+   {
+    "key": "lease_expirations",
+    "label": "Net Effective Rent by Lease Expiration Year",
+    "kind": "mix",
+    "kpis": [
+     {
+      "key": "exp_2026",
+      "label": "2026",
+      "unit": "percent"
+     },
+     {
+      "key": "exp_2027",
+      "label": "2027",
+      "unit": "percent"
+     },
+     {
+      "key": "exp_2028",
+      "label": "2028",
+      "unit": "percent"
+     },
+     {
+      "key": "exp_2029",
+      "label": "2029",
+      "unit": "percent"
+     },
+     {
+      "key": "exp_2030",
+      "label": "2030",
+      "unit": "percent"
+     },
+     {
+      "key": "thereafter",
+      "label": "Thereafter",
+      "unit": "percent"
      }
     ]
    }
   ],
-  "note": "Removed Operating Portfolio NOI as a profit measure; same-store NOI growth and rent change are kept as operating metrics (like same-store sales) though they are growth of a non-GAAP measure. Uncertain: development starts and stabilizations are kept as deployment volumes, with acquisitions and dispositions added on the same reasoning; the two AUM figures come from supplement chart labels; Fee Related Earnings not added."
+  "note": "Removed Operating Portfolio NOI as a profit measure; same-store NOI growth and rent change are kept as operating metrics (like same-store sales) though they are growth of a non-GAAP measure. Uncertain: development starts and stabilizations are kept as deployment volumes, with acquisitions and dispositions added on the same reasoning; the two AUM figures come from supplement chart labels; Fee Related Earnings not added.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 18,
+   "removed": 7,
+   "note": "NOI by region removed to match the first review's NOI removal; the two totals repeat held-out lines. Uncertain: estimated value creation is removed as an estimated development profit, the development portfolio TEI is kept as a pipeline balance, and the lease-expiration mix is kept as a mix stated in full."
+  }
  },
  "RF": {
   "name": "Regions Financial",
@@ -2993,6 +3578,16 @@
       "key": "mobile_banking_active_users",
       "label": "Mobile Banking Active Users",
       "unit": "count"
+     },
+     {
+      "key": "nonperforming_assets_ratio_ex_90",
+      "label": "Nonperforming Assets Ratio (Excluding 90+ Past Due)",
+      "unit": "percent"
+     },
+     {
+      "key": "nonperforming_assets_ratio_inc_90",
+      "label": "Nonperforming Assets Ratio (Including 90+ Past Due)",
+      "unit": "percent"
      }
     ]
    },
@@ -3184,9 +3779,33 @@
       "unit": "percent"
      }
     ]
+   },
+   {
+    "key": "mortgage_income_by_type",
+    "label": "Mortgage Income by Type",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "production_and_sales",
+      "label": "Production and Sales",
+      "unit": "currency"
+     },
+     {
+      "key": "msr_hedge_impact",
+      "label": "MSR and Related Hedge Impact",
+      "unit": "currency"
+     }
+    ]
    }
   ],
-  "note": "Removed Tier 1 and leverage; CET1, net interest margin and the efficiency ratio are kept at the owner's decision as core measures of a bank's business. Uncertain: loans-to-deposits is kept as a liquidity ratio, Net Interest Income is added as a revenue component, and mobile active users is matched to its chart by its growth label."
+  "note": "Removed Tier 1 and leverage; CET1, net interest margin and the efficiency ratio are kept at the owner's decision as core measures of a bank's business. Uncertain: loans-to-deposits is kept as a liquidity ratio, Net Interest Income is added as a revenue component, and mobile active users is matched to its chart by its growth label.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 4,
+   "removed": 4,
+   "note": "Four lines repeat held-out lines (CET1, nonperforming loan ratio, loans to deposits, branches at 1,246). The two nonperforming asset ratios and the two mortgage income components are stated in tables and kept."
+  }
  },
  "SBUX": {
   "name": "Starbucks",
@@ -3375,9 +3994,45 @@
       "unit": "currency"
      }
     ]
+   },
+   {
+    "key": "international_revenue_by_business_model",
+    "label": "International Revenue by Business Model",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "intl_other_revenue",
+      "label": "Other",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "net_coffeehouse_openings",
+    "label": "Net Coffeehouse Openings and Transfers",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "opening_na_licensed",
+      "label": "North America Licensed",
+      "unit": "count"
+     },
+     {
+      "key": "opening_intl_company_operated",
+      "label": "International Company-operated",
+      "unit": "count"
+     }
+    ]
    }
   ],
-  "note": "All draft lines are stated; added revenue by segment, transactions and ticket by region, and store counts by segment and ownership. Left out each segment's revenue by operation type and the lone U.S. net revenues figure."
+  "note": "All draft lines are stated; added revenue by segment, transactions and ticket by region, and store counts by segment and ownership. Left out each segment's revenue by operation type and the lone U.S. net revenues figure.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 3,
+   "removed": 3,
+   "note": "Global ticket, total North America net openings and total company net openings are already held; the other three are in the segment and store tables."
+  }
  },
  "TRV": {
   "name": "Travelers Companies",
@@ -3649,9 +4304,33 @@
       "unit": "currency"
      }
     ]
+   },
+   {
+    "key": "bond_specialty_nwp_by_product",
+    "label": "Bond & Specialty Insurance Net Written Premiums by Product Line",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "fidelity_and_surety",
+      "label": "Fidelity and surety",
+      "unit": "currency"
+     },
+     {
+      "key": "general_liability",
+      "label": "General liability",
+      "unit": "currency"
+     }
+    ]
    }
   ],
-  "note": "Removed Personal Insurance International, which shows a dash after the Canadian divestiture. Uncertain: Underlying Combined Ratio is kept although adjusted because the release headlines it; Business Insurance retention, renewal premium change and new business are added from prose rather than a table; the Business and Personal Insurance product totals repeat their segment lines."
+  "note": "Removed Personal Insurance International, which shows a dash after the Canadian divestiture. Uncertain: Underlying Combined Ratio is kept although adjusted because the release headlines it; Business Insurance retention, renewal premium change and new business are added from prose rather than a table; the Business and Personal Insurance product totals repeat their segment lines.",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 2,
+   "removed": 17,
+   "note": "The investment portfolio is a balance-sheet breakdown; seven lines repeat held-out figures, including the Bond & Specialty product-line total, which equals the segment's net written premiums. Fidelity and Surety and General Liability premiums are kept."
+  }
  },
  "TXN": {
   "name": "Texas Instruments",
@@ -3929,6 +4608,16 @@
       "key": "wireless_retail_core_prepaid_phone_net_a",
       "label": "Wireless Retail Core Prepaid Phone Net Additions",
       "unit": "count"
+     },
+     {
+      "key": "consumer_postpaid_phone_churn",
+      "label": "Consumer Postpaid Phone Churn",
+      "unit": "percent"
+     },
+     {
+      "key": "employees",
+      "label": "Employees",
+      "unit": "count"
      }
     ]
    },
@@ -3955,6 +4644,13 @@
     ]
    }
   ],
-  "note": "All draft lines are stated, each revenue group in its own segment table. Left out figures that appear only in the highlights text (postpaid net account additions, Consumer postpaid phone churn, total mobility and broadband service revenue)."
+  "note": "All draft lines are stated, each revenue group in its own segment table. Left out figures that appear only in the highlights text (postpaid net account additions, Consumer postpaid phone churn, total mobility and broadband service revenue).",
+  "metricGroupsReview": {
+   "run": "44002962609",
+   "reviewed": "2026-11-17",
+   "kept": 2,
+   "removed": 1,
+   "note": "Postpaid phone churn (0.94%) is the held-out Wireless Retail Postpaid Phone Churn. Uncertain: Consumer postpaid phone churn (0.87%) is kept though stated only in the highlights text."
+  }
  }
 }

@@ -34,20 +34,53 @@ def _norm(label: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", _NANOMETER.sub(r"\1nm", label.lower()).replace("&", " and ")))
 
 
+# A line read with its group's title, for lines a group names only by their row ("United States" under "Net
+# Oil-Equivalent Production by Region" is Chevron's U.S. Net Oil-Equivalent Production; "Total" under "Policies in
+# Force" is Total Policies in Force). Its words must be the other line's words exactly, so it never pairs loosely.
+_PLACE_SYNONYMS = ((re.compile(r"\bunited states\b|\bu\.?\s?s\.?(?=\s|$)"), "us"), (re.compile(r"&"), " and "))
+_CONTEXT_STOP = {"and", "of", "the", "in", "for", "a", "total", "consolidated", "company", "by"}
+_BY_CLAUSE = re.compile(r"\s+by\s+.*$", re.I)
+
+
+def _words(text: str) -> frozenset[str]:
+    text = text.lower()
+    for pattern, replacement in _PLACE_SYNONYMS:
+        text = pattern.sub(replacement, text)
+    return frozenset(word for word in re.findall(r"[a-z0-9]+", text) if word not in _CONTEXT_STOP)
+
+
+def _in_context(label: str, group_label: str) -> frozenset[str]:
+    return _words(f"{label} {_BY_CLAUSE.sub('', group_label)}")
+
+
+def _contexts(groups: list[dict]) -> list[frozenset[str]]:
+    """Each of _kpis(groups)' lines read with its group's title, in the same order."""
+    return [_in_context(label, str(group.get("label") or "")) for group in groups or [] for kpi in group.get("kpis") or []
+            if not (group.get("total_kpi") and kpi.get("key") == group.get("total_kpi"))
+            and (label := _UNIT_WORDS.sub("", str(kpi.get("label") or "")).strip())]
+
+
 def _same_kpi(a: str, b: str) -> bool:
     # Labels written differently for the same KPI ("Non-strategic" and "Non-strategic revenue", "(in thousands)").
     return labels_agree(a, b) and labels_agree(b, a)
 
 
-def match_one_to_one(owner: list[str], fresh: list[str]) -> dict[int, int]:
-    """Owner line index -> fresh line index: the same label first, then labels that agree both ways, each line once."""
+def match_one_to_one(owner: list[str], fresh: list[str], owner_context: list[frozenset] | None = None,
+                     fresh_context: list[frozenset] | None = None) -> dict[int, int]:
+    """Owner line index -> fresh line index: the same label first, then (with their groups' titles) lines whose words
+    read with their groups are the same, then labels that agree both ways; each line once."""
     matched: dict[int, int] = {}
     used: set[int] = set()
-    for test in (lambda a, b: _norm(a) == _norm(b), _same_kpi):
-        for i, label in enumerate(owner):
+    tests = [lambda i, j: _norm(owner[i]) == _norm(fresh[j])]
+    if owner_context is not None and fresh_context is not None:
+        # Before labels that only agree: "Real Estate" under Inflows by Segment is Real Estate Inflows, never the AUM row.
+        tests.append(lambda i, j: bool(fresh_context[j]) and fresh_context[j] in (_words(owner[i]), owner_context[i]))
+    tests.append(lambda i, j: _same_kpi(owner[i], fresh[j]))
+    for test in tests:
+        for i in range(len(owner)):
             if i in matched:
                 continue
-            j = next((j for j, other in enumerate(fresh) if j not in used and test(label, other)), None)
+            j = next((j for j in range(len(fresh)) if j not in used and test(i, j)), None)
             if j is not None:
                 matched[i], used = j, used | {j}
     return matched
@@ -79,7 +112,8 @@ def score_lists(fresh: dict[str, dict], owner: dict[str, dict], captured: dict[s
         if symbol not in fresh:
             continue
         mine, theirs = _kpis(spec.get("groups")), _kpis(fresh[symbol].get("groups"))
-        matched = match_one_to_one([label for _g, _k, label in mine], [label for _g, _k, label in theirs])
+        matched = match_one_to_one([label for _g, _k, label in mine], [label for _g, _k, label in theirs],
+                                   _contexts(spec.get("groups")), _contexts(fresh[symbol].get("groups")))
         current = current_lines(spec, spec.get("values"))
         is_current = [current is None or (group, key) in current for group, key, _label in mine]
         # Lines the run serves from XBRL (Adobe's customer groups, Unity's segments) are covered whatever the list says.
