@@ -57,18 +57,36 @@ def _balance(line: dict) -> bool:
         OPENING.search(label) or CLOSING.search(label) or DATED_CASH.search(label))
 
 
-def _quarter(line: dict, occurrence: int, others: list, statement: str):
-    """The fourth quarter's figure for the year's line: less the nine months' line of the same key and occurrence
-    (JPMorgan's 2007 income statement prints three lines keyed "Net income": the amount, and basic and diluted EPS),
-    only where both are amounts in one unit; a cash balance opens on the nine months' closing cash."""
+def _counterpart(line: dict, mine: list, others: list) -> dict | None:
+    """The nine months' line the year's line pairs with: the one line of its key on each side (a line keyed across
+    eras, XBRL beside print); where a key holds more, the line of the same concept, else of the same label, of the same
+    occurrence (JPMorgan's three "Net income" lines in 2007; EOG's 2020 cash flow keys three investing lines as its
+    section total). None where no such line is printed."""
+    if len(mine) == 1 and len(others) == 1:
+        return others[0]
+    for field in ("concept", "label"):
+        mark = line.get(field)
+        if mark:
+            same = [other for other in others if other.get(field) == mark]
+            index = next((position for position, item in enumerate(item for item in mine if item.get(field) == mark)
+                          if item is line), 0)
+            if same:
+                return same[index] if index < len(same) else None
+    return None
+
+
+def _quarter(line: dict, occurrence: int, others: list, statement: str, mine: list | None = None):
+    """The fourth quarter's figure for the year's line: less the nine months' line it pairs with (_counterpart), only
+    where both are amounts in one unit; a cash balance opens on the nine months' closing cash."""
     if statement == "cash_flow" and _balance(line):
         closing = [other for other in others if _balance(other)]
         opening = OPENING.search(str(line.get("label") or "")) or (len(closing) > 1 and occurrence == 0)
         return (closing[-1]["value"] if closing else None) if opening else line["value"]
-    if occurrence >= len(others):
-        return None
-    other = others[occurrence]
-    if not (_additive(line) and _additive(other)) or str(line.get("unit") or "") != str(other.get("unit") or ""):
+    if mine is None:
+        other = others[occurrence] if occurrence < len(others) else None
+    else:
+        other = _counterpart(line, mine, others)
+    if other is None or not (_additive(line) and _additive(other)) or str(line.get("unit") or "") != str(other.get("unit") or ""):
         return None
     return round(line["value"] - other["value"], 6)
 
@@ -135,7 +153,7 @@ def derive_fourth_quarters(chosen: list[dict], readings: list, keys: dict) -> li
         if pair is None:
             continue  # no year and nine months of one vintage: left underived rather than mixed
         nine, whole = pair
-        part = _keyed(nine, keys)
+        part, own = _keyed(nine, keys), _keyed(whole, keys)
         lines, seen = [], {}
         for position, line in enumerate(whole.lines):
             key = _key(statement, line, keys)
@@ -143,7 +161,7 @@ def derive_fourth_quarters(chosen: list[dict], readings: list, keys: dict) -> li
             if not line.get("is_heading") and line.get("value") is not None:
                 occurrence = seen[key] = seen.get(key, -1) + 1
                 if part.get(key):
-                    value = _quarter(line, occurrence, part[key], statement)
+                    value = _quarter(line, occurrence, part[key], statement, own[key])
             lines.append({**line, "line": position, "value": value, "key": key[0]})
         derived.append({
             "statement": statement, "fiscal_year": year, "fiscal_period": "Q4", "duration": "quarter",

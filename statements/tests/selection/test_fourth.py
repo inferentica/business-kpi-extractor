@@ -103,3 +103,14 @@ def test_a_count_tagged_without_its_unit_never_adds_up():
     assert not _additive({"label": "Basic", "concept": "us-gaap_WeightedAverageNumberOfSharesOutstandingBasic", "unit": "pure"})
     # Arista's "Basic" under net income available to common stockholders is dollars.
     assert _additive({"label": "Basic", "concept": "us-gaap_NetIncomeLossAvailableToCommonStockholdersBasic", "unit": "USD"})
+
+
+def test_a_key_holding_several_lines_pairs_them_by_concept():
+    # EOG's 2020 cash flow: the key across eras holds three investing lines, the nine months' only its section total.
+    from statement_extractor.selection.fourth import _quarter
+    other = {"label": "Other Investing Activities", "concept": "us-gaap_PaymentsForProceedsFromOtherInvestingActivities", "unit": "USD", "value": 0.0}
+    total = {"label": "Net Cash Used in Investing Activities", "concept": "us-gaap_NetCashProvidedByUsedInInvestingActivities", "unit": "USD", "value": -3_347.5}
+    nine = [{"label": "Net Cash Used in Investing Activities", "concept": "us-gaap_NetCashProvidedByUsedInInvestingActivities", "unit": "USD", "value": -2_710.6}]
+    mine = [other, total]
+    assert _quarter(other, 0, nine, "cash_flow", mine) is None
+    assert _quarter(total, 1, nine, "cash_flow", mine) == -636.9
