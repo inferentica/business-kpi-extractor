@@ -200,6 +200,8 @@ class CodeOnlyPipeline(SymbolPipeline):
                 if self._same_place_as_last(item, expected, document):
                     return "same row label, but its year-ago column differs from the stored figure"
                 if before is None:
+                    if self._last_quarter_cell_matches(item, document, expected, self._stored_last_quarter(expected).get(f"{group.key}.{item.kpi.key}")):
+                        continue
                     return "moved, and no year-ago figure is stored"
                 if not self._year_ago_cell_matches(item, document, before):
                     return "moved, and its year-ago column differs from the stored figure"

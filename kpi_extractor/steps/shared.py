@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from ..ai import Spec
 from ..sources.archive import filing_folder
@@ -86,35 +86,72 @@ def _year_ago_cells(document: Document, locator: dict, value: float,
     return list(cells.values())
 
 
-def repeated_in_quarter_columns(document: Document, locator: dict, value: float, expected: date, quarter: int) -> bool:
-    """Whether a figure's row states the same number for another quarter while the column read names this one: its
-    header names this quarter (by date or by number), and another column headed for a quarter, naming another period,
-    holds the number too. A stale column read in place of this quarter's names another quarter, so never passes."""
+def _this_quarter_column(document: Document, locator: dict, value: float, expected: date, quarter: int):
+    """A value's table, header row, row, column and unit when the column read names this quarter (by its date or its
+    quarter number) in the newest year, headed for a quarter; else None. The year-ago column may name the same quarter
+    ("<third quarter>" over 3Q23 too), so the newest year decides."""
     table = document.tables.get(str(locator.get("table")))
     if table is None or locator.get("row") is None or locator.get("col") is None:
-        return False
+        return None
     row, col = int(locator["row"]), int(locator["col"])
     current = parse_number(table.cell(row, col))
     factor = release_unit(value, current.value) if current is not None and current.value else None
     if factor is None:
-        return False
-    first = next((i for i, r in enumerate(table.rows) if r and any(parse_number(c) for c in r[1:])
-                  and re.search(r"[A-Za-z]", r[0]) and not all(re.fullmatch(r"(19|20)\d{2}", c.strip()) for c in r[1:] if c)), 1)
-
-    def quarter_column(index: int) -> bool:
-        return "quarter" in _spans(comparable_header(column_header(table, first, index))) or bool(_named_quarters(table, first, index))
-
+        return None
+    # Headers as the reading's own row sees them, as its locator recorded them ("quarter ended <second quarter>" over
+    # Truist's "2Q24"): a guessed first data row may be the line that names the quarters.
+    first = row
     dates, _years = column_dates(table, first, col)
     names_this = (any(abs((day - expected).days) <= PERIOD_TOLERANCE_DAYS for day in dates) if dates
                   else _named_quarters(table, first, col) == {quarter})
-    # Never the year-ago column, which may name the same quarter ("<third quarter>" over 3Q23 too): the newest year only.
-    if not names_this or not quarter_column(col) or not current_column(table, first, col):
-        return False
+    if not names_this or not _quarter_column(table, first, col) or not current_column(table, first, col):
+        return None
+    return table, first, row, col, factor
+
+
+def _quarter_column(table, first: int, index: int) -> bool:
+    return "quarter" in _spans(comparable_header(column_header(table, first, index))) or bool(_named_quarters(table, first, index))
+
+
+def _other_cells(table, row: int, col: int, factor: float):
     for other in range(1, len(table.rows[row])):
         text = table.cell(row, other) or ""
         cell = parse_number(text) if other != col and not re.search(r"[A-Za-z]", text) else None
-        if cell is not None and _same(cell.value * factor, value) and quarter_column(other) \
-                and _another_period(table, first, other, expected, quarter):
+        if cell is not None:
+            yield other, cell.value * factor
+
+
+def repeated_in_quarter_columns(document: Document, locator: dict, value: float, expected: date, quarter: int) -> bool:
+    """Whether a figure's row states the same number for another quarter while the column read names this one, in the
+    newest year: another column headed for a quarter, naming another period, holds the number too. A stale column read
+    in place of this quarter's names another quarter, so never passes."""
+    found = _this_quarter_column(document, locator, value, expected, quarter)
+    if found is None:
+        return False
+    table, first, row, col, factor = found
+    return any(_same(cell, value) and _quarter_column(table, first, other) and _another_period(table, first, other, expected, quarter)
+               for other, cell in _other_cells(table, row, col, factor))
+
+
+def previous_quarter_cell_matches(document: Document, locator: dict, value: float, previous: float | None, expected: date,
+                                  quarter: int) -> bool:
+    """Whether the row's column for the quarter before holds the figure stored for that quarter, while the column read
+    names this quarter in the newest year: the row is the KPI's and the column this quarter's (Truist's card and payment
+    fees, 230 for 2Q24 beside 1Q24's stored 224), the evidence a quarter read as it arrives has when no year-ago figure
+    is stored and no later release exists yet."""
+    if previous is None or not previous:
+        return False
+    found = _this_quarter_column(document, locator, value, expected, quarter)
+    if found is None:
+        return False
+    table, first, row, col, factor = found
+    before, end = 4 if quarter == 1 else quarter - 1, expected - timedelta(days=91)
+    for other, cell in _other_cells(table, row, col, factor):
+        if not _same(cell, previous) or not _quarter_column(table, first, other):
+            continue
+        dates, _years = column_dates(table, first, other)
+        if (any(abs((day - end).days) <= PERIOD_TOLERANCE_DAYS for day in dates) if dates
+                else _named_quarters(table, first, other) == {before}):
             return True
     return False
 
