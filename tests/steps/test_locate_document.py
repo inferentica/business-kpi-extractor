@@ -88,3 +88,17 @@ def test_a_metric_a_narrowed_reading_missed_is_read_again_from_the_whole_documen
     assert {item.kpi.key for item in read} == {"advisory", "underwriting"}
     assert "Other line 5" not in sent[0] and "Other line 5" in sent[1]  # the second reading had the whole document
     assert pipeline.result.second_read_reasons == {"narrowed_missed": 1}
+
+
+def test_a_supplement_past_select_s_limit_is_narrowed_too():
+    # JPMorgan's supplement runs past 120,000 characters, where Select picks its sections; the tables where each KPI sat
+    # last are narrower still (p4-finpages round 3).
+    from kpi_extractor.steps.ai_reading import MAX_DOCUMENT_CHARS
+    doc = supplement(filler_tables=500)
+    assert len(doc.render()) > MAX_DOCUMENT_CHARS
+    pipeline = run([("advisory", "Advisory"), ("underwriting", "Underwriting")])
+    text = pipeline._locate_document(doc, SPEC)
+    assert "[A_T500]" in text and "Other line 5" not in text and len(text) < MAX_DOCUMENT_CHARS * 0.6
+    # A KPI named nowhere still sends the usual document (Truist's margin went unread when it did not).
+    doc.tables["A_T500"].rows[2][0] = "Capital markets"
+    assert run([("advisory", "Advisory")])._last_places(doc, SPEC) is None
