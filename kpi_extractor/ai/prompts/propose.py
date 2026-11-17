@@ -15,17 +15,21 @@ Track:
 - Operating metrics that drive the business: users (DAU, MAU, DAP), paid members or subscribers, ARPU/ARPP, units \
 shipped or deliveries, wafer shipments, backlog or remaining performance obligations, bookings, gross bookings/GMV, \
 trips, same-store sales, store count, net revenue retention, ARR, ad impressions and price per ad growth.
+- Growth the company states for one named product, platform, user base, unit count or headcount (Vector growth, \
+AI-first ARR growth, Daily Active People growth, paid units growth, headcount growth), as a percent. A product's \
+revenue growth only when the company gives no amount for that revenue: growth is computed from amounts.
 
-Never track: total revenue on its own, revenue or profit growth rates (including FX-neutral or constant-currency \
-growth), costs, margins, operating or net income, EPS, cash flow or balance sheet lines, content, purchase or lease \
+Never track: total revenue on its own, growth of total revenue, of a segment's revenue or of profit (including \
+organic, FX-neutral or constant-currency growth), costs, margins, operating or net income, EPS, cash flow or balance sheet lines, content, purchase or lease \
 obligations, non-GAAP adjustments, guidance or outlook, dividends and buybacks, or anything not given as a number for \
 the reported quarter. Industry hints, when given after this task, lift this list only for the measures they name.
 
 When the documents give a breakdown as amounts (for example a financial report's revenue by technology in NT$), track \
 the amounts as a revenue_breakdown and do not also track its percentage shares: shares are computed from amounts. \
 Track a percentage mix only when the company gives no amounts for it, and only when it states every share.
-Do not track a breakdown that has the same rows as one listed under "Already covered by XBRL", even under another \
-title.
+Do not track a breakdown whose rows have the same names as one listed under "Already covered by XBRL" (the same \
+segments, products or regions, whatever its title). A table that splits revenue another way (strategic and \
+non-strategic revenue beside the segments, or one segment's products) is not covered: track it.
 
 Every group must be checkable: a revenue breakdown whose parts add up to a total row shown beside them, a mix whose shares \
 add up to about 100, or operating metrics reported the same way each quarter. A breakdown's rows are parts of revenue \
@@ -35,7 +39,7 @@ noninterest revenue listed together.
 Rules:
 - kind "revenue_breakdown": currency amounts that together make up revenue. Amounts that are not revenue (annualized rent, loans, deposits, client assets, backlog, bookings) are operating metrics, never a revenue_breakdown. Include the table's total row as a KPI and \
 name it in "total_kpi", with at least two parts beside it; a single amount (e.g. AI revenue) is a metric, not a \
-breakdown. Skip any breakdown listed under "Already covered by XBRL".
+breakdown. Skip a breakdown whose rows are those of one under "Already covered by XBRL".
 - kind "mix": percentages that add up to about 100.
 - kind "metric": standalone operating metrics; put them all in one group keyed "operating", labelled "Operating Metrics".
 - unit is one of currency, percent, count, ratio (a percentage growth rate is "percent").
