@@ -53,6 +53,10 @@ def repeats_xbrl(group, covered: list[set[str]]) -> bool:
     """Whether a group (of any kind) names the same rows as a breakdown the company still tags in XBRL (Meta's Family
     of Apps and Reality Labs, once added as "metrics"): read by code with its whole history, never again from
     releases."""
+    # XBRL breakdowns are amounts: lines in another unit name the same rows but measure something else (Caterpillar's
+    # dealer retail sales growth by region beside its sales by region). Shares of a breakdown (a mix) still repeat it.
+    if group.kind != "mix" and not any(kpi.unit == "currency" for kpi in group.kpis):
+        return False
     # A subtotal row the release adds ("Total Optum" beside its three segments, UnitedHealth) does not make it new.
     # "Agents and Infra Revenue" is the 10-Q's "Agents and Infra" (Microsoft's release names each line so).
     names = {_REVENUE_SUFFIX.sub("", _identity_text(kpi.label)) for kpi in group.kpis
