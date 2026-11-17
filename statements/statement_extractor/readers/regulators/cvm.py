@@ -22,6 +22,13 @@ _KEY_CONCEPTS = {("balance", "1"): "cvm_Assets", ("balance", "2"): "cvm_EquityAn
                  ("cash_flow", "6.05.02"): "cvm_CashAndCashEquivalents"}
 
 
+def _scale(code: str, unit: float) -> float:
+    """A line's scale: the form's money scale, except earnings per share (3.99, "Lucro por Ação - (Reais / Ação)"),
+    filed in reais a share whatever the form's scale (Ambev's Q2 2026 ITR: 0.45837 in a form in thousands). A form
+    that typed them in thousands is kept as filed (Copel's DFP 2010, Ambev's DFP 2013 parent: 0.00075)."""
+    return 1.0 if code == "3.99" or code.startswith("3.99.") else unit
+
+
 def _order(code: str) -> tuple[int, ...]:
     return tuple(int(part) for part in code.split(".") if part.isdigit())
 
@@ -49,7 +56,7 @@ def cvm_readings(form: str, rows: dict[str, list[dict]], fiscal_year_end: str, y
             continue
         unit = _SCALES.get(lines[0]["ESCALA_MOEDA"].upper(), 1000.0)
         ordered = sorted(lines, key=lambda row: _order(row["CD_CONTA"]))
-        values = {row["CD_CONTA"]: float(row["VL_CONTA"]) * unit for row in ordered}
+        values = {row["CD_CONTA"]: float(row["VL_CONTA"]) * _scale(row["CD_CONTA"], unit) for row in ordered}
         if not any(values.values()):
             continue  # a statement filed empty: TIM S.A.'s consolidated forms in quarters it had no subsidiaries
         reading = Reading(
@@ -62,7 +69,7 @@ def cvm_readings(form: str, rows: dict[str, list[dict]], fiscal_year_end: str, y
             lines=[{"line": index, "concept": _KEY_CONCEPTS.get((statement, row["CD_CONTA"]), f"cvm_{row['CD_CONTA']}"),
                     "code": row["CD_CONTA"], "label": row["DS_CONTA"], "fixed": row.get("ST_CONTA_FIXA") == "S",
                     "level": min(20, row["CD_CONTA"].count(".")), "is_heading": False, "value": values[row["CD_CONTA"]],
-                    "decimals": printed_decimals(float(row["VL_CONTA"]), unit)}
+                    "decimals": printed_decimals(float(row["VL_CONTA"]), _scale(row["CD_CONTA"], unit))}
                    for index, row in enumerate(ordered)],
             checks=cvm_checks(statement, values, unit, {row['CD_CONTA'] for row in ordered if row.get('ST_CONTA_FIXA') == 'S'}))
         readings.append(reading)

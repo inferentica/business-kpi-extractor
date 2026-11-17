@@ -22618,6 +22618,66 @@
    "era": "text",
    "checked": "read by hand",
    "note": "s7-sectionsums 2026-11-16, review T1e: the 10-Q's printed row, in thousands; was served as USD/share before s7-printedunits (PR 129)"
+  },
+  {
+   "symbol": "ABEV",
+   "statement": "income",
+   "fiscal_year": "2026",
+   "fiscal_period": "Q2",
+   "duration": "ytd",
+   "concept": "cvm_3.99.01.01",
+   "label": "ON",
+   "value": 0.4584,
+   "scale": 0.0001,
+   "source_accession": "0001292814-26-003969",
+   "era": "release",
+   "checked": "read by hand",
+   "note": "s7-cvmeps 2026-11-17, review D2: the 6-K 0001292814-26-003969 prints it; served from CVM's ITR as 1,000 times it before s7-cvmeps"
+  },
+  {
+   "symbol": "ABEV",
+   "statement": "income",
+   "fiscal_year": "2026",
+   "fiscal_period": "Q2",
+   "duration": "ytd",
+   "concept": "cvm_3.99.02.01",
+   "label": "ON",
+   "value": 0.4564,
+   "scale": 0.0001,
+   "source_accession": "0001292814-26-003969",
+   "era": "release",
+   "checked": "read by hand",
+   "note": "s7-cvmeps 2026-11-17, review D2: the 6-K 0001292814-26-003969 prints it; served from CVM's ITR as 1,000 times it before s7-cvmeps"
+  },
+  {
+   "symbol": "ABEV",
+   "statement": "income",
+   "fiscal_year": "2026",
+   "fiscal_period": "Q2",
+   "duration": "quarter",
+   "concept": "cvm_3.99.01.01",
+   "label": "ON",
+   "value": 0.217,
+   "scale": 0.001,
+   "source_accession": "0001292814-26-003969",
+   "era": "release",
+   "checked": "read by hand",
+   "note": "s7-cvmeps 2026-11-17, review D2: the 6-K 0001292814-26-003969 prints it; served from CVM's ITR as 1,000 times it before s7-cvmeps"
+  },
+  {
+   "symbol": "ABEV",
+   "statement": "income",
+   "fiscal_year": "2026",
+   "fiscal_period": "Q2",
+   "duration": "quarter",
+   "concept": "cvm_3.99.02.01",
+   "label": "ON",
+   "value": 0.2161,
+   "scale": 0.0001,
+   "source_accession": "0001292814-26-003969",
+   "era": "release",
+   "checked": "read by hand",
+   "note": "s7-cvmeps 2026-11-17, review D2: the 6-K 0001292814-26-003969 prints it; served from CVM's ITR as 1,000 times it before s7-cvmeps"
   }
  ]
 }
