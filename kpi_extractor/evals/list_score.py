@@ -26,8 +26,12 @@ def _kpis(groups: list[dict]) -> list[tuple[str, str, str]]:
             and (label := _UNIT_WORDS.sub("", str(kpi.get("label") or "")).strip())]
 
 
+_NANOMETER = re.compile(r"(\d)\s*-?\s*nanometers?\b")
+
+
 def _norm(label: str) -> str:
-    return " ".join(re.findall(r"[a-z0-9]+", label.lower().replace("&", " and ")))
+    # "7-nanometer" is "7nm" (TSMC's nodes, written either way by the same model on two runs).
+    return " ".join(re.findall(r"[a-z0-9]+", _NANOMETER.sub(r"\1nm", label.lower()).replace("&", " and ")))
 
 
 def _same_kpi(a: str, b: str) -> bool:

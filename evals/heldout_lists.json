@@ -1,0 +1,3905 @@
+{
+ "ABNB": {
+  "name": "Airbnb",
+  "sector": "Software and internet",
+  "accession": "0001193125-26-449727",
+  "release": "https://www.sec.gov/Archives/edgar/data/1559720/000119312526449727/0001193125-26-449727-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "nights_and_seats_booked",
+      "label": "Nights and Seats Booked",
+      "unit": "count"
+     },
+     {
+      "key": "gross_booking_value",
+      "label": "Gross Booking Value",
+      "unit": "currency"
+     },
+     {
+      "key": "adr",
+      "label": "ADR",
+      "unit": "currency"
+     },
+     {
+      "key": "implied_take_rate",
+      "label": "Implied Take Rate",
+      "unit": "percent"
+     },
+     {
+      "key": "nights_booked_on_app_share",
+      "label": "Nights Booked on App Share",
+      "unit": "percent"
+     },
+     {
+      "key": "nights_booked_on_app_growth",
+      "label": "Nights Booked on App Growth",
+      "unit": "percent"
+     },
+     {
+      "key": "first_time_bookers_growth",
+      "label": "First-Time Bookers Growth",
+      "unit": "percent"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated for the quarter and the letter gives no revenue breakdown. Uncertain: the two added growth lines (nights booked on app, first-time bookers) are prose figures that may not recur every quarter."
+ },
+ "BA": {
+  "name": "Boeing",
+  "sector": "Industrials and transport",
+  "accession": "0001628280-26-067411",
+  "release": "https://www.sec.gov/Archives/edgar/data/12927/000162828026067411/0001628280-26-067411-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "total_deliveries",
+      "label": "Total Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "deliveries_737",
+      "label": "737 Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "deliveries_787",
+      "label": "787 Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "deliveries_777",
+      "label": "777 Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "deliveries_767",
+      "label": "767 Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "net_orders",
+      "label": "Net Orders",
+      "unit": "count"
+     },
+     {
+      "key": "total_backlog",
+      "label": "Total Backlog",
+      "unit": "currency"
+     },
+     {
+      "key": "commercial_airplanes_backlog",
+      "label": "Commercial Airplanes Backlog",
+      "unit": "currency"
+     },
+     {
+      "key": "defense_space_security_backlog",
+      "label": "Defense, Space & Security Backlog",
+      "unit": "currency"
+     },
+     {
+      "key": "global_services_backlog",
+      "label": "Global Services Backlog",
+      "unit": "currency"
+     },
+     {
+      "key": "contractual_backlog",
+      "label": "Contractual Backlog",
+      "unit": "currency"
+     },
+     {
+      "key": "unobligated_backlog",
+      "label": "Unobligated Backlog",
+      "unit": "currency"
+     },
+     {
+      "key": "defense_space_security_total_deliveries",
+      "label": "Defense, Space & Security Total Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "ah_64_apache_new_deliveries",
+      "label": "AH-64 Apache (New) Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "ah_64_apache_remanufactured_deliveries",
+      "label": "AH-64 Apache (Remanufactured) Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "ch_47_chinook_new_deliveries",
+      "label": "CH-47 Chinook (New) Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "ch_47_chinook_renewed_deliveries",
+      "label": "CH-47 Chinook (Renewed) Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "f_15_models_deliveries",
+      "label": "F-15 Models Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "f_a_18_models_deliveries",
+      "label": "F/A-18 Models Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "kc_46_tanker_deliveries",
+      "label": "KC-46 Tanker Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "mh_139_deliveries",
+      "label": "MH-139 Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "p_8_models_deliveries",
+      "label": "P-8 Models Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "commercial_satellites_deliveries",
+      "label": "Commercial Satellites Deliveries",
+      "unit": "count"
+     },
+     {
+      "key": "defense_space_security_backlog_from_cust",
+      "label": "Defense, Space & Security Backlog From Customers Outside the U.S.",
+      "unit": "percent"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_segment",
+    "label": "Revenue By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "commercial_airplanes",
+      "label": "Commercial Airplanes",
+      "unit": "currency"
+     },
+     {
+      "key": "defense_space_security",
+      "label": "Defense, Space & Security",
+      "unit": "currency"
+     },
+     {
+      "key": "global_services",
+      "label": "Global Services",
+      "unit": "currency"
+     },
+     {
+      "key": "unallocated_items_eliminations_and_other",
+      "label": "Unallocated Items, Eliminations and Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_revenues_total",
+      "label": "Total Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_type",
+    "label": "Revenue By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "sales_of_products",
+      "label": "Sales of Products",
+      "unit": "currency"
+     },
+     {
+      "key": "sales_of_services",
+      "label": "Sales of Services",
+      "unit": "currency"
+     },
+     {
+      "key": "total_revenues_total",
+      "label": "Total Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated; Net Orders appears only in prose. Uncertain: the added per-program defense deliveries (P-8 is a dash this quarter) and the prose-only non-U.S. share of defense backlog; the two added revenue breakdowns share the same total."
+ },
+ "BKNG": {
+  "name": "Booking Holdings",
+  "sector": "Software and internet",
+  "accession": "0001075531-26-000044",
+  "release": "https://www.sec.gov/Archives/edgar/data/1075531/000107553126000044/0001075531-26-000044-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "room_nights",
+      "label": "Room Nights",
+      "unit": "count"
+     },
+     {
+      "key": "gross_bookings",
+      "label": "Gross Bookings",
+      "unit": "currency"
+     },
+     {
+      "key": "flight_tickets",
+      "label": "Flight Tickets",
+      "unit": "count"
+     },
+     {
+      "key": "rental_car_days",
+      "label": "Rental Car Days",
+      "unit": "count"
+     },
+     {
+      "key": "alternative_accommodation_room_nights_gr",
+      "label": "Alternative Accommodation Room Nights Growth at Booking.com",
+      "unit": "percent"
+     }
+    ]
+   },
+   {
+    "key": "gross_bookings_by_type",
+    "label": "Gross Bookings By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "merchant_gross_bookings",
+      "label": "Merchant Gross Bookings",
+      "unit": "currency"
+     },
+     {
+      "key": "agency_gross_bookings",
+      "label": "Agency Gross Bookings",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_type",
+    "label": "Revenue By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "merchant_revenues",
+      "label": "Merchant Revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "agency_revenues",
+      "label": "Agency Revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "advertising_and_other_revenues",
+      "label": "Advertising and Other Revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "total_revenues_total",
+      "label": "Total Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated. Uncertain: the added Total Revenues includes a one-off FTC matter reduction of $900 million, so the three revenue-type lines sum to Adjusted Revenue rather than to the total."
+ },
+ "BLK": {
+  "name": "BlackRock",
+  "sector": "Asset managers and exchanges",
+  "accession": "0001193125-26-420979",
+  "release": "https://www.sec.gov/Archives/edgar/data/2012383/000119312526420979/0001193125-26-420979-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "revenue_by_product_line",
+    "label": "Revenue by Product Line",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "equity_active",
+      "label": "Equity Active",
+      "unit": "currency"
+     },
+     {
+      "key": "equity_etfs",
+      "label": "Equity ETFs",
+      "unit": "currency"
+     },
+     {
+      "key": "fixed_income_active",
+      "label": "Fixed Income Active",
+      "unit": "currency"
+     },
+     {
+      "key": "fixed_income_etfs",
+      "label": "Fixed Income ETFs",
+      "unit": "currency"
+     },
+     {
+      "key": "active_multi_asset",
+      "label": "Active Multi-Asset",
+      "unit": "currency"
+     },
+     {
+      "key": "private_markets",
+      "label": "Private Markets",
+      "unit": "currency"
+     },
+     {
+      "key": "liquid_alternatives",
+      "label": "Liquid Alternatives",
+      "unit": "currency"
+     },
+     {
+      "key": "non_etf_index",
+      "label": "Non-ETF Index",
+      "unit": "currency"
+     },
+     {
+      "key": "digital_commodities_multi_asset_etfs",
+      "label": "Digital Assets, Commodities and Multi-Asset ETFs",
+      "unit": "currency"
+     },
+     {
+      "key": "cash_management",
+      "label": "Cash Management",
+      "unit": "currency"
+     },
+     {
+      "key": "total_base_fees",
+      "label": "Total Base Fees and Securities Lending Revenue (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_client_type",
+    "label": "Revenue by Client Type",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "retail",
+      "label": "Retail",
+      "unit": "currency"
+     },
+     {
+      "key": "etfs",
+      "label": "ETFs",
+      "unit": "currency"
+     },
+     {
+      "key": "institutional_active",
+      "label": "Institutional Active",
+      "unit": "currency"
+     },
+     {
+      "key": "institutional_index",
+      "label": "Institutional Index",
+      "unit": "currency"
+     },
+     {
+      "key": "cash_management_client",
+      "label": "Cash Management",
+      "unit": "currency"
+     },
+     {
+      "key": "total_base_fees_client",
+      "label": "Total Base Fees and Securities Lending Revenue (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "total_aum",
+      "label": "Total AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "total_net_flows",
+      "label": "Total Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "long_term_net_flows",
+      "label": "Long-Term Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "cash_management_net_flows",
+      "label": "Cash Management Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "average_aum",
+      "label": "Average AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "private_markets_gross_fundraising",
+      "label": "Private Markets Gross Fundraising",
+      "unit": "currency"
+     },
+     {
+      "key": "private_markets_gross_deployment",
+      "label": "Private Markets Gross Deployment",
+      "unit": "currency"
+     },
+     {
+      "key": "securities_lending_revenue",
+      "label": "Securities Lending Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "long_term_aum",
+      "label": "Long-Term AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "cash_management_aum",
+      "label": "Cash Management AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "retail_aum",
+      "label": "Retail AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "etfs_aum",
+      "label": "ETFs AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "institutional_aum",
+      "label": "Institutional AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "retail_net_flows",
+      "label": "Retail Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "etfs_net_flows",
+      "label": "ETFs Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "institutional_net_flows",
+      "label": "Institutional Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "active_net_flows",
+      "label": "Active Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "equity_aum",
+      "label": "Equity AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "fixed_income_aum",
+      "label": "Fixed Income AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset_aum",
+      "label": "Multi-Asset AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "private_markets_aum",
+      "label": "Private Markets AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "private_markets_net_flows",
+      "label": "Private Markets Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "realizations",
+      "label": "Realizations",
+      "unit": "currency"
+     },
+     {
+      "key": "technology_services_and_subscription_ann",
+      "label": "Technology Services and Subscription Annual Contract Value (ACV) Growth",
+      "unit": "percent"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_type",
+    "label": "Revenue By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "investment_advisory_administration_fees_",
+      "label": "Investment Advisory, Administration Fees and Securities Lending Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "investment_advisory_performance_fees",
+      "label": "Investment Advisory Performance Fees",
+      "unit": "currency"
+     },
+     {
+      "key": "technology_services_and_subscription_rev",
+      "label": "Technology Services and Subscription Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "distribution_fees",
+      "label": "Distribution Fees",
+      "unit": "currency"
+     },
+     {
+      "key": "advisory_and_other_revenue",
+      "label": "Advisory and Other Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "total_revenue_total",
+      "label": "Total Revenue (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated for the quarter. Uncertain: the two base-fee totals and the two Cash Management lines are the same figures in both breakdowns and are kept as rows of their own breakdown; private markets fundraising and deployment come from supplement chart text with ambiguous label order."
+ },
+ "BX": {
+  "name": "Blackstone",
+  "sector": "Asset managers and exchanges",
+  "accession": "0001193125-26-428297",
+  "release": "https://www.sec.gov/Archives/edgar/data/1393818/000119312526428297/0001193125-26-428297-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "revenue_by_segment",
+    "label": "Revenue by Segment",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "real_estate",
+      "label": "Real Estate",
+      "unit": "currency"
+     },
+     {
+      "key": "private_equity",
+      "label": "Private Equity",
+      "unit": "currency"
+     },
+     {
+      "key": "credit_insurance",
+      "label": "Credit & Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset_investing",
+      "label": "Multi-Asset Investing",
+      "unit": "currency"
+     },
+     {
+      "key": "total_segment_revenues",
+      "label": "Total Segment Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "total_aum",
+      "label": "Total Assets Under Management (AUM)",
+      "unit": "currency"
+     },
+     {
+      "key": "fee_earning_aum",
+      "label": "Fee-Earning Assets Under Management (AUM)",
+      "unit": "currency"
+     },
+     {
+      "key": "inflows",
+      "label": "Inflows",
+      "unit": "currency"
+     },
+     {
+      "key": "net_flows",
+      "label": "Net Flows",
+      "unit": "currency"
+     },
+     {
+      "key": "capital_deployed",
+      "label": "Capital Deployed",
+      "unit": "currency"
+     },
+     {
+      "key": "realizations",
+      "label": "Realizations",
+      "unit": "currency"
+     },
+     {
+      "key": "dry_powder",
+      "label": "Dry Powder",
+      "unit": "currency"
+     },
+     {
+      "key": "perpetual_capital_aum",
+      "label": "Perpetual Capital AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "fee_related_earnings",
+      "label": "Fee Related Earnings (FRE)",
+      "unit": "currency"
+     },
+     {
+      "key": "outflows",
+      "label": "Outflows",
+      "unit": "currency"
+     },
+     {
+      "key": "fee_earning_aum_inflows",
+      "label": "Fee-Earning AUM Inflows",
+      "unit": "currency"
+     },
+     {
+      "key": "fee_earning_perpetual_capital_aum",
+      "label": "Fee-Earning Perpetual Capital AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "invested_performance_eligible_aum",
+      "label": "Invested Performance Eligible AUM",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_type",
+    "label": "Revenue By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "management_and_advisory_fees_net",
+      "label": "Management and Advisory Fees, Net",
+      "unit": "currency"
+     },
+     {
+      "key": "fee_related_performance_revenues",
+      "label": "Fee Related Performance Revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "realized_performance_revenues",
+      "label": "Realized Performance Revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "realized_principal_investment_income",
+      "label": "Realized Principal Investment Income",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "aum_by_segment",
+    "label": "Aum By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "real_estate_total_aum",
+      "label": "Real Estate Total AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "private_equity_total_aum",
+      "label": "Private Equity Total AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "credit_insurance_total_aum",
+      "label": "Credit & Insurance Total AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset_investing_total_aum",
+      "label": "Multi-Asset Investing Total AUM",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "inflows_by_segment",
+    "label": "Inflows By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "real_estate_inflows",
+      "label": "Real Estate Inflows",
+      "unit": "currency"
+     },
+     {
+      "key": "private_equity_inflows",
+      "label": "Private Equity Inflows",
+      "unit": "currency"
+     },
+     {
+      "key": "credit_insurance_inflows",
+      "label": "Credit & Insurance Inflows",
+      "unit": "currency"
+     },
+     {
+      "key": "multi_asset_investing_inflows",
+      "label": "Multi-Asset Investing Inflows",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "Removed Distributable Earnings (profit measure) and Net Accrued Performance Revenues (balance-sheet carry figure; uncertain, some treat it as a backlog metric). Fee Related Earnings is kept because the filing makes it a headline measure (first item of the quarter's highlights and the top subtotal of every segment table); flip it if the usual removal should win."
+ },
+ "CME": {
+  "name": "CME Group",
+  "sector": "Asset managers and exchanges",
+  "accession": "0001156375-26-000065",
+  "release": "https://www.sec.gov/Archives/edgar/data/1156375/000115637526000065/0001156375-26-000065-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "total_adv",
+      "label": "Total Average Daily Volume (ADV)",
+      "unit": "count"
+     },
+     {
+      "key": "interest_rates_adv",
+      "label": "Interest Rates ADV",
+      "unit": "count"
+     },
+     {
+      "key": "equity_indexes_adv",
+      "label": "Equity Indexes ADV",
+      "unit": "count"
+     },
+     {
+      "key": "energy_adv",
+      "label": "Energy ADV",
+      "unit": "count"
+     },
+     {
+      "key": "agricultural_commodities_adv",
+      "label": "Agricultural Commodities ADV",
+      "unit": "count"
+     },
+     {
+      "key": "foreign_exchange_adv",
+      "label": "Foreign Exchange ADV",
+      "unit": "count"
+     },
+     {
+      "key": "metals_adv",
+      "label": "Metals ADV",
+      "unit": "count"
+     },
+     {
+      "key": "non_us_adv",
+      "label": "Non-U.S. ADV",
+      "unit": "count"
+     },
+     {
+      "key": "average_rpc",
+      "label": "Average Rate per Contract (RPC)",
+      "unit": "currency"
+     },
+     {
+      "key": "interest_rates_rpc",
+      "label": "Interest Rates RPC",
+      "unit": "currency"
+     },
+     {
+      "key": "equity_indexes_rpc",
+      "label": "Equity Indexes RPC",
+      "unit": "currency"
+     },
+     {
+      "key": "foreign_exchange_rpc",
+      "label": "Foreign Exchange RPC",
+      "unit": "currency"
+     },
+     {
+      "key": "energy_rpc",
+      "label": "Energy RPC",
+      "unit": "currency"
+     },
+     {
+      "key": "agricultural_commodities_rpc",
+      "label": "Agricultural Commodities RPC",
+      "unit": "currency"
+     },
+     {
+      "key": "metals_rpc",
+      "label": "Metals RPC",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_type",
+    "label": "Revenue By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "clearing_and_transaction_fees",
+      "label": "Clearing and Transaction Fees",
+      "unit": "currency"
+     },
+     {
+      "key": "market_data_and_information_services",
+      "label": "Market Data and Information Services",
+      "unit": "currency"
+     },
+     {
+      "key": "other",
+      "label": "Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_revenues_total",
+      "label": "Total Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "adv_by_venue",
+    "label": "Adv By Venue",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "cme_globex_adv",
+      "label": "CME Globex ADV",
+      "unit": "count"
+     },
+     {
+      "key": "open_outcry_adv",
+      "label": "Open Outcry ADV",
+      "unit": "count"
+     },
+     {
+      "key": "privately_negotiated_adv",
+      "label": "Privately Negotiated ADV",
+      "unit": "count"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated; added the revenue breakdown from the income statement and ADV by venue. Uncertain: Non-U.S. ADV is kept though stated only in release text as a rounded 9 million contracts."
+ },
+ "CVX": {
+  "name": "Chevron",
+  "sector": "Energy and utilities",
+  "accession": "0000093410-26-000196",
+  "release": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000196/0000093410-26-000196-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "net_oil_equivalent_production",
+      "label": "Net Oil-Equivalent Production",
+      "unit": "count"
+     },
+     {
+      "key": "us_net_oil_equivalent_production",
+      "label": "U.S. Net Oil-Equivalent Production",
+      "unit": "count"
+     },
+     {
+      "key": "international_net_oil_equivalent_production",
+      "label": "International Net Oil-Equivalent Production",
+      "unit": "count"
+     },
+     {
+      "key": "us_liquids_production",
+      "label": "U.S. Liquids Production",
+      "unit": "count"
+     },
+     {
+      "key": "us_natural_gas_production",
+      "label": "U.S. Natural Gas Production",
+      "unit": "count"
+     },
+     {
+      "key": "international_liquids_production",
+      "label": "International Liquids Production",
+      "unit": "count"
+     },
+     {
+      "key": "international_natural_gas_production",
+      "label": "International Natural Gas Production",
+      "unit": "count"
+     },
+     {
+      "key": "us_liquids_realization",
+      "label": "U.S. Liquids Realization",
+      "unit": "currency"
+     },
+     {
+      "key": "us_natural_gas_realization",
+      "label": "U.S. Natural Gas Realization",
+      "unit": "currency"
+     },
+     {
+      "key": "international_liquids_realization",
+      "label": "International Liquids Realization",
+      "unit": "currency"
+     },
+     {
+      "key": "international_natural_gas_realization",
+      "label": "International Natural Gas Realization",
+      "unit": "currency"
+     },
+     {
+      "key": "us_refinery_crude_unit_inputs",
+      "label": "U.S. Refinery Crude Unit Inputs",
+      "unit": "count"
+     },
+     {
+      "key": "international_refinery_crude_unit_inputs",
+      "label": "International Refinery Crude Unit Inputs",
+      "unit": "count"
+     },
+     {
+      "key": "us_refined_product_sales",
+      "label": "U.S. Refined Product Sales",
+      "unit": "count"
+     },
+     {
+      "key": "international_refined_product_sales",
+      "label": "International Refined Product Sales",
+      "unit": "count"
+     },
+     {
+      "key": "us_refinery_crude_unit_utilization",
+      "label": "U.S. Refinery Crude Unit Utilization",
+      "unit": "percent"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines match the segment tables and the exhibit has no revenue breakdown to add. Uncertain: U.S. Refinery Crude Unit Utilization is stated only in prose and may not appear every quarter."
+ },
+ "ELV": {
+  "name": "Elevance Health",
+  "sector": "Insurers and managed care",
+  "accession": "0001156039-26-000068",
+  "release": "https://www.sec.gov/Archives/edgar/data/1156039/000115603926000068/0001156039-26-000068-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "revenue_by_segment",
+    "label": "Revenue by Segment",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "health_benefits",
+      "label": "Health Benefits",
+      "unit": "currency"
+     },
+     {
+      "key": "carelonrx",
+      "label": "CarelonRx",
+      "unit": "currency"
+     },
+     {
+      "key": "carelon_services",
+      "label": "Carelon Services",
+      "unit": "currency"
+     },
+     {
+      "key": "corporate_other",
+      "label": "Corporate & Other",
+      "unit": "currency"
+     },
+     {
+      "key": "eliminations",
+      "label": "Eliminations",
+      "unit": "currency"
+     },
+     {
+      "key": "total_operating_revenue",
+      "label": "Total Operating Revenue (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_product",
+    "label": "Revenue by Product",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "commercial",
+      "label": "Commercial",
+      "unit": "currency"
+     },
+     {
+      "key": "medicare",
+      "label": "Medicare",
+      "unit": "currency"
+     },
+     {
+      "key": "medicaid",
+      "label": "Medicaid",
+      "unit": "currency"
+     },
+     {
+      "key": "federal_employee_program",
+      "label": "Federal Employee Program",
+      "unit": "currency"
+     },
+     {
+      "key": "total_health_benefits_operating_revenue",
+      "label": "Total Health Benefits Operating Revenue (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "total_medical_membership",
+      "label": "Total Medical Membership",
+      "unit": "count"
+     },
+     {
+      "key": "commercial_risk_based",
+      "label": "Commercial Risk-Based",
+      "unit": "count"
+     },
+     {
+      "key": "commercial_fee_based",
+      "label": "Commercial Fee-Based",
+      "unit": "count"
+     },
+     {
+      "key": "bluecard",
+      "label": "BlueCard",
+      "unit": "count"
+     },
+     {
+      "key": "medicare_advantage",
+      "label": "Medicare Advantage",
+      "unit": "count"
+     },
+     {
+      "key": "medicaid",
+      "label": "Medicaid",
+      "unit": "count"
+     },
+     {
+      "key": "federal_employee_program",
+      "label": "Federal Employee Program",
+      "unit": "count"
+     },
+     {
+      "key": "carelonrx_adjusted_scripts",
+      "label": "CarelonRx Adjusted Scripts",
+      "unit": "count"
+     },
+     {
+      "key": "carelon_services_consumers_served",
+      "label": "Carelon Services Consumers Served",
+      "unit": "count"
+     },
+     {
+      "key": "benefit_expense_ratio",
+      "label": "Benefit Expense Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "days_in_claims_payable",
+      "label": "Days in Claims Payable",
+      "unit": "count"
+     },
+     {
+      "key": "individual",
+      "label": "Individual",
+      "unit": "count"
+     },
+     {
+      "key": "employer_group_risk_based",
+      "label": "Employer Group Risk-Based",
+      "unit": "count"
+     },
+     {
+      "key": "employer_group_fee_based",
+      "label": "Employer Group Fee-Based",
+      "unit": "count"
+     },
+     {
+      "key": "medicare_supplement",
+      "label": "Medicare Supplement",
+      "unit": "count"
+     },
+     {
+      "key": "total_medicare",
+      "label": "Total Medicare",
+      "unit": "count"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_type",
+    "label": "Revenue By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "premiums",
+      "label": "Premiums",
+      "unit": "currency"
+     },
+     {
+      "key": "product_revenue",
+      "label": "Product Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "service_fees",
+      "label": "Service Fees",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "Removed the operating expense ratio and its adjusted form as cost ratios; the benefit expense ratio is kept as the insurer's loss ratio. Uncertain: Days in Claims Payable is kept though stated only in prose, and Total Health Benefits Operating Revenue equals the Health Benefits segment line but is kept as its breakdown's total."
+ },
+ "FITB": {
+  "name": "Fifth Third Bancorp",
+  "sector": "Banks",
+  "accession": "0000035527-26-000229",
+  "release": "https://www.sec.gov/Archives/edgar/data/35527/000003552726000229/0000035527-26-000229-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "revenue_by_fee_type",
+    "label": "Revenue by Fee Type",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "total_noninterest_income",
+      "label": "Total Noninterest Income (total)",
+      "unit": "currency"
+     },
+     {
+      "key": "wealth_asset_management",
+      "label": "Wealth and Asset Management Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "commercial_payments",
+      "label": "Commercial Payments Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "consumer_banking",
+      "label": "Consumer Banking Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "capital_markets",
+      "label": "Capital Markets Fees",
+      "unit": "currency"
+     },
+     {
+      "key": "commercial_banking",
+      "label": "Commercial Banking Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "mortgage_banking",
+      "label": "Mortgage Banking Net Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "other_noninterest_income",
+      "label": "Other Noninterest Income",
+      "unit": "currency"
+     },
+     {
+      "key": "securities_gains",
+      "label": "Securities Gains (Losses), Net",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "nco_ratio",
+      "label": "Net Charge-Off Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "npa_ratio",
+      "label": "Nonperforming Asset Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "acl_coverage_npl",
+      "label": "Allowance Coverage of Nonperforming Loans",
+      "unit": "percent"
+     },
+     {
+      "key": "avg_portfolio_loans",
+      "label": "Average Portfolio Loans and Leases",
+      "unit": "currency"
+     },
+     {
+      "key": "avg_deposits",
+      "label": "Average Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "core_deposits",
+      "label": "Core Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "loan_to_core_deposit",
+      "label": "Loan-to-Core Deposit Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "assets_under_care",
+      "label": "Assets Under Care",
+      "unit": "currency"
+     },
+     {
+      "key": "assets_under_management",
+      "label": "Assets Under Management",
+      "unit": "currency"
+     },
+     {
+      "key": "banking_centers",
+      "label": "Banking Centers",
+      "unit": "count"
+     },
+     {
+      "key": "atms",
+      "label": "ATMs",
+      "unit": "count"
+     },
+     {
+      "key": "employees",
+      "label": "Full-Time Equivalent Employees",
+      "unit": "count"
+     },
+     {
+      "key": "total_portfolio_loans_and_leases_end_of_",
+      "label": "Total Portfolio Loans and Leases (End of Period)",
+      "unit": "currency"
+     },
+     {
+      "key": "total_deposits_end_of_period",
+      "label": "Total Deposits (End of Period)",
+      "unit": "currency"
+     },
+     {
+      "key": "net_losses_charged_off",
+      "label": "Net Losses Charged-Off",
+      "unit": "currency"
+     },
+     {
+      "key": "total_nonaccrual_portfolio_loans_and_lea",
+      "label": "Total Nonaccrual Portfolio Loans and Leases (NPLs)",
+      "unit": "currency"
+     },
+     {
+      "key": "acl_as_a_percent_of_portfolio_loans_and_",
+      "label": "ACL as a Percent of Portfolio Loans and Leases",
+      "unit": "percent"
+     },
+     {
+      "key": "total_loans_and_leases_serviced_for_othe",
+      "label": "Total Loans and Leases Serviced for Others",
+      "unit": "currency"
+     },
+     {
+      "key": "average_active_digital_users",
+      "label": "Average Active Digital Users",
+      "unit": "count"
+     },
+     {
+      "key": "average_active_mobile_users",
+      "label": "Average Active Mobile Users",
+      "unit": "count"
+     },
+     {
+      "key": "mortgage_originations",
+      "label": "Mortgage Originations",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_components",
+    "label": "Revenue Components",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "net_interest_income",
+      "label": "Net Interest Income",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "noninterest_income_by_segment",
+    "label": "Noninterest Income By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "commercial_banking_noninterest_income",
+      "label": "Commercial Banking Noninterest Income",
+      "unit": "currency"
+     },
+     {
+      "key": "consumer_and_small_business_banking_noni",
+      "label": "Consumer and Small Business Banking Noninterest Income",
+      "unit": "currency"
+     },
+     {
+      "key": "wealth_and_asset_management_noninterest_",
+      "label": "Wealth and Asset Management Noninterest Income",
+      "unit": "currency"
+     },
+     {
+      "key": "general_corporate_and_other_noninterest_",
+      "label": "General Corporate and Other Noninterest Income",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "net_interest_income_by_segment",
+    "label": "Net Interest Income By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "commercial_banking_net_interest_income_f",
+      "label": "Commercial Banking Net Interest Income (FTE)",
+      "unit": "currency"
+     },
+     {
+      "key": "consumer_and_small_business_banking_net_",
+      "label": "Consumer and Small Business Banking Net Interest Income (FTE)",
+      "unit": "currency"
+     },
+     {
+      "key": "wealth_and_asset_management_net_interest",
+      "label": "Wealth and Asset Management Net Interest Income (FTE)",
+      "unit": "currency"
+     },
+     {
+      "key": "general_corporate_and_other_net_interest",
+      "label": "General Corporate and Other Net Interest Income (FTE)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "average_loans_by_type",
+    "label": "Average Loans By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "total_average_commercial_loans_and_lease",
+      "label": "Total Average Commercial Loans and Leases",
+      "unit": "currency"
+     },
+     {
+      "key": "average_commercial_and_industrial_loans",
+      "label": "Average Commercial and Industrial Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_commercial_mortgage_loans",
+      "label": "Average Commercial Mortgage Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_commercial_construction_loans",
+      "label": "Average Commercial Construction Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_commercial_leases",
+      "label": "Average Commercial Leases",
+      "unit": "currency"
+     },
+     {
+      "key": "total_average_consumer_loans",
+      "label": "Total Average Consumer Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_residential_mortgage_loans",
+      "label": "Average Residential Mortgage Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_home_equity",
+      "label": "Average Home Equity",
+      "unit": "currency"
+     },
+     {
+      "key": "average_indirect_secured_consumer_loans",
+      "label": "Average Indirect Secured Consumer Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_credit_card",
+      "label": "Average Credit Card",
+      "unit": "currency"
+     },
+     {
+      "key": "average_solar_energy_installation_loans",
+      "label": "Average Solar Energy Installation Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_other_consumer_loans",
+      "label": "Average Other Consumer Loans",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "average_deposits_by_type",
+    "label": "Average Deposits By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "average_demand_deposits",
+      "label": "Average Demand Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "average_interest_checking_deposits",
+      "label": "Average Interest Checking Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "average_savings_deposits",
+      "label": "Average Savings Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "average_money_market_deposits",
+      "label": "Average Money Market Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "average_cds_250_000_or_less",
+      "label": "Average CDs $250,000 or Less",
+      "unit": "currency"
+     },
+     {
+      "key": "average_cds_over_250_000",
+      "label": "Average CDs over $250,000",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "Removed NIM (a margin), the efficiency ratio and CET1; none is treated as a headline business measure. Uncertain: credit-quality ratios and the text-only loan-to-core deposit ratio are kept, and Net Interest Income plus segment NII and noninterest income are added as revenue breakdowns though they can be read as income-statement lines; mortgage originations is read from chart text."
+ },
+ "HD": {
+  "name": "Home Depot",
+  "sector": "Consumer and retail",
+  "accession": "0000354950-26-000145",
+  "release": "https://www.sec.gov/Archives/edgar/data/354950/000035495026000145/0000354950-26-000145-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "comparable_sales",
+      "label": "Comparable Sales",
+      "unit": "percent"
+     },
+     {
+      "key": "comparable_customer_transactions",
+      "label": "Comparable Customer Transactions",
+      "unit": "percent"
+     },
+     {
+      "key": "comparable_average_ticket",
+      "label": "Comparable Average Ticket",
+      "unit": "percent"
+     },
+     {
+      "key": "customer_transactions",
+      "label": "Customer Transactions",
+      "unit": "count"
+     },
+     {
+      "key": "average_ticket",
+      "label": "Average Ticket",
+      "unit": "currency"
+     },
+     {
+      "key": "retail_stores",
+      "label": "Retail Stores",
+      "unit": "count"
+     },
+     {
+      "key": "srs_locations",
+      "label": "SRS Locations",
+      "unit": "count"
+     },
+     {
+      "key": "comparable_sales_in_the_u_s",
+      "label": "Comparable Sales in the U.S.",
+      "unit": "percent"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated. Uncertain: SRS Locations is stated only as 'over 1,340', not an exact count."
+ },
+ "INTU": {
+  "name": "Intuit",
+  "sector": "Software and internet",
+  "accession": "0000896878-26-000029",
+  "release": "https://www.sec.gov/Archives/edgar/data/896878/000089687826000029/0000896878-26-000029-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "quickbooks_online_accounting_revenue_gro",
+      "label": "QuickBooks Online Accounting Revenue Growth",
+      "unit": "percent"
+     },
+     {
+      "key": "online_services_revenue_growth",
+      "label": "Online Services Revenue Growth",
+      "unit": "percent"
+     }
+    ]
+   },
+   {
+    "key": "segment_revenue",
+    "label": "Segment Revenue",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "global_business_solutions_revenue",
+      "label": "Global Business Solutions Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "consumer_revenue",
+      "label": "Consumer Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "total_net_revenue_total",
+      "label": "Total Net Revenue (total)",
+      "unit": "currency"
+     },
+     {
+      "key": "online_ecosystem_revenue",
+      "label": "Online Ecosystem Revenue",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "consumer_revenue",
+    "label": "Consumer Revenue",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "turbotax_revenue",
+      "label": "TurboTax Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "credit_karma_revenue",
+      "label": "Credit Karma Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "protax_revenue",
+      "label": "ProTax Revenue",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "Removed all three TurboTax unit lines: the unit table has only full-fiscal-year columns. Uncertain: the added segment amounts come from prose rounded to $0.1B, Online Ecosystem is a subset of Global Business Solutions, and the two added growth lines are for named products."
+ },
+ "ISRG": {
+  "name": "Intuitive Surgical",
+  "sector": "Healthcare",
+  "accession": "0001035267-26-000067",
+  "release": "https://www.sec.gov/Archives/edgar/data/1035267/000103526726000067/0001035267-26-000067-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "da_vinci_systems_placed",
+      "label": "da Vinci Systems Placed",
+      "unit": "count"
+     },
+     {
+      "key": "da_vinci_5_systems_placed",
+      "label": "da Vinci 5 Systems Placed",
+      "unit": "count"
+     },
+     {
+      "key": "da_vinci_installed_base",
+      "label": "da Vinci Installed Base",
+      "unit": "count"
+     },
+     {
+      "key": "ion_systems_placed",
+      "label": "Ion Systems Placed",
+      "unit": "count"
+     },
+     {
+      "key": "ion_installed_base",
+      "label": "Ion Installed Base",
+      "unit": "count"
+     },
+     {
+      "key": "da_vinci_placed_operating_lease",
+      "label": "da Vinci Systems Placed Under Operating Lease",
+      "unit": "count"
+     },
+     {
+      "key": "da_vinci_placed_usage_based_lease",
+      "label": "da Vinci Systems Placed Under Usage-Based Operating Lease",
+      "unit": "count"
+     },
+     {
+      "key": "worldwide_procedure_growth",
+      "label": "Worldwide Procedure Growth",
+      "unit": "percent"
+     },
+     {
+      "key": "da_vinci_procedure_growth",
+      "label": "da Vinci Procedure Growth",
+      "unit": "percent"
+     },
+     {
+      "key": "ion_procedure_growth",
+      "label": "Ion Procedure Growth",
+      "unit": "percent"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_type",
+    "label": "Revenue By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "instruments_and_accessories",
+      "label": "Instruments and Accessories",
+      "unit": "currency"
+     },
+     {
+      "key": "systems",
+      "label": "Systems",
+      "unit": "currency"
+     },
+     {
+      "key": "services",
+      "label": "Services",
+      "unit": "currency"
+     },
+     {
+      "key": "total_revenue_total",
+      "label": "Total Revenue (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated; added revenue by type and procedure growth. Uncertain: procedure growth is stated only as an approximate percentage with no procedure count, kept as growth of a named unit count."
+ },
+ "JNJ": {
+  "name": "Johnson & Johnson",
+  "sector": "Healthcare",
+  "accession": "0000200406-26-000189",
+  "release": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000189/0000200406-26-000189-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "revenue_by_therapeutic_area",
+    "label": "Revenue by Therapeutic Area",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "oncology",
+      "label": "Oncology",
+      "unit": "currency"
+     },
+     {
+      "key": "immunology",
+      "label": "Immunology",
+      "unit": "currency"
+     },
+     {
+      "key": "neuroscience",
+      "label": "Neuroscience",
+      "unit": "currency"
+     },
+     {
+      "key": "pulmonary_hypertension",
+      "label": "Pulmonary Hypertension (PH)",
+      "unit": "currency"
+     },
+     {
+      "key": "infectious_diseases",
+      "label": "Infectious Diseases (ID)",
+      "unit": "currency"
+     },
+     {
+      "key": "cardiovascular_metabolism_other",
+      "label": "Cardiovascular / Metabolism / Other (CVM)",
+      "unit": "currency"
+     },
+     {
+      "key": "total_innovative_medicine",
+      "label": "Total Innovative Medicine (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_oncology_product",
+    "label": "Revenue by Oncology Product",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "darzalex",
+      "label": "DARZALEX",
+      "unit": "currency"
+     },
+     {
+      "key": "carvykti",
+      "label": "CARVYKTI",
+      "unit": "currency"
+     },
+     {
+      "key": "tecvayli",
+      "label": "TECVAYLI",
+      "unit": "currency"
+     },
+     {
+      "key": "talvey",
+      "label": "TALVEY",
+      "unit": "currency"
+     },
+     {
+      "key": "rybrevant_lazcluze",
+      "label": "RYBREVANT / LAZCLUZE",
+      "unit": "currency"
+     },
+     {
+      "key": "erleada",
+      "label": "ERLEADA",
+      "unit": "currency"
+     },
+     {
+      "key": "imbruvica",
+      "label": "IMBRUVICA",
+      "unit": "currency"
+     },
+     {
+      "key": "other_oncology",
+      "label": "Other Oncology",
+      "unit": "currency"
+     },
+     {
+      "key": "total_oncology",
+      "label": "Total Oncology (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_medtech_franchise",
+    "label": "Revenue by MedTech Franchise",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "cardiovascular",
+      "label": "Cardiovascular",
+      "unit": "currency"
+     },
+     {
+      "key": "surgery",
+      "label": "Surgery",
+      "unit": "currency"
+     },
+     {
+      "key": "vision",
+      "label": "Vision",
+      "unit": "currency"
+     },
+     {
+      "key": "orthopaedics",
+      "label": "Orthopaedics",
+      "unit": "currency"
+     },
+     {
+      "key": "total_medtech",
+      "label": "Total MedTech (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_segment",
+    "label": "Revenue By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "innovative_medicine",
+      "label": "Innovative Medicine",
+      "unit": "currency"
+     },
+     {
+      "key": "medtech",
+      "label": "MedTech",
+      "unit": "currency"
+     },
+     {
+      "key": "worldwide_total",
+      "label": "Worldwide (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_geography",
+    "label": "Revenue By Geography",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "u_s",
+      "label": "U.S.",
+      "unit": "currency"
+     },
+     {
+      "key": "europe",
+      "label": "Europe",
+      "unit": "currency"
+     },
+     {
+      "key": "western_hemisphere_excluding_u_s",
+      "label": "Western Hemisphere Excluding U.S.",
+      "unit": "currency"
+     },
+     {
+      "key": "asia_pacific_africa",
+      "label": "Asia-Pacific, Africa",
+      "unit": "currency"
+     },
+     {
+      "key": "worldwide_total",
+      "label": "Worldwide (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_immunology_product",
+    "label": "Revenue By Immunology Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "tremfya",
+      "label": "TREMFYA",
+      "unit": "currency"
+     },
+     {
+      "key": "simponi_simponi_aria",
+      "label": "SIMPONI / SIMPONI ARIA",
+      "unit": "currency"
+     },
+     {
+      "key": "remicade",
+      "label": "REMICADE",
+      "unit": "currency"
+     },
+     {
+      "key": "stelara",
+      "label": "STELARA",
+      "unit": "currency"
+     },
+     {
+      "key": "other_immunology",
+      "label": "Other Immunology",
+      "unit": "currency"
+     },
+     {
+      "key": "total_immunology_total",
+      "label": "Total Immunology (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_neuroscience_product",
+    "label": "Revenue By Neuroscience Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "spravato",
+      "label": "SPRAVATO",
+      "unit": "currency"
+     },
+     {
+      "key": "caplyta",
+      "label": "CAPLYTA",
+      "unit": "currency"
+     },
+     {
+      "key": "invega_sustenna_xeplion_invega_trinza_tr",
+      "label": "INVEGA SUSTENNA / XEPLION / INVEGA TRINZA / TREVICTA",
+      "unit": "currency"
+     },
+     {
+      "key": "concerta_methylphenidate",
+      "label": "CONCERTA / Methylphenidate",
+      "unit": "currency"
+     },
+     {
+      "key": "other_neuroscience",
+      "label": "Other Neuroscience",
+      "unit": "currency"
+     },
+     {
+      "key": "total_neuroscience_total",
+      "label": "Total Neuroscience (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_pulmonary_hypertension_product",
+    "label": "Revenue By Pulmonary Hypertension Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "uptravi",
+      "label": "UPTRAVI",
+      "unit": "currency"
+     },
+     {
+      "key": "opsumit_opsynvi",
+      "label": "OPSUMIT / OPSYNVI",
+      "unit": "currency"
+     },
+     {
+      "key": "other_pulmonary_hypertension",
+      "label": "Other Pulmonary Hypertension",
+      "unit": "currency"
+     },
+     {
+      "key": "total_pulmonary_hypertension_total",
+      "label": "Total Pulmonary Hypertension (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_infectious_diseases_product",
+    "label": "Revenue By Infectious Diseases Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "edurant_rilpivirine",
+      "label": "EDURANT / Rilpivirine",
+      "unit": "currency"
+     },
+     {
+      "key": "prezista_prezcobix_rezolsta_symtuza",
+      "label": "PREZISTA / PREZCOBIX / REZOLSTA / SYMTUZA",
+      "unit": "currency"
+     },
+     {
+      "key": "other_infectious_diseases",
+      "label": "Other Infectious Diseases",
+      "unit": "currency"
+     },
+     {
+      "key": "total_infectious_diseases_total",
+      "label": "Total Infectious Diseases (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_cvm_product",
+    "label": "Revenue By Cvm Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "xarelto",
+      "label": "XARELTO",
+      "unit": "currency"
+     },
+     {
+      "key": "other",
+      "label": "Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_cardiovascular_metabolism_other_to",
+      "label": "Total Cardiovascular / Metabolism / Other (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_medtech_cardiovascular_product",
+    "label": "Revenue By Medtech Cardiovascular Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "electrophysiology",
+      "label": "Electrophysiology",
+      "unit": "currency"
+     },
+     {
+      "key": "abiomed",
+      "label": "Abiomed",
+      "unit": "currency"
+     },
+     {
+      "key": "shockwave",
+      "label": "Shockwave",
+      "unit": "currency"
+     },
+     {
+      "key": "other_cardiovascular",
+      "label": "Other Cardiovascular",
+      "unit": "currency"
+     },
+     {
+      "key": "total_cardiovascular_total",
+      "label": "Total Cardiovascular (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_medtech_surgery_product",
+    "label": "Revenue By Medtech Surgery Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "advanced",
+      "label": "Advanced",
+      "unit": "currency"
+     },
+     {
+      "key": "general",
+      "label": "General",
+      "unit": "currency"
+     },
+     {
+      "key": "total_surgery_total",
+      "label": "Total Surgery (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_medtech_vision_product",
+    "label": "Revenue By Medtech Vision Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "contact_lenses_other",
+      "label": "Contact Lenses / Other",
+      "unit": "currency"
+     },
+     {
+      "key": "surgical",
+      "label": "Surgical",
+      "unit": "currency"
+     },
+     {
+      "key": "total_vision_total",
+      "label": "Total Vision (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_medtech_orthopaedics_product",
+    "label": "Revenue By Medtech Orthopaedics Product",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "hips",
+      "label": "Hips",
+      "unit": "currency"
+     },
+     {
+      "key": "knees",
+      "label": "Knees",
+      "unit": "currency"
+     },
+     {
+      "key": "trauma",
+      "label": "Trauma",
+      "unit": "currency"
+     },
+     {
+      "key": "spine_sports_other",
+      "label": "Spine, Sports & Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_orthopaedics_total",
+      "label": "Total Orthopaedics (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated; added segment and geography revenue, the product tables for the other five therapeutic areas and the MedTech sub-franchise tables. Uncertain: each added product group's total repeats a figure in the therapeutic-area or franchise group, as the draft's Total Oncology does; drop them if cross-group duplicates are unwanted."
+ },
+ "MTB": {
+  "name": "M&T Bank",
+  "sector": "Banks",
+  "accession": "0000036270-26-000057",
+  "release": "https://www.sec.gov/Archives/edgar/data/36270/000003627026000057/0000036270-26-000057-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "fee_income_by_type",
+    "label": "Fee Income by Type",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "trust_and_investment_services_income",
+      "label": "Trust and investment services income",
+      "unit": "currency"
+     },
+     {
+      "key": "mortgage_banking_revenues",
+      "label": "Mortgage banking revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "service_charges_on_deposit_accounts",
+      "label": "Service charges on deposit accounts",
+      "unit": "currency"
+     },
+     {
+      "key": "card_revenues",
+      "label": "Card revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "letter_of_credit_and_credit_related_fees",
+      "label": "Letter of credit and credit-related fees",
+      "unit": "currency"
+     },
+     {
+      "key": "capital_markets_and_advisory_revenues",
+      "label": "Capital markets and advisory revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "gain_loss_on_bank_investment_securities",
+      "label": "Gain (loss) on bank investment securities",
+      "unit": "currency"
+     },
+     {
+      "key": "other_revenues_from_operations",
+      "label": "Other revenues from operations",
+      "unit": "currency"
+     },
+     {
+      "key": "total_noninterest_income",
+      "label": "Total noninterest income (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "net_charge_offs_to_average_loans",
+      "label": "Net Charge-Offs to Average Loans",
+      "unit": "percent"
+     },
+     {
+      "key": "nonaccrual_loans_to_total_loans",
+      "label": "Nonaccrual Loans to Total Loans",
+      "unit": "percent"
+     },
+     {
+      "key": "allowance_for_loan_losses_to_total_loans",
+      "label": "Allowance for Loan Losses to Total Loans",
+      "unit": "percent"
+     },
+     {
+      "key": "average_total_loans",
+      "label": "Average Total Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_total_deposits",
+      "label": "Average Total Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "average_commercial_and_industrial_loans",
+      "label": "Average Commercial and Industrial Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_commercial_real_estate_loans",
+      "label": "Average Commercial Real Estate Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_residential_real_estate_loans",
+      "label": "Average Residential Real Estate Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "average_consumer_loans",
+      "label": "Average Consumer Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "total_nonperforming_assets",
+      "label": "Total Nonperforming Assets",
+      "unit": "currency"
+     },
+     {
+      "key": "total_loans_period_end",
+      "label": "Total Loans (Period End)",
+      "unit": "currency"
+     },
+     {
+      "key": "total_deposits_period_end",
+      "label": "Total Deposits (Period End)",
+      "unit": "currency"
+     },
+     {
+      "key": "nonaccrual_loans",
+      "label": "Nonaccrual Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "net_charge_offs",
+      "label": "Net Charge-Offs",
+      "unit": "currency"
+     },
+     {
+      "key": "criticized_c_i_and_cre_loans",
+      "label": "Criticized C&I and CRE Loans",
+      "unit": "currency"
+     },
+     {
+      "key": "full_service_domestic_banking_offices",
+      "label": "Full-Service Domestic Banking Offices",
+      "unit": "count"
+     },
+     {
+      "key": "full_time_equivalent_employees",
+      "label": "Full-Time Equivalent Employees",
+      "unit": "count"
+     },
+     {
+      "key": "residential_mortgage_loans_serviced_for_",
+      "label": "Residential Mortgage Loans Serviced for Others (Total)",
+      "unit": "currency"
+     },
+     {
+      "key": "commercial_mortgage_loans_serviced_for_o",
+      "label": "Commercial Mortgage Loans Serviced for Others (Total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "revenue_components",
+    "label": "Revenue Components",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "net_interest_income",
+      "label": "Net Interest Income",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "mortgage_banking_revenues",
+    "label": "Mortgage Banking Revenues",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "total_residential_mortgage_banking_reven",
+      "label": "Total Residential Mortgage Banking Revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "total_commercial_mortgage_banking_revenu",
+      "label": "Total Commercial Mortgage Banking Revenues",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "other_revenues_from_operations",
+    "label": "Other Revenues From Operations",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "bank_owned_life_insurance_revenue",
+      "label": "Bank Owned Life Insurance Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "equipment_operating_lease_income",
+      "label": "Equipment Operating Lease Income",
+      "unit": "currency"
+     },
+     {
+      "key": "blg_income",
+      "label": "BLG Income",
+      "unit": "currency"
+     },
+     {
+      "key": "other",
+      "label": "Other",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "average_deposits_by_type",
+    "label": "Average Deposits By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "average_noninterest_bearing_deposits",
+      "label": "Average Noninterest-Bearing Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "average_savings_and_interest_checking_de",
+      "label": "Average Savings and Interest-Checking Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "average_time_deposits",
+      "label": "Average Time Deposits",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "Removed NIM, the efficiency ratio, CET1, Tier 1 and TCE/TA; credit-quality ratios and nonperforming assets are kept as operating measures. Uncertain: Net Interest Income is added as a revenue component, and criticized loans is read from presentation chart text; the filing states no AUM."
+ },
+ "MU": {
+  "name": "Micron Technology",
+  "sector": "Semiconductors",
+  "accession": "0000723125-26-000018",
+  "release": "https://www.sec.gov/Archives/edgar/data/723125/000072312526000018/0000723125-26-000018-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "business_unit_revenue",
+    "label": "Business Unit Revenue",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "cloud_memory_business_unit_revenue",
+      "label": "Cloud Memory Business Unit Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "core_data_center_business_unit_revenue",
+      "label": "Core Data Center Business Unit Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "mobile_and_client_business_unit_revenue",
+      "label": "Mobile and Client Business Unit Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "automotive_and_embedded_business_unit_re",
+      "label": "Automotive and Embedded Business Unit Revenue",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "The draft was empty; added the four business unit revenues. No total row is added because the table has none and the units do not sum exactly to revenue; the release states no DRAM/NAND split or bit shipments."
+ },
+ "NEE": {
+  "name": "NextEra Energy",
+  "sector": "Energy and utilities",
+  "accession": "0000753308-26-000077",
+  "release": "https://www.sec.gov/Archives/edgar/data/753308/000075330826000077/0000753308-26-000077-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "revenue_by_segment",
+    "label": "Revenue by Segment",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "fpl",
+      "label": "FPL",
+      "unit": "currency"
+     },
+     {
+      "key": "neer",
+      "label": "NextEra Energy Resources",
+      "unit": "currency"
+     },
+     {
+      "key": "corporate_and_other",
+      "label": "Corporate and Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total",
+      "label": "NextEra Energy (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "backlog_gw",
+      "label": "Backlog (GW)",
+      "unit": "count"
+     },
+     {
+      "key": "renewables_storage_added_to_backlog_gw",
+      "label": "Renewables and Storage Added to Backlog (GW)",
+      "unit": "count"
+     },
+     {
+      "key": "battery_storage_origination_gw",
+      "label": "Battery Storage Origination (GW)",
+      "unit": "count"
+     },
+     {
+      "key": "projects_placed_in_service_gw",
+      "label": "Projects Placed Into Service (GW)",
+      "unit": "count"
+     },
+     {
+      "key": "large_load_hubs_in_development",
+      "label": "Large-Load Hubs in Development",
+      "unit": "count"
+     }
+    ]
+   }
+  ],
+  "note": "Removed the recontracting line, stated only year to date. Uncertain: Large-Load Hubs in Development is kept on its current count (the year-end figure is a forecast) though it is a prose pipeline figure, and Projects Placed Into Service is measured since the last earnings call, not the calendar quarter."
+ },
+ "PGR": {
+  "name": "Progressive",
+  "sector": "Insurers and managed care",
+  "accession": "0000080661-26-000367",
+  "release": "https://www.sec.gov/Archives/edgar/data/80661/000008066126000367/0000080661-26-000367-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "policies_in_force",
+      "label": "Policies in Force (Thousands)",
+      "unit": "count"
+     },
+     {
+      "key": "agency_auto_policies",
+      "label": "Agency Auto Policies",
+      "unit": "count"
+     },
+     {
+      "key": "direct_auto_policies",
+      "label": "Direct Auto Policies",
+      "unit": "count"
+     },
+     {
+      "key": "special_lines_policies",
+      "label": "Special Lines Policies",
+      "unit": "count"
+     },
+     {
+      "key": "property_policies",
+      "label": "Property Policies",
+      "unit": "count"
+     },
+     {
+      "key": "commercial_lines_policies",
+      "label": "Commercial Lines Policies",
+      "unit": "count"
+     },
+     {
+      "key": "combined_ratio",
+      "label": "Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "net_premiums_written",
+      "label": "Net Premiums Written",
+      "unit": "currency"
+     },
+     {
+      "key": "net_premiums_earned",
+      "label": "Net Premiums Earned",
+      "unit": "currency"
+     },
+     {
+      "key": "total_personal_lines_policies",
+      "label": "Total Personal Lines Policies",
+      "unit": "count"
+     }
+    ]
+   }
+  ],
+  "note": "This is the September monthly release: only net premiums written, net premiums earned and the combined ratio have a Quarter column, so the segment premiums and the loss/LAE, expense and catastrophe ratios (month and year-to-date only) are removed. Uncertain: the draft's Companywide total did not say written or earned, so it is removed and Net Premiums Earned added."
+ },
+ "PLD": {
+  "name": "Prologis",
+  "sector": "Telecom and REIT",
+  "accession": "0001193125-26-422375",
+  "release": "https://www.sec.gov/Archives/edgar/data/1045609/000119312526422375/0001193125-26-422375-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "revenue_by_source",
+    "label": "Revenue by Source",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "rental",
+      "label": "Rental",
+      "unit": "currency"
+     },
+     {
+      "key": "strategic_capital",
+      "label": "Strategic Capital",
+      "unit": "currency"
+     },
+     {
+      "key": "development_management_and_other",
+      "label": "Development Management and Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_revenues",
+      "label": "Total Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "average_occupancy",
+      "label": "Average Occupancy",
+      "unit": "percent"
+     },
+     {
+      "key": "period_end_occupancy",
+      "label": "Period End Occupancy",
+      "unit": "percent"
+     },
+     {
+      "key": "same_store_noi_growth_cash",
+      "label": "Same Store NOI Growth - Cash",
+      "unit": "percent"
+     },
+     {
+      "key": "same_store_noi_growth_net_effective",
+      "label": "Same Store NOI Growth - Net Effective",
+      "unit": "percent"
+     },
+     {
+      "key": "rent_change_net_effective",
+      "label": "Rent Change - Net Effective",
+      "unit": "percent"
+     },
+     {
+      "key": "rent_change_cash",
+      "label": "Rent Change - Cash",
+      "unit": "percent"
+     },
+     {
+      "key": "leases_commenced",
+      "label": "Leases Commenced (Million SF)",
+      "unit": "count"
+     },
+     {
+      "key": "customer_retention",
+      "label": "Customer Retention",
+      "unit": "percent"
+     },
+     {
+      "key": "development_starts",
+      "label": "Development Starts",
+      "unit": "currency"
+     },
+     {
+      "key": "development_stabilizations",
+      "label": "Development Stabilizations",
+      "unit": "currency"
+     },
+     {
+      "key": "operating_portfolio_square_feet",
+      "label": "Operating Portfolio Square Feet (Prologis Share)",
+      "unit": "count"
+     },
+     {
+      "key": "top_10_customer_share",
+      "label": "Top 10 Customer Share of Net Effective Rent",
+      "unit": "percent"
+     },
+     {
+      "key": "acquisitions",
+      "label": "Acquisitions",
+      "unit": "currency"
+     },
+     {
+      "key": "total_dispositions_and_contributions",
+      "label": "Total Dispositions and Contributions",
+      "unit": "currency"
+     },
+     {
+      "key": "assets_under_management",
+      "label": "Assets Under Management",
+      "unit": "currency"
+     },
+     {
+      "key": "third_party_aum",
+      "label": "Third-Party AUM",
+      "unit": "currency"
+     },
+     {
+      "key": "operating_portfolio_leased",
+      "label": "Operating Portfolio Leased",
+      "unit": "percent"
+     }
+    ]
+   }
+  ],
+  "note": "Removed Operating Portfolio NOI as a profit measure; same-store NOI growth and rent change are kept as operating metrics (like same-store sales) though they are growth of a non-GAAP measure. Uncertain: development starts and stabilizations are kept as deployment volumes, with acquisitions and dispositions added on the same reasoning; the two AUM figures come from supplement chart labels; Fee Related Earnings not added."
+ },
+ "RF": {
+  "name": "Regions Financial",
+  "sector": "Banks",
+  "accession": "0001281761-26-000063",
+  "release": "https://www.sec.gov/Archives/edgar/data/1281761/000128176126000063/0001281761-26-000063-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "noninterest_income_by_type",
+    "label": "Noninterest Income by Type",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "service_charges_on_deposit_accounts",
+      "label": "Service Charges on Deposit Accounts",
+      "unit": "currency"
+     },
+     {
+      "key": "card_and_atm_fees",
+      "label": "Card and ATM Fees",
+      "unit": "currency"
+     },
+     {
+      "key": "wealth_management_income",
+      "label": "Wealth Management Income",
+      "unit": "currency"
+     },
+     {
+      "key": "capital_markets_income",
+      "label": "Capital Markets Income",
+      "unit": "currency"
+     },
+     {
+      "key": "mortgage_income",
+      "label": "Mortgage Income",
+      "unit": "currency"
+     },
+     {
+      "key": "commercial_credit_fee_income",
+      "label": "Commercial Credit Fee Income",
+      "unit": "currency"
+     },
+     {
+      "key": "boli_income",
+      "label": "BOLI Income",
+      "unit": "currency"
+     },
+     {
+      "key": "market_value_adjustments_on_employee_benefit_ass",
+      "label": "Market Value Adjustments on Employee Benefit Assets",
+      "unit": "currency"
+     },
+     {
+      "key": "securities_gains_losses_net",
+      "label": "Securities Gains (Losses), Net",
+      "unit": "currency"
+     },
+     {
+      "key": "other_miscellaneous_income",
+      "label": "Other Miscellaneous Income",
+      "unit": "currency"
+     },
+     {
+      "key": "total_noninterest_income",
+      "label": "Total Noninterest Income (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "net_charge_off_ratio",
+      "label": "Net Charge-Off Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "nonperforming_loan_ratio",
+      "label": "Nonperforming Loan Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "acl_to_nonperforming_loans",
+      "label": "Allowance for Credit Losses to Nonperforming Loans",
+      "unit": "percent"
+     },
+     {
+      "key": "total_loans",
+      "label": "Total Loans, Net of Unearned Income",
+      "unit": "currency"
+     },
+     {
+      "key": "total_deposits",
+      "label": "Total Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "loans_to_deposits",
+      "label": "Loans to Deposits",
+      "unit": "percent"
+     },
+     {
+      "key": "employees",
+      "label": "Employees",
+      "unit": "count"
+     },
+     {
+      "key": "branches",
+      "label": "Branches",
+      "unit": "count"
+     },
+     {
+      "key": "net_loans_charged_off",
+      "label": "Net Loans Charged-Off",
+      "unit": "currency"
+     },
+     {
+      "key": "non_performing_loans_excluding_loans_hel",
+      "label": "Non-Performing Loans, Excluding Loans Held for Sale",
+      "unit": "currency"
+     },
+     {
+      "key": "allowance_for_credit_losses_as_a_percent",
+      "label": "Allowance for Credit Losses as a Percentage of Loans",
+      "unit": "percent"
+     },
+     {
+      "key": "business_criticized_loans_to_total_busin",
+      "label": "Business Criticized Loans to Total Business Loans",
+      "unit": "percent"
+     },
+     {
+      "key": "total_criticized_loans_business_services",
+      "label": "Total Criticized Loans - Business Services",
+      "unit": "currency"
+     },
+     {
+      "key": "atms",
+      "label": "ATMs",
+      "unit": "count"
+     },
+     {
+      "key": "total_mortgage_production",
+      "label": "Total Mortgage Production",
+      "unit": "currency"
+     },
+     {
+      "key": "mobile_banking_active_users",
+      "label": "Mobile Banking Active Users",
+      "unit": "count"
+     }
+    ]
+   },
+   {
+    "key": "revenue_components",
+    "label": "Revenue Components",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "net_interest_income",
+      "label": "Net Interest Income",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "service_charges_by_segment",
+    "label": "Service Charges By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "consumer_bank_segment_service_charges_on",
+      "label": "Consumer Bank Segment Service Charges on Deposit Accounts",
+      "unit": "currency"
+     },
+     {
+      "key": "corporate_bank_segment_service_charges_o",
+      "label": "Corporate Bank Segment Service Charges on Deposit Accounts",
+      "unit": "currency"
+     },
+     {
+      "key": "wealth_management_segment_service_charge",
+      "label": "Wealth Management Segment Service Charges on Deposit Accounts",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "wealth_management_income",
+    "label": "Wealth Management Income",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "investment_management_and_trust_fee_inco",
+      "label": "Investment Management and Trust Fee Income",
+      "unit": "currency"
+     },
+     {
+      "key": "investment_services_fee_income",
+      "label": "Investment Services Fee Income",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "average_loans_by_type",
+    "label": "Average Loans By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "average_loans_net_of_unearned_income",
+      "label": "Average Loans, Net of Unearned Income",
+      "unit": "currency"
+     },
+     {
+      "key": "average_business_lending",
+      "label": "Average Business Lending",
+      "unit": "currency"
+     },
+     {
+      "key": "average_commercial_and_industrial",
+      "label": "Average Commercial and Industrial",
+      "unit": "currency"
+     },
+     {
+      "key": "average_commercial_real_estate_owner_occ",
+      "label": "Average Commercial Real Estate - Owner-Occupied",
+      "unit": "currency"
+     },
+     {
+      "key": "average_investor_real_estate",
+      "label": "Average Investor Real Estate",
+      "unit": "currency"
+     },
+     {
+      "key": "average_consumer_lending",
+      "label": "Average Consumer Lending",
+      "unit": "currency"
+     },
+     {
+      "key": "average_residential_first_mortgage",
+      "label": "Average Residential First Mortgage",
+      "unit": "currency"
+     },
+     {
+      "key": "average_home_equity",
+      "label": "Average Home Equity",
+      "unit": "currency"
+     },
+     {
+      "key": "average_consumer_credit_card",
+      "label": "Average Consumer Credit Card",
+      "unit": "currency"
+     },
+     {
+      "key": "average_other_consumer",
+      "label": "Average Other Consumer",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "average_deposits_by_segment",
+    "label": "Average Deposits By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "average_total_deposits",
+      "label": "Average Total Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "consumer_bank_segment_average_deposits",
+      "label": "Consumer Bank Segment Average Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "corporate_bank_segment_average_deposits",
+      "label": "Corporate Bank Segment Average Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "wealth_management_segment_average_deposi",
+      "label": "Wealth Management Segment Average Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "other_average_deposits",
+      "label": "Other Average Deposits",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "average_deposits_by_type",
+    "label": "Average Deposits By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "average_non_interest_bearing_deposits",
+      "label": "Average Non-Interest-Bearing Deposits",
+      "unit": "currency"
+     },
+     {
+      "key": "average_interest_bearing_checking",
+      "label": "Average Interest-Bearing Checking",
+      "unit": "currency"
+     },
+     {
+      "key": "average_savings",
+      "label": "Average Savings",
+      "unit": "currency"
+     },
+     {
+      "key": "average_money_market_domestic",
+      "label": "Average Money Market - Domestic",
+      "unit": "currency"
+     },
+     {
+      "key": "average_time_deposits",
+      "label": "Average Time Deposits",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "mortgage_production_mix",
+    "label": "Mortgage Production Mix",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "mortgage_production_purchased",
+      "label": "Mortgage Production - Purchased",
+      "unit": "percent"
+     },
+     {
+      "key": "mortgage_production_refinanced",
+      "label": "Mortgage Production - Refinanced",
+      "unit": "percent"
+     }
+    ]
+   }
+  ],
+  "note": "Removed NIM, the efficiency ratio (listed in the presentation's key metrics but still a cost ratio), CET1, Tier 1 and leverage. Uncertain: loans-to-deposits is kept as a liquidity ratio, Net Interest Income is added as a revenue component, and mobile active users is matched to its chart by its growth label."
+ },
+ "SBUX": {
+  "name": "Starbucks",
+  "sector": "Consumer and retail",
+  "accession": "0000829224-26-000154",
+  "release": "https://www.sec.gov/Archives/edgar/data/829224/000082922426000154/0000829224-26-000154-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "revenue_by_operation_type",
+    "label": "Revenue by Operation Type",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "company_operated",
+      "label": "Company-Operated Coffeehouses",
+      "unit": "currency"
+     },
+     {
+      "key": "licensed",
+      "label": "Licensed Coffeehouses",
+      "unit": "currency"
+     },
+     {
+      "key": "other",
+      "label": "Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_net_revenues",
+      "label": "Total Net Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "total_coffeehouses",
+      "label": "Total Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "north_america_coffeehouses",
+      "label": "North America Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "international_coffeehouses",
+      "label": "International Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "us_coffeehouses",
+      "label": "U.S. Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "net_new_coffeehouses",
+      "label": "Net New Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "ww_comparable_coffeehouse_sales",
+      "label": "Worldwide Comparable Coffeehouse Sales",
+      "unit": "percent"
+     },
+     {
+      "key": "na_comparable_coffeehouse_sales",
+      "label": "North America Comparable Coffeehouse Sales",
+      "unit": "percent"
+     },
+     {
+      "key": "us_comparable_coffeehouse_sales",
+      "label": "U.S. Comparable Coffeehouse Sales",
+      "unit": "percent"
+     },
+     {
+      "key": "intl_comparable_coffeehouse_sales",
+      "label": "International Comparable Coffeehouse Sales",
+      "unit": "percent"
+     },
+     {
+      "key": "na_comparable_transactions",
+      "label": "North America Comparable Transactions",
+      "unit": "percent"
+     },
+     {
+      "key": "na_average_ticket",
+      "label": "North America Average Ticket",
+      "unit": "percent"
+     },
+     {
+      "key": "global_comparable_transactions",
+      "label": "Global Comparable Transactions",
+      "unit": "percent"
+     },
+     {
+      "key": "global_average_ticket",
+      "label": "Global Average Ticket",
+      "unit": "percent"
+     },
+     {
+      "key": "u_s_comparable_transactions",
+      "label": "U.S. Comparable Transactions",
+      "unit": "percent"
+     },
+     {
+      "key": "u_s_average_ticket",
+      "label": "U.S. Average Ticket",
+      "unit": "percent"
+     },
+     {
+      "key": "international_comparable_transactions",
+      "label": "International Comparable Transactions",
+      "unit": "percent"
+     },
+     {
+      "key": "international_average_ticket",
+      "label": "International Average Ticket",
+      "unit": "percent"
+     },
+     {
+      "key": "north_america_company_operated_coffeehou",
+      "label": "North America Company-Operated Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "north_america_licensed_coffeehouses",
+      "label": "North America Licensed Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "international_company_operated_coffeehou",
+      "label": "International Company-Operated Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "international_licensed_coffeehouses",
+      "label": "International Licensed Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "north_america_net_new_coffeehouses",
+      "label": "North America Net New Coffeehouses",
+      "unit": "count"
+     },
+     {
+      "key": "international_net_new_coffeehouses",
+      "label": "International Net New Coffeehouses",
+      "unit": "count"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_segment",
+    "label": "Revenue By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "north_america",
+      "label": "North America",
+      "unit": "currency"
+     },
+     {
+      "key": "international",
+      "label": "International",
+      "unit": "currency"
+     },
+     {
+      "key": "channel_development",
+      "label": "Channel Development",
+      "unit": "currency"
+     },
+     {
+      "key": "corporate_and_other",
+      "label": "Corporate and Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_net_revenues_total",
+      "label": "Total Net Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated; added revenue by segment, transactions and ticket by region, and store counts by segment and ownership. Left out each segment's revenue by operation type and the lone U.S. net revenues figure."
+ },
+ "TRV": {
+  "name": "Travelers Companies",
+  "sector": "Insurers and managed care",
+  "accession": "0000086312-26-000180",
+  "release": "https://www.sec.gov/Archives/edgar/data/86312/000008631226000180/0000086312-26-000180-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "premiums_by_segment",
+    "label": "Net Written Premiums by Segment",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "business_insurance",
+      "label": "Business Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "bond_specialty_insurance",
+      "label": "Bond & Specialty Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "personal_insurance",
+      "label": "Personal Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "total",
+      "label": "Total (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "bi_premiums_by_product",
+    "label": "Business Insurance Premiums by Product",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "workers_compensation",
+      "label": "Workers\u2019 compensation",
+      "unit": "currency"
+     },
+     {
+      "key": "commercial_automobile",
+      "label": "Commercial automobile",
+      "unit": "currency"
+     },
+     {
+      "key": "commercial_property",
+      "label": "Commercial property",
+      "unit": "currency"
+     },
+     {
+      "key": "general_liability",
+      "label": "General liability",
+      "unit": "currency"
+     },
+     {
+      "key": "commercial_multi_peril",
+      "label": "Commercial multi-peril",
+      "unit": "currency"
+     },
+     {
+      "key": "other",
+      "label": "Other",
+      "unit": "currency"
+     },
+     {
+      "key": "international",
+      "label": "International",
+      "unit": "currency"
+     },
+     {
+      "key": "total",
+      "label": "Total (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "pi_premiums_by_product",
+    "label": "Personal Insurance Premiums by Product",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "automobile",
+      "label": "Automobile",
+      "unit": "currency"
+     },
+     {
+      "key": "homeowners_and_other",
+      "label": "Homeowners and Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total",
+      "label": "Total (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "combined_ratio",
+      "label": "Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "underlying_combined_ratio",
+      "label": "Underlying Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "loss_ratio",
+      "label": "Loss and Loss Adjustment Expense Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "expense_ratio",
+      "label": "Underwriting Expense Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "auto_policies_in_force",
+      "label": "Automobile Policies in Force",
+      "unit": "count"
+     },
+     {
+      "key": "home_policies_in_force",
+      "label": "Homeowners and Other Policies in Force",
+      "unit": "count"
+     },
+     {
+      "key": "business_insurance_combined_ratio",
+      "label": "Business Insurance Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "bond_specialty_insurance_combined_ratio",
+      "label": "Bond & Specialty Insurance Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "personal_insurance_combined_ratio",
+      "label": "Personal Insurance Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "business_insurance_underlying_combined_r",
+      "label": "Business Insurance Underlying Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "bond_specialty_insurance_underlying_comb",
+      "label": "Bond & Specialty Insurance Underlying Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "personal_insurance_underlying_combined_r",
+      "label": "Personal Insurance Underlying Combined Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "catastrophes_net_of_reinsurance_impact_o",
+      "label": "Catastrophes, Net of Reinsurance (Impact on Combined Ratio)",
+      "unit": "percent"
+     },
+     {
+      "key": "net_favorable_prior_year_reserve_develop",
+      "label": "Net Favorable Prior Year Reserve Development (Impact on Combined Ratio)",
+      "unit": "percent"
+     },
+     {
+      "key": "business_insurance_retention",
+      "label": "Business Insurance Retention",
+      "unit": "percent"
+     },
+     {
+      "key": "business_insurance_renewal_premium_chang",
+      "label": "Business Insurance Renewal Premium Change",
+      "unit": "percent"
+     },
+     {
+      "key": "business_insurance_new_business",
+      "label": "Business Insurance New Business",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "bi_premiums_by_market",
+    "label": "Bi Premiums By Market",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "select_accounts",
+      "label": "Select Accounts",
+      "unit": "currency"
+     },
+     {
+      "key": "middle_market",
+      "label": "Middle Market",
+      "unit": "currency"
+     },
+     {
+      "key": "national_accounts",
+      "label": "National Accounts",
+      "unit": "currency"
+     },
+     {
+      "key": "national_property_and_other",
+      "label": "National Property and Other",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "bsi_premiums_by_market",
+    "label": "Bsi Premiums By Market",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "management_liability",
+      "label": "Management Liability",
+      "unit": "currency"
+     },
+     {
+      "key": "surety",
+      "label": "Surety",
+      "unit": "currency"
+     },
+     {
+      "key": "international",
+      "label": "International",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "earned_premiums_by_segment",
+    "label": "Earned Premiums By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "business_insurance",
+      "label": "Business Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "bond_specialty_insurance",
+      "label": "Bond & Specialty Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "personal_insurance",
+      "label": "Personal Insurance",
+      "unit": "currency"
+     },
+     {
+      "key": "total_total",
+      "label": "Total (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "Removed Personal Insurance International, which shows a dash after the Canadian divestiture. Uncertain: Underlying Combined Ratio is kept although adjusted because the release headlines it; Business Insurance retention, renewal premium change and new business are added from prose rather than a table; the Business and Personal Insurance product totals repeat their segment lines."
+ },
+ "TXN": {
+  "name": "Texas Instruments",
+  "sector": "Semiconductors",
+  "accession": "0000097476-26-000165",
+  "release": "https://www.sec.gov/Archives/edgar/data/97476/000009747626000165/0000097476-26-000165-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "segment_revenue",
+    "label": "Segment Revenue",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "analog_revenue",
+      "label": "Analog Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "embedded_processing_revenue",
+      "label": "Embedded Processing Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "other_revenue",
+      "label": "Other Revenue",
+      "unit": "currency"
+     },
+     {
+      "key": "total_revenue_total",
+      "label": "Total Revenue (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "The draft was empty; added segment revenue. Uncertain: the segment table has no total row, so Total Revenue is taken from the summary, to which the three segments sum exactly."
+ },
+ "UPS": {
+  "name": "United Parcel Service",
+  "sector": "Industrials and transport",
+  "accession": "0001628280-26-067381",
+  "release": "https://www.sec.gov/Archives/edgar/data/1090727/000162828026067381/0001628280-26-067381-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "avg_daily_us_domestic_package_volume",
+      "label": "Average Daily U.S. Domestic Package Volume (thousands)",
+      "unit": "count"
+     },
+     {
+      "key": "operating_days",
+      "label": "Operating Days",
+      "unit": "count"
+     },
+     {
+      "key": "u_s_domestic_revenue_per_piece_growth",
+      "label": "U.S. Domestic Revenue Per Piece Growth",
+      "unit": "percent"
+     },
+     {
+      "key": "international_revenue_per_piece_growth",
+      "label": "International Revenue Per Piece Growth",
+      "unit": "percent"
+     }
+    ]
+   },
+   {
+    "key": "revenue_by_segment",
+    "label": "Revenue By Segment",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "u_s_domestic_segment",
+      "label": "U.S. Domestic Segment",
+      "unit": "currency"
+     },
+     {
+      "key": "international_segment",
+      "label": "International Segment",
+      "unit": "currency"
+     },
+     {
+      "key": "supply_chain_solutions",
+      "label": "Supply Chain Solutions",
+      "unit": "currency"
+     },
+     {
+      "key": "consolidated_revenue_total",
+      "label": "Consolidated Revenue (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "Both draft lines are stated; Operating Days is kept though it is a calendar count. Uncertain: the exhibit has no volume or revenue-per-piece tables, so only prose revenue-per-piece growth is added, and the consolidated revenue total is stated only rounded in prose."
+ },
+ "VZ": {
+  "name": "Verizon Communications",
+  "sector": "Telecom and REIT",
+  "accession": "0000732712-26-000049",
+  "release": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000049/0000732712-26-000049-index.htm",
+  "reviewed": "2026-11-17",
+  "groups": [
+   {
+    "key": "consumer_revenue_by_product",
+    "label": "Consumer Revenue by Product",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "mobility_and_broadband_service",
+      "label": "Mobility and broadband service",
+      "unit": "currency"
+     },
+     {
+      "key": "wireless_equipment",
+      "label": "Wireless equipment",
+      "unit": "currency"
+     },
+     {
+      "key": "other",
+      "label": "Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_operating_revenues",
+      "label": "Total Operating Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "business_revenue_by_product",
+    "label": "Business Revenue by Product",
+    "kind": "revenue_breakdown",
+    "kpis": [
+     {
+      "key": "mobility_and_broadband_service",
+      "label": "Mobility and broadband service",
+      "unit": "currency"
+     },
+     {
+      "key": "wireless_equipment",
+      "label": "Wireless equipment",
+      "unit": "currency"
+     },
+     {
+      "key": "other",
+      "label": "Other",
+      "unit": "currency"
+     },
+     {
+      "key": "total_operating_revenues",
+      "label": "Total Operating Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   },
+   {
+    "key": "operating",
+    "label": "Operating Metrics",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "wireless_retail_postpaid_phone_connections",
+      "label": "Wireless Retail Postpaid Phone Connections",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_postpaid_connections",
+      "label": "Wireless Retail Postpaid Connections",
+      "unit": "count"
+     },
+     {
+      "key": "total_broadband_connections",
+      "label": "Total Broadband Connections",
+      "unit": "count"
+     },
+     {
+      "key": "fiber_broadband_connections",
+      "label": "Fiber Broadband Connections",
+      "unit": "count"
+     },
+     {
+      "key": "fwa_broadband_connections",
+      "label": "FWA Broadband Connections",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_postpaid_phone_net_additions",
+      "label": "Wireless Retail Postpaid Phone Net Additions",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_postpaid_net_additions",
+      "label": "Wireless Retail Postpaid Net Additions",
+      "unit": "count"
+     },
+     {
+      "key": "total_broadband_net_additions",
+      "label": "Total Broadband Net Additions",
+      "unit": "count"
+     },
+     {
+      "key": "fiber_broadband_net_additions",
+      "label": "Fiber Broadband Net Additions",
+      "unit": "count"
+     },
+     {
+      "key": "fwa_broadband_net_additions",
+      "label": "FWA Broadband Net Additions",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_postpaid_phone_churn",
+      "label": "Wireless Retail Postpaid Phone Churn",
+      "unit": "percent"
+     },
+     {
+      "key": "wireless_retail_core_prepaid_churn",
+      "label": "Wireless Retail Core Prepaid Churn",
+      "unit": "percent"
+     },
+     {
+      "key": "wireless_retail_postpaid_arpa",
+      "label": "Wireless Retail Postpaid ARPA",
+      "unit": "currency"
+     },
+     {
+      "key": "wireless_retail_core_prepaid_arpu",
+      "label": "Wireless Retail Core Prepaid ARPU",
+      "unit": "currency"
+     },
+     {
+      "key": "wireless_retail_postpaid_accounts",
+      "label": "Wireless Retail Postpaid Accounts",
+      "unit": "count"
+     },
+     {
+      "key": "upgrade_rate",
+      "label": "Upgrade Rate",
+      "unit": "percent"
+     },
+     {
+      "key": "wireless_retail_connections",
+      "label": "Wireless Retail Connections",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_core_prepaid_connections",
+      "label": "Wireless Retail Core Prepaid Connections",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_core_prepaid_phone_conne",
+      "label": "Wireless Retail Core Prepaid Phone Connections",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_net_additions",
+      "label": "Wireless Retail Net Additions",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_core_prepaid_net_additio",
+      "label": "Wireless Retail Core Prepaid Net Additions",
+      "unit": "count"
+     },
+     {
+      "key": "wireless_retail_core_prepaid_phone_net_a",
+      "label": "Wireless Retail Core Prepaid Phone Net Additions",
+      "unit": "count"
+     }
+    ]
+   },
+   {
+    "key": "consolidated_revenue_by_type",
+    "label": "Consolidated Revenue By Type",
+    "kind": "metric",
+    "kpis": [
+     {
+      "key": "service_revenues_and_other",
+      "label": "Service Revenues and Other",
+      "unit": "currency"
+     },
+     {
+      "key": "wireless_equipment_revenues",
+      "label": "Wireless Equipment Revenues",
+      "unit": "currency"
+     },
+     {
+      "key": "total_operating_revenues_total",
+      "label": "Total Operating Revenues (total)",
+      "unit": "currency"
+     }
+    ]
+   }
+  ],
+  "note": "All draft lines are stated, each revenue group in its own segment table. Left out figures that appear only in the highlights text (postpaid net account additions, Consumer postpaid phone churn, total mobility and broadband service revenue)."
+ }
+}
