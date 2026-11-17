@@ -88,3 +88,11 @@ def test_only_cash_is_a_balance_in_a_cash_flow():
     others = [{"label": "Other", "unit": "USD", "value": 3.0}, {"label": "Other", "unit": "USD", "value": 5.0}]
     year = [{"label": "Other", "unit": "USD", "value": 4.0}, {"label": "Other", "unit": "USD", "value": 9.0}]
     assert [_quarter(line, index, others, "cash_flow") for index, line in enumerate(year)] == [1.0, 4.0]
+
+
+def test_a_lines_unit_decides_whether_it_adds_up():
+    from statement_extractor.selection.fourth import _additive
+    assert _additive({"label": "Common shares and equivalents issued (net of repurchases)", "unit": "USD"})  # Brookfield
+    assert not _additive({"label": "Effect of dilutive securities", "unit": "shares"})
+    assert not _additive({"label": "Net income", "unit": "USD/share"})
+    assert not _additive({"label": "Weighted average shares outstanding"})  # no unit: the label decides

@@ -31,10 +31,14 @@ def _keyed(reading, keys: dict) -> dict[tuple, list]:
 
 
 def _additive(line: dict) -> bool:
-    """A line a year less its nine months gives the fourth quarter of: never a figure a share or a share count, by its
-    unit (Coca-Cola's "Effect of dilutive securities (in shares)", a count its label alone does not name) or label."""
+    """A line a year less its nine months gives the fourth quarter of: never a figure a share or a share count. Its
+    unit decides (Coca-Cola's "Effect of dilutive securities (in shares)", a count its label alone does not name;
+    Brookfield's "Common shares and equivalents issued (net of repurchases)", dollars its label reads as a count); the
+    label only where the line has none."""
     label, unit = str(line.get("label") or ""), str(line.get("unit") or "")
-    return not (unit == "shares" or unit.endswith("/share") or PER_SHARE.search(label) or SHARE_COUNT.search(label))
+    if unit:
+        return not (unit == "shares" or unit.endswith("/share") or unit == "%")
+    return not (PER_SHARE.search(label) or SHARE_COUNT.search(label))
 
 
 # Balances a cash flow statement opens and closes on, by concept (the label decides for a printed statement).
