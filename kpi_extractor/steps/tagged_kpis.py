@@ -15,6 +15,8 @@ from ..readers.tagged_metrics import (agrees, concept_units, refines, fact_lines
 from ..quality.reasons import UNANCHORED, without
 from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _rounding, value_key
 
+_PICKED = "the releases do not state it"
+_UNCONFIRMED = "withdrawn: its report tag never gives the figure a release states for this KPI"
 # Where the AI's tag picks are kept between runs, beside the XBRL row curations.
 TAG_PICKS = "xbrl_tags"
 
@@ -83,6 +85,14 @@ class TaggedKpiReading:
         if records:
             self.log(f"{self.symbol}: {len(records)} KPI values read from reports' XBRL where the releases do not give them")
         return records
+
+    @staticmethod
+    def _unconfirmed(tag, stated: dict, quarters, kfacts) -> bool:
+        """Whether a KPI some release states has no quarter, of the newest eight it states, whose report tags the same
+        figure. A KPI no release states (Alphabet's revenue backlog) has nothing to confirm."""
+        shared = [quarter for quarter in sorted(stated, reverse=True) if quarter in quarters][:8]
+        return bool(stated) and not any(tag in kfacts(quarter) and agrees(kfacts(quarter)[tag], stated[quarter])
+                                        for quarter in shared)
 
     def _tag_fits(self, kpi, tag, newest_first, kfacts) -> bool:
         """Whether a tag's unit fits the KPI (a dollar KPI is never a count of shares), from the newest report that tags
@@ -169,13 +179,26 @@ class TaggedKpiReading:
                                 for v in held.values() if tag_from_locator(v.get("locator") or {}) == tag
                                 and not v.get("owner_decision") and v["validation_status"] != "rejected"]
                     continue
+                # A tag the AI picked for a KPI a release does state somewhere must give the release's figure in a
+                # quarter both give: State Street's "uninstalled revenue backlog" ($93 million in its Q1 2022 release)
+                # is not the software remaining performance obligation tagged from Q4 2022 ($1.4 billion).
+                stated = {quarter: float(v["value"]) for quarter, v in held.items()
+                          if v["validation_status"] != "rejected" and not (v.get("locator") or {}).get("tagged")}
+                if tag is not None and any(_PICKED in note for v in held.values() if tag_from_locator(v.get("locator") or {}) == tag
+                                           for note in v.get("notes") or []) and self._unconfirmed(tag, stated, quarters, kfacts):
+                    records += [{**v, "validation_status": "rejected", "notes": [_UNCONFIRMED]}
+                                for v in held.values() if tag_from_locator(v.get("locator") or {}) == tag
+                                and not v.get("owner_decision") and v["validation_status"] != "rejected"]
+                    continue
                 missing = [quarter for quarter in newest_first if quarter not in held
                            or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
                 if not missing:
                     continue
                 how = "tagged as in the quarters the release states it"
                 if tag is None and kpi.key in picked:
-                    tag, how = picked[kpi.key], "the releases do not state it"
+                    tag, how = picked[kpi.key], _PICKED
+                    if self._unconfirmed(tag, stated, quarters, kfacts):
+                        continue
                     if any(quarter in quarters and tag in kfacts(quarter) and not agrees(kfacts(quarter)[tag], value)
                            for quarter, value in readings.items()):
                         continue  # a release gave a different figure: not this tag
