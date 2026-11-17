@@ -153,3 +153,18 @@ def test_segment_pages_picks_company_metrics_held_for_a_segments_page():
         "OTHER": {"source_accession": "OTHER", "validation_status": "needs_review", "notes": ["sharp change"]},
     }
     assert picked_filings("segment-pages", values) == {"HELD"}
+
+
+def test_a_report_whose_quarter_a_split_skips_is_picked():
+    from kpi_extractor.ops.reread import picked_filings
+    def value(acc, group, end, kind="revenue_breakdown", period="Q1"):
+        return {"source_accession": acc, "method": "xbrl", "group_key": group, "group_kind": kind, "period_end": end,
+                "fiscal_period": period, "validation_status": "verified"}
+    values = dict(enumerate([
+        value("q4-17", "products", "2017-12-31", period="Q4"), value("q4-17", "segments", "2017-12-31", period="Q4"),
+        value("q1-18", "segments", "2018-03-31"),  # Alphabet's Q1 2018 10-Q: segments, no products
+        value("q2-19", "products", "2019-06-30", period="Q2"), value("q2-19", "products", "2018-06-30", period="Q2"),
+        value("q2-19", "segments", "2019-06-30", period="Q2"),
+        value("q3-19", "segments", "2019-09-30", period="Q3"),  # after the last products quarter: not a gap
+    ]))
+    assert picked_filings("reports-missing-split", values) == {"q1-18"}

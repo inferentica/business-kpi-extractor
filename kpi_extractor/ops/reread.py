@@ -141,6 +141,26 @@ def _reports_without_segments(values: dict) -> set[str]:
     return {accession for accession, keys in groups.items() if "segment_income" in keys and "segments" not in keys}
 
 
+def _reports_missing_split(values: dict) -> set[str]:
+    """Periodic reports whose quarter is missing from a revenue split the company has from XBRL before and after it (a
+    quarter or a year's figure): the report's split went unread (Alphabet's Q1 2018 10-Q, its product split refused until the
+    Google segment's own unnamed figure completed it, PR 170), leaving that quarter and its Q4 without the split."""
+    periods: dict[str, set[str]] = {}
+    report_period: dict[str, str] = {}
+    for value in values.values():
+        if value.get("method") != "xbrl" or not value.get("source_accession"):
+            continue
+        accession, end = value["source_accession"], str(value["period_end"])[:10]
+        if value.get("fiscal_period") != "FY":  # a year's figures bound the series, but name no report's quarter
+            report_period[accession] = max(end, report_period.get(accession, end))  # its own quarter, after its year-ago ones
+        key = str(value.get("group_key") or "")
+        if value.get("group_kind") == "revenue_breakdown" and value.get("validation_status") == "verified" \
+                and not key.endswith("_levels"):
+            periods.setdefault(key, set()).add(end)
+    return {accession for accession, end in report_period.items()
+            if any(end not in ends and min(ends) < end < max(ends) for ends in periods.values())}
+
+
 def _chart_share_quarters(values: dict) -> set[str]:
     """The other filings of a quarter whose figures a slide's shares still stand in for: its report, whose amounts the
     shares kept out while they blocked an unchecked reading (TSMC's Q3 2026 technology nodes, 2026-11-13)."""
@@ -156,6 +176,8 @@ def _chart_share_quarters(values: dict) -> set[str]:
 SET_SELECTORS: dict[str, tuple[str, Callable[[dict], set[str]]]] = {
     "reports-without-segments": ("periodic reports with segment income from XBRL but no revenue by segment", _reports_without_segments),
     "chart-share-quarters": ("the reports of quarters a slide's shares still stand in for", _chart_share_quarters),
+    "reports-missing-split": ("periodic reports whose quarter is missing from an XBRL revenue split held before and after it",
+                              _reports_missing_split),
 }
 
 
