@@ -173,6 +173,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.load(state.get("values") or [], state.get("filings") or [], state.get("ownerRejected") or [])
         self.learned_rules = {row["kind"]: row["status"] for row in state.get("learnedRules") or []}
         self.names = (state.get("spec") or {}).get("names") or {}
+        self.previous_left_out = (state.get("spec") or {}).get("left_out") or []
         # Which filing gave each stored statement period: a quarter read from releases belongs to the newest release
         # that presents it.
         self._statement_owners = {

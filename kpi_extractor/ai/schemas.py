@@ -149,10 +149,34 @@ class BreakdownName(BaseModel):
         return {key: label.strip() for key, label in value.items() if 0 < len(label.strip()) <= 60}
 
 
+MAX_LEFT_OUT_PROPOSED = 15
+
+
+class LeftOutItem(BaseModel):
+    """A measure the documents give for the quarter that Propose chose not to track, and the rule that kept it out."""
+    label: str = Field(min_length=1, max_length=80)
+    unit: Unit = "count"
+    reason: str = Field(min_length=1, max_length=60)
+    group: str | None = Field(default=None, max_length=60)
+
+
 class Spec(BaseModel):
     groups: list[GroupSpec] = Field(max_length=MAX_GROUPS)
     # Professional names for the company's XBRL breakdowns, keyed by breakdown key; members keyed by member key.
     names: dict[str, BreakdownName] = Field(default_factory=dict)
+    # Propose's own account of what it left out (steps/left_out.py); a malformed item is dropped, never the reply.
+    left_out: list[LeftOutItem] = Field(default_factory=list)
+
+    @field_validator("left_out", mode="before")
+    @classmethod
+    def _left_out(cls, value) -> list:
+        items = []
+        for raw in value if isinstance(value, list) else []:
+            try:
+                items.append(LeftOutItem.model_validate(raw))
+            except ValidationError:
+                continue
+        return items[:MAX_LEFT_OUT_PROPOSED]
 
     @model_validator(mode="after")
     def _unique(self) -> "Spec":

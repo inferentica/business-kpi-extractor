@@ -63,6 +63,10 @@ only when they help.
 quarterly version of an annual XBRL breakdown), give both the same title and row labels, so they read as one view.
 - "names" renames each breakdown listed under "Name these XBRL breakdowns": {{"<breakdown key>": {{"label": "...", \
 "members": {{"<member key>": "..."}}}}}}. Use only the keys given; omit a member whose label is already right.
+- "left_out" names up to 15 measures these documents give as a number for the quarter that you chose not to track, \
+most notable first: {{"label": "...", "unit": "...", "reason": "...", "group": "<key of the group it would join, or \
+null>"}}. The reason names the rule in two to five words ("a margin", "growth of total revenue", "covered by XBRL", \
+"year to date only", "cost line"). Never list what you track, and never invent a measure the documents do not give.
 - At most {MAX_GROUPS} groups and {MAX_KPIS_PER_GROUP} KPIs per group, and about {MAX_LISTED_KPIS} KPIs in all. Over that, \
 operating metrics are dropped from the end of their group (breakdowns and mixes never are), so list operating metrics \
 most important first. Prefer fewer, clearly reported KPIs.
@@ -70,4 +74,5 @@ most important first. Prefer fewer, clearly reported KPIs.
 JSON shape:
 {{"groups": [{{"key": "revenue_by_technology", "label": "Revenue by Technology", "kind": "mix", "total_kpi": null,
   "kpis": [{{"key": "n3", "label": "3nm", "unit": "percent"}}]}}],
- "names": {{"products": {{"label": "Revenue by Market Platform", "members": {{"hyperscale": "Hyperscale"}}}}}}}}"""
+ "names": {{"products": {{"label": "Revenue by Market Platform", "members": {{"hyperscale": "Hyperscale"}}}}}},
+ "left_out": [{{"label": "Gross Margin", "unit": "percent", "reason": "a margin", "group": "operating"}}]}}"""
