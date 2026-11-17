@@ -13,6 +13,19 @@ from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from .shared import CHART_METHOD
 
+def _agreed_total(past: dict[tuple[str, str], float]) -> float | None:
+    """The year-ago quarter's revenue, where two or more of its stored breakdowns add up to the same total (NVIDIA's
+    segments and geography both give 57,006): what a new layout's year-ago column must add up to."""
+    sums: dict[str, float] = {}
+    for (group, _key), value in past.items():
+        if not group.endswith("_levels") and group != INCOME_GROUP:
+            sums[group] = sums.get(group, 0.0) + value
+    for total in sums.values():
+        if sum(1 for other in sums.values() if abs(other - total) <= abs(total) * 1e-4) >= 2:
+            return total
+    return None
+
+
 def _row_label(locator: dict) -> str | None:
     """The name a reading's row goes by, its footnote mark dropped: "Lithography systems sold (units) 1 132 77 …" is
     "Lithography systems sold (units)"."""
@@ -73,6 +86,7 @@ class ReleaseTableReading:
                     groups.setdefault(value["group_key"], []).append(value)
             past = {(value["group_key"], value["kpi_key"]): float(value["value"]) for value in reported
                     if (value["fiscal_year"], value["fiscal_period"]) == year_ago}
+            year_ago_total = _agreed_total(past)
             document = self._code_document(latest)
             records: list[dict] = []
             tables: dict[str, str] = {}
@@ -90,7 +104,8 @@ class ReleaseTableReading:
                                            if (key, line["kpi_key"]) in past},
                                           latest.period_end, tables=within, totalled=not levels,
                                           # Segment operating income from the same table's "Operating income" rows.
-                                          measure="income" if key == INCOME_GROUP else "revenue")
+                                          measure="income" if key == INCOME_GROUP else "revenue",
+                                          year_ago_total=None if levels or key == INCOME_GROUP else year_ago_total)
                 if found is None:
                     continue
                 tables[key] = found.table

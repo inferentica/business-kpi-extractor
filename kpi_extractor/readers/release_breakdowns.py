@@ -40,9 +40,46 @@ def line_key(label: str) -> str:
     return member_key(text) if text else ""
 
 
+# A fiscal quarter as a column header: "Q3 FY27", "Q3'26", "3Q26", "Q3 2026", "FY26 Q3".
+_FISCAL_QUARTER = re.compile(r"^\s*(?:Q([1-4])\s*(?:FY|F)?\s*'?((?:19|20)?\d{2})|([1-4])Q\s*(?:FY)?\s*'?((?:19|20)?\d{2})"
+                             r"|FY\s*'?((?:19|20)?\d{2})\s*Q([1-4]))\s*\*?\s*$", re.I)
+
+
+def _fiscal_quarter(cell: str) -> tuple[int, int] | None:
+    match = _FISCAL_QUARTER.match(cell or "")
+    if not match:
+        return None
+    quarter, year = next((int(match.group(q)), match.group(y)) for q, y in ((1, 2), (3, 4), (6, 5)) if match.group(q))
+    return int(year) + (2000 if len(year) == 2 else 0), quarter
+
+
+def _span_heading(row: list[str], col: int) -> str:
+    """The heading a column sits under in a row of spanning headings ("Three Months Ended" over two columns)."""
+    return next((clean(row[at]) for at in range(min(col, len(row) - 1), 0, -1) if clean(row[at])), "")
+
+
 def _columns(table: Table, period_end: date) -> tuple[int, int, int] | None:
-    """(first body row, the quarter's column, the year-ago column) of a table headed by the quarter's month and years."""
+    """(first body row, the quarter's column, the year-ago column) of a table headed by the quarter's month and years,
+    by dates (NVIDIA's "Oct 25, 2026 | Oct 26, 2025" under "Three Months Ended"), or by fiscal quarters (its CFO
+    commentary's "Q3 FY27 | Q2 FY27 | Q3 FY26": the latest quarter with the same quarter a year before beside it; the
+    year-ago figures then prove the column)."""
     for index, row in enumerate(table.rows[:4]):
+        fiscal = {col: found for col, cell in enumerate(row) if col and (found := _fiscal_quarter(cell))}
+        paired = [col for col, (year, quarter) in fiscal.items() if (year - 1, quarter) in fiscal.values()]
+        if paired:
+            current = max(paired, key=lambda col: fiscal[col])
+            year, quarter = fiscal[current]
+            return index + 1, current, next(col for col, found in fiscal.items() if found == (year - 1, quarter))
+        dated = {col: when for col, cell in enumerate(row) if col and (when := _cell_date(cell))}
+        if dated:
+            above = [table.rows[at] for at in range(index)]
+            quarterly = {col: when for col, when in dated.items()
+                         if not any(_LONGER.search(_span_heading(heading, col)) for heading in above)}
+            current = [col for col, when in quarterly.items() if abs((when - period_end).days) <= 7]
+            prior = [col for col, when in quarterly.items() if 357 <= (period_end - when).days <= 371]
+            if current and prior:
+                return index + 1, current[0], prior[0]
+            return None
         years = {col: int(_YEAR.match(cell).group(1)) for col, cell in enumerate(row) if col and _YEAR.match(cell or "")}
         if not years:
             continue
@@ -84,7 +121,9 @@ def _rows(table: Table, start: int, current: int, measure: str) -> list[tuple[st
         if not figures:
             heading = label.rstrip(":")
             continue
-        if heading and _MEASURES[measure].match(label):
+        if measure == "revenue" and (label.lower() == "total" or label.lower().startswith("total") and _TOTAL.match(label)):
+            rows.append((label, row, True))  # "Total revenue" under a heading that names the table, not a segment
+        elif heading and _MEASURES[measure].match(label):
             rows.append((heading, row, bool(_WHOLE.match(heading))))
         elif measure == "revenue":
             rows.append((label, row, bool(_TOTAL.match(label))))
@@ -95,6 +134,18 @@ _DATE = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.
 _WHOLE_COLUMN = re.compile(r"^(total )?consolidated$|^total$", re.I)
 _LEFT_OVER = "unallocated"
 _FIGURE = re.compile(r"^[$€£¥(]*\s*[\d.,]+\)?%?$|^[—–-]$")
+
+
+def _cell_date(cell: str) -> date | None:
+    """A header cell that is a date and nothing more ("Oct 25, 2026")."""
+    match = _DATE.fullmatch(clean(cell or "").strip(" *"))
+    if not match:
+        return None
+    try:
+        return date(int(match.group(3)), next(index for index, month in enumerate(_MONTHS, 1) if month.startswith(match.group(1).lower())),
+                    int(match.group(2)))
+    except ValueError:
+        return None
 
 
 def _table_date(table: Table) -> date | None:
@@ -206,6 +257,16 @@ def _growth_items(table: Table, period_end: date, measure: str, scale: float):
     return None
 
 
+def _new_layout_proven(found: dict, members: dict, prior_total: float | None, year_ago_total: float | None,
+                       tolerance: float) -> bool:
+    """A layout the reports have not tagged a year ago (NVIDIA's Hyperscale, AI Clouds and Edge Computing from fiscal
+    2027): the table's year-ago column is the year-ago quarter's when its lines add up to its total and that total is
+    the revenue the reports give for that quarter."""
+    priors = [found[member][2] for member in members]
+    return (year_ago_total is not None and prior_total is not None and all(isinstance(p, float) for p in priors)
+            and abs(prior_total - year_ago_total) <= tolerance and abs(sum(priors) - prior_total) <= tolerance * len(priors))
+
+
 def _matches_year_ago(prior, value: float, year_ago: float, tolerance: float) -> bool:
     """The line's year-ago figure as the release gives it: the amount (to the table's rounding), or its stated change on
     the report's year-ago figure (to the change's rounding and the amount's)."""
@@ -216,8 +277,16 @@ def _matches_year_ago(prior, value: float, year_ago: float, tolerance: float) ->
     return prior is not None and abs(prior - year_ago) <= tolerance
 
 
+def _step(table: Table) -> float:
+    """The printed rounding of a table's amounts, in its own units (0.1 for "$106.0" in billions)."""
+    decimals = [len(match.group(1)) for row in table.rows for cell in row[1:]
+                if "%" not in (cell or "") and (match := re.search(r"\d\.(\d{1,2})\)?$", clean(cell or "")))]
+    return 10 ** -max(decimals) if decimals else 1.0
+
+
 def release_breakdown(document: Document, members: dict[str, str], year_ago: dict[str, float], period_end: date, *,
-                      tables: list[str] | None = None, totalled: bool = True, measure: str = "revenue") -> ReleaseBreakdown | None:
+                      tables: list[str] | None = None, totalled: bool = True, measure: str = "revenue",
+                      year_ago_total: float | None = None) -> ReleaseBreakdown | None:
     """The quarter's figure for every line in `members` (key → label) from one table of the release.
 
     `year_ago` holds the report's figures for the same quarter a year before; every one of them must be the table's
@@ -254,10 +323,11 @@ def release_breakdown(document: Document, members: dict[str, str], year_ago: dic
             found[left[0]] = ("Unallocated", round(total - sum(item[1] for item in rest), 2), prior)
         if set(found) != set(members):
             continue
-        tolerance = scale * 1.5
+        tolerance = scale * _step(table) * 1.5
         compared = [member for member in members if member in year_ago]
-        if len(compared) < (0 if tables else 2) or not all(
-                _matches_year_ago(found[member][2], found[member][1], year_ago[member], tolerance) for member in compared):
+        if not all(_matches_year_ago(found[member][2], found[member][1], year_ago[member], tolerance) for member in compared):
+            continue
+        if len(compared) < (0 if tables else 2) and not _new_layout_proven(found, members, prior_total, year_ago_total, tolerance):
             continue
         values = {member: found[member][1] for member in members}
         if totalled and (total is None or abs(sum(values.values()) - total) > tolerance * len(values)):
