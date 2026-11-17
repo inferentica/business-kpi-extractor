@@ -36,14 +36,22 @@ def test_the_owners_name_wins_and_ai_groups_keep_their_own():
     assert [(v["group_key"], v["group_label"], v["kpi_label"]) for v in renamed] == [("products", "Products", "iPhone sales")]
 
 
-def test_a_key_the_series_once_continued_joins_it_again():
-    # Alphabet: "googleotherrevenues" was continued as "googlesubscriptionsplatformsanddevices" in 2018 Q2; Q1 2018's
-    # "Google other revenues", worked out from the Google segment, has no element or prior to link it.
-    q1 = {**value("products", "googleotherrevenues", "Google other revenues", "2018-03-31", year="2018"), "value": 4_354e6}
-    q2 = {**value("products", "googlesubscriptionsplatformsanddevices", "Google subscriptions, platforms, and devices",
-                  "2018-06-30", year="2018", period="Q2"), "value": 4_425e6}
-    q2_old = {**q2, "kpi_key": "googleotherrevenues", "validation_status": "rejected",
-              "notes": ["continued as googlesubscriptionsplatformsanddevices"]}
-    written = run([q1, q2, q2_old])._unify_series()
-    assert [(v["kpi_key"], v["fiscal_period"], v["validation_status"]) for v in written] == [
-        ("googlesubscriptionsplatformsanddevices", "Q1", "verified"), ("googleotherrevenues", "Q1", "rejected")]
+def test_a_quarters_unnamed_line_is_the_one_line_its_year_lacks():
+    # Alphabet 2018: the 10-K and Q2, Q3 list four lines; Q1's "Google other revenues", completed from the Google
+    # segment's own figure (no XBRL element), is the one Q1 lacks, so the year's Q4 can be worked out.
+    def line(key, label, period, member="goog:M", amount=1.0):
+        row = {**value("products", key, label, "2018-03-31" if period == "Q1" else "2018-12-31", year="2018", period=period),
+               "value": amount}
+        return {**row, "locator": {"member": member} if member else {}}
+    lines = [("googleproperties", "Google properties"), ("googlenetwork", "Google Network"),
+             ("googlesubscriptionsplatformsanddevices", "Google subscriptions, platforms, and devices"), ("otherbets", "Other Bets")]
+    rows = [line(k, n, p) for p in ("Q2", "Q3", "FY") for k, n in lines]
+    rows.append(line("googleadvertisingrevenues", "Google advertising revenues", "FY"))  # a subtotal only the year adds
+    rows += [line(k, n, "Q1") for k, n in lines if k != "googlesubscriptionsplatformsanddevices"]
+    rows.append(line("googleotherrevenues", "Google other revenues", "Q1", member=None, amount=4_354e6))
+    written = run(rows)._join_year_remainders()
+    assert [(v["kpi_key"], v["validation_status"]) for v in written] == [
+        ("googlesubscriptionsplatformsanddevices", "verified"), ("googleotherrevenues", "rejected")]
+    # A line with its own element, or a year whose other periods disagree, is left alone.
+    tagged = rows[:-1] + [line("googleotherrevenues", "Google other revenues", "Q1", member="goog:OtherMember")]
+    assert run(tagged)._join_year_remainders() == []
