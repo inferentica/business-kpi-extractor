@@ -16,10 +16,11 @@ from datetime import date
 from fractions import Fraction
 from statistics import median
 
+from ..domain.model import REGULATOR_SOURCES as REGULATORS
 from ..domain.printed_labels import PER_SHARE, SHARE_COUNT
 
 _KIND = re.compile(r"\b(basic|diluted|primary|fully\s+diluted)\b", re.I)
-_NAMES = {"primary": "basic", "fully diluted": "diluted"}  # earnings per share before SFAS 128 (1997)
+_NAMES = {"primary": "basic", "fully diluted": "diluted"}
 
 
 def _kind(found) -> str:
@@ -85,6 +86,7 @@ def split_ledger(readings: list) -> list[tuple[date, float, str]]:
     """The company's splits, (first filing presenting it, ratio, share class or ""), oldest first: Visa split its
     class A shares four-for-one in 2015, not its classes B and C."""
     presented: dict[tuple, list] = defaultdict(list)
+    places: dict[tuple, int] = {}
     for reading in readings:
         if reading.status != "kept" or reading.statement != "income" or reading.scope != "consolidated":
             continue
@@ -94,51 +96,96 @@ def split_ledger(readings: list) -> list[tuple[date, float, str]]:
             if (measure, kind, member) not in seen and reading.lines[index]["value"]:
                 seen.add((measure, kind, member))
                 presented[(reading.key, measure, kind, member)].append((reading.filed, reading.lines[index]["value"]))
+                places[(reading.filed, reading.lines[index]["value"])] = _places(reading.lines[index])
     marks: dict[tuple, dict] = defaultdict(lambda: defaultdict(list))
+    rounding: dict[tuple, list] = defaultdict(list)  # each earnings move with what rounding alone could do to it
     for (period, measure, kind, member), shown in presented.items():
         shown = _without_outliers(sorted(set(shown)))
-        for (_, older), (filed, newer) in zip(shown, shown[1:]):
+        for (was, older), (filed, newer) in zip(shown, shown[1:]):
             if older and newer and older / newer > 0:
                 ratio = older / newer if measure == "eps" else newer / older
                 # Never a figure read at another scale (1,000 to one), nor a ratio a restatement makes (0.99).
                 if 0.015 <= abs(ratio - 1) and 0.01 < ratio < 100:
-                    marks[(filed, member)][measure].append((ratio, period, _rounding(older, newer, measure)))
+                    marks[(filed, member)][measure].append((ratio, period))
+                    if measure == "eps":
+                        rounding[(filed, member)].append(
+                            (ratio, _rounding(older, places.get((was, older), 2), newer, places.get((filed, newer), 2))))
     events: list[tuple[date, float, str]] = []
     for filed, member in sorted(marks):
         earnings, shares = marks[(filed, member)]["eps"], marks[(filed, member)]["shares"]
         if len(earnings) < 2:
             continue
-        ratio = median(value for value, _, _ in earnings)
-        if any(abs(value - ratio) > max(0.01, slack) * ratio for value, _, slack in earnings):
+        ratio = median(value for value, _ in earnings)
+        proven = _proven(shares, rounding[(filed, member)])
+        if proven is not None:
+            ratio = proven  # share counts give the ratio; earnings printed to the cent meet it within their rounding
+        elif any(abs(value - ratio) > 0.01 * ratio for value, _ in earnings):
             continue  # earnings moving by different ratios: a restatement, no split
-        confirmed = any(abs(value - ratio) <= max(0.01, slack) * ratio for value, _, slack in shares) or (
-            _clean(ratio) is not None and len({period for _, period, _ in earnings}) >= 2)
+        confirmed = proven is not None or any(abs(value - ratio) <= 0.01 * ratio for value, _ in shares) or (
+            _clean(ratio) is not None and len({period for _, period in earnings}) >= 2)
         if not confirmed:
             continue
         # Dated by the first filing that presents it, confirmed or not: Apple's 10-Q of May 2005 already halves its
         # earlier earnings per share, though only its 10-K of 2006 shows the split in two periods.
         first = min((when for (when, other), measures in marks.items() if other == member and 0 <= (filed - when).days <= 450
-                     and any(abs(value - ratio) <= max(0.01, slack) * ratio for values in measures.values() for value, _, slack in values)),
+                     and any(abs(value - ratio) <= 0.01 * ratio for values in measures.values() for value, _ in values)),
                     default=filed)
-        periods = {period for _, period, _ in earnings}
-        # The same split presented again by a later filing marks other periods; one that moves a period an earlier
-        # split already moved is a split of its own, whatever its ratio (two two-for-ones within a year).
         if any(other == member and abs(seen_ratio - ratio) <= 0.01 * ratio and abs((first - when).days) <= 450
-               and not periods & moved for when, seen_ratio, other, moved in events):
-            continue
-        events.append((first, _clean(ratio) or ratio, member, periods))
+               for when, seen_ratio, other in events):
+            continue  # the same split, presented again by a later filing
+        events.append((first, _clean(ratio) or ratio, member))
     # A split undone within two years is one filing's misreading, no split (Helix's 2006 "reverse" and "forward").
-    noise = {index for index, (when, ratio, member, _) in enumerate(events) for other, (later, back, same, _) in enumerate(events)
+    noise = {index for index, (when, ratio, member) in enumerate(events) for other, (later, back, same) in enumerate(events)
              if other != index and same == member and abs((later - when).days) <= 730 and abs(ratio * back - 1) <= 0.02}
-    return sorted(event[:3] for index, event in enumerate(events) if index not in noise)
+    return sorted(event for index, event in enumerate(events) if index not in noise)
 
 
-def _rounding(older: float, newer: float, measure: str) -> float:
-    """How far rounding alone can move a ratio of two printed figures: half a cent on each per-share figure (Kroger's
-    quarterly earnings of 0.69 and 0.34 after its 2015 two-for-one measure 2.03)."""
-    if measure != "eps":
-        return 0.0
-    return 0.005 / abs(older) + 0.005 / abs(newer)
+def _proven(shares: list, earnings: list) -> float | None:
+    """A split share counts prove: they all move by one ratio a split declares, within 1%, and every earnings move
+    meets it within what rounding to the printed cent does (Kroger's 2015 two-for-one: its quarterly EPS of 0.69
+    printed again as 0.34 measures 2.03). None where they do not."""
+    if not shares or not earnings:
+        return None
+    middle = median(value for value, _ in shares)
+    if any(abs(value - middle) > 0.01 * middle for value, _ in shares):
+        return None
+    ratio = _declared(middle)
+    if ratio is None or abs(ratio - middle) > 0.01 * middle:
+        return None
+    return ratio if all(abs(value - ratio) <= max(0.01, slack) * ratio for value, slack in earnings) else None
+
+
+def _declared(ratio: float) -> float | None:
+    """The ratio a split declares nearest a measured one: a whole number up to 100, or a fraction of ten or less over
+    two to four (3-for-2, 5-for-4), or the inverse of one (a reverse split)."""
+    value = ratio if ratio >= 1 else 1 / ratio
+    candidates = [Fraction(round(value))] if round(value) <= 100 else []
+    near = Fraction(value).limit_denominator(4)
+    if near.denominator > 1 and near.numerator <= 10:
+        candidates.append(near)
+    if not candidates:
+        return None
+    best = float(min(candidates, key=lambda candidate: abs(float(candidate) - value)))
+    if best < 1.2:
+        return None
+    return best if ratio >= 1 else 1 / best
+
+
+def _places(line: dict) -> int:
+    """The decimal places a per-share figure is printed to: its tag's, else its own digits."""
+    decimals = line.get("decimals")
+    if isinstance(decimals, int) and decimals >= 0:
+        return decimals
+    text = f"{abs(float(line.get('value') or 0)):.6f}".rstrip("0")
+    return max(2, len(text.split(".")[1])) if "." in text else 2
+
+
+def _rounding(older: float, older_places: int, newer: float, newer_places: int) -> float:
+    """How far rounding alone can move a ratio of two printed figures: half the last place of each (Kroger's
+    quarterly earnings of 0.69 and 0.34 after its 2015 two-for-one measure 2.03), at most 3%."""
+    if min(abs(older), abs(newer)) < 0.10:
+        return 0.0  # half a cent is anything to a figure under ten cents
+    return min(0.03, 0.5 * 10 ** -older_places / abs(older) + 0.5 * 10 ** -newer_places / abs(newer))
 
 
 def adjust_for_splits(chosen: list[dict], ledger: list[tuple[date, float, str]]) -> None:

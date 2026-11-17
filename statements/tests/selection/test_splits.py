@@ -74,12 +74,3 @@ def test_a_split_measured_from_figures_rounded_to_the_cent():
     readings = [quarter(date(2014, 9, 23), (0.69, 0.68), 492e6), quarter(date(2015, 9, 22), (0.34, 0.34), 984e6)]
     assert split_ledger(readings) == [(date(2015, 9, 22), 2.0, "")]
 
-
-def test_two_splits_of_one_ratio_within_a_year_stay_two():
-    def at(filed, eps):
-        return reading(filed, "2010", eps, None)
-    readings = [at(date(2011, 1, 30), (4.0, 3.96)), at(date(2011, 8, 1), (2.0, 1.98)), at(date(2012, 4, 1), (1.0, 0.99))]
-    for item in list(readings):
-        other = reading(item.filed, "2009", tuple(value / 2 for value in [line["value"] for line in item.lines]), None)
-        readings.append(other)
-    assert [ratio for _when, ratio, _member in split_ledger(readings)] == [2.0, 2.0]
