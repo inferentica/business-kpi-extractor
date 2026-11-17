@@ -105,6 +105,13 @@ def company_pool(workers: int) -> ProcessPoolExecutor:
 RENEW_SECONDS = 60
 
 
+def waits_for_offpeak(trigger: str) -> bool:
+    """Which runs wait for DeepSeek's half-price hours: a Refresh pressed by hand, and a backfill (an onboarding wave
+    reading a company's history: wave 2's eight companies ran in peak hours for 32.66 yuan). A scheduled run reads a
+    filing just published, and a newly watched company is read at once."""
+    return trigger in ("manual", "backfill")
+
+
 def wait_for_offpeak(control, log=print, sleep=time.sleep, clock=lambda: datetime.now(timezone.utc)) -> None:
     """A run that can wait for DeepSeek's half-price hours waits here, after taking its run, renewing it every minute so
     the watcher sees a live worker. Waiting before taking it, a Refresh pressed early in a peak (up to four hours) was
@@ -199,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         # A Refresh (or a newly watched company) waits for a run already on its company; scheduled runs move on.
         waits = args.trigger in ("manual", "watchlist_add")
         if started.get("queued"):
-            if args.trigger == "manual":
+            if waits_for_offpeak(args.trigger):
                 wait_for_offpeak(control, log=lambda line: print(line, flush=True))
             with company_pool(workers) as pool, MemoryWatch(pool, log=lambda line: print(line, flush=True)) as memory:
                 finished = work_queue(control, pool, workers, quarters, force, waits, memory,
