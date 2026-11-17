@@ -1302,6 +1302,11 @@
       "unit": "percent"
      },
      {
+      "key": "cet1_ratio",
+      "label": "CET1 Capital Ratio",
+      "unit": "percent"
+     },
+     {
       "key": "avg_portfolio_loans",
       "label": "Average Portfolio Loans and Leases",
       "unit": "currency"
@@ -1564,7 +1569,7 @@
     ]
    }
   ],
-  "note": "Removed NIM (a margin), the efficiency ratio and CET1; none is treated as a headline business measure. Uncertain: credit-quality ratios and the text-only loan-to-core deposit ratio are kept, and Net Interest Income plus segment NII and noninterest income are added as revenue breakdowns though they can be read as income-statement lines; mortgage originations is read from chart text."
+  "note": "Removed NIM (a margin) and the efficiency ratio; CET1 is kept at the owner's decision as a core measure of a bank's business. Uncertain: credit-quality ratios and the text-only loan-to-core deposit ratio are kept, and Net Interest Income plus segment NII and noninterest income are added as revenue breakdowns though they can be read as income-statement lines; mortgage originations is read from chart text."
  },
  "HD": {
   "name": "Home Depot",
@@ -2321,6 +2326,11 @@
       "unit": "percent"
      },
      {
+      "key": "cet1_capital_ratio",
+      "label": "CET1 Capital Ratio",
+      "unit": "percent"
+     },
+     {
       "key": "average_total_loans",
       "label": "Average Total Loans",
       "unit": "currency"
@@ -2481,7 +2491,7 @@
     ]
    }
   ],
-  "note": "Removed NIM, the efficiency ratio, CET1, Tier 1 and TCE/TA; credit-quality ratios and nonperforming assets are kept as operating measures. Uncertain: Net Interest Income is added as a revenue component, and criticized loans is read from presentation chart text; the filing states no AUM."
+  "note": "Removed NIM, the efficiency ratio, Tier 1 and TCE/TA; CET1 is kept at the owner's decision as a core measure of a bank's business, and credit-quality ratios and nonperforming assets are kept as operating measures. Uncertain: Net Interest Income is added as a revenue component, and criticized loans is read from presentation chart text; the filing states no AUM."
  },
  "MU": {
   "name": "Micron Technology",
@@ -2875,6 +2885,11 @@
       "unit": "percent"
      },
      {
+      "key": "common_equity_tier_1_ratio",
+      "label": "Common Equity Tier 1 Ratio",
+      "unit": "percent"
+     },
+     {
       "key": "total_loans",
       "label": "Total Loans, Net of Unearned Income",
       "unit": "currency"
@@ -3131,7 +3146,7 @@
     ]
    }
   ],
-  "note": "Removed NIM, the efficiency ratio (listed in the presentation's key metrics but still a cost ratio), CET1, Tier 1 and leverage. Uncertain: loans-to-deposits is kept as a liquidity ratio, Net Interest Income is added as a revenue component, and mobile active users is matched to its chart by its growth label."
+  "note": "Removed NIM, the efficiency ratio (listed in the presentation's key metrics but still a cost ratio), Tier 1 and leverage; CET1 is kept at the owner's decision as a core measure of a bank's business. Uncertain: loans-to-deposits is kept as a liquidity ratio, Net Interest Income is added as a revenue component, and mobile active users is matched to its chart by its growth label."
  },
  "SBUX": {
   "name": "Starbucks",
