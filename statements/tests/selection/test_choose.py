@@ -293,3 +293,14 @@ def test_a_start_of_its_own_never_splits_a_period():
     newest.period_end, newest.period_start = date(2020, 12, 31), date(2020, 1, 1)
     [chosen] = choose([own, newest])
     assert (chosen["source_accession"], chosen["period_start"]) == ("fy22", "2020-01-01") and "other_periods" not in chosen
+
+
+def test_a_period_on_another_basis_keeps_its_own_end():
+    # KB's 2011 year-end balance sheet: on K-IFRS to December 31, 2011; its IFRS restatement opens January 1, 2012.
+    kifrs = reading("k", date(2012, 11, 29), 1, own=False, statement="balance", duration="instant")
+    kifrs.basis, kifrs.period_end = "K-IFRS", date(2011, 12, 31)
+    ifrs = reading("i", date(2014, 4, 29), 2, own=False, statement="balance", duration="instant")
+    ifrs.basis, ifrs.period_end = "IFRS", date(2012, 1, 1)
+    kifrs.checks = ifrs.checks = [Check("balance", "pass")]
+    [chosen] = choose([kifrs, ifrs])
+    assert chosen["period_end"] == "2012-01-01" and chosen["other_bases"][0]["period_end"] == "2011-12-31"

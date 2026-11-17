@@ -27,7 +27,7 @@ def _row(record: dict, source: dict, primary: bool, accepted: dict) -> dict:
     own = record.get("own_accession")
     return {
         **{field: record[field] for field in _PERIOD}, "basis": source["basis"], "is_primary": primary,
-        "period_start": source.get("period_start"), "period_end": record["period_end"],
+        "period_start": source.get("period_start"), "period_end": source.get("period_end") or record["period_end"],
         "currency": source["currency"], "scope": source["scope"], "source": source["source"],
         "source_accession": accession, "source_form": source["source_form"], "source_filed": source["source_filed"],
         "available_from": available_from(accession, source["source_filed"], accepted),

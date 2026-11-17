@@ -151,8 +151,10 @@ def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
 
 
 def _served_fields(reading: Reading) -> dict:
-    """What Quotiva serves beside a statement's lines: its source, first day, and the checks it passed as read."""
+    """What Quotiva serves beside a statement's lines: its source, its own first and last days (KB's 2011 on K-IFRS
+    closes December 31 beside its IFRS restatement opening January 1, 2012), and the checks it passed as read."""
     return {"source": reading.source, "period_start": reading.period_start.isoformat() if reading.period_start else None,
+            "period_end": reading.period_end.isoformat(),
             "checks": {"checks": [asdict(check) for check in reading.checks], "arelle": reading.arelle}}
 
 
