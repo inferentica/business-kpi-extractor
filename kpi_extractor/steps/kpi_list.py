@@ -114,6 +114,26 @@ def apply_maintenance(spec: Spec, answer: ai.Maintenance, covered: list[set[str]
     return ai.normalize_spec(Spec.model_validate({"groups": [group.model_dump() for group in groups], "names": spec.names}), cap=cap)
 
 
+MAX_DRAFT_ADDITIONS = 12
+
+
+def limit_additions(answer: ai.Maintenance, most: int) -> ai.Maintenance:
+    """An audit's additions kept to `most` lines, in the order it gave them: lines of existing groups first."""
+    left, add_kpis, add_groups = most, {}, []
+    for group_key, kpis in answer.add_kpis.items():
+        if left <= 0:
+            break
+        add_kpis[group_key], left = kpis[:left], left - len(kpis[:left])
+    for group in answer.add_groups:
+        if left <= 0:
+            break
+        kpis = group.kpis[:left]
+        if kpis:
+            add_groups.append(group.model_copy(update={"kpis": kpis}))
+            left -= len(kpis)
+    return answer.model_copy(update={"add_kpis": add_kpis, "add_groups": add_groups})
+
+
 def _dimension(label: str) -> str:
     """What a breakdown splits revenue by: "Revenue by Technology Mix" and "Revenue by Technology" → "technology"."""
     words = re.sub(r"\b(wafer|net|revenue|sales|by|mix|share|shares|of|the)\b", " ", label.lower())
@@ -252,6 +272,8 @@ class KpiListUpkeep:
         self._leave_out(left_out.dropped(proposed, spec, left_out.REASON_XBRL))
         self.store.write(self._set_aside_dropped(current, spec))
         spec = self._capped(spec)
+        if row is None and getattr(self, "draft_audit", False):
+            spec = self._audit_draft(spec, document)
         # Names may only rename breakdowns and members that exist; titles follow rules/titles.py, and stored ones stay.
         names = breakdown_names(spec.names, breakdowns, (row or {}).get("names"))
         version = (int(row["version"]) if row else 0) + 1
@@ -292,6 +314,31 @@ class KpiListUpkeep:
             self.result.trimmed_kpis = sorted(set(self.result.trimmed_kpis) | set(trimmed))
             self.log(f"{self.symbol}: KPI cap left out {', '.join(trimmed[:10])}")
         return normalized
+
+    def _audit_draft(self, spec: Spec, document) -> Spec:
+        """A new company's first list, audited once on the same documents before it is stored: additions only, up to
+        MAX_DRAFT_ADDITIONS lines, through the audit's own rules (apply_maintenance), the XBRL-repeat check and the cap.
+        Production lists grew through quarterly audits before the owner's edits (JPMorgan 38 to 54 lines); a first
+        draft had none."""
+        self.result.draft_before_audit = [group.model_dump() for group in spec.groups]
+        data = f"KPI list:\n{ai.kpi_lines(spec)}\n\nCaptured for this quarter:\n- nothing yet (a first list)"
+        try:
+            answer = self._ask(ai.prompt(self.company, self._prompt_document(document, spec), ai.MAINTAIN_TASK, data),
+                               "maintain", ai.Maintenance, thinking_first=True, model="flash")
+        except (AiResponseError, ControlError, ValueError) as error:
+            self.result.errors.append(f"KPI list draft audit: {error}"[:300])
+            return spec
+        answer = limit_additions(answer.model_copy(update={"retire": []}), MAX_DRAFT_ADDITIONS)
+        covered = [] if self.profile.foreign else self._current_xbrl_members()
+        updated = apply_maintenance(spec, answer, covered)
+        if updated is None:
+            return spec
+        cleaned = without_xbrl_repeats(updated, covered)
+        self._leave_out(left_out.dropped(updated, cleaned, left_out.REASON_XBRL))
+        audited = self._capped(cleaned)
+        self.result.draft_audit_added = sum(len(g.kpis) for g in audited.groups) - sum(len(g.kpis) for g in spec.groups)
+        self.log(f"{self.symbol}: draft audit added {self.result.draft_audit_added} KPIs")
+        return audited
 
     def _maintain(self, spec: Spec, version: int, latest_quarter: list[FilingRef]) -> tuple[Spec, int] | None:
         """The reasoning reader audits the newest quarter against the list: KPIs the documents report that the list lacks, and KPIs the

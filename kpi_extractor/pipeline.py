@@ -61,6 +61,9 @@ class SymbolResult:
     # Why each second read was needed: period, annual, repeats_earlier, checks_failed, not_placed, missing_now, moved.
     second_read_reasons: dict = field(default_factory=dict)
     cache_waits: int = 0  # second readings that waited for the first's prompt to enter the cache
+    # A first list before its draft audit added to it (the lists suite scores both), and the lines the audit added.
+    draft_before_audit: list | None = None
+    draft_audit_added: int = 0
     flash_only_reads: int = 0
     replayed_reads: int = 0
     replay_outcomes: dict = field(default_factory=dict)  # per group: "replayed", or why the AI read it
@@ -87,8 +90,12 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
 
     def __init__(self, control, symbol: str, quarters: int, force: bool, today: date | None = None, log=print,
                  wait_for_lock: bool = False, report_quarters: int | None = None, source: FilingSource | None = None,
-                 retrace: bool = False, reread: str | None = None, lists_only: bool = False):
+                 retrace: bool = False, reread: str | None = None, lists_only: bool = False,
+                 draft_audit: bool | None = None):
         self.control = control
+        # A new company's first list gets one additions-only audit (steps/kpi_list.py, p4-draftaudit): off until the
+        # held-out lists show precision holds; the lists suite turns it on to measure it, KPI_DRAFT_AUDIT=1 elsewhere.
+        self.draft_audit = os.environ.get("KPI_DRAFT_AUDIT") == "1" if draft_audit is None else draft_audit
         # An evaluation of KPI lists alone (evals/lists_eval.py): the run stops once the list is written.
         self.lists_only = lists_only
         # A selective re-read reads again only the filings its selector picks (ops/reread.py), and leaves the KPI list
