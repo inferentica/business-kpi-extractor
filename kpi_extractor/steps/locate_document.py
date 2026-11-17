@@ -13,6 +13,12 @@ from .shared import _identity_text
 # A document below this is read whole: narrowing it saves little. Above it, Locate reads the tables where each KPI sat
 # last when they are under 60% of it (a bank's supplement: 42,000-67,000 tokens a call, whole).
 NARROW_ABOVE_CHARS = 40_000
+# A KPI whose newest reading is this much older than the list's newest is history the company stopped reporting
+# (JPMorgan's Treasury Services, last read 2019): it neither asks for the whole document nor counts as missed.
+STOPPED_DAYS = 400
+# Past Select's limit, the parts may take this share of what Select sends: they still spare a third of the prompt and
+# the Select call (JPMorgan's 83,000 characters against Select's 120,000).
+PAST_LIMIT_SHARE = 0.75
 
 
 def _table_distance(table: str, last: str) -> int:
@@ -34,7 +40,34 @@ class LocateDocument:
         if str(id(document)) not in self._narrowed or str(id(document)) in self._whole_documents:
             return set()
         found = {f"{item.group.key}.{item.kpi.key}" for item in read}
-        return {key for key in self._asked_keys(spec) if key not in found}
+        stopped = self._stopped_keys(spec)
+        return {key for key in self._asked_keys(spec) if key not in found and key not in stopped}
+
+    def _placed_history(self) -> dict[str, tuple[str, dict]]:
+        """Each KPI's newest AI reading ("group.kpi" -> period end, locator), and the newest that has a place: a figure
+        entered or corrected by hand carries none (JPMorgan's advisors, 2026 Q3), and must not hide where it was read."""
+        newest: dict[str, str] = {}
+        placed: dict[str, tuple[str, dict]] = {}
+        for value in list(self.values.values()):
+            if value.get("method") != "ai" or value.get("validation_status") == "rejected" or not value.get("period_end"):
+                continue
+            key = f"{str(value['group_key']).removeprefix('kpi_')}.{value['kpi_key']}"
+            end = str(value["period_end"])
+            newest[key] = max(end, newest.get(key, end))
+            locator = value.get("locator") or {}
+            if (locator.get("table") or locator.get("block")) and end >= placed.get(key, ("", {}))[0]:
+                placed[key] = (end, locator)
+        return {key: (newest[key], placed.get(key, ("", {}))[1]) for key in newest}
+
+    def _stopped_keys(self, spec: Spec) -> set[str]:
+        """Listed KPIs the company stopped reporting: newest reading STOPPED_DAYS before the list's newest."""
+        history = self._placed_history()
+        ends = [end for end, _locator in history.values()]
+        if not ends:
+            return set()
+        latest = date.fromisoformat(max(ends)[:10])
+        return {key for key in self._asked_keys(spec) if key in history
+                and (latest - date.fromisoformat(history[key][0][:10])).days > STOPPED_DAYS}
 
     def _locate_document(self, document: Document, spec: Spec) -> str:
         """The document Locate reads, the same for both readings so they share the prompt cache: the tables where each
@@ -60,12 +93,15 @@ class LocateDocument:
         whole = len(document.render())
         if whole <= NARROW_ABOVE_CHARS:
             return None
-        history = self._ai_history(date.max)
+        history = self._placed_history()
+        stopped = self._stopped_keys(spec)
         found: set[str] = set()
         for key in self._asked_keys(spec):
+            if key in stopped:
+                continue  # history the company stopped reporting: nothing here to send the whole document for
             group_key, kpi_key = key.split(".", 1)
             kpi = next(k for g in spec.groups if g.key == group_key for k in g.kpis if k.key == kpi_key)
-            last = (history.get(key) or {}).get("locator") or {}
+            last = (history.get(key) or ("", {}))[1]
             names = {_identity_text(kpi.label), _identity_text(str(last.get("row_label") or ""))} - {""}
             tables = [t for t, table in document.tables.items()
                       if any(row and any(_identity_text(row[0]).startswith(name) for name in names) for row in table.rows)]
@@ -79,4 +115,5 @@ class LocateDocument:
                 continue
             found |= {*sorted(tables, key=lambda t: _table_distance(t, str(last.get("table") or "")))[:2], *blocks[:3]}
         chosen = sum(len((document.tables.get(key) or document.blocks[key]).render()) for key in found)
-        return found if chosen <= min(whole, MAX_DOCUMENT_CHARS) * 0.6 else None
+        limit = whole * 0.6 if whole <= MAX_DOCUMENT_CHARS else MAX_DOCUMENT_CHARS * PAST_LIMIT_SHARE
+        return found if chosen <= limit else None

@@ -102,3 +102,28 @@ def test_a_supplement_past_select_s_limit_is_narrowed_too():
     # A KPI named nowhere still sends the usual document (Truist's margin went unread when it did not).
     doc.tables["A_T500"].rows[2][0] = "Capital markets"
     assert run([("advisory", "Advisory")])._last_places(doc, SPEC) is None
+
+
+def test_a_line_the_company_stopped_reporting_neither_widens_nor_counts_as_missed():
+    # JPMorgan's Treasury Services, last read 2019, sat in no table of today's supplement and sent the whole of it.
+    spec = Spec.model_validate({"groups": [{"key": "fees", "label": "Fees", "kind": "revenue_breakdown", "kpis": [
+        {"key": "advisory", "label": "Advisory", "unit": "currency"}, {"key": "underwriting", "label": "Underwriting", "unit": "currency"},
+        {"key": "treasury", "label": "Treasury Services", "unit": "currency"}]}]})
+    pipeline = run([("advisory", "Advisory"), ("underwriting", "Underwriting")])
+    pipeline.store.write([{"symbol": "GS", "group_key": "kpi_fees", "kpi_key": "treasury", "fiscal_year": "2019", "fiscal_period": "Q4",
+                           "period_end": "2019-12-31", "method": "ai", "validation_status": "verified", "value": 1.0,
+                           "locator": {"table": "A_T999", "row": 1, "col": 1, "row_label": "Treasury Services"}}])
+    doc = supplement()
+    assert pipeline._stopped_keys(spec) == {"fees.treasury"}
+    assert pipeline._last_places(doc, spec) is not None
+    pipeline._locate_document(doc, spec)
+    assert pipeline._missed_in_narrowed(doc, [], spec) == {"fees.advisory", "fees.underwriting"}
+
+
+def test_a_hand_entered_figure_does_not_hide_where_the_kpi_was_read():
+    # JPMorgan's advisors: the 2026 Q3 figure was entered by hand (no locator); Q2's reading still says where it sits.
+    pipeline = run([("advisory", "Advisory"), ("underwriting", "Underwriting")])
+    pipeline.store.write([{"symbol": "GS", "group_key": "kpi_fees", "kpi_key": "advisory", "fiscal_year": "2026", "fiscal_period": "Q4",
+                           "period_end": "2026-12-31", "method": "ai", "validation_status": "verified", "value": 2.0, "locator": None}])
+    end, locator = pipeline._placed_history()["fees.advisory"]
+    assert end == "2026-12-31" and locator["table"] == "A_T60"
