@@ -958,13 +958,14 @@ def test_quarters_read_side_by_side_are_checked_against_each_other_in_date_order
 
 def test_a_kpi_list_is_kept_to_the_cap_by_trimming_metrics_first():
     from kpi_extractor.ai import MAX_LISTED_KPIS, normalize_spec
-    breakdown = {"key": "segments", "label": "Revenue by Segment", "kind": "revenue_breakdown",
-                 "kpis": [{"key": f"s{i}", "label": f"S{i}", "unit": "currency"} for i in range(10)]}
+    def breakdown(key):
+        return {"key": key, "label": key, "kind": "revenue_breakdown",
+                "kpis": [{"key": f"{key}{i}", "label": f"{key} {i}", "unit": "currency"} for i in range(20)]}
     metrics = {"key": "operating", "label": "Operating Metrics", "kind": "metric",
-               "kpis": [{"key": f"m{i}", "label": f"M{i}", "unit": "count"} for i in range(16)]}
-    spec = normalize_spec(Spec.model_validate({"groups": [breakdown, metrics]}))
+               "kpis": [{"key": f"m{i}", "label": f"M{i}", "unit": "count"} for i in range(24)]}
+    spec = normalize_spec(Spec.model_validate({"groups": [breakdown("segments"), breakdown("products"), metrics]}))
     assert sum(len(g.kpis) for g in spec.groups) == MAX_LISTED_KPIS
-    assert len(spec.groups[0].kpis) == 10  # the breakdown, which is checked by its sum, is kept whole
+    assert [len(g.kpis) for g in spec.groups[:2]] == [20, 20]  # breakdowns, checked by their sums, are kept whole
 
 
 def test_the_cap_never_drops_a_breakdown():
@@ -989,7 +990,7 @@ def test_a_list_the_owner_edited_is_never_capped():
         return {"key": key, "label": key, "kind": kind,
                 "kpis": [{"key": f"{key}{i}", "label": f"{key} {i}", "unit": "count" if kind == "metric" else "currency"}
                          for i in range(n)]}
-    owner = Spec.model_validate({"groups": [group("flows", 11), *(group(f"g{i}", 4) for i in range(MAX_GROUPS - 2)),
+    owner = Spec.model_validate({"groups": [group("flows", 23), *(group(f"g{i}", 4) for i in range(MAX_GROUPS - 2)),
                                             group("lone", 1, "revenue_breakdown")]})
     lines = sum(len(g.kpis) for g in owner.groups)
     kept = normalize_spec(owner, cap=False)
@@ -2308,3 +2309,13 @@ def test_a_rounded_cell_read_in_full_elsewhere_still_holds_the_other_metric_read
                             notes=[], locator={"table": "A_T1", "row": 32, "col": 1})
     validate_groups([average, total], {})
     assert (average.status, total.status) == ("verified", "needs_review") and total.notes == [SHARED_CELL]
+
+
+def test_loose_lines_join_operating_metrics_not_a_metric_breakdown():
+    from kpi_extractor.ai import normalize_spec
+    aum = {"key": "aum_by_asset_class", "label": "AUM by Asset Class", "kind": "metric",
+           "kpis": [{"key": "credit", "label": "Credit", "unit": "currency"}, {"key": "equity", "label": "Equity", "unit": "currency"}]}
+    operating = {"key": "operating", "label": "Operating Metrics", "kind": "metric", "kpis": [{"key": "aum", "label": "AUM", "unit": "currency"}]}
+    lone = {"key": "ai_revenue", "label": "AI Revenue", "kind": "revenue_breakdown", "kpis": [{"key": "ai", "label": "AI Revenue", "unit": "currency"}]}
+    spec = normalize_spec(Spec.model_validate({"groups": [aum, operating, lone]}))
+    assert [(g.key, [k.key for k in g.kpis]) for g in spec.groups] == [("aum_by_asset_class", ["credit", "equity"]), ("operating", ["aum", "ai"])]

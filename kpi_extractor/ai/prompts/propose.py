@@ -41,7 +41,10 @@ Rules:
 name it in "total_kpi", with at least two parts beside it; a single amount (e.g. AI revenue) is a metric, not a \
 breakdown. Skip a breakdown whose rows are those of one under "Already covered by XBRL".
 - kind "mix": percentages that add up to about 100.
-- kind "metric": standalone operating metrics; put them all in one group keyed "operating", labelled "Operating Metrics".
+- kind "metric": operating metrics. Standalone ones go in one group keyed "operating", labelled "Operating Metrics". A \
+table that breaks one metric down (assets under management by asset class, loans or deposits by type, deliveries by \
+program, premiums by line, subscribers by plan) is a metric group of its own, titled for what it breaks down ("AUM by \
+Asset Class"), with the table's total row when it has one.
 - unit is one of currency, percent, count, ratio (a percentage growth rate is "percent").
 - keys are short snake_case and stable.
 
@@ -67,9 +70,9 @@ quarterly version of an annual XBRL breakdown), give both the same title and row
 most notable first: {{"label": "...", "unit": "...", "reason": "...", "group": "<key of the group it would join, or \
 null>"}}. The reason names the rule in two to five words ("a margin", "growth of total revenue", "covered by XBRL", \
 "year to date only", "cost line"). Never list what you track, and never invent a measure the documents do not give.
-- At most {MAX_GROUPS} groups and {MAX_KPIS_PER_GROUP} KPIs per group, and about {MAX_LISTED_KPIS} KPIs in all. Over that, \
-operating metrics are dropped from the end of their group (breakdowns and mixes never are), so list operating metrics \
-most important first. Prefer fewer, clearly reported KPIs.
+- Track every measure these documents give for the quarter that these rules allow, at most {MAX_GROUPS} groups and \
+{MAX_KPIS_PER_GROUP} KPIs per group, and about {MAX_LISTED_KPIS} KPIs in all. Over that, operating metrics are dropped \
+from the end of their groups (breakdowns and mixes never are), so list each group's most important first.
 
 JSON shape:
 {{"groups": [{{"key": "revenue_by_technology", "label": "Revenue by Technology", "kind": "mix", "total_kpi": null,
