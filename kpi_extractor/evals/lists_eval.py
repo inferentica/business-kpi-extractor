@@ -81,10 +81,14 @@ def main(argv: list[str] | None = None) -> int:
     report = {"tuning": tuning, "heldout": held, "aiCalls": sum(result.ai_calls for result in results),
               "emptyLists": sorted(symbol for symbol in symbols if not any((fresh.get(symbol) or {}).get("groups") or [])),
               "errors": {result.symbol: result.errors[:3] for result in results if result.errors}, "freshLists": fresh}
+    # What each fresh list left out, by source (Quotiva Review's Left out section; p4-leftout).
+    report["leftOut"] = {source: sum(1 for spec in fresh.values() for line in spec.get("leftOut") or [] if line.get("source") == source)
+                         for source in ("propose", "rule", "audit")}
     plane.call("finish", summary={key: value for key, value in report.items() if key != "freshLists"})
     lines = [_line("Tuning (owner-edited lists)", tuning), _line("Held out", held),
              f"Removed groups proposed again: {len(tuning['proposedAgain'])}; empty lists: {', '.join(report['emptyLists']) or 'none'}; "
-             f"AI calls {report['aiCalls']}", "", "| Set | Company | Still reported | Named | From XBRL | Fresh | Recall | Precision |",
+             f"AI calls {report['aiCalls']}",
+             "Left out: " + ", ".join(f"{count} by {source}" for source, count in report["leftOut"].items()), "", "| Set | Company | Still reported | Named | From XBRL | Fresh | Recall | Precision |",
              "|---|---|---|---|---|---|---|---|"]
     for name, scored in (("tuning", tuning), ("held out", held)):
         for symbol, row in sorted(scored["byCompany"].items()):

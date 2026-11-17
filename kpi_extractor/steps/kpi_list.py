@@ -15,6 +15,7 @@ from ..documents.image_pages import picture_pages
 from ..quality.reasons import OUTSIDE_REPORTED_PERIODS, has, without
 from ..rules.classify import classify_by_rules
 from ..rules.titles import OWN_AXIS_PREFIX, breakdown_names, keep_titles
+from . import left_out
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
 from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds
@@ -200,6 +201,7 @@ class KpiListUpkeep:
                 cleaned = without_xbrl_repeats(spec, [] if self.profile.foreign else self._current_xbrl_members())
                 if cleaned is not spec:
                     self.store.write(self._set_aside_dropped(spec, cleaned))
+                    self._leave_out(left_out.dropped(spec, cleaned, left_out.REASON_XBRL))
                     spec = cleaned
             if spec.model_dump() != stored.model_dump():
                 # A stored list that breaks the rules is repaired once; its filings are then read with the new version.
@@ -239,12 +241,15 @@ class KpiListUpkeep:
         except Exception as error:  # noqa: BLE001
             self.result.errors.append(f"KPI list: {error}"[:300])
             return None, 0, False
+        self._leave_out(left_out.from_propose(spec))
         if current is not None:
             spec = keep_current_groups(spec, current)
         # A group the owner kept stays; one the extractor itself listed that repeats an XBRL breakdown (Amazon's product
         # and service sales, listed before XBRL tagged them as a view) goes.
+        proposed = spec
         spec = without_xbrl_repeats(spec, [] if self.profile.foreign else self._current_xbrl_members(),
                                     keep=current if getattr(self, "_owner_edited", False) else None)
+        self._leave_out(left_out.dropped(proposed, spec, left_out.REASON_XBRL))
         self.store.write(self._set_aside_dropped(current, spec))
         spec = self._capped(spec)
         # Names may only rename breakdowns and members that exist; titles follow rules/titles.py, and stored ones stay.
@@ -282,6 +287,8 @@ class KpiListUpkeep:
                    if (g.key, k.key) not in kept and not any(k.key == other.key for other in
                                                               next((n.kpis for n in normalized.groups if n.kind == "metric"), []))]
         if trimmed:
+            self._leave_out([line for line in left_out.dropped(spec, normalized, left_out.REASON_CAP)
+                             if f"{line['group']}.{line['key']}" in trimmed])
             self.result.trimmed_kpis = sorted(set(self.result.trimmed_kpis) | set(trimmed))
             self.log(f"{self.symbol}: KPI cap left out {', '.join(trimmed[:10])}")
         return normalized
@@ -307,9 +314,18 @@ class KpiListUpkeep:
                 answer = answer.model_copy(update={"retire": self._long_absent(answer.retire, period_end)})
             covered = [] if self.profile.foreign else self._current_xbrl_members()
             updated = apply_maintenance(spec, answer, covered, cap=not getattr(self, "_owner_edited", False))
+            retired = set(answer.retire)
+            for line in left_out.dropped(spec, updated, left_out.REASON_RETIRED, "audit"):
+                gone = f"{line['group']}.{line['key']}" in retired
+                self._leave_out([line if gone else {**line, "reason": left_out.REASON_CAP, "source": "rule"}])
+            if updated is not None:
+                added = Spec.model_validate({"groups": [group.model_dump() for group in answer.add_groups
+                                                        if group.key not in {g.key for g in spec.groups}][:ai.MAX_GROUPS]})
+                self._leave_out(left_out.dropped(added, updated, left_out.REASON_NOT_ADDED))
             if not getattr(self, "_owner_edited", False):
                 # The extractor's own repeats of an XBRL breakdown go, whether or not the audit changed anything else.
                 cleaned = without_xbrl_repeats(updated or spec, covered)
+                self._leave_out(left_out.dropped(updated or spec, cleaned, left_out.REASON_XBRL))
                 updated = cleaned if cleaned is not spec else updated
         except (AiResponseError, ControlError, ValueError) as error:
             self.result.errors.append(f"KPI list audit: {error}"[:300])
@@ -360,9 +376,15 @@ class KpiListUpkeep:
                      f"{', '.join(key for key in keys if key in recent)}")
         return kept
 
+    def _leave_out(self, lines: list[dict]) -> None:
+        """Lines this run's list leaves out, sent with the next list it stores (steps/left_out.py)."""
+        self.__dict__.setdefault("_left_out", []).extend(lines)
+
     def _store_spec(self, spec: Spec, names: dict, version: int, accession: str) -> None:
+        lines = left_out.merge(self.__dict__.pop("_left_out", []), self.__dict__.get("previous_left_out"), spec)
         self.store.spec({"version": version, "groups": [group.model_dump() for group in spec.groups], "names": names,
-                         "sourceAccession": accession})
+                         "sourceAccession": accession, "leftOut": lines})
+        self.previous_left_out = lines
 
     def _xbrl_breakdowns(self) -> dict[str, dict]:
         """Each XBRL breakdown's latest title and members (key → label)."""
