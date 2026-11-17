@@ -1166,6 +1166,16 @@
       "unit": "percent"
      },
      {
+      "key": "operating_expense_ratio",
+      "label": "Operating Expense Ratio",
+      "unit": "percent"
+     },
+     {
+      "key": "adjusted_operating_expense_ratio",
+      "label": "Adjusted Operating Expense Ratio",
+      "unit": "percent"
+     },
+     {
       "key": "days_in_claims_payable",
       "label": "Days in Claims Payable",
       "unit": "count"
@@ -1220,7 +1230,7 @@
     ]
    }
   ],
-  "note": "Removed the operating expense ratio and its adjusted form as cost ratios; the benefit expense ratio is kept as the insurer's loss ratio. Uncertain: Days in Claims Payable is kept though stated only in prose, and Total Health Benefits Operating Revenue equals the Health Benefits segment line but is kept as its breakdown's total."
+  "note": "The owner keeps insurers' expense ratios (2026-11-17), so the operating expense ratio and its adjusted form stay; the benefit expense ratio is kept as the insurer's loss ratio. Uncertain: Days in Claims Payable is kept though stated only in prose, and Total Health Benefits Operating Revenue equals the Health Benefits segment line but is kept as its breakdown's total."
  },
  "FITB": {
   "name": "Fifth Third Bancorp",
