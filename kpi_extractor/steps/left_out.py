@@ -18,6 +18,11 @@ REASON_XBRL = "repeats an XBRL breakdown"
 REASON_RETIRED = "no longer reported"
 REASON_NOT_ADDED = "the audit's addition broke a list rule"
 MAX_LEFT_OUT = 60
+# Reasons that only restate the Never-track rules (a margin, EPS, a cost line): nothing the owner would add back, and in
+# the first run 2026-11-17 most of Propose's 778 entries.
+_RULE_RESTATED = re.compile(r"margin|cost|expense|\beps\b|per[- ]share|earnings|income|profit|cash flow|balance sheet|"
+                            r"guidance|outlook|total revenue|dividend|buyback|repurchase|non-gaap|adjust|tax|return|"
+                            r"share count|shares outstanding|growth of (?:total|segment|a segment)", re.I)
 
 
 def _today() -> str:
@@ -52,6 +57,8 @@ def from_propose(spec: Spec) -> list[dict]:
     groups = {group.key: group for group in spec.groups}
     lines = []
     for item in spec.left_out:
+        if _RULE_RESTATED.search(item.reason):
+            continue
         group = groups.get(item.group or "")
         lines.append({"group": item.group or None, "groupLabel": group.label if group else None,
                       "kind": group.kind if group else None, "key": _key(item.label), "label": item.label,

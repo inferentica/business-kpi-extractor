@@ -169,7 +169,7 @@ class BreakdownName(BaseModel):
         return {key: label.strip() for key, label in value.items() if 0 < len(label.strip()) <= 60}
 
 
-MAX_LEFT_OUT_PROPOSED = 15
+MAX_LEFT_OUT_PROPOSED = 10
 
 
 class LeftOutItem(BaseModel):

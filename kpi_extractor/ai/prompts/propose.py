@@ -66,10 +66,12 @@ only when they help.
 quarterly version of an annual XBRL breakdown), give both the same title and row labels, so they read as one view.
 - "names" renames each breakdown listed under "Name these XBRL breakdowns": {{"<breakdown key>": {{"label": "...", \
 "members": {{"<member key>": "..."}}}}}}. Use only the keys given; omit a member whose label is already right.
-- "left_out" names up to 15 measures these documents give as a number for the quarter that you chose not to track, \
-most notable first: {{"label": "...", "unit": "...", "reason": "...", "group": "<key of the group it would join, or \
-null>"}}. The reason names the rule in two to five words ("a margin", "growth of total revenue", "covered by XBRL", \
-"year to date only", "cost line"). Never list what you track, and never invent a measure the documents do not give.
+- "left_out" names up to 10 measures these documents give as a number for the quarter that a reader might want \
+tracked but you chose not to, most notable first: {{"label": "...", "unit": "...", "reason": "...", "group": "<key of \
+the group it would join, or null>"}}. Only breakdowns, operating metrics and a product's figures belong here, with \
+the reason in two to five words ("covered by XBRL", "year to date only", "stated only in prose", "a one-off figure"). \
+Never list what "Never track" names (margins, costs, EPS, income, cash flow, balance sheet, guidance, total revenue or \
+its growth), never what you track, and never a measure the documents do not give.
 - Track every measure these documents give for the quarter that these rules allow, at most {MAX_GROUPS} groups and \
 {MAX_KPIS_PER_GROUP} KPIs per group, and about {MAX_LISTED_KPIS} KPIs in all. Over that, operating metrics are dropped \
 from the end of their groups (breakdowns and mixes never are), so list each group's most important first.
@@ -78,4 +80,4 @@ JSON shape:
 {{"groups": [{{"key": "revenue_by_technology", "label": "Revenue by Technology", "kind": "mix", "total_kpi": null,
   "kpis": [{{"key": "n3", "label": "3nm", "unit": "percent"}}]}}],
  "names": {{"products": {{"label": "Revenue by Market Platform", "members": {{"hyperscale": "Hyperscale"}}}}}},
- "left_out": [{{"label": "Gross Margin", "unit": "percent", "reason": "a margin", "group": "operating"}}]}}"""
+ "left_out": [{{"label": "Year-to-Date Bookings", "unit": "currency", "reason": "year to date only", "group": "operating"}}]}}"""
