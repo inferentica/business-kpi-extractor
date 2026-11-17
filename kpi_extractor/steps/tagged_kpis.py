@@ -34,6 +34,24 @@ def _percent_view(facts_of):
     return lambda quarter: _percent_scale(facts_of(quarter))
 
 
+# Words that name no particular measure: a tag sharing only these with a KPI's name does not name it.
+_GENERIC = {"revenue", "revenues", "total", "net", "income", "amount", "number", "value", "member", "axis", "other", "and",
+            "of", "the", "to", "for", "in", "by", "from", "average", "period", "end", "s"}
+
+
+def _words(text: str) -> set[str]:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text.split(":")[-1])
+    return {word.removesuffix("s") for word in re.findall(r"[a-z0-9]+", spaced.lower())} - _GENERIC
+
+
+def _names_kpi(tag, label: str) -> bool:
+    """Whether the tag's concept or a member it is tagged by shares a word with the KPI's name, beyond generic ones."""
+    named = _words(tag.concept)
+    for _axis, member in tag.dimensions or ():
+        named |= _words(str(member).removesuffix("Member"))
+    return bool(named & _words(label))
+
+
 class TaggedKpiReading:
     """KPIs filled from a report's XBRL tags, and breakdown periods settled by exact tagged figures."""
 
@@ -87,12 +105,19 @@ class TaggedKpiReading:
         return records
 
     @staticmethod
-    def _unconfirmed(tag, stated: dict, quarters, kfacts) -> bool:
-        """Whether a KPI some release states has no quarter, of the newest eight it states, whose report tags the same
-        figure. A KPI no release states (Alphabet's revenue backlog) has nothing to confirm."""
-        shared = [quarter for quarter in sorted(stated, reverse=True) if quarter in quarters][:8]
-        return bool(stated) and not any(tag in kfacts(quarter) and agrees(kfacts(quarter)[tag], stated[quarter])
-                                        for quarter in shared)
+    def _unconfirmed(tag, stated: dict, quarters, kfacts, label: str = "") -> bool:
+        """Whether a tag picked for a KPI some release states is not shown to be that KPI. Where a report tags a quarter
+        a release states (of the newest eight it states), the tag must give the release's figure there. Where none does
+        (McDonald's restaurant counts by type, in its releases until 2017 and tagged from 2022), the tag must name the
+        KPI: "Number of Restaurants, Conventional Franchised" names "Conventional franchised"; State Street's software
+        "Remaining Performance Obligation" does not name its "Uninstalled Revenue Backlog". A KPI no release states
+        (Alphabet's revenue backlog) has nothing to confirm."""
+        if not stated:
+            return False
+        shared = [quarter for quarter in sorted(stated, reverse=True) if quarter in quarters and tag in kfacts(quarter)][:8]
+        if shared:
+            return not any(agrees(kfacts(quarter)[tag], stated[quarter]) for quarter in shared)
+        return not _names_kpi(tag, label)
 
     def _tag_fits(self, kpi, tag, newest_first, kfacts) -> bool:
         """Whether a tag's unit fits the KPI (a dollar KPI is never a count of shares), from the newest report that tags
@@ -185,7 +210,7 @@ class TaggedKpiReading:
                 stated = {quarter: float(v["value"]) for quarter, v in held.items()
                           if v["validation_status"] != "rejected" and not (v.get("locator") or {}).get("tagged")}
                 if tag is not None and any(_PICKED in note for v in held.values() if tag_from_locator(v.get("locator") or {}) == tag
-                                           for note in v.get("notes") or []) and self._unconfirmed(tag, stated, quarters, kfacts):
+                                           for note in v.get("notes") or []) and self._unconfirmed(tag, stated, quarters, kfacts, kpi.label):
                     records += [{**v, "validation_status": "rejected", "notes": [_UNCONFIRMED]}
                                 for v in held.values() if tag_from_locator(v.get("locator") or {}) == tag
                                 and not v.get("owner_decision") and v["validation_status"] != "rejected"]
@@ -197,7 +222,7 @@ class TaggedKpiReading:
                 how = "tagged as in the quarters the release states it"
                 if tag is None and kpi.key in picked:
                     tag, how = picked[kpi.key], _PICKED
-                    if self._unconfirmed(tag, stated, quarters, kfacts):
+                    if self._unconfirmed(tag, stated, quarters, kfacts, kpi.label):
                         continue
                     if any(quarter in quarters and tag in kfacts(quarter) and not agrees(kfacts(quarter)[tag], value)
                            for quarter, value in readings.items()):

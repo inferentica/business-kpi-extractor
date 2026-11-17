@@ -68,15 +68,24 @@ def test_a_segment_line_holds_no_period_before_its_segment():
     assert held[0]["notes"] == [OUTSIDE_SEGMENT_ERA]
 
 
-def test_a_picked_tag_must_give_a_figure_a_release_states():
-    tag = object()
+def test_a_picked_tag_must_give_a_figure_a_release_states_or_name_the_kpi():
+    from kpi_extractor.readers.tagged_metrics import Tag
+    rpo = Tag("us-gaap:RevenueRemainingPerformanceObligation",
+              (("dim_us-gaap_StatementBusinessSegmentsAxis", "stt:SoftwareLicenseSalesSaaSMember"),), True)
     quarters = {("2022", "Q1"): None, ("2025", "Q3"): None}
-    facts = {("2022", "Q1"): {}, ("2025", "Q3"): {tag: 2.11e9}}
-    kfacts = facts.get
-    # State Street: the release's $93 million backlog in Q1 2022; the tag is in no report of a quarter a release states.
-    assert TaggedKpiReading._unconfirmed(tag, {("2022", "Q1"): 93e6}, quarters, kfacts)
-    assert not TaggedKpiReading._unconfirmed(tag, {}, quarters, kfacts)  # no release states it (Alphabet's backlog)
-    assert not TaggedKpiReading._unconfirmed(tag, {("2025", "Q3"): 2.11e9}, quarters, kfacts)
+    facts = {("2022", "Q1"): {}, ("2025", "Q3"): {rpo: 2.11e9}}
+    # State Street: its release's $93 million backlog in Q1 2022; no report tags that quarter, and the tag names
+    # another measure.
+    assert TaggedKpiReading._unconfirmed(rpo, {("2022", "Q1"): 93e6}, quarters, facts.get, "Uninstalled Revenue Backlog")
+    assert not TaggedKpiReading._unconfirmed(rpo, {}, quarters, facts.get, "Revenue backlog")  # no release states it
+    # A quarter both give decides by the figure.
+    assert not TaggedKpiReading._unconfirmed(rpo, {("2025", "Q3"): 2.11e9}, quarters, facts.get, "Uninstalled Revenue Backlog")
+    assert TaggedKpiReading._unconfirmed(rpo, {("2025", "Q3"): 93e6}, quarters, facts.get, "Revenue backlog")
+    # McDonald's counts by type, in its releases until 2017 and tagged from 2022: the tag names the line.
+    units = Tag("us-gaap:NumberOfRestaurants", (("dim_mcd_SegmentReportingInformationBySecondarySegmentAxis", "mcd:ConventionalFranchisesMember"),
+                                                ("dim_us-gaap_FranchisorDisclosureAxis", "us-gaap:FranchisedUnitsMember")), True)
+    assert not TaggedKpiReading._unconfirmed(units, {("2017", "Q2"): 21317}, {("2017", "Q2"): None}, {("2017", "Q2"): {}}.get,
+                                             "Conventional franchised")
 
 
 def test_the_wave3_holds_are_picked_for_a_re_read():
