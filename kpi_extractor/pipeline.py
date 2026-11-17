@@ -24,6 +24,8 @@ from .documents.document import Document
 from .domain.fiscal import with_first_year
 from .sources import source as filing_source
 from .sources.base import FilingRef, FilingSource
+from .quality.metric_totals import unbalanced_quarters
+from .quality.reasons import METRIC_TOTAL
 from .steps.segment_eras import lines_outside_segment_eras
 from .steps.shared import RecordBuilding, _folder, list_parents, only_adds
 from .steps.loading import FilingLoading
@@ -349,6 +351,9 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.store.write(self._adopt_restated_quarters())
         for rows in self._fix_mislabelled_quarters():
             self.store.write(rows)
+        if held := unbalanced_quarters(self.values, METRIC_TOTAL):
+            self.log(f"{self.symbol}: {len(held)} figures held: their group's lines do not add up to its total")
+            self.store.write(held)
         self.store.write(self._derive(spec))
         self.store.write(self._harmonize_labels())
         self.store.write(self.store.reread_disagreements())

@@ -26,6 +26,7 @@ from ..readers.replay import (LABEL_CUT, AmbiguousQuote, _same_place, _source_te
                               missing_since, mostly_whole, replay, reported_period, stated_total)
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, states_one_period, validate_groups
+from ..quality.metric_totals import breaks_learned
 from ..readers.trace import placed_elsewhere, trace_replay
 from .shared import (previous_quarter_cell_matches, repeated_in_quarter_columns, AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same,
                      _same_chain, _year_ago_cells)
@@ -142,6 +143,7 @@ class ReplayReading:
                 parts = [(mine, Spec.model_validate({"groups": [group.model_dump()]}), group.key)]
             else:
                 parts = [(mine, Spec.model_validate({"groups": [group.model_dump()]}), group.key)]
+            first_item, done_before = len(items), set(done)
             for locators, part, key in parts:
                 found = self._replay_part(document, part, locators, expected, currency)
                 if isinstance(found, str) and kpi_by_kpi(group) and "quote" in locators[key]:
@@ -155,6 +157,13 @@ class ReplayReading:
                 items += read
                 done.add(key)
                 kept_located = kept_located or located
+            if kpi_by_kpi(group) and self._breaks_learned_totals(group, items[first_item:]):
+                # Lines replayed one by one that break a total the group's quarters add up to (KeyCorp's consumer loans,
+                # replayed from its nonperforming assets table): the AI reads the group instead.
+                missed("its lines do not add up to a total they add up to in most quarters", len(done - done_before))
+                del items[first_item:]
+                done = done_before
+                continue
             if kpi_by_kpi(group) and not unlooked and done & listed and listed - done <= not_reported:
                 done.add(group.key)  # every KPI the AI would look for was read by code
         # A reading of the whole document as the year outweighs a quarter's reading of part of it: a year's report
@@ -356,6 +365,12 @@ class ReplayReading:
                                    if locator.get("row_label") for label_key in (sideless_key, member_key)}
                 located.tables, located.values = [table], []
         return self._checked(document, part, located, expected, currency, annual=annual)
+
+    def _breaks_learned_totals(self, group: GroupSpec, read: list[ReadValue]) -> bool:
+        """Whether a metric group's replayed figures break a total its stored quarters mostly add up to (metric_totals)."""
+        return bool(read) and all(kpi.unit == "currency" for kpi in group.kpis) and breaks_learned(
+            self.values, f"{AI_GROUP_PREFIX}{group.key}", [(kpi.key, kpi.label) for kpi in group.kpis],
+            {item.kpi.key: item.value for item in read})
 
     def _stored_last_quarter(self, expected: date) -> dict[str, float]:
         """Each KPI's verified figure for the quarter before ("group.kpi" → value)."""
