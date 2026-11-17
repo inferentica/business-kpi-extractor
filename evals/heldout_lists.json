@@ -1287,6 +1287,16 @@
     "kind": "metric",
     "kpis": [
      {
+      "key": "nim",
+      "label": "Net Interest Margin",
+      "unit": "percent"
+     },
+     {
+      "key": "efficiency_ratio",
+      "label": "Efficiency Ratio",
+      "unit": "percent"
+     },
+     {
       "key": "nco_ratio",
       "label": "Net Charge-Off Ratio",
       "unit": "percent"
@@ -1569,7 +1579,7 @@
     ]
    }
   ],
-  "note": "Removed NIM (a margin) and the efficiency ratio; CET1 is kept at the owner's decision as a core measure of a bank's business. Uncertain: credit-quality ratios and the text-only loan-to-core deposit ratio are kept, and Net Interest Income plus segment NII and noninterest income are added as revenue breakdowns though they can be read as income-statement lines; mortgage originations is read from chart text."
+  "note": "Nothing removed: CET1, net interest margin and the efficiency ratio are kept at the owner's decision as core measures of a bank's business. Uncertain: credit-quality ratios and the text-only loan-to-core deposit ratio are kept, and Net Interest Income plus segment NII and noninterest income are added as revenue breakdowns though they can be read as income-statement lines; mortgage originations is read from chart text."
  },
  "HD": {
   "name": "Home Depot",
@@ -2311,6 +2321,16 @@
     "kind": "metric",
     "kpis": [
      {
+      "key": "net_interest_margin",
+      "label": "Net Interest Margin",
+      "unit": "percent"
+     },
+     {
+      "key": "efficiency_ratio",
+      "label": "Efficiency Ratio",
+      "unit": "percent"
+     },
+     {
       "key": "net_charge_offs_to_average_loans",
       "label": "Net Charge-Offs to Average Loans",
       "unit": "percent"
@@ -2491,7 +2511,7 @@
     ]
    }
   ],
-  "note": "Removed NIM, the efficiency ratio, Tier 1 and TCE/TA; CET1 is kept at the owner's decision as a core measure of a bank's business, and credit-quality ratios and nonperforming assets are kept as operating measures. Uncertain: Net Interest Income is added as a revenue component, and criticized loans is read from presentation chart text; the filing states no AUM."
+  "note": "Removed Tier 1 and TCE/TA; CET1, net interest margin and the efficiency ratio are kept at the owner's decision as core measures of a bank's business, and credit-quality ratios and nonperforming assets are kept as operating measures. Uncertain: Net Interest Income is added as a revenue component, and criticized loans is read from presentation chart text; the filing states no AUM."
  },
  "MU": {
   "name": "Micron Technology",
@@ -2870,6 +2890,16 @@
     "kind": "metric",
     "kpis": [
      {
+      "key": "net_interest_margin_fte",
+      "label": "Net Interest Margin (FTE)",
+      "unit": "percent"
+     },
+     {
+      "key": "efficiency_ratio",
+      "label": "Efficiency Ratio",
+      "unit": "percent"
+     },
+     {
       "key": "net_charge_off_ratio",
       "label": "Net Charge-Off Ratio",
       "unit": "percent"
@@ -3146,7 +3176,7 @@
     ]
    }
   ],
-  "note": "Removed NIM, the efficiency ratio (listed in the presentation's key metrics but still a cost ratio), Tier 1 and leverage; CET1 is kept at the owner's decision as a core measure of a bank's business. Uncertain: loans-to-deposits is kept as a liquidity ratio, Net Interest Income is added as a revenue component, and mobile active users is matched to its chart by its growth label."
+  "note": "Removed Tier 1 and leverage; CET1, net interest margin and the efficiency ratio are kept at the owner's decision as core measures of a bank's business. Uncertain: loans-to-deposits is kept as a liquidity ratio, Net Interest Income is added as a revenue component, and mobile active users is matched to its chart by its growth label."
  },
  "SBUX": {
   "name": "Starbucks",
