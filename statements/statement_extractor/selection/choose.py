@@ -10,6 +10,7 @@ from dataclasses import asdict
 from ..domain.basis import ifrs_family
 from ..domain.model import REGULATOR_SOURCES, Reading
 from .lines import line_keys
+from .period_dates import same_period
 from .signs import settle_signs
 from .ties import tie
 from .witnesses import contradicted, verdict
@@ -41,7 +42,8 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
     for reading in readings:
         groups[reading.key].append(reading)
     chosen = []
-    for key, group in groups.items():
+    for key, everything in groups.items():
+        group, others = same_period(everything)  # a presentation a week or more off is another period
         # A statement in a currency the company does not report in is a convenience translation read as the
         # statement (TSMC's archived Q3 2001 nine months in US$): never served, even where nothing else covers the
         # period.
@@ -80,13 +82,17 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
                 winner = later
         record = {
             "statement": key[0], "fiscal_year": key[1], "fiscal_period": key[2], "duration": key[3],
-            "period_end": max(reading.period_end for reading in group).isoformat(),
+            # The winner's own end, never a later one another presentation gives (Varex's FY2018 HTML reading).
+            "period_end": (winner.period_end if winner else max(reading.period_end for reading in group)).isoformat(),
             "status": "kept" if winner else ("rejected" if any(r.status == "rejected" for r in group) else "unproven"),
             "presentations": len(group), "kept_presentations": len(kept),
             "own_accession": own.accession if own else None, "own_status": own.status if own else None,
             "rejections": sorted({f"{reading.accession}: {check.name} {check.detail}"[:200] for reading in group
                                   for check in reading.checks if check.result == "fail"})[:5],
         }
+        if others:
+            record["other_periods"] = sorted(f"{reading.accession}: {reading.period_start or ''} to {reading.period_end}"
+                                             for reading in others)[:5]
         if winner is not None:
             if winner.source not in REGULATORS:  # a regulator's lines are served with their signs as filed
                 winner = settle_signs(winner, kept, (printed or {}).get(winner.accession))
@@ -145,8 +151,10 @@ def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
 
 
 def _served_fields(reading: Reading) -> dict:
-    """What Quotiva serves beside a statement's lines: its source, first day, and the checks it passed as read."""
+    """What Quotiva serves beside a statement's lines: its source, its own first and last days (KB's 2011 on K-IFRS
+    closes December 31 beside its IFRS restatement opening January 1, 2012), and the checks it passed as read."""
     return {"source": reading.source, "period_start": reading.period_start.isoformat() if reading.period_start else None,
+            "period_end": reading.period_end.isoformat(),
             "checks": {"checks": [asdict(check) for check in reading.checks], "arelle": reading.arelle}}
 
 
