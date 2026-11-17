@@ -147,7 +147,13 @@ def _reports_missing_split(values: dict) -> set[str]:
     Google segment's own unnamed figure completed it, PR 170), leaving that quarter and its Q4 without the split."""
     periods: dict[str, set[str]] = {}
     report_period: dict[str, str] = {}
+    sources: dict[tuple[str, str], set[str]] = {}  # (split, quarter end) -> the filings its figures came from
+    year_of: dict[str, str] = {}  # quarter end -> fiscal year
+    listed: dict[tuple[str, str], set[str]] = {}  # (split, fiscal year) -> its verified periods
     for value in values.values():
+        if value.get("method") == "derived" and value.get("validation_status") == "verified":
+            # A worked-out Q4 counts as the year's Q4.
+            listed.setdefault((str(value.get("group_key") or ""), str(value.get("fiscal_year"))), set()).add(str(value.get("fiscal_period")))
         if value.get("method") != "xbrl" or not value.get("source_accession"):
             continue
         accession, end = value["source_accession"], str(value["period_end"])[:10]
@@ -157,14 +163,26 @@ def _reports_missing_split(values: dict) -> set[str]:
         if value.get("group_kind") == "revenue_breakdown" and value.get("validation_status") == "verified" \
                 and not key.endswith("_levels"):
             periods.setdefault(key, set()).add(end)
+            listed.setdefault((key, str(value.get("fiscal_year"))), set()).add(str(value.get("fiscal_period")))
+            if value.get("fiscal_period") != "FY":
+                sources.setdefault((key, end), set()).add(accession)
+                year_of[end] = str(value.get("fiscal_year"))
     from ..readers.segment_income import LEFT_OVER_KEY
+
+    # A report whose own quarter's split is held only from a later report's year-ago columns, in a year whose Q4 is
+    # missing (Alphabet's Q2 and Q3 2018 10-Qs, refused until PR 170): read again, the year's quarters stand on the
+    # figures first reported, as the year does, so its Q4 can be worked out on one basis.
+    no_q4 = {(key, year) for (key, year), found in listed.items() if {"FY", "Q1", "Q2", "Q3"} <= found and "Q4" not in found}
+    own_missing = {accession for accession, end in report_period.items()
+                   if any(end in ends and accession not in sources.get((key, end), set()) and (key, year_of.get(end)) in no_q4
+                          for key, ends in periods.items())}
 
     # A report whose split holds a line still unnamed ("Unallocated"): its name comes from the report's table, once a
     # reader can find it (Alphabet's Q1 2018 "Google other revenues", in the column after the year-ago one).
     unnamed = {value["source_accession"] for value in values.values() if value.get("method") == "xbrl"
                and value.get("kpi_key") == LEFT_OVER_KEY and value.get("validation_status") != "rejected"
                and value.get("source_accession") and value.get("group_kind") == "revenue_breakdown"}
-    return unnamed | {accession for accession, end in report_period.items()
+    return unnamed | own_missing | {accession for accession, end in report_period.items()
                       if any(end not in ends and min(ends) < end < max(ends) for ends in periods.values())}
 
 
@@ -184,7 +202,7 @@ SET_SELECTORS: dict[str, tuple[str, Callable[[dict], set[str]]]] = {
     "reports-without-segments": ("periodic reports with segment income from XBRL but no revenue by segment", _reports_without_segments),
     "chart-share-quarters": ("the reports of quarters a slide's shares still stand in for", _chart_share_quarters),
     "reports-missing-split": ("periodic reports whose quarter is missing from an XBRL revenue split held before and after it, "
-                              "or whose split holds a line still unnamed",
+                              "whose split holds a line still unnamed, or whose own quarter's split is held only from a later report",
                               _reports_missing_split),
 }
 

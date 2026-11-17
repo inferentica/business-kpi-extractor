@@ -168,3 +168,17 @@ def test_a_report_whose_quarter_a_split_skips_is_picked():
         value("q3-19", "segments", "2019-09-30", period="Q3"),  # after the last products quarter: not a gap
     ]))
     assert picked_filings("reports-missing-split", values) == {"q1-18"}
+
+
+def test_a_years_quarter_held_only_from_a_later_report_is_picked_when_its_q4_is_missing():
+    from kpi_extractor.ops.reread import picked_filings
+    def value(acc, end, year, period, group="products"):
+        return {"source_accession": acc, "method": "xbrl", "group_key": group, "group_kind": "revenue_breakdown",
+                "period_end": end, "fiscal_year": year, "fiscal_period": period, "validation_status": "verified"}
+    rows = [value("10k-18", "2018-12-31", "2018", "FY"), value("q1-18", "2018-03-31", "2018", "Q1"),
+            value("q2-18", "2018-06-30", "2018", "Q2", group="segments"),  # Alphabet's own Q2 2018 10-Q: no products
+            value("q2-19", "2018-06-30", "2018", "Q2"), value("q2-19", "2019-06-30", "2019", "Q2"),
+            value("q3-19", "2018-09-30", "2018", "Q3"), value("q3-19", "2019-09-30", "2019", "Q3")]
+    assert "q2-18" in picked_filings("reports-missing-split", dict(enumerate(rows)))
+    rows.append({**value("10k-18", "2018-12-31", "2018", "Q4"), "method": "derived"})  # once Q4 stands, nothing to read
+    assert "q2-18" not in picked_filings("reports-missing-split", dict(enumerate(rows)))
