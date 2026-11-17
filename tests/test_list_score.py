@@ -61,15 +61,15 @@ def test_a_list_draft_runs_the_pipeline_lists_only(monkeypatch):
     seen = {}
 
     class Pipeline:
-        def __init__(self, control, symbol, quarters, force, log=None, lists_only=False):
-            seen.update(symbol=symbol, force=force, lists_only=lists_only)
+        def __init__(self, control, symbol, quarters, force, log=None, lists_only=False, draft_audit=None):
+            seen.update(symbol=symbol, force=force, lists_only=lists_only, draft_audit=draft_audit)
             control.specs[symbol] = {"groups": []}
 
         def run(self):
             return SymbolResult("X")
     monkeypatch.setattr(lists_eval, "SymbolPipeline", Pipeline)
     _result, spec, values = lists_eval.draft_list(object(), "X", 4)
-    assert seen == {"symbol": "X", "force": True, "lists_only": True} and spec == {"groups": []} and values == []
+    assert seen == {"symbol": "X", "force": True, "lists_only": True, "draft_audit": True} and spec == {"groups": []} and values == []
 
 
 def test_the_lists_summary_line_names_both_measures():
