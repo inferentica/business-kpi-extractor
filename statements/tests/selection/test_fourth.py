@@ -96,3 +96,10 @@ def test_a_lines_unit_decides_whether_it_adds_up():
     assert not _additive({"label": "Effect of dilutive securities", "unit": "shares"})
     assert not _additive({"label": "Net income", "unit": "USD/share"})
     assert not _additive({"label": "Weighted average shares outstanding"})  # no unit: the label decides
+
+
+def test_a_count_tagged_without_its_unit_never_adds_up():
+    from statement_extractor.selection.fourth import _additive
+    assert not _additive({"label": "Basic", "concept": "us-gaap_WeightedAverageNumberOfSharesOutstandingBasic", "unit": "pure"})
+    # Arista's "Basic" under net income available to common stockholders is dollars.
+    assert _additive({"label": "Basic", "concept": "us-gaap_NetIncomeLossAvailableToCommonStockholdersBasic", "unit": "USD"})

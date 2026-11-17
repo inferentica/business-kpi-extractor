@@ -9,6 +9,7 @@ value, never guessed. Each derived quarter names both filings it came from. A qu
 replaced."""
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 from ..domain.model import REGULATOR_SOURCES as REGULATORS
@@ -30,15 +31,18 @@ def _keyed(reading, keys: dict) -> dict[tuple, list]:
     return found
 
 
+_COUNTED = re.compile(r"PerShare|NumberOf\w*Shares|SharesOutstanding|SharesIssued", re.I)  # a tag of a count or per share
+
+
 def _additive(line: dict) -> bool:
     """A line a year less its nine months gives the fourth quarter of: never a figure a share or a share count. Its
     unit decides (Coca-Cola's "Effect of dilutive securities (in shares)", a count its label alone does not name;
     Brookfield's "Common shares and equivalents issued (net of repurchases)", dollars its label reads as a count); the
     label only where the line has none."""
-    label, unit = str(line.get("label") or ""), str(line.get("unit") or "")
-    if unit:
-        return not (unit == "shares" or unit.endswith("/share") or unit == "%")
-    return not (PER_SHARE.search(label) or SHARE_COUNT.search(label))
+    label, unit, concept = str(line.get("label") or ""), str(line.get("unit") or ""), str(line.get("concept") or "")
+    if _COUNTED.search(concept) or unit in ("shares", "pure", "%") or unit.endswith("/share"):
+        return False  # Bancorp's weighted average shares, tagged "pure"
+    return bool(unit) or not (PER_SHARE.search(label) or SHARE_COUNT.search(label))
 
 
 # Balances a cash flow statement opens and closes on, by concept (the label decides for a printed statement).
