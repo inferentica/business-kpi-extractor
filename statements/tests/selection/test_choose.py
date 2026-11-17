@@ -247,3 +247,38 @@ def test_a_parents_summary_or_a_20fs_year_is_never_replaced_by_a_later_release()
     release.form, release.source = "6-K", "html"
     [chosen] = choose([year, comparative, release])
     assert chosen["source_accession"] == "20-F"  # for a year the 20-F stays first
+
+
+def test_the_served_period_is_its_winners_own():
+    # Varex's FY2018: its 10-K's printed reading says October 2, 2018, its XBRL September 28; the 2020 10-K wins.
+    from statement_extractor.selection.period_dates import align_dates
+    own = reading("fy18", date(2018, 11, 27), 1, own=True)
+    own.period_end, own.period_start = date(2018, 9, 28), date(2017, 9, 30)
+    printed = reading("fy18", date(2018, 11, 27), 1, own=True)
+    printed.source, printed.period_end, printed.period_start = "html", date(2018, 10, 2), date(2017, 10, 4)
+    newest = reading("fy20", date(2020, 11, 30), 1, own=False)
+    newest.period_end, newest.period_start = date(2018, 9, 28), date(2017, 9, 30)
+    [chosen] = choose(align_dates([own, printed, newest]))
+    assert (chosen["source_accession"], chosen["period_end"], chosen["period_start"]) == ("fy20", "2018-09-28", "2017-09-30")
+
+
+def test_a_presentation_a_week_or_more_off_is_another_period():
+    # Delta's 2007 10-Qs present April 30 and May 1 balance sheets (its fresh start) under its first quarter of 2007.
+    own = reading("q1", date(2007, 4, 27), 1, own=True, statement="balance", period="Q1", duration="instant")
+    own.period_end = date(2007, 3, 31)
+    fresh = reading("q2", date(2007, 8, 2), 2, own=False, statement="balance", period="Q1", duration="instant")
+    fresh.period_end = date(2007, 5, 1)
+    own.checks = fresh.checks = [Check("balance", "pass")]
+    [chosen] = choose([own, fresh])
+    assert (chosen["source_accession"], chosen["period_end"]) == ("q1", "2007-03-31")
+    assert chosen["other_periods"] == ["q2:  to 2007-05-01"]
+
+
+def test_without_its_own_filing_a_period_takes_its_xbrl_dates():
+    from statement_extractor.selection.period_dates import align_dates
+    tagged = reading("fy10", date(2010, 6, 1), 1, own=False)
+    tagged.period_end, tagged.period_start = date(2008, 12, 31), date(2008, 1, 1)
+    printed = reading("6k", date(2011, 3, 31), 1, own=False)
+    printed.source, printed.period_end, printed.period_start = "html", date(2009, 1, 1), date(2008, 1, 1)
+    aligned = {r.accession: r for r in align_dates([tagged, printed])}
+    assert aligned["6k"].period_end == date(2008, 12, 31)  # CSN's 2011 6-K dates 2008 to January 1, 2009

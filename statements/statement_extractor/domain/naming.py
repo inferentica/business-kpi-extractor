@@ -160,14 +160,20 @@ def _eras(annual_ends: list[date], usual: str, proven=()) -> tuple[list[Era], li
 
 def name_readings(readings: list, naming: Naming) -> tuple[list, dict[str, int]]:
     """Each reading labelled by the era its own end falls in. Left out: a year to date that does not open its fiscal
-    year, and a new era's recast or transition period that would take a year the era before names. A reading off its
-    era's calendar keeps the label its reader gave it (Brookfield Asset Management's short first year)."""
+    year; a new era's recast or transition period that would take a year the era before names; and a comparative off
+    its era's calendar, a period another calendar recast (Delta's calendar 1999 beside its fiscal years to June). A
+    reading its reader labelled for a span of its own keeps that label (Brookfield Asset Management's short first
+    year, July 4 to December 31, 2022, its year 2022); so does a filing's own period."""
     kept, left_out = [], {}
     for reading in readings:
-        labelled, why = naming.label(Period(reading.period_end, reading.period_start))
+        period = Period(reading.period_end, reading.period_start)
+        if period.duration != reading.duration:
+            kept.append(reading)
+            continue
+        labelled, why = naming.label(period)
         if labelled is not None:
             reading.fiscal_year, reading.fiscal_period = labelled[0], labelled[1]
-        elif why != "off calendar":
+        elif not (why == "off calendar" and reading.own):
             left_out[why] = left_out.get(why, 0) + 1
             continue
         kept.append(reading)

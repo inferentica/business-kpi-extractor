@@ -103,3 +103,20 @@ def test_one_annual_report_whose_own_year_closes_then_is_an_era():
     assert naming.label(Period(date(2008, 11, 30), date(2007, 12, 1)))[0] == ("2008", "FY", "year")
     assert naming.label(Period(date(2008, 8, 29), date(2007, 12, 1)))[0] == ("2008", "Q3", "ytd")
     assert naming.label(Period(date(2008, 12, 31), date(2008, 1, 1))) == (None, "recast")
+
+
+def test_a_comparative_off_its_eras_calendar_is_left_out():
+    # Delta's 10-K for 2001 presents calendar 1999 again; its fiscal 1999 ended June 30, 1999, its old era to June 2000.
+    ends = [date(1998, 6, 30), date(1999, 6, 30), date(2000, 6, 30), date(2001, 12, 31), date(2002, 12, 31)]
+    naming = Naming(ends, "1231")
+    kept, left_out = name_readings([reading(date(1999, 1, 1), date(1999, 12, 31), "year", "10-K405"),
+                                    reading(date(2000, 1, 1), date(2000, 6, 30), "ytd")], naming)
+    assert kept == [] and left_out == {"off calendar": 2}
+
+
+def test_a_span_its_reader_labelled_keeps_its_label():
+    # Brookfield Asset Management's first year, July 4 to December 31, 2022, read as its year 2022.
+    short = reading(date(2022, 7, 4), date(2022, 12, 31), "year", "10-K")
+    short.fiscal_year, short.fiscal_period = "2022", "FY"
+    kept, _left_out = name_readings([short], Naming([date(2022, 12, 31), date(2023, 12, 31)], "1231"))
+    assert [(item.fiscal_year, item.fiscal_period) for item in kept] == [("2022", "FY")]
