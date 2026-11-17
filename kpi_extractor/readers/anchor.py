@@ -56,6 +56,19 @@ _FIGURE = (r"(?:US\$|NT\$|[$€£¥])?\s?\(?(?:\d(?:[\d,]*\d)?(?:\.\d+)?|\.\d+)\
            r"(?:\s?(?:%|percent|trillion|billion|million|thousand|bn|mn)\b|%)?")
 
 
+# A dash standing alone between a row's words and its next figure is the row's figure for none ("Pension group
+# annuities — 9,058": nothing this quarter, 9,058 the year to date), never punctuation to read past.
+_LONE_DASH = re.compile(r"(?:^|\s)[—–-](?:\s|$)")
+
+
+def _gap_before(quote: str, value_text: str) -> str:
+    """What stood between the last word before last quarter's figure and the figure."""
+    at = clean(quote).find(clean(value_text))
+    before = clean(quote)[:at] if at >= 0 else ""
+    words = list(_WORD.finditer(before))
+    return before[words[-1].end():] if words else before
+
+
 def anchor_words(quote: str, value_text: str, count: int) -> tuple[str, ...] | None:
     """The last words before a quote's figure, or None when there are fewer, or the figure is not once in the quote."""
     quote, value_text = clean(quote), clean(value_text)
@@ -78,14 +91,20 @@ def anchor_locator(document: Document, key: str, last: dict, label: str | None =
         if label is not None and not names_metric(words, label):
             why = "anchor phrase does not name the metric"
             continue
-        pattern = re.compile(r"\b" + r"[^A-Za-z0-9]{1,6}".join(map(re.escape, words)) + r"(?:[^A-Za-z0-9$€£¥(.]|\.(?!\d)){0,4}(" + _FIGURE + ")",
+        pattern = re.compile(r"\b" + r"[^A-Za-z0-9]{1,6}".join(map(re.escape, words)) + r"((?:[^A-Za-z0-9$€£¥(.]|\.(?!\d)){0,4})(" + _FIGURE + ")",
                              re.I)
         found = [(block_id, match) for block_id, block in document.blocks.items() for match in pattern.finditer(block.text)]
+        # A lone dash where last quarter's figure stood is this quarter's figure: none (Apollo's 3Q'23 pension group
+        # annuities); the number after it belongs to another column.
+        if not _LONE_DASH.search(_gap_before(quote, value_text)):
+            dashed = [(block_id, match) for block_id, match in found if _LONE_DASH.search(match.group(1))]
+            if dashed:
+                return "a dash stands where the figure was"
         if len(found) == 1:
             block_id, match = found[0]
             text = document.blocks[block_id].text
-            figure = match.group(1).strip()
-            end = match.start(1) + len(match.group(1).rstrip())
+            figure = match.group(2).strip()
+            end = match.start(2) + len(match.group(2).rstrip())
             return Locator(kpi=key, block=block_id, quote=text[match.start():end], value_text=figure), " ".join(words)
         why = "anchor phrase leads to several figures" if found else "anchor phrase not found"
     return why
