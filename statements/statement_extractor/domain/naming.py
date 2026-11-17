@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from ..sources.edgar import FiscalCalendarError, fiscal_label, fiscal_year_end_for
-from .calendar import _SAME, _gap, _mmdd, year_end_for
+from .calendar import _SAME, _YEAR, _gap, _mmdd, year_end_for
 from .periods import Period, label_period
 
 _SLACK = timedelta(days=10)  # a 52/53-week year ends up to a week either side of its usual day
@@ -41,7 +41,7 @@ class Naming:
         self.usual = usual
         self.annual_ends = sorted({end for end in annual_ends if end is not None})
         self.samples: list[tuple[date, str, bool]] = []
-        self.eras = _eras(self.annual_ends, usual)
+        self.eras, self.closing = _eras(self.annual_ends, usual)
         for sample in samples:
             self.add(sample)
 
@@ -56,7 +56,11 @@ class Naming:
         return Naming([*self.annual_ends, *ends], self.usual, self.samples)
 
     def year_end(self, end: date) -> str:
-        return year_end_for(end, self.annual_ends, self.usual)
+        """The year end of the annual report that closes the period's year; before the first one EDGAR holds, the
+        oldest era's (Oshkosh's quarters of 1992, before its first 10-K on EDGAR closed in September 1993)."""
+        if not any(0 <= (closing - end).days <= _YEAR for closing in self.closing):
+            return self.eras[self.era_of(end)].fiscal_year_end
+        return year_end_for(end, self.closing, self.usual)
 
     def era_of(self, end: date) -> int:
         for index, era in enumerate(self.eras):
@@ -126,9 +130,9 @@ class Naming:
                  "naming": era.naming, "learnt": era.learnt} for era in self.eras]
 
 
-def _eras(annual_ends: list[date], usual: str) -> list[Era]:
-    """Runs of annual reports closing on about the same day each year, oldest first; one report on another day between
-    two runs on one day is no era of its own."""
+def _eras(annual_ends: list[date], usual: str) -> tuple[list[Era], list[date]]:
+    """Runs of annual reports closing on about the same day each year, oldest first; one report on another day is no
+    era of its own unless it is the newest, a year end the company has just moved to."""
     runs: list[list[date]] = []
     for end in annual_ends:
         if runs and _gap(_mmdd(end), _mmdd(runs[-1][-1])) <= _SAME:
@@ -137,9 +141,8 @@ def _eras(annual_ends: list[date], usual: str) -> list[Era]:
             runs.append([end])
     merged: list[list[date]] = []
     for index, run in enumerate(runs):
-        lone = len(run) == 1 and 0 < index < len(runs) - 1 and _gap(_mmdd(runs[index - 1][-1]), _mmdd(runs[index + 1][0])) <= _SAME
-        if lone:
-            continue
+        if len(run) == 1 and index < len(runs) - 1:
+            continue  # only the newest year end may have closed one year yet (Alcon's 2003-03-18 on EDGAR is no era)
         if merged and _gap(_mmdd(merged[-1][-1]), _mmdd(run[0])) <= _SAME:
             merged[-1].extend(run)
         else:
@@ -147,7 +150,7 @@ def _eras(annual_ends: list[date], usual: str) -> list[Era]:
     eras = [Era(_mmdd(run[-1]), run[-1]) for run in merged]
     if not eras or _gap(eras[-1].fiscal_year_end, usual) > _SAME:
         eras.append(Era(usual, None))  # a year end the company has moved to and closed no year on yet
-    return eras
+    return eras, [end for run in merged for end in run]
 
 
 def name_readings(readings: list, naming: Naming) -> tuple[list, dict[str, int]]:

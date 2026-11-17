@@ -77,3 +77,19 @@ def test_a_lone_odd_year_end_is_no_era():
     naming = Naming(ends, "1231")
     assert len(naming.eras) == 1
     assert naming.label(Period(date(2012, 12, 31), date(2012, 1, 1)))[0] == ("2012", "FY", "year")
+
+
+def test_one_odd_annual_date_before_the_rest_is_no_era():
+    # Alcon: one report on EDGAR has 2003-03-18 for its period, before years closing every December 31.
+    ends = [date(2003, 3, 18)] + [date(year, 12, 31) for year in range(2003, 2008)]
+    naming = Naming(ends, "1231")
+    assert len(naming.eras) == 1
+    assert naming.label(Period(date(2002, 12, 31), date(2002, 1, 1)))[0] == ("2002", "FY", "year")
+
+
+def test_periods_before_the_first_annual_report_take_the_oldest_era():
+    # Oshkosh's first 10-K on EDGAR closes September 30, 1994; its first quarter of fiscal 1993 ended January 2, 1993.
+    ends = [date(1994, 9, 30), date(1995, 9, 30), date(2021, 9, 30), date(2022, 12, 31), date(2023, 12, 31)]
+    naming = Naming(ends, "1231")
+    assert naming.label(Period(date(1993, 1, 2), date(1992, 10, 4)))[0] == ("1993", "Q1", "quarter")
+    assert naming.label(Period(date(1993, 6, 30), date(1993, 4, 1)))[0] == ("1993", "Q3", "quarter")
