@@ -11,7 +11,7 @@ from datetime import date
 from typing import Callable, Iterable
 
 from ..rules.numbers import same_figure
-from .reasons import SHARED_CELL
+from .reasons import OFF_ROW, SHARED_CELL
 
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
 BREAKDOWN_TOLERANCE = 0.01
@@ -209,6 +209,32 @@ def _shared_cells(values: list) -> None:
             _flag((item for item in held if SHARED_CELL not in item.notes), SHARED_CELL)
 
 
+def _row_key(label: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", label.lower())
+
+
+def _off_row(values: list) -> None:
+    """A group whose lines are a table's columns (State Street's net flows by asset class: Equity, Fixed-Income, Cash
+    across one "Total flows, net" row) has each line read from that one row; a line read from another row is held
+    (Cash, read from the "Cash fund" row, the one row naming it). Only when at least two lines share a row that names
+    none of them: a group whose lines are rows has no shared row."""
+    by_group: dict[str, list] = {}
+    for item in values:
+        if item.locator.get("row_label"):
+            by_group.setdefault(item.group.key, []).append(item)
+    for items in by_group.values():
+        rows: dict[str, list] = {}
+        for item in items:
+            rows.setdefault(_row_key(str(item.locator["row_label"])), []).append(item)
+        shared, sharers = max(rows.items(), key=lambda pair: len(pair[1]))
+        columns = [item for item in sharers if shared and shared not in _row_key(item.kpi.label)
+                   and _row_key(item.kpi.label) not in shared]
+        if len(columns) < 2 or len(sharers) * 2 < len(items):
+            continue
+        _flag((item for item in items if _row_key(str(item.locator["row_label"])) != shared and OFF_ROW not in item.notes),
+              OFF_ROW)
+
+
 def validate_groups(values: list, previous: dict[str, float]) -> None:
     """Marks every value of a group that fails its check as needs_review, with the reason."""
     by_group: dict[str, list] = {}
@@ -218,6 +244,7 @@ def validate_groups(values: list, previous: dict[str, float]) -> None:
         for finding in findings(READING_CHECKS, reading_figures(items), previous=previous):
             _flag((figure.source for figure in finding.figures), finding.note)
     _shared_cells(values)
+    _off_row(values)
 
 
 def check_period(located, expected: date) -> str | None:

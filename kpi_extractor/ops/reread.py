@@ -51,6 +51,15 @@ def _audit_held(value: dict) -> bool:
             and has(value.get("notes"), *_AUDIT_HOLDS))
 
 
+# Holds the wave 3 audit set (2026-11-17, owner's "Fix and hold"): read again once PR 178's checks refuse what misread them.
+_WAVE3_HOLD = "held 2026-11-17 (wave 3 audit"
+
+
+def _wave3_held(value: dict) -> bool:
+    return (value.get("validation_status") == "needs_review" and not value.get("owner_decision")
+            and any(str(note).startswith(_WAVE3_HOLD) for note in value.get("notes") or []))
+
+
 def _unit_price_row(value: dict) -> bool:
     """A price whose row states its unit (Exxon's "Brent ($/b)") read with a scale or held, before such a row kept its
     units (2026-11-13: $74.35 was served as 0.000074); or a figure held for a place its section's title names."""
@@ -106,6 +115,8 @@ SELECTORS: dict[str, tuple[str, Callable[[dict], bool]]] = {
                     "counted as named (Coca-Cola's EMEA row reads Europe, Middle East & Africa)", _place_held),
     "audit-holds": ("figures the wave 2 audit held: two listed metrics read from one cell (Exxon's \"Worldwide\" rows), "
                     "a percent read from an amounts row (Wells Fargo's allowance coverage)", _audit_held),
+    "wave3-holds": ("figures the wave 3 audit held: Northern Trust's charge-off ratio, State Street's net flows and backlog, "
+                    "McDonald's 2016-18 segment lines", _wave3_held),
     "unit-price-rows": ("prices whose row states its unit (Exxon's \"Brent ($/b)\") read with a scale or held, and figures "
                         "held for a place their section's title names", _unit_price_row),
     "series-rescaled": ("figures put on their series' scale by code, read again at the scale their filing states",

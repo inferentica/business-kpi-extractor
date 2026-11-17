@@ -4,11 +4,12 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
-from ..quality.reasons import EXPLAINED, note_with
+from ..quality.reasons import EXPLAINED, SIGN_TURNED, note_with
 from .. import ai
 from ..ai import Spec
 from ..documents.image_pages import hold_single_reads
 from ..documents.document import Document, clean
+from ..rules.sign_convention import opposite_convention
 from ..quality.checks import check_period, date_order_findings, validate_groups
 from ..readers.extract import (_FOURTH_QUARTER, ReadValue, _stands_at_period_end, column_duration_problem, explanation_supports, falls,
                        forward_looking, net_gross_mismatch)
@@ -133,6 +134,18 @@ def release_reread_due(previous: dict | None) -> bool:
 
 
 
+
+def _turn_opposite_signs(read) -> None:
+    """A figure read from a row that states the line's sign convention the other way round (Northern Trust's 2019 "Net
+    Charge-offs / (Recoveries)", its "(0.01)" a net recovery, for the line "Net Recoveries (Charge-offs)") takes the
+    line's sign. Only where the figure still has the sign printed in its cell: a reading that turned it already stays."""
+    for item in read:
+        numbers = [n for n in item.locator.get("row_numbers") or [] if n is not None]
+        if (item.value and numbers and float(numbers[0]) * item.value > 0
+                and opposite_convention(str(item.locator.get("row_label") or ""), item.kpi.label)):
+            item.value = -item.value
+            item.notes.append(SIGN_TURNED)
+
 class ReleaseFlow:
     """Earnings documents in turn: which are read, by how many readers at once, and how their readings are stored."""
 
@@ -181,6 +194,7 @@ class ReleaseFlow:
                 read, dropped = _year_columns_only(read)
                 problems.extend(dropped)
                 read = year_figures(read)
+            _turn_opposite_signs(read)
             validate_groups(read, self._previous(period_end, annual=located.annual))
             self._mark_year_ago_agreement(read, document, period_end, annual=located.annual)
             hold_single_reads(read, document)  # a figure one OCR model alone read, until a check proves it
