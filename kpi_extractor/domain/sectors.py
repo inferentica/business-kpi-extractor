@@ -68,7 +68,7 @@ SECTORS = {
                                 "program or aircraft, shop visits, flight hours"),
     "industrial": Sector("industrial", "Industrials, construction and services",
                          "backlog (total, fixed, under master service agreements), orders and book-to-bill, units "
-                         "delivered or booked, organic growth by segment, customers or locations served"),
+                         "delivered or booked, customers or locations served"),
     "transport": Sector("transport", "Transport and travel",
                         "volumes (packages, shipments, room nights, passengers, trips), yield or revenue per unit, "
                         "gross bookings, average daily volume, load factor, fleet"),
