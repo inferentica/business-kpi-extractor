@@ -267,3 +267,20 @@ def other_period_problem(text: str, quote: str, before: str, kpi_label: str) -> 
         if not (level and _STOCK_KPI.search(kpi_label)):
             return f"the quote gives the figure {span.group(0).lower()!r}, not the quarter's"
     return None
+
+
+# A sentence that opens with an adjustment gives the adjusted figure: KeyCorp's Q4 2019 slides say "Excluding PAA, 4Q19
+# net interest income was $972 MM and net interest margin was 2.93%", while its reported margin was 2.98%. Only a clause
+# that opens the sentence and ends at a comma: State Street's "new bookings, excluding affiliates, of $5 million" states
+# its measure's own scope. A line whose name carries the adjustment is that figure.
+_OPENS_ADJUSTED = re.compile(r"^\W*(?:excluding|excl\.?|ex-|adjusted for|on an? (?:adjusted|non-gaap|operating|core|underlying) basis"
+                             r"|non-gaap|on a pro[- ]forma basis|pro[- ]forma)\b[^,.;]{0,80},", re.I)
+_ADJUSTED_LINE = re.compile(r"\bexcl|\bex-|adjusted|non-gaap|pro[- ]forma|\bcore\b|underlying|operating basis", re.I)
+
+
+def adjusted_problem(text: str, quote: str, kpi_label: str) -> str | None:
+    """Why a quoted figure is not the line's reported one: its sentence opens with an adjustment the line's name lacks."""
+    opening = f"{sentence_opening(text, quote)} {quote}".strip()
+    if (clause := _OPENS_ADJUSTED.match(opening)) and not _ADJUSTED_LINE.search(kpi_label):
+        return f"the sentence gives the figure {clause.group(0).rstrip(',').strip().lower()!r}, not the reported one"
+    return None
