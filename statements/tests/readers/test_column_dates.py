@@ -380,3 +380,20 @@ def test_slashed_dates_day_first_where_only_that_order_reads():
                        + head + rows + "</table>")[0]
     periods = column_periods("balance", [table], "1231", date(2009, 6, 30))
     assert sorted(p.end for p in periods.values()) == [date(2009, 3, 31), date(2009, 3, 31), date(2009, 6, 30), date(2009, 6, 30)]
+
+
+def test_years_named_for_the_fiscal_years_the_title_dates_close():
+    # Kroger's 10-K for fiscal 2018: "2018 | 2017 | 2016" under "Years Ended February 2, 2019, February 3, 2018 and
+    # January 28, 2017"; its fiscal years are named for the year they begin in.
+    html = ("<p>THE KROGER CO. CONSOLIDATED STATEMENTS OF OPERATIONS Years Ended February 2, 2019, February 3, 2018 and"
+            " January 28, 2017 (In millions)</p><table>" + row("", "2018", "2017", "2016")
+            + row("Sales", "121,162", "122,662", "115,337")
+            + row("Merchandise costs", "94,894", "95,662", "89,502")
+            + row("Earnings before income tax expense", "26,268", "27,000", "25,835")
+            + row("Income tax expense", "268", "100", "835")
+            + row("Net earnings", "26,000", "26,900", "25,000") + "</table>")
+    readings, _notes = read_document(html, accession="x", form="10-K", filed=date(2019, 4, 2), document_end=date(2019, 2, 2),
+                                     fiscal_year_end="0130", year_offset=-1)
+    income = sorted((r.period_end, r.fiscal_year, r.lines[0]["value"]) for r in readings if r.statement == "income")
+    assert income == [(date(2017, 1, 28), "2016", 115337.0e6), (date(2018, 2, 3), "2017", 122662.0e6),
+                      (date(2019, 2, 2), "2018", 121162.0e6)]

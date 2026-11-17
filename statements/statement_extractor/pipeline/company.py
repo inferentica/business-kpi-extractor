@@ -15,6 +15,7 @@ from ..checks.across import cash_against_balances
 from ..checks.arelle import arelle_summary, enabled as arelle_cache
 from ..domain.calendar import ANNUAL_FORMS
 from ..domain.line_fields import finish_lines
+from ..domain.naming import name_readings
 from ..domain.model import REGULATOR_SOURCES
 from ..quality.coverage import summarise
 from ..selection.choose import choose
@@ -61,27 +62,30 @@ def read_company(symbol: str, since: date, out: Path, log=print, previous: Path 
     def lap(name: str) -> None:
         clock["mark"] = _phase(phases, name, clock["mark"])
 
-    readings, filings, offset, year_ends = read_reports(symbol, reports, profile, units, summaries, log, lap)
+    readings, filings, naming, year_ends = read_reports(symbol, reports, profile, units, summaries, log, lap)
+    offset = naming.current_offset()
     mark = clock["mark"]
     if profile.foreign or any(ref.form in ("20-F", "40-F") for ref in reports):
-        records, found = read_releases(symbol, company, since, profile.fiscal_year_end, offset or 0, log, phases,
+        records, found = read_releases(symbol, company, since, profile.fiscal_year_end, naming, log, phases,
                                        predecessors, units)
         filings.extend(records)
         readings.extend(found)
         archived_summaries: list[dict] = []
         mark = _phase(phases, "releases", mark)
-        records, found = read_archives(symbol, profile.fiscal_year_end, offset or 0, log, archived_summaries)
+        records, found = read_archives(symbol, profile.fiscal_year_end, offset, log, archived_summaries)
         filings.extend(record for record in records if record["filed"] >= since.isoformat())  # the years on paper
         readings.extend(reading for reading in found if reading.filed >= since)
         summaries.extend(figure for figure in archived_summaries if figure["filed"] >= since.isoformat())
         mark = _phase(phases, "archives", mark)
-        regulator_reads, found = read_regulators(symbol, since, profile.fiscal_year_end, offset or 0, readings, log,
+        regulator_reads, found = read_regulators(symbol, since, profile.fiscal_year_end, offset, readings, log,
                                                  units)
         readings.extend(reading for reading in found if reading.filed >= since)
     mark = _phase(phases, "regulators", mark)
     printed_signs: dict[str, dict] = {}
-    readings.extend(printed_second_look(symbol, reports, filings, readings, year_ends, offset or 0, log,
+    readings.extend(printed_second_look(symbol, reports, filings, readings, year_ends, naming, log,
                                         printed_signs, units))
+    # Every period named by the era its own end falls in (domain/naming.py).
+    readings, left_out = name_readings(readings, naming)
     _release_bases(readings)
     settle_currencies(readings)  # pipeline/currencies.py
     finish_lines(readings)  # each line's unit, taxonomy, rounding and sign, its currency now known (domain/line_fields.py)
@@ -99,6 +103,7 @@ def read_company(symbol: str, since: date, out: Path, log=print, previous: Path 
     summary["summary_figures"] = summary_coverage(summary_figures, chosen)
     summary["regulator_reads"] = regulator_reads
     summary["phases"] = phases
+    summary["naming"] = {"eras": naming.describe(), "left_out": left_out}
     summary["incremental"] = units.finish()
     if arelle_cache():
         summary["arelle"] = arelle_summary(readings, filings, arelle_cache())

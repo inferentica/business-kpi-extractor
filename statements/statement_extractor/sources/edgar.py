@@ -7,7 +7,7 @@ Nothing here may import the KPI extractor's AI, readers or pipeline (tests/test_
 from __future__ import annotations
 
 
-from kpi_extractor.domain.fiscal import FiscalCalendarError, fiscal_label, learn_year_offset
+from kpi_extractor.domain.fiscal import FiscalCalendarError, fiscal_label, fiscal_year_end_for, learn_year_offset
 from kpi_extractor.sources.sec import (
     PERIODIC_FORMS,
     CompanyProfile,
@@ -21,5 +21,5 @@ from kpi_extractor.sources.sec import (
 
 __all__ = [
     "PERIODIC_FORMS", "CompanyProfile", "FilingRef", "FiscalCalendarError", "company_profile", "configure_identity",
-    "fiscal_label", "learn_year_offset", "load_submission", "period_of_report", "periodic_reports",
+    "fiscal_label", "fiscal_year_end_for", "learn_year_offset", "load_submission", "period_of_report", "periodic_reports",
 ]

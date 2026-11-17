@@ -37,10 +37,10 @@ def slashed_day_first(text: str) -> bool:
 def off_title(kind: str, end: date, dated_in_title: dict) -> bool:
     """A flow's figure-dated column whose end is not the title's for its year: Copel's Q1 2010 ITR prints "31/12/2009"
     over the first quarter of 2009 under "As of March 31, 2010 and March 31, 2009". Left out, never dated either way."""
-    named = dated_in_title.get(str(end.year))
+    named = next((dated for dated in dated_in_title.values() if int(dated[2]) == end.year), None)
     if kind == "balance" or named is None:
         return False
-    stated = _named_day(*named, end.year)
+    stated = _named_day(named[0], named[1], end.year)
     return stated is not None and stated != end
 
 

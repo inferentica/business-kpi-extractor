@@ -22678,6 +22678,50 @@
    "era": "release",
    "checked": "read by hand",
    "note": "s7-cvmeps 2026-11-17, review D2: the 6-K 0001292814-26-003969 prints it; served from CVM's ITR as 1,000 times it before s7-cvmeps"
+  },
+  {
+   "symbol": "KR",
+   "statement": "income",
+   "fiscal_year": "2015",
+   "fiscal_period": "FY",
+   "duration": "year",
+   "concept": "us-gaap_NetIncomeLoss",
+   "label": "Net earnings attributable to The Kroger Co.",
+   "value": 2039000000.0,
+   "scale": 1000000.0,
+   "source_accession": "0001558370-17-002198",
+   "era": "xbrl",
+   "checked": "printed row",
+   "note": "s7-yearnaming 2026-11-17, review D3, D4: fiscal 2015 closes on January 30, 2016 (\"2016 2015 2014\" under \"Years Ended January 28, 2017, January 30, 2016 and January 31, 2015\"); served fiscal 2016's 1,975 before."
+  },
+  {
+   "symbol": "RPM",
+   "statement": "income",
+   "fiscal_year": "2025",
+   "fiscal_period": "FY",
+   "duration": "year",
+   "concept": "us-gaap_NetIncomeLoss",
+   "label": "Net Income Attributable to RPM International Inc. Stockholders",
+   "value": 688688000.0,
+   "scale": 1000.0,
+   "source_accession": "0000950170-25-098313",
+   "era": "xbrl",
+   "checked": "printed row",
+   "note": "s7-yearnaming 2026-11-17, review D3, D4: the year ended May 31, 2025; labelled 2024 before, from the fiscal 2027 first-quarter 10-Q's DocumentFiscalYearFocus (2026)."
+  },
+  {
+   "symbol": "RPM",
+   "statement": "income",
+   "fiscal_year": "2008",
+   "fiscal_period": "FY",
+   "duration": "year",
+   "label": "^net sales$",
+   "value": 3643791000.0,
+   "scale": 1000.0,
+   "source_accession": "0000950152-08-005780",
+   "era": "html",
+   "checked": "read by hand",
+   "note": "s7-yearnaming 2026-11-17, review D3, D4: the year ended May 31, 2008 (EX-13: Consolidated $3,643,791 thousand); labelled 2007 before."
   }
  ]
 }

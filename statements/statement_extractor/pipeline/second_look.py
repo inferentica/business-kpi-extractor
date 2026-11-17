@@ -4,13 +4,15 @@ presentation (the printed sign decides, from the statement or any table of the f
 (pipeline/units.py); which filings need one is decided over all the company's readings every read."""
 from __future__ import annotations
 
+from datetime import date
+
 from ..selection.signs import sign_ties
 from ..sources.listing import filing_for
 from .printed import read_printed
 from .units import Units, readings_of, unit_id
 
 
-def printed_second_look(symbol, reports, filings, readings, year_ends: dict[str, str], year_offset: int, log,
+def printed_second_look(symbol, reports, filings, readings, year_ends: dict[str, str], naming, log,
                         printed_signs: dict, units: Units | None = None) -> list:
     failed = {reading.accession for reading in readings
               if reading.source == "xbrl" and reading.own and reading.status != "kept"}
@@ -23,6 +25,7 @@ def printed_second_look(symbol, reports, filings, readings, year_ends: dict[str,
         ref = by_accession.get(accession)
         if ref is None:
             continue
+        year_offset = naming.offset(_period_end(records.get(accession), ref))
         context = {"fiscal_year_end": year_ends[accession], "offset": year_offset, "signs": accession in ties}
         unit = units.reuse(unit_id("second", accession), context) if units is not None else None
         if unit is not None:
@@ -54,3 +57,12 @@ def printed_second_look(symbol, reports, filings, readings, year_ends: dict[str,
             found = readings_of(unit)
         found_all.extend(found)
     return found_all
+
+
+def _period_end(record: dict | None, ref):
+    """A report's own period, as EDGAR gives it, else its filing date: the era its year naming comes from."""
+    end = (record or {}).get("period_end")
+    try:
+        return date.fromisoformat(end[:10]) if end else ref.filed
+    except ValueError:
+        return ref.filed
