@@ -1790,6 +1790,14 @@ def test_a_worked_out_remainder_takes_the_name_the_reports_table_gives_it():
     regions = {line_key(name) for name in ("Americas", "Europe", "Asia Pacific")}
     assert _row_named(document, 9e6, regions) == "Hedging gains"
     assert _row_named(document, 10e6, regions) is None  # no row of that amount
+    # Any column: Alphabet's 10-Qs print the year-ago column first ("Google other revenues | 3,207 | 4,354", Q1 2018).
+    from kpi_extractor.documents.document import Document, Table
+    q1 = Document(source_url="https://www.sec.gov/goog10-q.htm")
+    q1.tables["T46"] = Table("T46", "(in millions)", [["", "2017", "2018"], ["Google properties", "$17,403", "$21,998"],
+                                                    ["Google Network Members' properties", "4,008", "4,644"],
+                                                    ["Google other revenues", "3,207", "4,354"], ["Other Bets revenues", "132", "150"]])
+    q1.order.append("T46")
+    assert _row_named(q1, 4_354e6, {"googleproperties", "googlenetworkmembersproperties"}) == "Google other revenues"
     assert _row_named(document, 9e6, {line_key("Americas"), line_key("Japan")}) is None  # not this breakdown's table
 
 

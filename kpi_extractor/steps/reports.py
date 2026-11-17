@@ -20,7 +20,8 @@ _AI_PENDING = "AI review unavailable; retried next run"
 INCOME_ORDER = 50
 
 def _row_named(document: Document, value: float, others: set[str]) -> str | None:
-    """The label of a table row whose first amount is `value`, in a table that lists at least two of `others`."""
+    """The label of a table row with `value` among its amounts, in a table that lists at least two of `others`. Any column:
+    Alphabet's 10-Qs print the year-ago column first ("Google other revenues | 3,207 | 4,354" for Q1 2018)."""
     for table in document.tables.values():
         scale = table.declared_scale() or document.default_scale()
         labels = [clean(row[0]) if row else "" for row in table.rows]
@@ -29,8 +30,8 @@ def _row_named(document: Document, value: float, others: set[str]) -> str | None
         for row, label in zip(table.rows, labels):
             if not label or line_key(label) in others:
                 continue
-            amount = next((parsed for cell in row[1:] if (parsed := parse_number(cell)) is not None), None)
-            if amount is not None and not amount.percent and abs(amount.value * scale - value) <= scale / 2:
+            amounts = [parsed for cell in row[1:] if (parsed := parse_number(cell)) is not None and not parsed.percent]
+            if any(abs(amount.value * scale - value) <= scale / 2 for amount in amounts):
                 return label
     return None
 
