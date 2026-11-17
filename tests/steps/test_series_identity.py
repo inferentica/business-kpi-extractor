@@ -34,3 +34,16 @@ def test_the_owners_name_wins_and_ai_groups_keep_their_own():
     ai = {**value("kpi_products", "iphone", "iPhone units", "2024-12-28"), "method": "ai"}
     renamed = run([xbrl, ai], names={"products": {"label": "Products", "members": {"iphone": "iPhone sales"}}})._harmonize_labels()
     assert [(v["group_key"], v["group_label"], v["kpi_label"]) for v in renamed] == [("products", "Products", "iPhone sales")]
+
+
+def test_a_key_the_series_once_continued_joins_it_again():
+    # Alphabet: "googleotherrevenues" was continued as "googlesubscriptionsplatformsanddevices" in 2018 Q2; Q1 2018's
+    # "Google other revenues", worked out from the Google segment, has no element or prior to link it.
+    q1 = {**value("products", "googleotherrevenues", "Google other revenues", "2018-03-31", year="2018"), "value": 4_354e6}
+    q2 = {**value("products", "googlesubscriptionsplatformsanddevices", "Google subscriptions, platforms, and devices",
+                  "2018-06-30", year="2018", period="Q2"), "value": 4_425e6}
+    q2_old = {**q2, "kpi_key": "googleotherrevenues", "validation_status": "rejected",
+              "notes": ["continued as googlesubscriptionsplatformsanddevices"]}
+    written = run([q1, q2, q2_old])._unify_series()
+    assert [(v["kpi_key"], v["fiscal_period"], v["validation_status"]) for v in written] == [
+        ("googlesubscriptionsplatformsanddevices", "Q1", "verified"), ("googleotherrevenues", "Q1", "rejected")]
