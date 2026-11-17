@@ -77,3 +77,12 @@ def test_a_picked_tag_must_give_a_figure_a_release_states():
     assert TaggedKpiReading._unconfirmed(tag, {("2022", "Q1"): 93e6}, quarters, kfacts)
     assert not TaggedKpiReading._unconfirmed(tag, {}, quarters, kfacts)  # no release states it (Alphabet's backlog)
     assert not TaggedKpiReading._unconfirmed(tag, {("2025", "Q3"): 2.11e9}, quarters, kfacts)
+
+
+def test_the_wave3_holds_are_picked_for_a_re_read():
+    from kpi_extractor.ops.reread import picked_filings
+    held = {"validation_status": "needs_review", "source_accession": "a",
+            "notes": ["held 2026-11-17 (wave 3 audit, owner's Allow): re-read after the fix"]}
+    decided = {**held, "source_accession": "b", "owner_decision": "confirmed"}
+    other = {"validation_status": "needs_review", "source_accession": "c", "notes": ["scale not stated in the document"]}
+    assert picked_filings("wave3-holds", {1: held, 2: decided, 3: other}) == {"a"}
