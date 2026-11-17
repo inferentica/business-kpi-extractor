@@ -127,3 +127,17 @@ def test_a_hand_entered_figure_does_not_hide_where_the_kpi_was_read():
                            "period_end": "2026-12-31", "method": "ai", "validation_status": "verified", "value": 2.0, "locator": None}])
     end, locator = pipeline._placed_history()["fees.advisory"]
     assert end == "2026-12-31" and locator["table"] == "A_T60"
+
+
+def test_a_line_is_stopped_only_for_quarters_after_it_was_last_reported():
+    from datetime import date as day
+    spec = Spec.model_validate({"groups": [{"key": "fees", "label": "Fees", "kind": "revenue_breakdown", "kpis": [
+        {"key": "advisory", "label": "Advisory", "unit": "currency"}, {"key": "treasury", "label": "Treasury Services", "unit": "currency"}]}]})
+    pipeline = run([("advisory", "Advisory")])
+    pipeline.store.write([{"symbol": "GS", "group_key": "kpi_fees", "kpi_key": "treasury", "fiscal_year": "2019", "fiscal_period": "Q4",
+                           "period_end": "2019-12-31", "method": "ai", "validation_status": "verified", "value": 1.0,
+                           "locator": {"table": "A_T60", "row": 2, "col": 1, "row_label": "Treasury Services"}}])
+    pipeline._local.period = day(2026, 9, 30)
+    assert pipeline._stopped_keys(spec) == {"fees.treasury"}
+    pipeline._local.period = day(2019, 6, 30)  # a backfill of 2019: still reported then
+    assert pipeline._stopped_keys(spec) == set()
