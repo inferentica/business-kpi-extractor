@@ -79,3 +79,8 @@ def test_the_lists_summary_line_names_both_measures():
     assert _line("Held out", scored) == ("Held out: 2 companies, recall 60.0% of 10 lines still reported (5 named, 1 from XBRL; "
                                          "2 history apart), precision 90.0% (9/10)")
     assert _line("Held out", {"companies": 0}) == "Held out: no companies"
+
+
+def test_nanometer_nodes_match_however_written():
+    from kpi_extractor.evals.list_score import match_one_to_one
+    assert match_one_to_one(["7nm", "16nm", "2nm"], ["2-nanometer", "7 nanometer", "16-nanometer"]) == {0: 1, 1: 2, 2: 0}
