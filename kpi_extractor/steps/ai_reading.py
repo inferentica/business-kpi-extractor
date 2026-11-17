@@ -169,6 +169,7 @@ class AiReading:
         earlier = self._earlier_values(expected)
         last = self._last_locators(expected, _source_template(document.source_url))
         stored = self._stored_year_ago(expected)
+        last_quarter = self._stored_last_quarter(expected)
         confirmed = set()
         for group in spec.groups:
             items = [item for item in read if item.group.key == group.key]
@@ -193,6 +194,7 @@ class AiReading:
             new = {item.kpi.key for item in parts if whole and any(i.is_total for i in items) and f"{group.key}.{item.kpi.key}" not in listed}
             if all(item.kpi.key in new or self._same_place_as_last(item, expected, document, before := stored.get(f"{group.key}.{item.kpi.key}"))
                    or self._year_ago_cell_matches(item, document, before) or self._later_column_matches(item, expected, document)
+                   or self._last_quarter_cell_matches(item, document, expected, last_quarter.get(f"{group.key}.{item.kpi.key}"))
                    for item in parts) and len(new) < len(parts):
                 confirmed.add(group.key)
             elif self._adds_up_to_xbrl(group, parts, expected, items):

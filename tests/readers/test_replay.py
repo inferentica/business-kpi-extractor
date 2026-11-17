@@ -1141,3 +1141,21 @@ def test_a_figure_the_filing_states_for_two_quarters_alike_is_not_a_stale_column
     assert repeated_in_quarter_columns(doc, at(1), 3.3e6, date(2024, 9, 30), 3)
     assert not repeated_in_quarter_columns(doc, at(2), 3.3e6, date(2024, 9, 30), 3)  # last quarter's column read for this one
     assert not repeated_in_quarter_columns(doc, at(5), 2.9e6, date(2024, 9, 30), 3)  # the year-ago quarter's
+
+
+def test_last_quarters_column_holding_its_stored_figure_confirms_this_quarters():
+    # Truist 2Q24: card and payment related fees 230 beside 1Q24's 224, the figure stored for 1Q24; no 2Q23 figure stored.
+    from datetime import date
+    from kpi_extractor.documents.document import Document, Table
+    from kpi_extractor.steps.shared import previous_quarter_cell_matches
+    doc = Document(source_url="https://www.sec.gov/s.htm")
+    doc.tables["A_T7"] = Table("A_T7", "", [["", "Noninterest Income", "", "", ""], ["", "Quarter Ended", "", "", "Change"],
+                                            ["(Dollars in millions)", "2Q24", "1Q24", "2Q23", "Link"],
+                                            ["Wealth management income", "$ 362", "$ 364", "$ 350", "(2)"],
+                                            ["Card and payment related fees", "230", "224", "236", "6"]])
+    doc.order.append("A_T7")
+    at = lambda col: {"table": "A_T7", "row": 4, "col": col}
+    assert previous_quarter_cell_matches(doc, at(1), 230e6, 224e6, date(2024, 6, 30), 2)
+    assert not previous_quarter_cell_matches(doc, at(1), 230e6, 225e6, date(2024, 6, 30), 2)  # another stored figure
+    assert not previous_quarter_cell_matches(doc, at(2), 224e6, 224e6, date(2024, 6, 30), 2)  # last quarter's column read
+    assert not previous_quarter_cell_matches(doc, at(1), 230e6, None, date(2024, 6, 30), 2)

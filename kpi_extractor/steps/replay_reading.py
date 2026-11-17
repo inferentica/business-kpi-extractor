@@ -27,7 +27,7 @@ from ..readers.replay import (LABEL_CUT, AmbiguousQuote, _same_place, _source_te
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, states_one_period, validate_groups
 from ..readers.trace import placed_elsewhere, trace_replay
-from .shared import (repeated_in_quarter_columns, AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same,
+from .shared import (previous_quarter_cell_matches, repeated_in_quarter_columns, AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same,
                      _same_chain, _year_ago_cells)
 
 REPLAYED = "replayed"
@@ -356,6 +356,21 @@ class ReplayReading:
                                    if locator.get("row_label") for label_key in (sideless_key, member_key)}
                 located.tables, located.values = [table], []
         return self._checked(document, part, located, expected, currency, annual=annual)
+
+    def _stored_last_quarter(self, expected: date) -> dict[str, float]:
+        """Each KPI's verified figure for the quarter before ("group.kpi" → value)."""
+        target = (expected - timedelta(days=91)).isoformat()
+        return {f"{v['group_key'].removeprefix(AI_GROUP_PREFIX)}.{v['kpi_key']}": float(v["value"])
+                for v in self.values.values() if v["validation_status"] == "verified" and v["method"] in ("ai", "derived")
+                and v["fiscal_period"] != "FY" and abs(_days(v["period_end"], target)) <= 12}
+
+    def _last_quarter_cell_matches(self, item: ReadValue, document: Document, expected: date, previous: float | None) -> bool:
+        """The reading's row shows last quarter's stored figure in last quarter's column (shared.previous_quarter_cell_matches)."""
+        profile = getattr(self, "profile", None)
+        if profile is None or previous is None:
+            return False
+        _year, period = fiscal_label(expected, profile.fiscal_year_end, year_offset=getattr(self, "offset", 0))
+        return period.startswith("Q") and previous_quarter_cell_matches(document, item.locator, item.value, previous, expected, int(period[1]))
 
     def _stored_year_ago(self, expected: date) -> dict[str, float]:
         """Each KPI's verified figure for the same quarter one year earlier ("group.kpi" → value)."""
