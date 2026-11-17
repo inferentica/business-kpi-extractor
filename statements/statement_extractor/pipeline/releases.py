@@ -21,18 +21,21 @@ from .printed import read_printed
 from .units import Units, readings_of, record_of, unit_id
 
 
-def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_offset: int, log=print,
+def read_releases(symbol: str, company, since: date, fiscal_year_end: str, naming, log=print,
                   phases: dict | None = None, predecessors: list = (), units: Units | None = None):
     """(filing records, readings) of every release since `since`; with `units`, one read before in the same context
-    (its quarter, the company's year end and year naming) is taken as it was (pipeline/units.py)."""
+    (its quarter, the year end and year naming of its era) is taken as it was (pipeline/units.py). Each release is read
+    on its quarter's era (domain/naming.py): Gildan's releases before 2015 close their years in October."""
     records, readings = [], []
     refs = list_releases(company, since, lambda day: quarter_end_before(day, fiscal_year_end), predecessors)
     folder = os.environ.get("STATEMENTS_ARCHIVE_CACHE")
     known, empty = remembered(folder), set()
     log(f"{symbol}: {len(refs)} 6-Ks in the release window, {len(known & {ref.accession for ref in refs})} remembered empty")
     stored = {}
+    eras = {ref.accession: (naming.year_end(ref.period_end), naming.offset(ref.period_end)) for ref in refs}
     for ref in refs:
-        context = {"fiscal_year_end": fiscal_year_end, "offset": year_offset, "quarter_end": ref.period_end.isoformat()}
+        context = {"fiscal_year_end": eras[ref.accession][0], "offset": eras[ref.accession][1],
+                   "quarter_end": ref.period_end.isoformat()}
         # A unit first, remembered empty or not: what the runner's cache remembers differs from run to run.
         unit = units.reuse(unit_id("release", ref.accession), context) if units is not None else None
         stored[ref.accession] = (unit, context)
@@ -41,6 +44,7 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
     for ref in ahead(refs, lambda ref: None if ref.accession in known or (stored.get(ref.accession) or (None,))[0]
                      else load_submission(ref.filing)):
         unit, context = stored.get(ref.accession, (None, None))
+        year_end, year_offset = eras[ref.accession]
         if unit is not None:
             records.append(record_of(unit))
             readings.extend(readings_of(unit))
@@ -50,7 +54,7 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
             continue
         record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
                   "accepted": ref.accepted,
-                  "release_quarter": _quarter(ref.period_end, fiscal_year_end, year_offset), "period_end": ref.period_end.isoformat()}
+                  "release_quarter": _quarter(ref.period_end, year_end, year_offset), "period_end": ref.period_end.isoformat()}
         if ref.accession in known:  # names no statement (pipeline/empty_releases.py): not fetched again
             empty.add(ref.accession)
             records.append(_kept(units, ref, context, {
@@ -61,12 +65,12 @@ def read_releases(symbol: str, company, since: date, fiscal_year_end: str, year_
             with_network_retries(lambda: load_submission(ref.filing))
             titled: set = set()
             began = time.time()
-            found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=ref.period_end, titled=titled)
+            found, notes, kinds = read_printed(ref, year_end, year_offset, document_end=ref.period_end, titled=titled)
             latest = own_quarter(found, ref.period_end)
             if latest is not None:
                 ref.period_end, titled = latest, set()
-                found, notes, kinds = read_printed(ref, fiscal_year_end, year_offset, document_end=latest, titled=titled)
-                record.update({"release_quarter": _quarter(latest, fiscal_year_end, year_offset), "period_end": latest.isoformat()})
+                found, notes, kinds = read_printed(ref, year_end, year_offset, document_end=latest, titled=titled)
+                record.update({"release_quarter": _quarter(latest, year_end, year_offset), "period_end": latest.isoformat()})
             if phases is not None:  # reading, apart from waiting for the download (pipeline/company.py's phases)
                 phases["releases read"] = round(phases.get("releases read", 0.0) + time.time() - began, 1)
             if not found and not titled and not names_a_statement(ref.filing.attachments) and not any(

@@ -153,7 +153,8 @@ def read_summaries(tables: list[Table], *, accession: str, form: str, filed: dat
             seen.add(name)
             for year, value in values.items():
                 month, day = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
-                end = date(int(year), month, min(day, calendar.monthrange(int(year), month)[1]))
+                closes = int(year) - year_offset  # a year named for the fiscal year it closes (Kroger's 2015 ends in 2016)
+                end = date(closes, month, min(day, calendar.monthrange(closes, month)[1]))
                 labelled = label_period(Period(end, end - timedelta(days=363)), fiscal_year_end, year_offset)
                 if labelled is None or labelled[1] != "FY":
                     continue

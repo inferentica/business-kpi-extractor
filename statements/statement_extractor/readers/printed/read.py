@@ -63,7 +63,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
                                  -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
     read_periods: dict[tuple, set] = {}  # by kind and scope: Copel prints the parent's quarter, then the group's
     for kind, group in found:
-        periods = without_repeats(group[0], split_by_sign(group[0], column_periods(kind, group, fiscal_year_end, document_end)))
+        periods = without_repeats(group[0], split_by_sign(group[0], column_periods(kind, group, fiscal_year_end, document_end, year_offset)))
         notes.extend(titled_notes(kind, periods, document_end, fiscal_year_end, year_offset))
         # Another company's statement the filing carries has periods of its own (Heineken's in FEMSA's 20-Fs, its
         # fuller balance sheet read first; Coca-Cola FEMSA's release in FEMSA's, round 84): it never takes the company's.
@@ -99,7 +99,7 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             continue
         layout = [(group[0], dated)]
         for table in group[1:]:
-            own = column_periods(kind, [table], fiscal_year_end, document_end)
+            own = column_periods(kind, [table], fiscal_year_end, document_end, year_offset)
             columns = sorted(own) if own else [c for c in figure_columns(table)][:len(dated)]
             # A page split as the first was, by the signs its title defined there: FEMSA's continued cash flows head
             # "2010" over the dollars and the pesos again, with no sign beside them (round 81).

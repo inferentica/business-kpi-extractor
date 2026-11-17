@@ -7,7 +7,9 @@ import re
 from datetime import date, timedelta
 
 from ...domain.periods import Period
+from ...sources.edgar import fiscal_year_end_for
 from .find import TITLE_PATTERNS
+from .named_years import QUARTER_NAME as _QUARTER_NAME, QUARTERLY as _QUARTERLY, named_quarter as _named_quarter, title_dates
 from .ranges import (dates_in_order, spans_over, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric,
                      own_month, paired_spans, counted_start, slashed_day_first, off_title, YEAR_TO_DATE)
 from .tables import Table, figure_columns, header_text
@@ -30,7 +32,6 @@ def month_first(text: str) -> str:
     return _MONTH_YEAR_NOTE.sub(lambda m: f"{m.group(1)} {m.group(2)}", text)
 
 
-_FULL_DATE = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}}),?\s+((?:19|20)\d{{2}})\b", re.I)
 _MONTH_YEAR = re.compile(rf"\b({_MONTH})(?:-|\s*['’])(\d{{2}})\b", re.I)  # "Sep-99"; América Móvil's "Dec '09"
 
 
@@ -85,32 +86,12 @@ def _date(month: str, day: str, year: str) -> date | None:
     return date(int(year), number, min(int(day), calendar.monthrange(int(year), number)[1]))
 
 
-# A quarter by name and year: TSMC's "Q3 2007", "3Q 2007", "1Q08", "Third Quarter 2007", Petrobras's "3Q-2016", Copel's "2nd Q 2003", "4th Q.2003".
-_QUARTER_NAME = re.compile(r"\b(?:Q([1-4])|([1-4])(?:(?:st|nd|rd|th)\s*(?:Q\b|quarter)|Q)|(first|second|third|fourth)\s+quarter)(?:\s+of)?\s*[,.'\-/]?\s*((?:19|20)\d{2}|\d{2})\b", re.I)
-_QUARTERLY = re.compile(r"quarter|\b[1-4](?:st|nd|rd|th)?\s*Q\b|\bQ[1-4]\b", re.I)  # a quarter's column, never a year to date
-_ORDINAL = {"first": 1, "second": 2, "third": 3, "fourth": 4}
-
-
-def _named_quarter(text: str, fiscal_year_end: str) -> date | None:
-    """The end of the fiscal quarter a header names, in the fiscal year it names (the year its fourth quarter ends)."""
-    match = _QUARTER_NAME.search(text)
-    if match is None:
-        return None
-    number = int(match.group(1) or match.group(2) or _ORDINAL[match.group(3).lower()])
-    year = int(match.group(4))
-    year += 2000 if year < 50 else 1900 if year < 100 else 0
-    month, day = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
-    back = month - 3 * (4 - number)
-    end_year, end_month = (year, back) if back > 0 else (year - 1, back + 12)
-    last = calendar.monthrange(end_year, end_month)[1]
-    return date(end_year, end_month, last if day >= 28 else min(day, last))
-
-
 def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
-                   document_end: date | None = None) -> dict[tuple[int, ...], Period]:
+                   document_end: date | None = None, year_offset: int = 0) -> dict[tuple[int, ...], Period]:
     """Each figure column's period, from the header above it and the statement's title. A column printed with a year
     only ("2002 | 2001" under "Third Quarter") ends on the filing's own period date in that year when it spans less than
-    a year (JPM's 2002 10-Qs), and on the fiscal year end otherwise."""
+    a year (JPM's 2002 10-Qs), and on the fiscal year end otherwise: the end of the fiscal year the company names so
+    (year_offset, Kroger's "2016" closes on January 28, 2017)."""
     first = group[0]
     header_all = month_first(" ".join(" ".join(cell.text for cell in cells) for cells in first.header))
     context = month_first(first.context[-300:])
@@ -147,7 +128,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
     own_named = [[m.group(0).lower() for m in _MONTH_DAY.finditer(aboves[column])] for column in columns]
     in_order_days = len(header_days) == len(columns) >= 2 and len(set(named)) == len(named) and all(
         not own or own == named or named[index] in own for index, own in enumerate(own_named))
-    dated_in_title = {match.group(3): (match.group(1), match.group(2)) for match in _FULL_DATE.finditer(title + " " + header_all)}
+    over = {year for column in columns for year in ([in_order[column]] if column in in_order else _YEAR.findall(aboves[column]))}
+    dated_in_title = title_dates(title + " " + header_all, fiscal_year_end, year_offset, over)
     ranged: set = set()
     # Bare years as the release's own year to date only where they are its year and the one before: "2007 | 2008 |
     # 2009" in CSN's 6-K of December 2010 are years (round 61).
@@ -171,7 +153,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             end = date(year, month, calendar.monthrange(year, month)[1])
             periods[column] = Period(end) if kind == "balance" else Period(end, counted_start(end, 91))
             continue
-        named = _named_quarter(above, fiscal_year_end)
+        named = _named_quarter(above, fiscal_year_end, year_offset)
         quarter_name = _QUARTER_NAME.search(above)  # a column's own year after a title's: "(Fourth Quarter 2011) 2010" (CCU)
         own_year = [int(year) for year in _YEAR.findall(above[quarter_name.end():])] if quarter_name and named else []
         printed = int(quarter_name.group(4)) % 100 if own_year else None
@@ -237,8 +219,8 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             except ValueError:
                 end = None
         elif day is not None and not _MONTH_DAY.search(above) and year in dated_in_title and own_month(above) in (
-                None, _date(dated_in_title[year][0], "1", year).month):  # FEMSA: "December 2011" under "… January 1, 2011"
-            end = _date(*dated_in_title[year], year)  # "June 29, 2014 and June 30, 2013": each year's own date (ASML)
+                None, _date(dated_in_title[year][0], "1", dated_in_title[year][2]).month):  # FEMSA: "December 2011" under "… January 1, 2011"
+            end = _date(*dated_in_title[year])  # "June 29, 2014 and June 30, 2013": each year's own date (ASML)
         elif day is not None:
             end = _date(day.group(1), day.group(2), year)
             month_named = re.search(rf"\b({_MONTH})\s+(?:19|20)\d{{2}}\b", above, re.I)
@@ -250,13 +232,15 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
                 titled_day = next((int(match.group(2)) for match in [*_MONTH_DAY.finditer(header_all), *in_title]
                                    if _date(match.group(1), "1", year).month == month), None)
                 end = date(int(year), month, titled_day or calendar.monthrange(int(year), month)[1])
-        elif document_end is not None and (days < 350 and kind != "balance" or kind == "balance" and int(year) == document_end.year
+        elif document_end is not None and (days < 350 and kind != "balance" or kind == "balance" and (int(year) == document_end.year or (
+                                               year_offset and int(year) - year_offset == fiscal_year_end_for(document_end, fiscal_year_end).year))
                                            or kind != "balance" and span is None and releases_years and not _QUARTERLY.search(above)
                                            and not _near_year_end(document_end, fiscal_year_end)):
             end = date(int(year), document_end.month, min(document_end.day, calendar.monthrange(int(year), document_end.month)[1]))
         else:
             month, day_of = int(fiscal_year_end[:2]), int(fiscal_year_end[2:])
-            end = date(int(year), month, min(day_of, calendar.monthrange(int(year), month)[1]))
+            closes = int(year) - year_offset  # the year the fiscal year named so closes in
+            end = date(closes, month, min(day_of, calendar.monthrange(closes, month)[1]))
         if end is None or numeric is not None and off_title(kind, end, dated_in_title):
             continue
         if kind == "balance":

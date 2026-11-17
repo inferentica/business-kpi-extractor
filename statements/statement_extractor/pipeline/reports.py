@@ -13,7 +13,8 @@ from ..domain.periods import Period, label_period
 from ..quality.coverage import own_period
 from ..readers.xbrl.read import read_filing
 from ..readers.xbrl.taxonomy import tag_taxonomies, taxonomy_versions
-from ..sources.edgar import learn_year_offset, load_submission, period_of_report
+from ..domain.naming import Naming
+from ..sources.edgar import load_submission, period_of_report
 from ..sources.retry import with_network_retries
 from .prefetch import load_all
 from .printed import read_printed
@@ -21,7 +22,8 @@ from .units import Units, readings_of, record_of, unit_id
 
 
 def read_reports(symbol: str, reports: list, profile, units: Units, summaries: list, log=print, mark=None):
-    """(readings, filing records, year offset, each report's fiscal year end) of the reports, newest first."""
+    """(readings, filing records, the year naming (domain/naming.py), each report's fiscal year end) of the reports,
+    newest first."""
     # Every report's period comes from its submission, so those not read before are downloaded first, four at a time
     # (pipeline/prefetch.py); each is held on its filing until read, as it was when they came one by one.
     period_ends = {ref.accession: units.stored_extra(unit_id("report", ref.accession), "period_end") for ref in reports}
@@ -36,22 +38,24 @@ def read_reports(symbol: str, reports: list, profile, units: Units, summaries: l
     annual_ends = [end for ref in reports if ref.form in ANNUAL_FORMS and (end := ends[ref.accession]) is not None]
     year_ends = {ref.accession: year_end_for(ends[ref.accession], annual_ends, profile.fiscal_year_end) for ref in reports}
     arelle = Checks(cache) if (cache := arelle_cache()) else None
-    offset, slots = None, []
+    # The company's year naming, era by era (domain/naming.py): from the fiscal years its XBRL filings state, those
+    # read before first, then each as it is read.
+    stated = [(ref, units.stored_extra(unit_id("report", ref.accession), "entity")) for ref in reports]
+    naming = Naming(annual_ends, profile.fiscal_year_end,
+                    [_sample(entity, ref.form) for ref, entity in stated if entity])
+    slots = []
     for ref in reports:
         id = unit_id("report", ref.accession)
-        # The year naming a full read would read it with: the one learnt so far, or the one this filing states when
-        # none is yet (a full read learns it from the newest XBRL filing stating one).
-        entity, expected = units.stored_extra(id, "entity"), offset
-        if expected is None and entity:
-            expected = learn_year_offset([(date.fromisoformat(entity[0]), entity[1], False)], profile.fiscal_year_end)
-        unit = units.reuse(id, _context(year_ends[ref.accession], expected, ref, arelle))
+        offset = naming.offset(ends[ref.accession] or ref.filed)
+        unit = units.reuse(id, _context(year_ends[ref.accession], offset, ref, arelle))
         if unit is not None:
-            offset = expected if entity else offset
             year_ends[ref.accession] = unit["extra"].get("fiscal_year_end", year_ends[ref.accession])
             slots.append(unit)
             ref.filing = None
             continue
-        slot, offset = _read(symbol, ref, year_ends, ends[ref.accession], offset, profile, arelle, summaries, log)
+        slot = _read(symbol, ref, year_ends, ends[ref.accession], offset, profile, arelle, summaries, log)
+        if slot["facts"].get("entity"):
+            naming.add(_sample(slot["facts"]["entity"], ref.form))
         slots.append(slot)
     if mark:
         mark("reports read")
@@ -66,15 +70,23 @@ def read_reports(symbol: str, reports: list, profile, units: Units, summaries: l
         readings.extend(readings_of(unit))
         filings.append(record_of(unit))
         summaries.extend(unit["extra"].get("summaries", []))
-    return readings, filings, offset, year_ends
+    # Printed annual reports EDGAR gives no period for close their eras too (Gildan's 40-Fs to 2013).
+    naming = naming.with_ends(reading.period_end for reading in readings
+                              if reading.own and reading.form in ANNUAL_FORMS and reading.duration == "year")
+    return readings, filings, naming, year_ends
+
+
+def _sample(entity: list, form: str) -> tuple[date, str, bool]:
+    """(period end, fiscal year stated, annual) from a filing's DocumentPeriodEndDate and DocumentFiscalYearFocus."""
+    return date.fromisoformat(entity[0]), str(entity[1]), form in ANNUAL_FORMS
 
 
 def _context(fiscal_year_end: str, offset: int | None, ref, arelle) -> dict:
-    return {"fiscal_year_end": fiscal_year_end, "offset": offset or 0, "form": ref.form, "arelle": bool(arelle)}
+    return {"fiscal_year_end": fiscal_year_end, "offset": offset, "form": ref.form, "arelle": bool(arelle)}
 
 
-def _read(symbol, ref, year_ends: dict, period_end, offset, profile, arelle, summaries: list, log) -> tuple[dict, int | None]:
-    """One report read from EDGAR: (its pending unit, the year offset after it)."""
+def _read(symbol, ref, year_ends: dict, period_end, offset: int, profile, arelle, summaries: list, log) -> dict:
+    """One report read from EDGAR: its pending unit."""
     fiscal_year_end = year_ends[ref.accession]
     context = _context(fiscal_year_end, offset, ref, arelle)
     record = {"accession": ref.accession, "form": ref.form, "filed": ref.filed.isoformat(), "xbrl": False,
@@ -89,19 +101,19 @@ def _read(symbol, ref, year_ends: dict, period_end, offset, profile, arelle, sum
         if ref.form == "6-K":
             xbrl = None  # EDGAR's flag without an instance (2016-17); the release reader reads its pages
         else:
-            return _close(pending, summaries), offset
+            return _close(pending, summaries)
     if xbrl is None and ref.form == "6-K":
         record.setdefault("note", "no XBRL")
         ref.filing = None
-        return _close(pending, summaries), offset
+        return _close(pending, summaries)
     if xbrl is None:
-        found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0, summaries=summaries)
+        found, notes, kinds = read_printed(ref, fiscal_year_end, offset, summaries=summaries)
         printed_end = _printed_year_end(notes, ref) if ref.form in ANNUAL_FORMS and period_end is None else None
         if printed_end and printed_end != fiscal_year_end:
             # No period on EDGAR and its years off the company's calendar: its own year end (Gildan's 40-Fs to
             # 2013 close in late September, before its move to calendar years).
             fiscal_year_end = year_ends[ref.accession] = printed_end
-            found, notes, kinds = read_printed(ref, fiscal_year_end, offset or 0, summaries=summaries)
+            found, notes, kinds = read_printed(ref, fiscal_year_end, offset, summaries=summaries)
         own = [reading for reading in found if reading.own]
         record.update({"note": "no XBRL", "printed": kinds, "columns": len(found), "notes": notes,
                        "own": sorted({(reading.statement, reading.duration, reading.status) for reading in own}),
@@ -109,7 +121,7 @@ def _read(symbol, ref, year_ends: dict, period_end, offset, profile, arelle, sum
         if not own and ref.form in ANNUAL_FORMS and period_end is not None:
             # An annual report whose statements came elsewhere (Brookfield's FY2010 40-F holds its annual
             # information form; the statements came on 6-K): its year, so another filing's statements count.
-            labelled = label_period(Period(period_end), fiscal_year_end, offset or 0)
+            labelled = label_period(Period(period_end), fiscal_year_end, offset)
             if labelled:
                 record.update({"fiscal_year": labelled[0], "fiscal_period": "FY"})
         pending.update(found=found, extra={"fiscal_year_end": fiscal_year_end})
@@ -117,18 +129,13 @@ def _read(symbol, ref, year_ends: dict, period_end, offset, profile, arelle, sum
             f"own {[f'{s}/{d}:{st}' for s, d, st in record['own']]}")
         ref.filing = None
         gc.collect()
-        return _close(pending, summaries), offset
+        return _close(pending, summaries)
     entity = xbrl.entity_info or {}
     end, year = entity.get("document_period_end_date"), entity.get("fiscal_year")
     if end and year:
         pending["facts"]["entity"] = [str(end)[:10], str(year)]
-    if offset is None and end and year:
-        # The company's own fiscal-year naming, from its newest filing that states it (NVIDIA's FY2027 ends in
-        # January 2027).
-        offset = learn_year_offset([(date.fromisoformat(str(end)[:10]), str(year), False)], profile.fiscal_year_end)
-        context["offset"] = offset or 0
     found, notes = read_filing(xbrl, accession=ref.accession, form=ref.form, filed=ref.filed,
-                               fiscal_year_end=fiscal_year_end, year_offset=offset or 0)
+                               fiscal_year_end=fiscal_year_end, year_offset=offset)
     own = [reading for reading in found if reading.own]
     record.update({"xbrl": True, "period_end": str(entity.get("document_period_end_date"))[:10],
                    **own_period(own, ref.form),
@@ -142,7 +149,7 @@ def _read(symbol, ref, year_ends: dict, period_end, offset, profile, arelle, sum
     del xbrl
     ref.filing = None
     gc.collect()
-    return _close(pending, summaries), offset
+    return _close(pending, summaries)
 
 
 def _close(pending: dict, summaries: list) -> dict:
