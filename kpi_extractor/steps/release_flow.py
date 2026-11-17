@@ -142,7 +142,8 @@ def _turn_opposite_signs(read) -> None:
     for item in read:
         numbers = [n for n in item.locator.get("row_numbers") or [] if n is not None]
         if (item.value and numbers and float(numbers[0]) * item.value > 0
-                and opposite_convention(str(item.locator.get("row_label") or ""), item.kpi.label)):
+                and opposite_convention(str(item.locator.get("row_label") or ""), item.kpi.label,
+                                       ratio=item.kpi.unit == "percent")):
             item.value = -item.value
             item.notes.append(SIGN_TURNED)
 

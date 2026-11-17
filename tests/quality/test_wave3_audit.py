@@ -35,7 +35,7 @@ def test_a_line_read_off_the_row_its_group_shares_is_held():
 
 def test_a_row_stating_the_opposite_convention_turns_the_sign():
     # Northern Trust's Q3 2019 release: "(0.01)" under "Net Charge-offs / (Recoveries)", a net recovery.
-    kpi = SimpleNamespace(label="Annualized Net Recoveries (Charge-offs) to Average Loans")
+    kpi = SimpleNamespace(label="Annualized Net Recoveries (Charge-offs) to Average Loans", unit="percent")
 
     def item(row_label, value, printed):
         return SimpleNamespace(kpi=kpi, value=value, notes=[],
@@ -44,8 +44,9 @@ def test_a_row_stating_the_opposite_convention_turns_the_sign():
     flipped = item("Net Charge-offs / (Recoveries) (Annualized) to Avg Loans and Leases", -0.01, -0.01)
     same = item("Annualized Net Recoveries (Charge-offs) to Avg Loans and Leases", -0.04, -0.04)
     turned_already = item("Net Charge-offs / (Recoveries) (Annualized) to Avg Loans and Leases", 0.01, -0.01)
-    _turn_opposite_signs([flipped, same, turned_already])
-    assert (flipped.value, same.value, turned_already.value) == (0.01, -0.04, 0.01)
+    alone = item("Net Charge-offs (Annualized) to Average Loans and Leases", 0.03, 0.03)  # 2016: charge-offs alone
+    _turn_opposite_signs([flipped, same, turned_already, alone])
+    assert (flipped.value, same.value, turned_already.value, alone.value) == (0.01, -0.04, 0.01, -0.03)
     assert flipped.notes == [SIGN_TURNED] and same.notes == [] and turned_already.notes == []
 
 
