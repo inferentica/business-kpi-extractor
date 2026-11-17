@@ -1124,3 +1124,20 @@ def test_a_row_label_stored_cut_at_80_characters_finds_its_row_again():
     # Two rows begin with the same 80 characters: no reading.
     twice = _replay_value(document, "asset_quality.past_due", {"table": "A_T17", "row": 3, "col": 1, "row_label": (twin + ", excluding government guaranteed")[:80], "header": header})
     assert isinstance(twice, str)
+
+
+def test_a_figure_the_filing_states_for_two_quarters_alike_is_not_a_stale_column():
+    # American Express, 3Q24: proprietary new cards acquired 3.3 million in Q3'24 and Q2'24 alike. Read from Q3'24's
+    # column the repeat stands; read from Q2'24's or the year-ago Q3'23's (also "third quarter") it is still held.
+    from datetime import date
+    from kpi_extractor.documents.document import Document, Table
+    from kpi_extractor.steps.shared import repeated_in_quarter_columns
+    doc = Document(source_url="https://www.sec.gov/s.htm")
+    doc.tables["A_T6"] = Table("A_T6", "", [["", "Q3'24", "Q2'24", "Q1'24", "Q4'23", "Q3'23"],
+                                            ["Billed business", "$387.3", "$388.2", "$367.0", "$379.8", "$366.2"],
+                                            ["Proprietary new cards acquired", "3.3", "3.3", "3.4", "2.9", "2.9"]])
+    doc.order.append("A_T6")
+    at = lambda col: {"table": "A_T6", "row": 2, "col": col}
+    assert repeated_in_quarter_columns(doc, at(1), 3.3e6, date(2024, 9, 30), 3)
+    assert not repeated_in_quarter_columns(doc, at(2), 3.3e6, date(2024, 9, 30), 3)  # last quarter's column read for this one
+    assert not repeated_in_quarter_columns(doc, at(5), 2.9e6, date(2024, 9, 30), 3)  # the year-ago quarter's

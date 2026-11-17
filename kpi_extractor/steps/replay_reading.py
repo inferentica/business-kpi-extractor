@@ -27,7 +27,7 @@ from ..readers.replay import (LABEL_CUT, AmbiguousQuote, _same_place, _source_te
 from ..ops.learned import LIVE, SHADOW, evidence, spot_checked
 from ..quality.checks import check_period, states_one_period, validate_groups
 from ..readers.trace import placed_elsewhere, trace_replay
-from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same,
+from .shared import (repeated_in_quarter_columns, AI_GROUP_PREFIX, _ANNUAL_HEADER, _NOT_REPORTED, _QUARTER_HEADER, _READ_BY_AI, _annual_header, _days, _same,
                      _same_chain, _year_ago_cells)
 
 REPLAYED = "replayed"
@@ -223,8 +223,7 @@ class ReplayReading:
                         return True
         return False
 
-    @staticmethod
-    def _repeats(item: ReadValue, document: Document | None, earlier: list[float], period_end: date | None = None) -> bool:
+    def _repeats(self, item: ReadValue, document: Document | None, earlier: list[float], period_end: date | None = None) -> bool:
         """Whether a figure is the same number as one of its KPI's recent figures (_earlier_values), a sign another
         period's column was read in place of this one's; unless its row shows that number again in another column
         headed for the same length of period, so the filing states the two periods alike (JPMorgan's lending fees,
@@ -236,7 +235,18 @@ class ReplayReading:
             return False
         if period_end is not None and states_one_period({"locator": item.locator, "period_end": period_end.isoformat()}):
             return False
-        return document is None or not any(_same(cell, item.value) for cell in _year_ago_cells(document, item.locator, item.value))
+        if document is None:
+            return True
+        if any(_same(cell, item.value) for cell in _year_ago_cells(document, item.locator, item.value)):
+            return False
+        # The column read names this quarter and another quarter's column of its row holds the same number: the filing
+        # states the two quarters alike (American Express's new cards acquired, 3.3 million in 2Q24 and 3Q24).
+        profile = getattr(self, "profile", None)
+        if period_end is not None and profile is not None:
+            _year, period = fiscal_label(period_end, profile.fiscal_year_end, year_offset=getattr(self, "offset", 0))
+            if period.startswith("Q") and repeated_in_quarter_columns(document, item.locator, item.value, period_end, int(period[1])):
+                return False
+        return True
 
     def _year_history(self, expected: date) -> dict[str, dict]:
         """Last year's readings of the year (an annual report's figures, read a year before this one ends): each KPI's
