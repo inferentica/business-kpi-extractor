@@ -9,10 +9,11 @@ value, never guessed. Each derived quarter names both filings it came from. A qu
 replaced."""
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 from ..domain.model import REGULATOR_SOURCES as REGULATORS
-from ..domain.printed_labels import PER_SHARE, SHARE_COUNT
+from ..domain.printed_labels import CLOSING, DATED_CASH, OPENING, PER_SHARE, SHARE_COUNT
 from .identity import _same
 
 
@@ -30,11 +31,89 @@ def _keyed(reading, keys: dict) -> dict[tuple, list]:
     return found
 
 
+_COUNTED = re.compile(r"PerShare|NumberOf\w*Shares|SharesOutstanding|SharesIssued", re.I)  # a tag of a count or per share
+
+
 def _additive(line: dict) -> bool:
-    """A line a year less its nine months gives the fourth quarter of: never a figure a share or a share count, by its
-    unit (Coca-Cola's "Effect of dilutive securities (in shares)", a count its label alone does not name) or label."""
-    label, unit = str(line.get("label") or ""), str(line.get("unit") or "")
-    return not (unit == "shares" or unit.endswith("/share") or PER_SHARE.search(label) or SHARE_COUNT.search(label))
+    """A line a year less its nine months gives the fourth quarter of: never a figure a share or a share count. Its
+    unit decides (Coca-Cola's "Effect of dilutive securities (in shares)", a count its label alone does not name;
+    Brookfield's "Common shares and equivalents issued (net of repurchases)", dollars its label reads as a count); the
+    label only where the line has none."""
+    label, unit, concept = str(line.get("label") or ""), str(line.get("unit") or ""), str(line.get("concept") or "")
+    if _COUNTED.search(concept) or unit in ("shares", "pure", "%") or unit.endswith("/share"):
+        return False  # Bancorp's weighted average shares, tagged "pure"
+    return bool(unit) or not (PER_SHARE.search(label) or SHARE_COUNT.search(label))
+
+
+# Balances a cash flow statement opens and closes on, by concept (the label decides for a printed statement).
+_CASH_CONCEPTS = ("us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents", "us-gaap_CashAndCashEquivalentsAtCarryingValue",
+                  "us-gaap_Cash", "us-gaap_CashAndDueFromBanks", "ifrs-full_CashAndCashEquivalents")
+
+
+# Opening and closing cash printed under a cash heading without the word: Coca-Cola's "Balance at beginning of year".
+_BALANCE_LINE = re.compile(r"^balances?,?\s+(?:at\s+)?(?:the\s+)?(beginning|start|end)\b", re.I)
+
+
+def _balance(line: dict) -> bool:
+    """Opening or closing cash: the one balance in a cash flow statement, never another line its key repeats."""
+    label = str(line.get("label") or "")
+    return str(line.get("concept") or "") in _CASH_CONCEPTS or bool(
+        OPENING.search(label) or CLOSING.search(label) or DATED_CASH.search(label) or _BALANCE_LINE.search(label))
+
+
+def _opening(line: dict) -> bool:
+    label = str(line.get("label") or "")
+    found = _BALANCE_LINE.search(label)
+    return bool(OPENING.search(label) or found and found.group(1).lower() in ("beginning", "start"))
+
+
+def _words(label) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", str(label or "").lower()))
+
+
+def _likeness(left, right) -> float:
+    """Words two labels share, of all their words: "Profit for the year" and "Profit for the period", 0.6."""
+    mine, theirs = _words(left), _words(right)
+    return len(mine & theirs) / len(mine | theirs) if mine | theirs else 0.0
+
+
+def _counterpart(line: dict, mine: list, others: list) -> dict | None:
+    """The nine months' line the year's line pairs with: the one line of its key on each side (a line keyed across
+    eras, XBRL beside print); where a key holds more, the line of the same concept, else of the closest label (at
+    least 0.6 alike: Gerdau's "Net income" and "NET INCOME", KEPCO's "Net cash flows from operating activities" and
+    "Net cash from operating activities" beside "Cash generated from operations"), of the same occurrence (JPMorgan's
+    three "Net income" lines in 2007). None where no such line is printed (EOG's 2020 section total keyed with two of
+    its investing lines)."""
+    if len(mine) == 1 and len(others) == 1:
+        return others[0]
+    concept = line.get("concept")
+    same = [other for other in others if concept and other.get("concept") == concept]
+    peers = [item for item in mine if concept and item.get("concept") == concept]
+    if not same:
+        scores = [_likeness(line.get("label"), other.get("label")) for other in others]
+        best = max(scores, default=0.0)
+        if best < 0.6:
+            return None
+        same = [other for other, score in zip(others, scores) if score == best]
+        peers = [item for item in mine if _words(item.get("label")) == _words(line.get("label"))]
+    index = next((position for position, item in enumerate(peers) if item is line), 0)
+    return same[index] if index < len(same) else None
+
+
+def _quarter(line: dict, occurrence: int, others: list, statement: str, mine: list | None = None):
+    """The fourth quarter's figure for the year's line: less the nine months' line it pairs with (_counterpart), only
+    where both are amounts in one unit; a cash balance opens on the nine months' closing cash."""
+    if statement == "cash_flow" and _balance(line):
+        closing = [other for other in others if _balance(other) and not _opening(other)] or [other for other in others if _balance(other)]
+        opening = _opening(line) or (len(closing) > 1 and occurrence == 0 and not any(_opening(other) for other in others))
+        return (closing[-1]["value"] if closing else None) if opening else line["value"]
+    if mine is None:
+        other = others[occurrence] if occurrence < len(others) else None
+    else:
+        other = _counterpart(line, mine, others)
+    if other is None or not (_additive(line) and _additive(other)) or str(line.get("unit") or "") != str(other.get("unit") or ""):
+        return None
+    return round(line["value"] - other["value"], 6)
 
 
 def _agree(left, right, keys: dict) -> bool:
@@ -100,18 +179,14 @@ def derive_fourth_quarters(chosen: list[dict], readings: list, keys: dict) -> li
             continue  # no year and nine months of one vintage: left underived rather than mixed
         nine, whole = pair
         part, own = _keyed(nine, keys), _keyed(whole, keys)
-        lines = []
+        lines, seen = [], {}
         for position, line in enumerate(whole.lines):
             key = _key(statement, line, keys)
             value = None
-            others, mine = part.get(key) or [], own.get(key) or []
-            if line.get("is_heading") or line.get("value") is None or not others or not _additive(line):
-                pass
-            elif statement == "cash_flow" and len(mine) > 1:
-                # A balance, no flow: the quarter opens on the nine months' closing cash and closes on the year's.
-                value = others[-1]["value"] if line is mine[0] else line["value"]
-            else:
-                value = round(line["value"] - others[0]["value"], 6)
+            if not line.get("is_heading") and line.get("value") is not None:
+                occurrence = seen[key] = seen.get(key, -1) + 1
+                if part.get(key):
+                    value = _quarter(line, occurrence, part[key], statement, own[key])
             lines.append({**line, "line": position, "value": value, "key": key[0]})
         derived.append({
             "statement": statement, "fiscal_year": year, "fiscal_period": "Q4", "duration": "quarter",

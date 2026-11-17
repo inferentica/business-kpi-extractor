@@ -65,3 +65,73 @@ def test_a_share_count_by_its_unit_gives_no_fourth_quarter():
                "period_end": "2019-09-28", "basis": "US GAAP", "currency": "USD", "lines": year.lines}]
     [q4] = derive_fourth_quarters(chosen, [nine, year], {})
     assert [line["label"] for line in q4["lines"]] == ["Net sales"]
+
+
+def test_repeated_keys_pair_by_occurrence_and_only_amounts_are_subtracted():
+    # JPMorgan's 2007 income statement keys three lines "Net income": the amount, then basic and diluted EPS.
+    from statement_extractor.selection.fourth import _quarter
+    year = [{"label": "Net income", "unit": "USD", "value": 15_365e6}, {"label": "Net income", "unit": "USD/share", "value": 4.51},
+            {"label": "Net income", "unit": "USD/share", "value": 4.38}]
+    nine = [{"label": "Net income", "unit": "USD", "value": 12_394e6}, {"label": "Net income", "unit": "USD/share", "value": 3.63},
+            {"label": "Net income", "unit": "USD/share", "value": 3.52}]
+    assert [_quarter(line, index, nine, "income") for index, line in enumerate(year)] == [2_971e6, None, None]
+    assert _quarter({"label": "Net income", "unit": "USD", "value": 1.0}, 0, [{"label": "Net income", "unit": "EUR", "value": 0.5}], "income") is None
+
+
+def test_only_cash_is_a_balance_in_a_cash_flow():
+    from statement_extractor.selection.fourth import _quarter
+    nine = [{"label": "Cash at beginning of period", "unit": "USD", "value": 10.0},
+            {"label": "Cash at end of period", "unit": "USD", "value": 14.0}]
+    opening, closing = {"label": "Cash at beginning of period", "unit": "USD", "value": 10.0}, {"label": "Cash at end of period", "unit": "USD", "value": 20.0}
+    assert (_quarter(opening, 0, nine, "cash_flow"), _quarter(closing, 1, nine, "cash_flow")) == (14.0, 20.0)
+    # A flow whose key repeats (two "Other" lines) is a flow: each less the nine months' line of its occurrence.
+    others = [{"label": "Other", "unit": "USD", "value": 3.0}, {"label": "Other", "unit": "USD", "value": 5.0}]
+    year = [{"label": "Other", "unit": "USD", "value": 4.0}, {"label": "Other", "unit": "USD", "value": 9.0}]
+    assert [_quarter(line, index, others, "cash_flow") for index, line in enumerate(year)] == [1.0, 4.0]
+
+
+def test_a_lines_unit_decides_whether_it_adds_up():
+    from statement_extractor.selection.fourth import _additive
+    assert _additive({"label": "Common shares and equivalents issued (net of repurchases)", "unit": "USD"})  # Brookfield
+    assert not _additive({"label": "Effect of dilutive securities", "unit": "shares"})
+    assert not _additive({"label": "Net income", "unit": "USD/share"})
+    assert not _additive({"label": "Weighted average shares outstanding"})  # no unit: the label decides
+
+
+def test_a_count_tagged_without_its_unit_never_adds_up():
+    from statement_extractor.selection.fourth import _additive
+    assert not _additive({"label": "Basic", "concept": "us-gaap_WeightedAverageNumberOfSharesOutstandingBasic", "unit": "pure"})
+    # Arista's "Basic" under net income available to common stockholders is dollars.
+    assert _additive({"label": "Basic", "concept": "us-gaap_NetIncomeLossAvailableToCommonStockholdersBasic", "unit": "USD"})
+
+
+def test_a_key_holding_several_lines_pairs_them_by_concept():
+    # EOG's 2020 cash flow: the key across eras holds three investing lines, the nine months' only its section total.
+    from statement_extractor.selection.fourth import _quarter
+    other = {"label": "Other Investing Activities", "concept": "us-gaap_PaymentsForProceedsFromOtherInvestingActivities", "unit": "USD", "value": 0.0}
+    total = {"label": "Net Cash Used in Investing Activities", "concept": "us-gaap_NetCashProvidedByUsedInInvestingActivities", "unit": "USD", "value": -3_347.5}
+    nine = [{"label": "Net Cash Used in Investing Activities", "concept": "us-gaap_NetCashProvidedByUsedInInvestingActivities", "unit": "USD", "value": -2_710.6}]
+    mine = [other, total]
+    assert _quarter(other, 0, nine, "cash_flow", mine) is None
+    assert _quarter(total, 1, nine, "cash_flow", mine) == -636.9
+
+
+def test_a_key_across_eras_pairs_the_closest_label():
+    from statement_extractor.selection.fourth import _quarter
+    # KEPCO 2017: the nine months key two lines with the year's one; "Cash generated from operations" is not it.
+    year = {"label": "Net cash flows from operating activities", "concept": "ifrs-full_CashFlowsFromUsedInOperatingActivities", "unit": "KRW", "value": 10.0}
+    nine = [{"label": "Cash generated from operations", "concept": "us-gaap_NetCashProvidedByUsedInOperatingActivities", "unit": "KRW", "value": 13.0},
+            {"label": "Net cash from operating activities", "concept": "us-gaap_NetCashProvidedByUsedInOperatingActivities", "unit": "KRW", "value": 9.0}]
+    assert _quarter(year, 0, nine, "cash_flow", [year]) == 1.0
+    # Gerdau 2022: "Net income" printed twice in the year, once in the nine months as "NET INCOME".
+    first, second = ({"label": "Net income", "concept": "ifrs-full_ProfitLoss", "unit": "BRL", "value": 12.0} for _ in range(2))
+    ytd = [{"label": "NET INCOME", "concept": "us-gaap_NetIncomeLoss", "unit": "BRL", "value": 10.0}]
+    assert (_quarter(first, 0, ytd, "income", [first, second]), _quarter(second, 1, ytd, "income", [first, second])) == (2.0, None)
+
+
+def test_a_balance_printed_without_cash_in_its_label_is_a_balance():
+    # Coca-Cola's 1997 cash flow: "Balance at beginning of year" and "Balance at end of year" under its cash heading.
+    from statement_extractor.selection.fourth import _quarter
+    nine = [{"label": "Balance at beginning of year", "unit": "USD", "value": 1_433.0}, {"label": "Balance at end of year", "unit": "USD", "value": 1_798.0}]
+    opening, closing = {"label": "Balance at beginning of year", "unit": "USD", "value": 1_433.0}, {"label": "Balance at end of year", "unit": "USD", "value": 1_737.0}
+    assert (_quarter(opening, 0, nine, "cash_flow"), _quarter(closing, 0, nine, "cash_flow")) == (1_798.0, 1_737.0)
