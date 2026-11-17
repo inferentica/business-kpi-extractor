@@ -32,7 +32,8 @@ def draft_list(plane: ControlPlane, symbol: str, quarters: int) -> tuple[SymbolR
     """One company's fresh list, and what the run read on the way (its XBRL breakdowns)."""
     control = EvalControl(plane)
     try:
-        result = SymbolPipeline(control, symbol, quarters, True, log=lambda line: print(line, flush=True), lists_only=True).run()
+        result = SymbolPipeline(control, symbol, quarters, True, log=lambda line: print(line, flush=True), lists_only=True,
+                                draft_audit=True).run()
     except Exception as error:  # noqa: BLE001
         import traceback
         print(f"{symbol}: {traceback.format_exc()}", flush=True)  # the cause, not only its message
@@ -76,16 +77,25 @@ def main(argv: list[str] | None = None) -> int:
             owner[symbol] = {**spec, "values": state.get("values") or []}
     tuning = score_lists(fresh, owner, captured)
     tuning["proposedAgain"] = proposed_again(fresh, owner, json.loads(REMOVED.read_text()) if REMOVED.exists() else [])
-    held = score_lists(fresh, {symbol: {"groups": entry.get("groups") or []} for symbol, entry in heldout.items()}, captured)
+    held_lists = {symbol: {"groups": entry.get("groups") or []} for symbol, entry in heldout.items()}
+    held = score_lists(fresh, held_lists, captured)
+    # The same lists before the draft audit added to them (p4-draftaudit): what Propose alone listed.
+    before = {result.symbol: {"groups": result.draft_before_audit} for result, _spec, _values in outcomes.values()
+              if result.draft_before_audit is not None}
+    before_audit = {"tuning": score_lists(before, owner, captured), "heldout": score_lists(before, held_lists, captured),
+                    "added": sum(result.draft_audit_added for result, _spec, _values in outcomes.values())}
     results = [result for result, _spec, _values in outcomes.values()]
-    report = {"tuning": tuning, "heldout": held, "aiCalls": sum(result.ai_calls for result in results),
+    report = {"tuning": tuning, "heldout": held, "beforeAudit": before_audit, "aiCalls": sum(result.ai_calls for result in results),
               "emptyLists": sorted(symbol for symbol in symbols if not any((fresh.get(symbol) or {}).get("groups") or [])),
               "errors": {result.symbol: result.errors[:3] for result in results if result.errors}, "freshLists": fresh}
     # What each fresh list left out, by source (Quotiva Review's Left out section; p4-leftout).
     report["leftOut"] = {source: sum(1 for spec in fresh.values() for line in spec.get("leftOut") or [] if line.get("source") == source)
                          for source in ("propose", "rule", "audit")}
-    plane.call("finish", summary={key: value for key, value in report.items() if key != "freshLists"})
+    plane.call("finish", summary={key: value for key, value in report.items() if key not in ("freshLists", "beforeAudit")})
     lines = [_line("Tuning (owner-edited lists)", tuning), _line("Held out", held),
+             _line("Tuning before the draft audit", before_audit["tuning"]),
+             _line("Held out before the draft audit", before_audit["heldout"]),
+             f"Draft audit added {before_audit['added']} KPIs",
              f"Removed groups proposed again: {len(tuning['proposedAgain'])}; empty lists: {', '.join(report['emptyLists']) or 'none'}; "
              f"AI calls {report['aiCalls']}",
              "Left out: " + ", ".join(f"{count} by {source}" for source, count in report["leftOut"].items()), "", "| Set | Company | Still reported | Named | From XBRL | Fresh | Recall | Precision |",

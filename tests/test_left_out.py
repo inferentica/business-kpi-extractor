@@ -52,3 +52,32 @@ def test_a_label_over_80_characters_is_cut_at_a_word_not_failed():
     long = "Allowance for Credit Losses as a Percent of Portfolio Loans and Leases, Excluding Loans Held for Sale"
     spec = _spec(("operating", "Operating Metrics", "metric", [("acl", long)]))
     assert spec.groups[0].kpis[0].label == "Allowance for Credit Losses as a Percent of Portfolio Loans and Leases"
+
+
+def test_a_draft_audit_adds_at_most_its_limit_and_never_retires():
+    from kpi_extractor import ai
+    from kpi_extractor.steps.kpi_list import limit_additions
+    answer = ai.Maintenance.model_validate({
+        "add_kpis": {"operating": [{"key": f"a{i}", "label": f"A{i}", "unit": "count"} for i in range(5)]},
+        "add_groups": [{"key": "aum", "label": "AUM by Asset Class", "kind": "metric",
+                        "kpis": [{"key": f"g{i}", "label": f"G{i}", "unit": "currency"} for i in range(10)]}],
+        "retire": ["operating.users"]})
+    limited = limit_additions(answer, 12)
+    assert [k.key for k in limited.add_kpis["operating"]] == [f"a{i}" for i in range(5)]
+    assert [k.key for k in limited.add_groups[0].kpis] == [f"g{i}" for i in range(7)]
+    assert limit_additions(answer, 3).add_groups == []
+
+
+def test_a_first_list_is_audited_once_before_it_is_stored(monkeypatch):
+    from kpi_extractor import ai
+    from tests.pipeline.test_pipeline import FakeControl, _pipeline
+    pipeline = _pipeline(FakeControl({}), [])
+    pipeline.draft_audit = True
+    spec = _spec(OPERATING)
+    answer = ai.Maintenance.model_validate({"add_kpis": {"operating": [{"key": "orders", "label": "Orders", "unit": "count"}]},
+                                            "retire": ["operating.users"]})
+    pipeline._ask = lambda *args, **kwargs: answer
+    pipeline._prompt_document = lambda document, spec: "documents"
+    audited = pipeline._audit_draft(spec, None)
+    assert [k.key for k in audited.groups[0].kpis] == ["users", "stores", "orders"]  # added, none retired
+    assert pipeline.result.draft_audit_added == 1 and pipeline.result.draft_before_audit[0]["kpis"][-1]["key"] == "stores"
