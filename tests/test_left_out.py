@@ -15,15 +15,17 @@ def test_a_malformed_left_out_item_is_dropped_not_the_reply():
                                   {"label": "", "reason": "x"}, "CET1", {"label": "Ok", "reason": "y", "unit": "furlongs"}])
     assert [item.label for item in spec.left_out] == ["Gross Margin"]
     spec = _spec(OPERATING, left=[{"label": f"M{i}", "reason": "r"} for i in range(30)])
-    assert len(spec.left_out) == 15
+    assert len(spec.left_out) == 10
 
 
 def test_propose_lines_take_their_group_when_the_list_has_it():
-    spec = _spec(OPERATING, left=[{"label": "Gross Margin", "unit": "percent", "reason": "a margin", "group": "operating"},
-                                  {"label": "Tier 1 Ratio", "unit": "percent", "reason": "capital ratio"}])
+    spec = _spec(OPERATING, left=[{"label": "YTD Bookings", "unit": "currency", "reason": "year to date only", "group": "operating"},
+                                  {"label": "Tier 1 Ratio", "unit": "percent", "reason": "capital ratio"},
+                                  {"label": "Gross Margin", "unit": "percent", "reason": "a margin"},  # a rule restated
+                                  {"label": "Diluted EPS", "unit": "currency", "reason": "EPS"}])
     lines = left_out.from_propose(spec)
     assert [(line["group"], line["groupLabel"], line["key"], line["source"]) for line in lines] == [
-        ("operating", "Operating Metrics", "gross_margin", "propose"), (None, None, "tier_1_ratio", "propose")]
+        ("operating", "Operating Metrics", "ytd_bookings", "propose"), (None, None, "tier_1_ratio", "propose")]
 
 
 def test_dropped_lines_carry_their_group_and_reason():
