@@ -4,11 +4,12 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
-from ..quality.reasons import EXPLAINED, SIGN_TURNED, note_with
+from ..quality.reasons import EXPLAINED, RATE_COLUMN, SIGN_TURNED, note_with
 from .. import ai
 from ..ai import Spec
 from ..documents.image_pages import hold_single_reads
 from ..documents.document import Document, clean
+from ..rules.rate_columns import rate_column
 from ..rules.sign_convention import opposite_convention
 from ..quality.checks import check_period, date_order_findings, validate_groups
 from ..readers.extract import (_FOURTH_QUARTER, ReadValue, _stands_at_period_end, column_duration_problem, explanation_supports, falls,
@@ -196,6 +197,9 @@ class ReleaseFlow:
                 problems.extend(dropped)
                 read = year_figures(read)
             _turn_opposite_signs(read)
+            for item in read:
+                if item.kpi.unit in ("currency", "count") and rate_column(document, item.locator) and RATE_COLUMN not in item.notes:
+                    item.status, item.notes = "needs_review", [*item.notes, RATE_COLUMN]
             validate_groups(read, self._previous(period_end, annual=located.annual))
             self._mark_year_ago_agreement(read, document, period_end, annual=located.annual)
             hold_single_reads(read, document)  # a figure one OCR model alone read, until a check proves it
