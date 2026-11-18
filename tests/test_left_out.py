@@ -48,6 +48,14 @@ def test_merge_keeps_each_line_once_and_none_the_list_holds():
     assert [line["key"] for line in left_out.merge(new, previous, spec)] == ["margin", "nim"]
 
 
+def test_a_name_another_group_still_lists_is_left_out_all_the_same():
+    # Caterpillar: revenue by application's "Power Generation" left out, its retail sales growth's line of that name kept.
+    spec = _spec(("growth", "Retail Sales Growth", "metric", [("power_generation", "Power Generation")]))
+    new = [{"group": "revenue_by_application", "key": "power_generation", "label": "Power Generation", "source": "rule"},
+           {"group": None, "key": "power_generation", "label": "Power Generation", "source": "propose"}]  # no group: held
+    assert [(line["group"], line["key"]) for line in left_out.merge(new, [], spec)] == [("revenue_by_application", "power_generation")]
+
+
 def test_a_label_over_80_characters_is_cut_at_a_word_not_failed():
     long = "Allowance for Credit Losses as a Percent of Portfolio Loans and Leases, Excluding Loans Held for Sale"
     spec = _spec(("operating", "Operating Metrics", "metric", [("acl", long)]))

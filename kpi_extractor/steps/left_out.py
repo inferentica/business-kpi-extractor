@@ -67,17 +67,22 @@ def from_propose(spec: Spec) -> list[dict]:
 
 
 def merge(new: list[dict], previous: list[dict] | None, spec: Spec) -> list[dict]:
-    """The list's left-out lines: this run's first, then those stored before, each once, none the list holds now."""
+    """The list's left-out lines: this run's first, then those stored before, each once, none the list holds now. A name
+    is the list's own only in the same group (Caterpillar's revenue by application has "Power Generation", and so has its
+    retail sales growth, which stays); a line with no group (Propose's, a sector's) is held by a line of that name in any."""
     listed = {(group.key, kpi.key) for group in spec.groups for kpi in group.kpis}
-    listed_labels = {_plain(kpi.label) for group in spec.groups for kpi in group.kpis}
+    listed_names = {(group.key, _plain(kpi.label)) for group in spec.groups for kpi in group.kpis}
+    any_group = {_plain(kpi.label) for group in spec.groups for kpi in group.kpis}
     seen: set = set()
     lines = []
     for line in [*new, *(previous or [])]:
         if not isinstance(line, dict) or not line.get("label"):
             continue
-        place, label = (line.get("group"), line.get("key")), _plain(str(line["label"]))
-        if place in listed or label in listed_labels or place in seen or label in seen:
+        group, label = line.get("group"), _plain(str(line["label"]))
+        place, name = (group, line.get("key")), (group, label)
+        held = name in listed_names if group else label in any_group
+        if place in listed or held or place in seen or name in seen:
             continue
-        seen.update({place, label})
+        seen.update({place, name})
         lines.append(line)
     return lines[:MAX_LEFT_OUT]
