@@ -91,7 +91,10 @@ def another_registrant(ref, attachments) -> str | None:
     return next((printed[:80] for printed, words in found if any(words & name for name in names)), None)
 
 
-_GENERIC = {"AND", "OF", "DE", "DO", "DA", "DAS", "DOS", "THE", "HOLDINGS", "HOLDING", "GROUP", "INCORPORATED"}
+# Words any company's name may carry: Portuguese and Spanish "holdings" and "company" too (Ultrapar's 6-Ks title its
+# statements "… Participações S.A.", where EDGAR names it Ultrapar Holdings Inc).
+_GENERIC = {"AND", "OF", "DE", "DO", "DA", "DAS", "DOS", "THE", "HOLDINGS", "HOLDING", "GROUP", "INCORPORATED",
+            "PARTICIPACOES", "COMPANHIA", "COMPANIA", "SOCIEDAD", "ANONIMA"}
 
 
 # A listed subsidiary is named for its parent and its market: CEMEX's 6-Ks carry CEMEX Holdings Philippines', CEMEX

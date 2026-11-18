@@ -138,7 +138,7 @@ def test_an_inline_xbrl_covers_names_come_after_its_hidden_header():
     cover = ("<p>Commission file number 1-14226 COMPA&#209;&#205;A CERVECER&#205;AS UNIDAS S.A. (Exact name of Registrant "
              "as specified in its charter) UNITED BREWERIES COMPANY, INC. (Translation of Registrant's name into English)</p>")
     document = SimpleNamespace(document_type="20-F", content="<html><body>" + header + cover + "</body></html>")
-    assert _registrant_words(_cover_text([document], ("20-F",))) == {"COMPANIA", "CERVECERIAS", "UNIDAS", "UNITED", "BREWERIES"}
+    assert _registrant_words(_cover_text([document], ("20-F",))) == {"CERVECERIAS", "UNIDAS", "UNITED", "BREWERIES"}  # "Compañía" is any company's word
 
 
 def test_the_companys_name_under_another_legal_form_is_another_entity():
@@ -166,3 +166,10 @@ def test_one_word_with_its_legal_form_is_a_companys_name():
     cover = "Commission File Number: 1-14830 GILDAN ACTIVEWEAR INC. (Translation of Registrant's name into English)"
     assert _others(["HANESBRANDS INC."], ["GILDAN ACTIVEWEAR INC."], cover) == ["HANESBRANDS INC."]
     assert _others(["GILDAN INC."], ["GILDAN ACTIVEWEAR INC."], cover) == []
+
+
+def test_a_generic_word_with_a_legal_form_is_no_other_company():
+    # Ultrapar's 6-K of 2021: a title cut to "Participações S.A.", where EDGAR names it Ultrapar Holdings Inc.
+    cover = "Commission File Number 001-14950 ULTRAPAR HOLDINGS INC. (Translation of Registrant's Name into English)"
+    assert _others(["Participações S.A."], ["ULTRAPAR HOLDINGS INC"], cover) == []
+    assert _others(["Quattor Participações S.A."], ["BRASKEM SA"], "BRASKEM S.A. (Exact name)") == ["Quattor Participações S.A."]
