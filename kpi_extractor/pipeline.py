@@ -26,7 +26,9 @@ from .sources import source as filing_source
 from .sources.base import FilingRef, FilingSource
 from .quality.metric_totals import unbalanced_quarters
 from .quality.reasons import METRIC_TOTAL
+from .ai import Spec
 from .quality import list_checks
+from .steps import left_out
 from .steps.segment_eras import lines_outside_segment_eras
 from .steps.shared import RecordBuilding, _folder, list_parents, only_adds
 from .steps.loading import FilingLoading
@@ -74,8 +76,8 @@ class SymbolResult:
     rule_evidence: list = field(default_factory=list)  # learned rules' figures beside the AI's (ops/learned.py)
     # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.
     q4_gaps: list[str] = field(default_factory=list)
-    # A first list's flags (quality/list_checks.py): it read only its newest quarters, until accepted on Quotiva Review.
-    list_flags: list = field(default_factory=list)
+    # A first list's lines none of its newest filings reports, moved to its Left out (quality/list_checks.py).
+    lines_not_found: list = field(default_factory=list)
     skipped: bool = False
     # Values read from earnings documents that are not rejected, and how many of them are verified (shown to users).
     release_values: int = 0
@@ -168,34 +170,32 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             except ControlError:
                 pass  # the run's finish releases it anyway
 
-    def _first_quarters_gate(self, state: dict, releases: list, spec, version: int, proposed: bool):
-        """A first list reads its newest quarters, then its checks (quality/list_checks.py) decide the rest: one that
-        passes reads every release of the window in this run; a flagged one, or a stored list whose checks the owner has
-        not yet accepted, stays at its newest quarters. Returns the releases this run keeps, and those processed."""
+    def _settle_first_list(self, state: dict, releases: list, spec, version: int, proposed: bool):
+        """A first list (or one a check flagged before 2026-11-18) reads its newest four quarters first; lines none of
+        them reports come off the list and go to its Left out (quality/list_checks.py), and the rest of its history is
+        read with the lines that remain, in the same run. Nothing waits for the owner. Returns the releases, those
+        processed, and the list."""
         first_list = proposed and not state.get("spec")
-        open_checks = bool((state.get("spec") or {}).get("checks"))
+        flagged = bool((state.get("spec") or {}).get("checks"))
         ends = sorted({ref.period_end for ref in releases})[-list_checks.FIRST_QUARTERS:]
-        if not (first_list or open_checks) or self.reread or len({ref.period_end for ref in releases}) <= len(ends):
-            return releases, self._process_releases(releases, spec, version)
+        if not (first_list or flagged) or self.reread or len({ref.period_end for ref in releases}) <= len(ends):
+            return releases, self._process_releases(releases, spec, version), spec
         first = [ref for ref in releases if ref.period_end in ends]
         processed = self._process_releases(first, spec, version)
-        # A first list's flags, or an unaccepted list's again: its unread lines judged anew from its newest filings, a
-        # sector line kept until the owner accepts (only Propose's document shows it).
-        earlier = self.__dict__.get("list_checks") if first_list else [
-            flag for flag in (state.get("spec") or {}).get("checks") or [] if flag.get("check") != "unread_lines"]
-        notes = [(self.filings.get(ref.accession) or {}).get("notes") or [] for ref in first]
-        flags = [*(earlier or []), *filter(None, [list_checks.unread_lines(spec, notes, len(ends))])]
-        if first_list or flags != (state.get("spec") or {}).get("checks"):
-            self.list_checks = flags
+        unread = list_checks.unread_lines(spec, [(self.filings.get(ref.accession) or {}).get("notes") or [] for ref in first])
+        if unread or flagged:
+            self._leave_out([left_out.entry(group, kpi, list_checks.REASON_UNREAD, "rule")
+                             for group in spec.groups for kpi in group.kpis if (group.key, kpi.key) in unread])
+            groups = [{**group.model_dump(), "kpis": kpis} for group in spec.groups
+                      if (kpis := [kpi.model_dump() for kpi in group.kpis if (group.key, kpi.key) not in unread])]
+            spec = Spec.model_validate({"groups": groups, "names": spec.names})
             self._store_spec(spec, self.names, version, releases[-1].accession)
-        open_checks = bool(flags)
-        if open_checks:
-            self.log(f"{self.symbol}: list flagged ({'; '.join(str(f.get('text')) for f in flags or [])}): "
-                     f"{len(ends)} newest quarters only, until it is accepted on Quotiva Review")
-            self.result.list_flags = list(flags or [])
-            return first, processed
-        self.log(f"{self.symbol}: list passed its checks; reading its other {len(releases) - len(first)} releases")
-        return releases, processed + self._process_releases([ref for ref in releases if ref not in first], spec, version)
+            self.result.lines_not_found = sorted(f"{group}.{kpi}" for group, kpi in unread)
+            if unread:
+                self.log(f"{self.symbol}: {len(unread)} lines no newest filing reports, moved to Left out: "
+                         f"{', '.join(sorted(f'{g}.{k}' for g, k in unread))}")
+        rest = [ref for ref in releases if ref not in first]
+        return releases, processed + (self._process_releases(rest, spec, version) if spec.groups else []), spec
 
     def _run(self) -> SymbolResult:
         state = self.control.call("symbol_state", symbol=self.symbol)
@@ -297,7 +297,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         if spec is not None and not proposed:
             self._carry_owner_additions(spec, version, state.get("previousSpec"), releases)
         if spec is not None:
-            releases, processed = self._first_quarters_gate(state, releases, spec, version, proposed)
+            releases, processed, spec = self._settle_first_list(state, releases, spec, version, proposed)
             latest_end = releases[-1].period_end if releases else None
             # An evaluation on stored lists scores the readers, so it keeps the list as stored (no audit call).
             audit = os.environ.get("KPI_EVAL_LISTS") != "stored" and not self.reread
