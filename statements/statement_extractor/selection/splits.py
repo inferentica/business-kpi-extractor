@@ -16,9 +16,16 @@ from datetime import date
 from fractions import Fraction
 from statistics import median
 
+from ..domain.model import REGULATOR_SOURCES as REGULATORS
 from ..domain.printed_labels import PER_SHARE, SHARE_COUNT
 
-_KIND = re.compile(r"\b(basic|diluted)\b", re.I)
+_KIND = re.compile(r"\b(basic|diluted|primary|fully\s+diluted)\b", re.I)
+_NAMES = {"primary": "basic", "fully diluted": "diluted"}
+
+
+def _kind(found) -> str:
+    word = re.sub(r"\s+", " ", found.group(1).lower())
+    return _NAMES.get(word, word)
 
 
 def _classified(lines: list[dict]) -> dict[int, tuple[str, str]]:
@@ -33,9 +40,9 @@ def _classified(lines: list[dict]) -> dict[int, tuple[str, str]]:
         if line.get("is_heading") or value is None or kind is None:
             continue
         if "WeightedAverage" in concept or SHARE_COUNT.search(label) and not re.search(r"per\s+share", label, re.I):
-            found[index] = ("shares", kind.group(1).lower())
+            found[index] = ("shares", _kind(kind))
         elif PER_SHARE.search(label) or "PerShare" in concept:
-            by_kind[kind.group(1).lower()].append(index)
+            by_kind[_kind(kind)].append(index)
     for kind, indexes in by_kind.items():
         values = sorted(indexes, key=lambda index: abs(lines[index]["value"]))
         smallest = abs(lines[values[0]]["value"]) or 1
@@ -79,6 +86,7 @@ def split_ledger(readings: list) -> list[tuple[date, float, str]]:
     """The company's splits, (first filing presenting it, ratio, share class or ""), oldest first: Visa split its
     class A shares four-for-one in 2015, not its classes B and C."""
     presented: dict[tuple, list] = defaultdict(list)
+    places: dict[tuple, int] = {}
     for reading in readings:
         if reading.status != "kept" or reading.statement != "income" or reading.scope != "consolidated":
             continue
@@ -88,24 +96,32 @@ def split_ledger(readings: list) -> list[tuple[date, float, str]]:
             if (measure, kind, member) not in seen and reading.lines[index]["value"]:
                 seen.add((measure, kind, member))
                 presented[(reading.key, measure, kind, member)].append((reading.filed, reading.lines[index]["value"]))
+                places[(reading.filed, reading.lines[index]["value"])] = _places(reading.lines[index])
     marks: dict[tuple, dict] = defaultdict(lambda: defaultdict(list))
+    rounding: dict[tuple, list] = defaultdict(list)  # each earnings move with what rounding alone could do to it
     for (period, measure, kind, member), shown in presented.items():
         shown = _without_outliers(sorted(set(shown)))
-        for (_, older), (filed, newer) in zip(shown, shown[1:]):
+        for (was, older), (filed, newer) in zip(shown, shown[1:]):
             if older and newer and older / newer > 0:
                 ratio = older / newer if measure == "eps" else newer / older
                 # Never a figure read at another scale (1,000 to one), nor a ratio a restatement makes (0.99).
                 if 0.015 <= abs(ratio - 1) and 0.01 < ratio < 100:
                     marks[(filed, member)][measure].append((ratio, period))
+                    if measure == "eps":
+                        rounding[(filed, member)].append(
+                            (ratio, _rounding(older, places.get((was, older), 2), newer, places.get((filed, newer), 2))))
     events: list[tuple[date, float, str]] = []
     for filed, member in sorted(marks):
         earnings, shares = marks[(filed, member)]["eps"], marks[(filed, member)]["shares"]
         if len(earnings) < 2:
             continue
         ratio = median(value for value, _ in earnings)
-        if any(abs(value - ratio) > 0.01 * ratio for value, _ in earnings):
+        proven = _proven(shares, rounding[(filed, member)])
+        if proven is not None:
+            ratio = proven  # share counts give the ratio; earnings printed to the cent meet it within their rounding
+        elif any(abs(value - ratio) > 0.01 * ratio for value, _ in earnings):
             continue  # earnings moving by different ratios: a restatement, no split
-        confirmed = any(abs(value - ratio) <= 0.01 * ratio for value, _ in shares) or (
+        confirmed = proven is not None or any(abs(value - ratio) <= 0.01 * ratio for value, _ in shares) or (
             _clean(ratio) is not None and len({period for _, period in earnings}) >= 2)
         if not confirmed:
             continue
@@ -124,22 +140,83 @@ def split_ledger(readings: list) -> list[tuple[date, float, str]]:
     return sorted(event for index, event in enumerate(events) if index not in noise)
 
 
+def _proven(shares: list, earnings: list) -> float | None:
+    """A split share counts prove: they all move by one ratio a split declares, within 1%, and every earnings move
+    meets it within what rounding to the printed cent does (Kroger's 2015 two-for-one: its quarterly EPS of 0.69
+    printed again as 0.34 measures 2.03). None where they do not."""
+    if not shares or not earnings:
+        return None
+    middle = median(value for value, _ in shares)
+    if any(abs(value - middle) > 0.01 * middle for value, _ in shares):
+        return None
+    ratio = _declared(middle)
+    if ratio is None or abs(ratio - middle) > 0.01 * middle:
+        return None
+    return ratio if all(abs(value - ratio) <= max(0.01, slack) * ratio for value, slack in earnings) else None
+
+
+def _declared(ratio: float) -> float | None:
+    """The ratio a split declares nearest a measured one: a whole number up to 100, or a fraction of ten or less over
+    two to four (3-for-2, 5-for-4), or the inverse of one (a reverse split)."""
+    value = ratio if ratio >= 1 else 1 / ratio
+    candidates = [Fraction(round(value))] if round(value) <= 100 else []
+    near = Fraction(value).limit_denominator(4)
+    if near.denominator > 1 and near.numerator <= 10:
+        candidates.append(near)
+    if not candidates:
+        return None
+    best = float(min(candidates, key=lambda candidate: abs(float(candidate) - value)))
+    if best < 1.2:
+        return None
+    return best if ratio >= 1 else 1 / best
+
+
+def _places(line: dict) -> int:
+    """The decimal places a per-share figure is printed to: its tag's, else its own digits."""
+    decimals = line.get("decimals")
+    if isinstance(decimals, int) and decimals >= 0:
+        return decimals
+    text = f"{abs(float(line.get('value') or 0)):.6f}".rstrip("0")
+    return max(2, len(text.split(".")[1])) if "." in text else 2
+
+
+def _rounding(older: float, older_places: int, newer: float, newer_places: int) -> float:
+    """How far rounding alone can move a ratio of two printed figures: half the last place of each (Kroger's
+    quarterly earnings of 0.69 and 0.34 after its 2015 two-for-one measure 2.03), at most 3%."""
+    if min(abs(older), abs(newer)) < 0.10:
+        return 0.0  # half a cent is anything to a figure under ten cents
+    return min(0.03, 0.5 * 10 ** -older_places / abs(older) + 0.5 * 10 ** -newer_places / abs(newer))
+
+
 def adjust_for_splits(chosen: list[dict], ledger: list[tuple[date, float, str]]) -> None:
-    """Each served per-share figure and share count on today's share basis, its printed figure kept beside it."""
+    """Each served per-share figure and share count on today's share basis, its printed figure kept beside it: every
+    line a share or of shares by its unit (Apple's dividends per share), and those the income statement's labels and
+    tags name, on every basis served. A split of all the company's shares moves each class's figures too (Alphabet's
+    2022 twenty-for-one); one class's split, that class's alone (Visa's class A in 2015)."""
     if not ledger:
         return
     for record in chosen:
-        if record["statement"] != "income" or not record.get("lines") or not record.get("source_filed"):
+        if not record.get("lines") or not record.get("source_filed"):
             continue
-        filed = date.fromisoformat(record["source_filed"][:10])
-        for index, (measure, _kind) in _classified(record["lines"]).items():
-            line = record["lines"][index]
-            factor = 1.0
-            for when, ratio, member in ledger:
-                if when > filed and member == _member(line):
-                    factor *= ratio
-            if abs(factor - 1) < 1e-9:
-                continue
-            line["printed_value"] = line["value"]
-            line["value"] = round(line["value"] / factor, 6) if measure == "eps" else round(line["value"] * factor)
-            line["split_factor"] = round(factor, 6)
+        for served in [record, *(record.get("other_bases") or [])]:
+            if served.get("lines") and served.get("source_filed"):
+                _adjust(served["lines"], date.fromisoformat(served["source_filed"][:10]), ledger,
+                        record["statement"] == "income")
+
+
+def _adjust(lines: list[dict], filed: date, ledger: list[tuple[date, float, str]], income: bool) -> None:
+    measures = {index: measure for index, (measure, _kind) in _classified(lines).items()} if income else {}
+    for index, line in enumerate(lines):
+        unit = str(line.get("unit") or "")
+        measure = "eps" if unit.endswith("/share") else "shares" if unit == "shares" else measures.get(index)
+        if measure is None or line.get("value") is None or "split_factor" in line:
+            continue
+        factor = 1.0
+        for when, ratio, member in ledger:
+            if when > filed and member in ("", _member(line)):
+                factor *= ratio
+        if abs(factor - 1) < 1e-9:
+            continue
+        line["printed_value"] = line["value"]
+        line["value"] = round(line["value"] / factor, 6) if measure == "eps" else round(line["value"] * factor)
+        line["split_factor"] = round(factor, 6)
