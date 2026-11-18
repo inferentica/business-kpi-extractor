@@ -23,6 +23,7 @@ from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA
 from .company_title import titled_company
 from .currency import column_currencies, reporting_currency, split_by_sign, translations
 from .ranges import without_repeats
+from .segments import without_segments
 from .dates import column_periods
 from .find import TITLES, find_statements, unlabelled_totals
 from .two_currencies import two_columns
@@ -56,8 +57,8 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
     With `left_out` (other companies' names), only statements titled for a company not among them (Brookfield's)."""
     readings: list[Reading] = []
     notes: list[str] = []
-    found = [(kind, group) for kind, group in find_statements(all_tables, release=form == "6-K") if not left_out
-             or titled_company(kind, group[0]) not in left_out | {None}]  # beside another's, only titled ones
+    found = without_segments([(kind, group) for kind, group in find_statements(all_tables, release=form == "6-K")
+                              if not left_out or titled_company(kind, group[0]) not in left_out | {None}], notes)
     # A statement printed more than once: the fullest table, the group's before the parent's alone (TSMC's 2008 6-Ks).
     found.sort(key=lambda item: (statement_scope(item[0], item[1], form, found) != "consolidated",
                                  -sum(len([row for row in table.rows if row.figures]) for table in item[1])))
@@ -250,8 +251,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 # is the net cash of the section (Brookfield's operating section has a subtotal before it).
                 section_total = len(printed)
             if re.match(r"^(balance|net\s*\(?(increase|decrease)|increase|decrease|beginning|end|start)\b", row.label, re.I) \
-                    and "cash" not in row.label.lower() \
-                    and CASH_HEADING.match(heading):
+                    and "cash" not in row.label.lower() and CASH_HEADING.match(heading):
                 # Coca-Cola: CASH AND CASH EQUIVALENTS / Balance at beginning of year; Kroger: Cash and temporary cash
                 # investments: / Beginning of year
                 meaning = f"{heading} {row.label}"

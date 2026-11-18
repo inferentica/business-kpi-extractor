@@ -61,8 +61,11 @@ def read_printed(ref, fiscal_year_end: str, year_offset: int, signs: dict | None
     cover = _cover_text(attachments) if release else None
     # An annual report's own cover names its registrant, against which its statements' titles are checked: another
     # company's statements it carries are never the company's (Heineken's in FEMSA's 20-Fs).
-    annual_cover = ref.form.upper().startswith(("20-F", "40-F"))
-    names_cover = cover if release else _cover_text(attachments, ("20-F", "40-F")) if annual_cover else None
+    # A 10-K's and a 10-Q's too: RPM's FY2010 10-K prints its deconsolidated subsidiary's statements in a note,
+    # "Specialty Products Holding Corp. Consolidated Statements of Income".
+    covers = ("20-F", "40-F", "10-K", "10-Q")
+    annual_cover = ref.form.upper().startswith(covers)
+    names_cover = cover if release else _cover_text(attachments, covers) if annual_cover else None
     if other:
         # A subsidiary's report furnished beside the company's (Lloyds Bank plc's under Lloyds Banking Group): another
         # issuer's statements, never the company's.
