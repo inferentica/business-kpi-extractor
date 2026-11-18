@@ -397,3 +397,17 @@ def test_years_named_for_the_fiscal_years_the_title_dates_close():
     income = sorted((r.period_end, r.fiscal_year, r.lines[0]["value"]) for r in readings if r.statement == "income")
     assert income == [(date(2017, 1, 28), "2016", 115337.0e6), (date(2018, 2, 3), "2017", 122662.0e6),
                       (date(2019, 2, 2), "2018", 121162.0e6)]
+
+
+
+def test_a_statement_by_country_is_a_segments_table():
+    # Coca-Cola Andina's 3Q26 release: "Argentina Brazil Chile Paraguay Total" over each period's income statement.
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed.segments import by_segment
+    html = ("<p>Consolidated Income Statement (In million Chilean pesos)</p><table>"
+            + row("", "Third Quarter 2026", "", "", "", "") + row("", "Argentina", "Brazil", "Chile", "Paraguay", "Total")
+            + row("Net sales", "100", "200", "300", "50", "650") + "</table>")
+    by_country = parse_html(html)[0]
+    assert by_segment(by_country)
+    plain = parse_html("<table>" + row("", "2026", "2025") + row("Net sales", "650", "600") + "</table>")[0]
+    assert not by_segment(plain)

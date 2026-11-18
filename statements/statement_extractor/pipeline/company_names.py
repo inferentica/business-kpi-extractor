@@ -100,6 +100,11 @@ _REGIONS = {"PHILIPPINES", "LATAM", "ESPANA", "SPAIN", "LATIN", "AMERICA", "AMER
             "COLOMBIA", "CHILE", "PERU", "BRASIL", "BRAZIL", "ARGENTINA", "CANADA", "USA", "PANAMA", "EGYPT", "INDIA"}
 
 
+# One word is a company's name where its legal form follows it: "HANESBRANDS INC. Consolidated Statements of Cash
+# Flows" in Gildan's 6-K of September 2025, its acquisition's statements under Form 6-K's business acquisition report.
+_LEGAL = re.compile(r"\b(?:inc|corp|corporation|ltd|limited|plc|llc|ulc|s\.?a|n\.?v|ag|s\.?a\.?b|b\.?v)\.?$", re.I)
+
+
 # The company's own name under another legal form is another entity: Brookfield Asset Management ULC, the business
 # Brookfield Asset Management Ltd. held a quarter of until 2025, whose statements its releases print in full.
 _OTHER_FORMS = {"ULC"}
@@ -123,7 +128,7 @@ def _other_companies(readings: list, ref, cover: str | None) -> list[str]:
     audited = {getattr(reading, "audited_of", "") for reading in readings} - {""}
     for printed in {reading.titled for reading in readings if reading.titled} | audited:
         words = _named(printed.removesuffix("’s"))
-        if (len(words) >= 2 or (printed.endswith("’s") or printed in audited) and words) and (not words & own and not any(
+        if (len(words) >= 2 or (printed.endswith("’s") or printed in audited or _LEGAL.search(printed)) and words) and (not words & own and not any(
                 SequenceMatcher(None, word, other).ratio() >= 0.85 for word in words for other in own)
                 or words & own and (words - own) & _REGIONS
                 or words & own and words - own and words - own <= _OTHER_FORMS):

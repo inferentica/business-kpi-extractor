@@ -159,3 +159,10 @@ def test_another_company_under_the_companys_own_name_is_told_apart_from_an_acqui
     assert same_name_others(["BROOKFIELD ASSET MANAGEMENT ULC"], Ref, "Brookfield Asset Management Ltd. (Translation")
     printed._NAMES["0"] = ["GILDAN ACTIVEWEAR INC."]
     assert not same_name_others(["GOLD TOE MORETZ HOLDINGS CORP."], Ref, "GILDAN ACTIVEWEAR INC. (Translation")
+
+
+def test_one_word_with_its_legal_form_is_a_companys_name():
+    # Gildan's 6-K of September 2025: Hanesbrands' statements under its business acquisition report.
+    cover = "Commission File Number: 1-14830 GILDAN ACTIVEWEAR INC. (Translation of Registrant's name into English)"
+    assert _others(["HANESBRANDS INC."], ["GILDAN ACTIVEWEAR INC."], cover) == ["HANESBRANDS INC."]
+    assert _others(["GILDAN INC."], ["GILDAN ACTIVEWEAR INC."], cover) == []
