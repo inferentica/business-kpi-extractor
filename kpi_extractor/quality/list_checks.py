@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import re
 
+_NOT_REPORTED = "not reported: "
+
 FIRST_QUARTERS = 4  # a new list's newest quarters, read before its checks decide the rest
 UNREAD_SHARE = 0.4
 MIN_LINES = 2
@@ -39,15 +41,19 @@ def sector_lines_missing(sector_key: str | None, text: str, spec) -> list[dict]:
     return flags
 
 
-def unread_lines(spec, values, quarters: set[tuple[str, str]]) -> dict | None:
-    """A flag when the newest quarters found no figure for a share of the list's lines (stored rows: group_key, kpi_key,
-    fiscal_year, fiscal_period, validation_status)."""
-    lines = [(f"kpi_{group.key}", kpi.key, kpi.label) for group in spec.groups for kpi in group.kpis
-             if kpi.key != group.total_kpi]
-    found = {(v["group_key"], v["kpi_key"]) for v in values
-             if v["validation_status"] == "verified" and (v["fiscal_year"], v["fiscal_period"]) in quarters}
-    unread = [label for group, key, label in lines if (group, key) not in found]
-    if len(lines) < MIN_LINES or len(unread) < len(lines) * UNREAD_SHARE:
+def unread_lines(spec, filing_notes: list[list[str]], quarters: int) -> dict | None:
+    """A flag when the newest quarters' filings found no figure for a share of the list's lines. Each read filing notes
+    the list lines it did not report ("not reported: group.kpi, ...", by the list's own keys); a line is unread when
+    every one of them notes it. Stored figures are no measure: a line read from the row of a stored series is kept under
+    that series' key (Caterpillar's retail sales growth, T-Mobile's postpaid accounts)."""
+    lines = {f"{group.key}.{kpi.key}": kpi.label for group in spec.groups for kpi in group.kpis if kpi.key != group.total_kpi}
+    noted = [set(note[len(_NOT_REPORTED):].split(", ")) for notes in filing_notes
+             for note in [next((n for n in notes or [] if str(n).startswith(_NOT_REPORTED)), "")] if note]
+    read = [notes for notes in filing_notes if any(str(n).startswith(("read by", _NOT_REPORTED)) for n in notes or [])]
+    if len(lines) < MIN_LINES or not read:
+        return None
+    unread = [label for key, label in lines.items() if len(noted) == len(read) and all(key in keys for keys in noted)]
+    if len(unread) < len(lines) * UNREAD_SHARE:
         return None
     return {"check": "unread_lines", "lines": unread[:60],
-            "text": f"Its newest {len(quarters)} quarters found no figure for {len(unread)} of its {len(lines)} lines."}
+            "text": f"Its newest {quarters} quarters found no figure for {len(unread)} of its {len(lines)} lines."}

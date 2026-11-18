@@ -21,7 +21,7 @@ from datetime import date, timedelta
 from .sources.archive import Archive
 from .ops.control import ControlError
 from .documents.document import Document
-from .domain.fiscal import fiscal_label, with_first_year
+from .domain.fiscal import with_first_year
 from .sources import source as filing_source
 from .sources.base import FilingRef, FilingSource
 from .quality.metric_totals import unbalanced_quarters
@@ -179,15 +179,17 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             return releases, self._process_releases(releases, spec, version)
         first = [ref for ref in releases if ref.period_end in ends]
         processed = self._process_releases(first, spec, version)
-        if first_list:
-            quarters = {fiscal_label(end, self.profile.fiscal_year_end, year_offset=self.offset) for end in ends}
-            flags = [*(self.__dict__.get("list_checks") or []),
-                     *filter(None, [list_checks.unread_lines(spec, self.values.values(), quarters)])]
+        # A first list's flags, or an unaccepted list's again: its unread lines judged anew from its newest filings, a
+        # sector line kept until the owner accepts (only Propose's document shows it).
+        earlier = self.__dict__.get("list_checks") if first_list else [
+            flag for flag in (state.get("spec") or {}).get("checks") or [] if flag.get("check") != "unread_lines"]
+        notes = [(self.filings.get(ref.accession) or {}).get("notes") or [] for ref in first]
+        flags = [*(earlier or []), *filter(None, [list_checks.unread_lines(spec, notes, len(ends))])]
+        if first_list or flags != (state.get("spec") or {}).get("checks"):
             self.list_checks = flags
             self._store_spec(spec, self.names, version, releases[-1].accession)
-            open_checks = bool(flags)
+        open_checks = bool(flags)
         if open_checks:
-            flags = self.__dict__.get("list_checks") if first_list else (state.get("spec") or {}).get("checks")
             self.log(f"{self.symbol}: list flagged ({'; '.join(str(f.get('text')) for f in flags or [])}): "
                      f"{len(ends)} newest quarters only, until it is accepted on Quotiva Review")
             self.result.list_flags = list(flags or [])
