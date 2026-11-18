@@ -45,6 +45,8 @@ METRIC_TOTAL = "its group's lines do not add up to a total they add up to in mos
 PART_ROW = "read from the row of one part of the line"
 RATE_COLUMN = "an amount read from a column of rates"
 OFF_ROW = "read from another row than the group's other lines"
+# Holds about what a cell is, not about its number: a later filing repeating the number proves nothing.
+IDENTITY_HOLDS = frozenset({RATE_COLUMN, PART_ROW, OFF_ROW, OUTSIDE_SEGMENT_ERA, METRIC_TOTAL})
 SEGMENT_TABLE = "read from a table headed for one segment"
 PRECISE_FIGURE = "the full figure, printed rounded elsewhere"
 OUTSIDE_REPORTED_PERIODS = "outside the KPI's reported periods"
