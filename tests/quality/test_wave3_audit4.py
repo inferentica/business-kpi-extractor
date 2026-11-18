@@ -59,3 +59,18 @@ def test_an_amount_read_from_a_column_of_rates():
     assert rate_column(document, {"table": "A_T6", "row": 3, "col": 2})
     assert not rate_column(document, {"table": "A_T6", "row": 3, "col": 3})
     assert not rate_column(None, {"table": "A_T6", "row": 3, "col": 2})
+
+
+def test_a_figure_held_for_its_cell_is_not_proven_by_a_later_release():
+    from kpi_extractor.pipeline import SymbolPipeline
+    from kpi_extractor.quality.reasons import CONFIRMED_LATER, RATE_COLUMN
+
+    pipeline = SymbolPipeline(SimpleNamespace(call=lambda *a, **k: {}), "STT", quarters=4, force=False, log=lambda *_: None)
+    pipeline.profile = SimpleNamespace(name="State Street", fiscal_year_end="1231", foreign=False)
+    row = {"group_key": "kpi_operating", "group_kind": "metric", "kpi_key": "average_loans", "kpi_label": "Average Loans",
+           "fiscal_year": "2021", "fiscal_period": "Q4", "period_end": "2021-12-31", "unit": "currency", "value": 2.08e6,
+           "method": "ai", "validation_status": "verified", "notes": [RATE_COLUMN, CONFIRMED_LATER], "locator": {}}
+    pipeline.values = {("kpi_operating", "average_loans", "2021", "Q4"): row}
+    pipeline._code_document = lambda *_: None
+    settled = pipeline._prove_flagged([])
+    assert [(v["validation_status"], v["notes"]) for v in settled] == [("needs_review", [RATE_COLUMN])]

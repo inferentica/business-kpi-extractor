@@ -10,6 +10,7 @@ from ..ai import Spec
 from ..domain.derive import derive_periods, same_derivation
 from ..documents.document import Document, parse_number
 from ..quality.checks import parts_add_up, reported_matches
+from ..quality.reasons import IDENTITY_HOLDS
 from ..quality.reasons import (ADDS_TO_XBRL as _ADDS_TO_XBRL, ASIDES, CONFIRMED_LATER as _CONFIRMED_LATER, EQUALS_XBRL as _EQUALS_XBRL,
                               GROUP_HOLDS, NO_REVENUE_NOTE, OTHER_PART_NOTE, PROOFS, RESTATED_LATER as _RESTATED_LATER, SIZE_HOLD_LIFTED,
                               SIZE_HOLDS, TIES_OUT, UNANCHORED,
@@ -190,7 +191,12 @@ class SeriesChecks:
         - the next year's release repeats each figure in its year-ago column: the same number proves it, a single other
           number is the figure as restated and replaces it, and none matching among several rejects it.
         What nothing settles stays unserved. A later release is fetched for a value only until it has been checked."""
-        flagged = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] == "needs_review"]
+        # A figure held for what its cell is (a rate column, one part's row, another row than its group's, a segment not
+        # reported then, a total its group breaks) is the same cell in the next year's release: State Street's average
+        # loans read from its rate column (2.08) were "confirmed" by the next release's rate column. Only a new reading
+        # of its own filing settles it.
+        flagged = [v for v in self.values.values() if v["method"] == "ai" and v["validation_status"] == "needs_review"
+                   and not any(note in IDENTITY_HOLDS for note in v.get("notes") or [])]
         official = xbrl_figures(self.values.values())
 
         def settle(row: dict, note: str, **fields) -> None:
@@ -229,6 +235,12 @@ class SeriesChecks:
                           and abs(float(v["value"]) - round(float(v["value"]))) > 1e-3):
                 settled[value_key(v)] = {**v, "value": float(match.group(1)), "validation_status": "needs_review",
                                          "notes": [n for n in v.get("notes") or [] if n != note]}
+        # Figures a later release "confirmed" while held for what their cell is go back to review, without that proof.
+        for v in self.values.values():
+            if v["method"] == "ai" and v["validation_status"] == "verified" and any(
+                    note in IDENTITY_HOLDS for note in v.get("notes") or []) and _CONFIRMED_LATER in (v.get("notes") or []):
+                settled[value_key(v)] = {**v, "validation_status": "needs_review",
+                                         "notes": [note for note in v["notes"] if note != _CONFIRMED_LATER]}
         # Parts proven alone by an earlier version of this rule, in breakdowns that do not add up, go back to review.
         for rows in groups.values():
             if not whole(rows[0]):
