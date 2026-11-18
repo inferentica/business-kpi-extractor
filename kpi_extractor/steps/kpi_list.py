@@ -282,9 +282,9 @@ class KpiListUpkeep:
         # Names may only rename breakdowns and members that exist; titles follow rules/titles.py, and stored ones stay.
         names = breakdown_names(spec.names, breakdowns, (row or {}).get("names"))
         version = (int(row["version"]) if row else 0) + 1
-        if row is None:  # a first list: its sector's lines the document names, then its first quarters (pipeline)
-            self.list_checks = list_checks.sector_lines_missing(getattr(sector_of(self.profile.sic), "key", None),
-                                                                    text if isinstance(text, str) else "", spec)
+        if row is None:  # a first list: what its sector keeps and its document names, if the list lacks it, is left out
+            self._leave_out(list_checks.sector_lines_missing(getattr(sector_of(self.profile.sic), "key", None),
+                                                             text if isinstance(text, str) else "", spec))
         self._store_spec(spec, names, version, latest.accession)
         self.names = names
         self.log(f"{self.symbol}: KPI list v{version} with {sum(len(g.kpis) for g in spec.groups)} KPIs")
@@ -437,9 +437,9 @@ class KpiListUpkeep:
 
     def _store_spec(self, spec: Spec, names: dict, version: int, accession: str) -> None:
         lines = left_out.merge(self.__dict__.pop("_left_out", []), self.__dict__.get("previous_left_out"), spec)
-        checks = self.__dict__.get("list_checks")
+        # Checks no longer flag a list (they feed Left out): an empty one clears a flag stored before 2026-11-18.
         self.store.spec({"version": version, "groups": [group.model_dump() for group in spec.groups], "names": names,
-                         "sourceAccession": accession, "leftOut": lines, **({"checks": checks} if checks is not None else {})})
+                         "sourceAccession": accession, "leftOut": lines, "checks": []})
         self.previous_left_out = lines
 
     def _xbrl_breakdowns(self) -> dict[str, dict]:
