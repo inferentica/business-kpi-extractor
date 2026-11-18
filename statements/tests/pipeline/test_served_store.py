@@ -21,7 +21,7 @@ def _record(**extra):
 def test_a_source_is_public_from_its_edgar_acceptance_else_the_end_of_its_filing_day():
     accepted = {"0000320193-24-000123": "2024-11-01T10:01:36+00:00"}
     assert available_from("0000320193-24-000123", "2024-11-01", accepted) == "2024-11-01T10:01:36+00:00"
-    # A regulator's form: the end of its filing day in New York (EST in January, EDT in July).
+    # No acceptance time and no regulator named: the end of its filing day in New York (EST in January, EDT in July).
     assert available_from("CVM-ITR-160183-v1", "2024-01-15", accepted) == "2024-01-16T04:59:59+00:00"
     assert available_from("CVM-ITR-160183-v1", "2024-07-15", accepted) == "2024-07-16T03:59:59+00:00"
 
@@ -172,3 +172,23 @@ def test_a_read_with_units_stores_them_and_the_next_read_gets_them_back(tmp_path
     assert posted[-1] == {"operation": "downloads", "cik": 320193}
     again = Units(tmp_path / "next", previous=later)
     assert again.reuse("report-0000320193-24-000123", {"offset": 0})["record"] == {"accession": "0000320193-24-000123"}
+
+
+def test_a_stamp_without_a_time_or_long_after_the_filing_day_is_no_publication():
+    from statement_extractor.pipeline.served import available_from
+    # Salesforce's 10-Q filed as of June 1, 2020, under an accession accepted February 24, 2022: its filing day.
+    late = {"0001108524-22-000007": "2022-02-24T21:11:16+00:00"}
+    assert available_from("0001108524-22-000007", "2020-06-01", late) == "2020-06-02T03:59:59+00:00"
+    # Before April 2002 EDGAR stamps midnight New York: a date, its day's end.
+    old = {"0000320193-97-000016": "1997-12-05T05:00:00+00:00"}
+    assert available_from("0000320193-97-000016", "1997-12-05", old) == "1997-12-06T04:59:59+00:00"
+    # An after-hours filing stamped the evening before its filing date is public at its stamp.
+    evening = {"x": "2024-02-01T22:15:00+00:00"}
+    assert available_from("x", "2024-02-02", evening) == "2024-02-01T22:15:00+00:00"
+
+
+def test_a_regulators_form_is_public_on_its_own_markets_day():
+    from statement_extractor.pipeline.served import available_from
+    assert available_from("BMV-1", "2024-07-25", {}, "bmv") == "2024-07-26T05:59:59+00:00"  # Mexico City, UTC-6
+    assert available_from("CVM-ITR-1", "2024-07-15", {}, "cvm") == "2024-07-16T02:59:59+00:00"  # São Paulo, UTC-3
+    assert available_from("DART-1", "2024-08-14", {}, "dart") == "2024-08-14T14:59:59+00:00"  # Seoul, UTC+9
