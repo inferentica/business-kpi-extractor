@@ -24,7 +24,7 @@ from ..rules.wording import (  # noqa: F401 - re-exported for callers of extract
 from ..rules.currency import (  # noqa: F401 - re-exported for callers of extract
     _column_currency, _currency, _CURRENCY_MARKERS)
 from ..rules.period import (  # noqa: F401 - re-exported for callers of extract
-    adjusted_problem, other_period_problem, year_ago_record, year_ago_value,
+    quote_problem, year_ago_record, year_ago_value,
     _CHANGE_KPI, _FOURTH_QUARTER, _FULL_DATE, _LONG_SPAN_KPI, _LONGER, _MONTH_NAME,
     _MONTH_SPAN, _MONTHS, _NAMES_QUARTER, _NUMERIC_DATE, _ORDINAL, _OTHER_PERIOD,
     _QUARTER, _stands_at_period_end, _STOCK_KPI, _YEAR, _YEAR_ROW, _YTD_TITLE,
@@ -199,7 +199,7 @@ def _read_raw(document: Document, locator: Locator, kpi: KpiSpec, default_curren
     before = quote[:quote.find(value_text)]
     if forward_looking(before):
         raise LocateError("the quote is a forecast or guidance, not the reported figure")
-    if problem := other_period_problem(block.text, quote, before, kpi.label) or adjusted_problem(block.text, quote, kpi.label):
+    if problem := quote_problem(block.text, quote, before, value_text, kpi.label):
         raise LocateError(problem)
     # A slide's title can follow its figures: Borr's "22 New Commitments $625M Added Backlog Revenue ... 4,820+ Backlog
     # Days 2025 YTD Contracting Statistics" gives the year to date, though no word before the figures says so.

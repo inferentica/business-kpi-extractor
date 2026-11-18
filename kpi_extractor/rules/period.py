@@ -284,3 +284,39 @@ def adjusted_problem(text: str, quote: str, kpi_label: str) -> str | None:
     if (clause := _OPENS_ADJUSTED.match(opening)) and not _ADJUSTED_LINE.search(kpi_label):
         return f"the sentence gives the figure {clause.group(0).rstrip(',').strip().lower()!r}, not the reported one"
     return None
+
+
+# A bound is not a figure: "climbed to over $65 billion", "more than 300,000 GPUs", "nearly $10 billion". "Approximately"
+# and "about" give the figure, rounded.
+_BOUND = re.compile(r"\b(?:over|more than|nearly|almost|exceeding|in excess of|upwards of|less than|under|just under|"
+                    r"just over|at least|up to)\s*$", re.I)
+_TRAILING = re.compile(r"\btrailing[- ](?:twelve|12)[- ]months?\b|\bTTM\b|\bLTM\b|\b(?:past|last|prior) (?:twelve|12) months\b", re.I)
+
+
+def bound_problem(before: str, value_text: str) -> str | None:
+    """Why a quoted figure is not the figure: a bound stands before it."""
+    words = re.match(r"^\s*((?:[a-z]+\s+){1,3}?)[$€£¥]?\s*\d", value_text or "", re.I)
+    lead = f"{before[-24:]} {words.group(1) if words else ''}".rstrip()
+    if found := _BOUND.search(re.sub(r"[$€£¥]\s*$", "", lead).rstrip()):
+        return f"the quote gives a bound ({found.group(0).strip().lower()!r}), not the figure"
+    return None
+
+
+def trailing_problem(text: str, quote: str, before: str, kpi_label: str) -> str | None:
+    """Why a quoted figure is not the quarter's: the trailing twelve months come before it, and before every other figure
+    of its clause. McDonald's "sales to loyalty members for the trailing twelve months increased over 20% to $40 billion"
+    gives no quarter; its "were approximately $33 billion for the trailing twelve-month period and approximately $9
+    billion for the quarter" names the year for the $33 billion only."""
+    context = f"{sentence_opening(text, quote)} {before}"
+    found = None
+    for found in _TRAILING.finditer(context):
+        pass
+    if found is None or _LONG_SPAN_KPI.search(kpi_label) or re.search(r"\d", context[:found.start()].split(".")[-1]):
+        return None
+    return f"the quote gives the figure for {found.group(0).lower()!r}, not the quarter"
+
+
+def quote_problem(text: str, quote: str, before: str, value_text: str, kpi_label: str) -> str | None:
+    """Why a quoted figure is not the line's for the quarter, from the words around it (the checks above, in order)."""
+    return (other_period_problem(text, quote, before, kpi_label) or adjusted_problem(text, quote, kpi_label)
+            or bound_problem(before, value_text) or trailing_problem(text, quote, before, kpi_label))
