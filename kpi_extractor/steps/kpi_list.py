@@ -16,6 +16,7 @@ from ..quality.reasons import OUTSIDE_REPORTED_PERIODS, has, without
 from ..rules.classify import classify_by_rules
 from ..rules.titles import OWN_AXIS_PREFIX, breakdown_names, keep_titles
 from . import left_out
+from ..quality import list_checks
 from ..store import FilingReading
 from ..xbrl import XbrlCandidate
 from .shared import AI_GROUP_PREFIX, _DONE, _days, _identity_text, only_adds
@@ -281,6 +282,9 @@ class KpiListUpkeep:
         # Names may only rename breakdowns and members that exist; titles follow rules/titles.py, and stored ones stay.
         names = breakdown_names(spec.names, breakdowns, (row or {}).get("names"))
         version = (int(row["version"]) if row else 0) + 1
+        if row is None:  # a first list: its sector's lines the document names, then its first quarters (pipeline)
+            self.list_checks = list_checks.sector_lines_missing(getattr(sector_of(self.profile.sic), "key", None),
+                                                                    text if isinstance(text, str) else "", spec)
         self._store_spec(spec, names, version, latest.accession)
         self.names = names
         self.log(f"{self.symbol}: KPI list v{version} with {sum(len(g.kpis) for g in spec.groups)} KPIs")
@@ -433,8 +437,9 @@ class KpiListUpkeep:
 
     def _store_spec(self, spec: Spec, names: dict, version: int, accession: str) -> None:
         lines = left_out.merge(self.__dict__.pop("_left_out", []), self.__dict__.get("previous_left_out"), spec)
+        checks = self.__dict__.get("list_checks")
         self.store.spec({"version": version, "groups": [group.model_dump() for group in spec.groups], "names": names,
-                         "sourceAccession": accession, "leftOut": lines})
+                         "sourceAccession": accession, "leftOut": lines, **({"checks": checks} if checks is not None else {})})
         self.previous_left_out = lines
 
     def _xbrl_breakdowns(self) -> dict[str, dict]:

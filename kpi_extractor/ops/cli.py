@@ -230,6 +230,8 @@ def main(argv: list[str] | None = None) -> int:
             "replayedReads": sum(result.replayed_reads for result in results),
             "replayOutcomes": _tally(result.replay_outcomes for result in results),
             "q4Gaps": {result.symbol: result.q4_gaps[:10] for result in results if result.q4_gaps},
+            # First lists the checks flagged: each read only its newest quarters, until accepted on Quotiva Review.
+            "flaggedLists": {result.symbol: [flag["text"] for flag in result.list_flags] for result in results if result.list_flags},
             # Companies whose earnings-document values are mostly unverified: a list or reading that needs attention.
             "lowCoverage": {result.symbol: f"{result.release_verified}/{result.release_values}" for result in results
                             if result.release_values >= 5 and result.release_verified < 0.5 * result.release_values},
