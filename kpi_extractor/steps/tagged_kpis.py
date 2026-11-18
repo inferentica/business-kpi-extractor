@@ -44,6 +44,26 @@ def _words(text: str) -> set[str]:
     return {word.removesuffix("s") for word in re.findall(r"[a-z0-9]+", spaced.lower())} - _GENERIC
 
 
+def _member_words(tag) -> set[str]:
+    named: set[str] = set()
+    for _axis, member in tag.dimensions or ():
+        named |= _words(str(member).removesuffix("Member"))
+    return named
+
+
+def names_measure(tag, label: str, group_label: str, unit: str = "percent") -> bool:
+    """Whether a tag names the measure of a line that is only a member's name: McDonald's "International Operated
+    Markets" in "Comparable Sales by Segment" is not the 10-Qs' "Minority Interest Ownership Percentage" for that
+    segment (89% franchised), whose concept names no word of the group. A line that names its own measure (Alphabet's
+    "Google Cloud Backlog", its remaining performance obligation) or whose tag's member does not name it is judged by
+    the rest of the checks. Only for a percentage: a filing tags many rates (ownership, tax, discount) by segment, while an
+    amount by segment is its line's own (KeyCorp's credit card loans, "Financing Receivable" for that member)."""
+    if unit != "percent" or not hasattr(tag, "concept") or not (_member_words(tag) & _words(label)) \
+            or _words(label) - _member_words(tag):
+        return True  # the line names its own measure ("Google Cloud Backlog"): the AI's pick and the other checks decide
+    return bool(_words(tag.concept) & _words(group_label))
+
+
 def _names_kpi(tag, label: str) -> bool:
     """Whether the tag's concept or a member it is tagged by shares a word with the KPI's name, beyond generic ones."""
     named = _words(tag.concept)
@@ -161,7 +181,7 @@ class TaggedKpiReading:
         for _group, kpi, _key in unread:
             line = ids.get(answer.picks.get(kpi.key) or "")
             if line is None or not unit_fits(kpi.unit, line[3], kpi.label, line[0].concept) or earlier is None \
-                    or line[0] not in facts_of(earlier):
+                    or line[0] not in facts_of(earlier) or not names_measure(line[0], kpi.label, _group.label, kpi.unit):
                 continue
             picked[kpi.key] = line[0]
         if picked:
@@ -210,7 +230,8 @@ class TaggedKpiReading:
                 stated = {quarter: float(v["value"]) for quarter, v in held.items()
                           if v["validation_status"] != "rejected" and not (v.get("locator") or {}).get("tagged")}
                 if tag is not None and any(_PICKED in note for v in held.values() if tag_from_locator(v.get("locator") or {}) == tag
-                                           for note in v.get("notes") or []) and self._unconfirmed(tag, stated, quarters, kfacts, kpi.label):
+                                           for note in v.get("notes") or []) and (
+                        self._unconfirmed(tag, stated, quarters, kfacts, kpi.label) or not names_measure(tag, kpi.label, group.label, kpi.unit)):
                     records += [{**v, "validation_status": "rejected", "notes": [_UNCONFIRMED]}
                                 for v in held.values() if tag_from_locator(v.get("locator") or {}) == tag
                                 and not v.get("owner_decision") and v["validation_status"] != "rejected"]
@@ -222,8 +243,8 @@ class TaggedKpiReading:
                 how = "tagged as in the quarters the release states it"
                 if tag is None and kpi.key in picked:
                     tag, how = picked[kpi.key], _PICKED
-                    if self._unconfirmed(tag, stated, quarters, kfacts, kpi.label):
-                        continue
+                    if self._unconfirmed(tag, stated, quarters, kfacts, kpi.label) or not names_measure(tag, kpi.label, group.label, kpi.unit):
+                        continue  # a cached pick is checked again: the measure rule came after some picks were kept
                     if any(quarter in quarters and tag in kfacts(quarter) and not agrees(kfacts(quarter)[tag], value)
                            for quarter, value in readings.items()):
                         continue  # a release gave a different figure: not this tag

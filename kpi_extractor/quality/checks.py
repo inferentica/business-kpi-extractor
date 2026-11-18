@@ -11,7 +11,7 @@ from datetime import date
 from typing import Callable, Iterable
 
 from ..rules.numbers import same_figure
-from .reasons import OFF_ROW, SHARED_CELL
+from .reasons import OFF_ROW, PART_ROW, SHARED_CELL
 
 MIX_TOLERANCE = 2.5  # percentage points; each rounded share can be off by half a point
 BREAKDOWN_TOLERANCE = 0.01
@@ -235,6 +235,17 @@ def _off_row(values: list) -> None:
               OFF_ROW)
 
 
+def _part_rows(values: list) -> None:
+    """A line read from the row of one of its parts: KeyCorp's "Time Deposits" from its "Other time deposits" row, one
+    of the two (beside "Certificates of deposit ($100,000 or more)"), 3,209 of 6,192 in Q4 2020."""
+    for item in values:
+        row = re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", str(item.locator.get("row_label") or "").lower())).strip()
+        line = re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", item.kpi.label.lower())).strip()
+        if line and not line.startswith("other") and re.fullmatch(rf"(?:all )?other {re.escape(line)}s?", row) \
+                and PART_ROW not in item.notes:
+            _flag([item], PART_ROW)
+
+
 def validate_groups(values: list, previous: dict[str, float]) -> None:
     """Marks every value of a group that fails its check as needs_review, with the reason."""
     by_group: dict[str, list] = {}
@@ -245,6 +256,7 @@ def validate_groups(values: list, previous: dict[str, float]) -> None:
             _flag((figure.source for figure in finding.figures), finding.note)
     _shared_cells(values)
     _off_row(values)
+    _part_rows(values)
 
 
 def check_period(located, expected: date) -> str | None:
