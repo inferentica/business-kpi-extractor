@@ -21,11 +21,12 @@ from datetime import date, timedelta
 from .sources.archive import Archive
 from .ops.control import ControlError
 from .documents.document import Document
-from .domain.fiscal import with_first_year
+from .domain.fiscal import fiscal_label, with_first_year
 from .sources import source as filing_source
 from .sources.base import FilingRef, FilingSource
 from .quality.metric_totals import unbalanced_quarters
 from .quality.reasons import METRIC_TOTAL
+from .quality import list_checks
 from .steps.segment_eras import lines_outside_segment_eras
 from .steps.shared import RecordBuilding, _folder, list_parents, only_adds
 from .steps.loading import FilingLoading
@@ -73,6 +74,8 @@ class SymbolResult:
     rule_evidence: list = field(default_factory=list)  # learned rules' figures beside the AI's (ops/learned.py)
     # Breakdown years with a full year and three quarters but no fourth: surfaced in the run summary, never silent.
     q4_gaps: list[str] = field(default_factory=list)
+    # A first list's flags (quality/list_checks.py): it read only its newest quarters, until accepted on Quotiva Review.
+    list_flags: list = field(default_factory=list)
     skipped: bool = False
     # Values read from earnings documents that are not rejected, and how many of them are verified (shown to users).
     release_values: int = 0
@@ -164,6 +167,33 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
                 self.control.call("release", symbol=self.symbol)
             except ControlError:
                 pass  # the run's finish releases it anyway
+
+    def _first_quarters_gate(self, state: dict, releases: list, spec, version: int, proposed: bool):
+        """A first list reads its newest quarters, then its checks (quality/list_checks.py) decide the rest: one that
+        passes reads every release of the window in this run; a flagged one, or a stored list whose checks the owner has
+        not yet accepted, stays at its newest quarters. Returns the releases this run keeps, and those processed."""
+        first_list = proposed and not state.get("spec")
+        open_checks = bool((state.get("spec") or {}).get("checks"))
+        ends = sorted({ref.period_end for ref in releases})[-list_checks.FIRST_QUARTERS:]
+        if not (first_list or open_checks) or self.reread or len({ref.period_end for ref in releases}) <= len(ends):
+            return releases, self._process_releases(releases, spec, version)
+        first = [ref for ref in releases if ref.period_end in ends]
+        processed = self._process_releases(first, spec, version)
+        if first_list:
+            quarters = {fiscal_label(end, self.profile.fiscal_year_end, year_offset=self.offset) for end in ends}
+            flags = [*(self.__dict__.get("list_checks") or []),
+                     *filter(None, [list_checks.unread_lines(spec, self.values.values(), quarters)])]
+            self.list_checks = flags
+            self._store_spec(spec, self.names, version, releases[-1].accession)
+            open_checks = bool(flags)
+        if open_checks:
+            flags = self.__dict__.get("list_checks") if first_list else (state.get("spec") or {}).get("checks")
+            self.log(f"{self.symbol}: list flagged ({'; '.join(str(f.get('text')) for f in flags or [])}): "
+                     f"{len(ends)} newest quarters only, until it is accepted on Quotiva Review")
+            self.result.list_flags = list(flags or [])
+            return first, processed
+        self.log(f"{self.symbol}: list passed its checks; reading its other {len(releases) - len(first)} releases")
+        return releases, processed + self._process_releases([ref for ref in releases if ref not in first], spec, version)
 
     def _run(self) -> SymbolResult:
         state = self.control.call("symbol_state", symbol=self.symbol)
@@ -265,7 +295,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         if spec is not None and not proposed:
             self._carry_owner_additions(spec, version, state.get("previousSpec"), releases)
         if spec is not None:
-            processed = self._process_releases(releases, spec, version)
+            releases, processed = self._first_quarters_gate(state, releases, spec, version, proposed)
             latest_end = releases[-1].period_end if releases else None
             # An evaluation on stored lists scores the readers, so it keeps the list as stored (no audit call).
             audit = os.environ.get("KPI_EVAL_LISTS") != "stored" and not self.reread
