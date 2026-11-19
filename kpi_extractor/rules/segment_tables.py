@@ -48,7 +48,13 @@ def _heading_line(context: str) -> str:
     tail = re.split(r"[.;:)]\s", (context or "")[-200:])[-1].strip()
     letters = re.findall(r"[A-Za-z]", tail)
     # A title, set in capitals; a sentence's end that names a segment ("... at Optum Rx") is no heading.
-    return tail if 0 < len(tail) <= 100 and letters and sum(c.isupper() for c in letters) >= 0.8 * len(letters) else ""
+    if 0 < len(tail) <= 100 and letters and sum(c.isupper() for c in letters) >= 0.8 * len(letters):
+        return tail
+    # A page's running head before the title: Wells Fargo's "Wells Fargo & Company and Subsidiaries WEALTH AND
+    # INVESTMENT MANAGEMENT SEGMENT". The title is the run of words in capitals that ends the line, two words or more.
+    caps = re.search(r"(?:\b[A-Z][A-Z&,'-]*(?:\s+|$))+$", tail)
+    run = caps.group(0).strip() if caps else ""
+    return run if len(re.findall(r"[A-Z]{2,}", run)) >= 2 else ""
 
 
 def heading(table: Table) -> str:

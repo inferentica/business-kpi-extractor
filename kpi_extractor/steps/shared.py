@@ -82,7 +82,9 @@ def _year_ago_cells(document: Document, locator: dict, value: float,
         if cell is not None and column_header(table, first, other) == span:
             cells[other] = cell.value * factor
     if period is not None:
-        cells = {other: cell for other, cell in cells.items() if not _another_period(table, first, other, *period)}
+        # Dates read above the value's own row, as header_contradicts reads them: `first` can be a header row whose
+        # dates read as numbers (Wells Fargo's "Mar 31,2023"), with only "Quarter ended" above it.
+        cells = {other: cell for other, cell in cells.items() if not _another_period(table, row, other, *period)}
     return list(cells.values())
 
 

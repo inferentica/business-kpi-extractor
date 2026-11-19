@@ -546,7 +546,7 @@ def _choose(candidates, year_ago_rows, stored, prose=True):
         return located, [item]
     pipeline._checked = checked
     pipeline._stored_year_ago = lambda expected: {"operating.members": stored} if stored is not None else {}
-    pipeline._year_ago_cell_matches = lambda item, document, before: before is not None and before in year_ago_rows[item.locator["block"]]
+    pipeline._year_ago_cell_matches = lambda item, document, before, *_: before is not None and before in year_ago_rows[item.locator["block"]]
     result = pipeline._one_of(None, SPEC, "operating.members", AmbiguousQuote(places), Q2, "USD")
     return result if isinstance(result, str) else result[1][0].value
 
@@ -911,8 +911,8 @@ def test_one_of_several_tables_is_the_one_whose_year_ago_cell_holds_the_stored_f
         table = located.values[0].table
         return located, [SimpleNamespace(value=figures[table], locator={"table": table})]
     pipeline._checked = checked
-    pipeline._year_ago_cell_matches = lambda item, document, before: before == year_ago[item.locator["table"]]
-    pipeline._year_ago_differs = lambda item, document, before: before is not None and before != year_ago[item.locator["table"]] \
+    pipeline._year_ago_cell_matches = lambda item, document, before, *_: before == year_ago[item.locator["table"]]
+    pipeline._year_ago_differs = lambda item, document, before, *_: before is not None and before != year_ago[item.locator["table"]] \
         and item.locator["table"] in shows_year_ago
     shows_year_ago = {"T0", "T1"}
     def choose(stored):
@@ -936,7 +936,8 @@ def _noninterest(trading: str, debt: str, equity: str = "Net gains (losses) from
     deposit, card, gains, losses, other = figures
     total = deposit + card + gains + losses + other + (int(debt) if debt.isdigit() else 0) + (lease or 0)
     cell = lambda n: f"({-n:,})" if n < 0 else f"{n:,}"
-    return f"""<table><tr><td>(in millions)</td><td>Mar 31,2023</td><td>Dec 31,2022</td></tr>
+    # Its columns headed with no date (the same table stands for each quarter read here).
+    return f"""<table><tr><td>(in millions)</td><td>Quarter ended</td><td>Quarter ended</td></tr>
 <tr><td>Deposit-related fees</td><td>{cell(deposit)}</td><td>1,178</td></tr><tr><td>Card fees</td><td>{cell(card)}</td><td>1,095</td></tr>
 <tr><td>{trading}</td><td>{cell(gains)}</td><td>552</td></tr><tr><td>Net gains from debt securities</td><td>{debt}</td><td>—</td></tr>
 <tr><td>{equity}</td><td>{cell(losses)}</td><td>(733)</td></tr>{f"<tr><td>Lease income</td><td>{lease}</td><td>287</td></tr>" if lease else ""}
@@ -1159,3 +1160,22 @@ def test_last_quarters_column_holding_its_stored_figure_confirms_this_quarters()
     assert not previous_quarter_cell_matches(doc, at(1), 230e6, 225e6, date(2024, 6, 30), 2)  # another stored figure
     assert not previous_quarter_cell_matches(doc, at(2), 224e6, 224e6, date(2024, 6, 30), 2)  # last quarter's column read
     assert not previous_quarter_cell_matches(doc, at(1), 230e6, None, date(2024, 6, 30), 2)
+
+
+def test_only_the_year_ago_column_decides_which_table_holds_a_figure():
+    # Wells Fargo 1Q23: the company restated 1Q22's efficiency ratio (79 stored, 78 printed); the wealth segment's row
+    # printed 79 for 2Q22. Its 2Q22 cell is no year-ago figure for 1Q23.
+    from kpi_extractor.documents.document import Document
+    from kpi_extractor.readers.extract import ReadValue
+    from kpi_extractor.steps.ai_reading import AiReading
+    doc = Document(source_url="https://www.sec.gov/s.htm")
+    doc.tables["B_T14"] = Table("B_T14", "", [["", "Quarter ended", "", "", "", ""],
+                                              ["($ in millions)", "Mar 31,2023", "Dec 31,2022", "Sep 30,2022", "Jun 30,2022", "Mar 31,2022"],
+                                              ["Efficiency ratio", "83", "74", "76", "79", "85"]])
+    doc.order.append("B_T14")
+    spec = Spec.model_validate({"groups": [{"key": "operating", "label": "Operating", "kind": "metric",
+                                            "kpis": [{"key": "efficiency_ratio", "label": "Efficiency Ratio", "unit": "percent"}]}]})
+    item = ReadValue(spec.groups[0], spec.groups[0].kpis[0], 83.0, None, {"table": "B_T14", "row": 2, "col": 1})
+    assert AiReading._year_ago_cell_matches(item, doc, 79.0)  # every quarter's cell, as other checks still read it
+    assert not AiReading._year_ago_cell_matches(item, doc, 79.0, date(2022, 3, 31))
+    assert AiReading._year_ago_cell_matches(item, doc, 85.0, date(2022, 3, 31))

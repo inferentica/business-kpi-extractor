@@ -344,9 +344,14 @@ class AiReading:
         return confirmed >= 2
 
     @staticmethod
-    def _year_ago_cell_matches(item: ReadValue, document: Document, before: float | None) -> bool:
+    def _year_ago_cell_matches(item: ReadValue, document: Document, before: float | None,
+                               year_ago: date | None = None) -> bool:
+        """Whether the row's year-ago cells hold the figure stored for that quarter last year. With `year_ago` (that
+        quarter's end), only a column that names no other period: in a five-quarter supplement another quarter's cell
+        can hold it by chance (Wells Fargo's wealth segment printed 79 for 2Q22, the company's stored 1Q22 ratio)."""
+        period = (year_ago, None) if year_ago is not None else None
         return before is not None and any(abs(cell - before) <= abs(before) * 1e-4
-                                          for cell in _year_ago_cells(document, item.locator, item.value))
+                                          for cell in _year_ago_cells(document, item.locator, item.value, period))
 
     def _ask(self, text: str, purpose: str, schema, thinking_first: bool, model: str = "flash"):
         last_error = None

@@ -145,7 +145,8 @@ _MONTHS = {name: index for index, names in enumerate(
 _NUMERIC_DATE = re.compile(r"\b(\d{1,2})/(\d{1,2})/((?:19|20)\d{2})\b")
 
 
-_FULL_DATE = re.compile(r"\b(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")\.?\s+(\d{1,2}),?\s+((?:19|20)\d{2})\b")
+# "Mar 31,2023" too: Wells Fargo's supplement prints no space after the comma, and its columns named no date.
+_FULL_DATE = re.compile(r"\b(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")\.?\s+(\d{1,2})(?:,\s*|\s+)((?:19|20)\d{2})\b")
 
 
 _YEAR = re.compile(r"(?<![\d$.,])(?:fy\s?)?['’]?((?:19|20)\d{2})(?![\d%]|[,.]\d)|\b[1-4]q['’]?(\d{2})\b|\bq[1-4]\s?['’]?(\d{2}|(?:19|20)\d{2})\b")

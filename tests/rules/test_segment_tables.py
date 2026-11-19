@@ -101,3 +101,16 @@ def test_a_heading_joining_the_company_and_its_segments_is_no_one_segments():
     # A heading naming the one segment before the word still is that segment's.
     wealth = Table("A_T4", "", [["PRIVATE WEALTH SEGMENT", ""], ["", "3Q24"], ["Average loans", "$9,100"]])
     assert segment_of(wealth, BNY) == "private wealth"
+
+
+def test_a_segment_title_after_the_pages_running_head_names_the_segment():
+    # Wells Fargo's supplement: each page opens "Wells Fargo & Company and Subsidiaries", then its title in capitals.
+    names = segment_names(["Commercial Banking", "Wealth and Investment Management", "Consumer Banking and Lending"])
+    page = Table("B_T14", "Wells Fargo & Company and Subsidiaries WEALTH AND INVESTMENT MANAGEMENT SEGMENT",
+                 [["", "Quarter ended"], ["Efficiency ratio", "83"]])
+    summary = Table("B_T2", "Wells Fargo & Company and Subsidiaries SUMMARY FINANCIAL DATA",
+                    [["", "Quarter ended"], ["Efficiency ratio (7)", "66"]])
+    assert segment_of(page, names) == "wealth and investment management" and segment_of(summary, names) is None
+    # A sentence ending in a short capitalised word is no title.
+    assert segment_of(Table("T3", "Revenue grew at Wealth and Investment Management in the US", [["", "1Q23"], ["Revenue", "5"]]),
+                      names) is None

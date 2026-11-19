@@ -434,7 +434,8 @@ class ReplayReading:
             if not isinstance(checked, str):
                 passing.append((checked, section))
         before = self._stored_year_ago(expected).get(key)
-        pool = [checked for checked, _section in passing if self._year_ago_cell_matches(checked[1][0], document, before)]
+        year_ago = expected - timedelta(days=365)  # its year-ago column alone, never another quarter's equal cell
+        pool = [checked for checked, _section in passing if self._year_ago_cell_matches(checked[1][0], document, before, year_ago)]
         # Sections decide only between sentences of prose that each sit under a named period, the quarter's and longer
         # spans' (Mastercard): table rows quoted as lines repeat across different tables (Apollo's "Ending Balance" ends
         # its AUM and its fee-generating AUM roll-forwards, each for the quarter and the twelve months).
