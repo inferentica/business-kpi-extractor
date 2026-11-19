@@ -57,6 +57,8 @@ class FilingReading:
     # What a periodic report's figures are reported in (xbrl/basis.py); an earnings release takes its report's.
     accounting_standard: str | None = None
     currency: str | None = None
+    # The listed lines a reading found no line for, in full (its "not reported" note is cut at 300 characters).
+    unreported: list[str] | None = None
 
 
 def failed_reading(ref: FilingRef, error: Exception, spec_version: int | None = None) -> FilingReading:
@@ -72,6 +74,7 @@ class CompanyStore:
         self.log = log
         self._values: dict[tuple, MappingProxyType] = {}
         self._filings: dict[str, dict] = {}
+        self.unreported: dict[str, frozenset[str]] = {}  # this run's readings: accession → lines it found no line for
         self.owner_rejected: list[dict] = []
         # Each listed KPI's reported periods (group key, KPI key) -> (since, until): a figure outside them is not kept.
         self.windows: dict[tuple[str, str], tuple[str | None, str | None]] = {}
@@ -163,6 +166,8 @@ class CompanyStore:
         }
         self._send(filings=[filing], values=records)
         self._filings[ref.accession] = filing
+        if reading.unreported is not None:
+            self.unreported[ref.accession] = frozenset(reading.unreported)
         if not reading.counted:
             return
         self.result.filings += 1

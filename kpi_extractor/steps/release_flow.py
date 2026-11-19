@@ -4,6 +4,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
+from ..quality.list_checks import refused_lines
 from ..quality.reasons import EXPLAINED, RATE_COLUMN, SIGN_TURNED, note_with
 from .. import ai
 from ..ai import Spec
@@ -206,8 +207,11 @@ class ReleaseFlow:
             records = self._release_records(read, spec, ref, document, fiscal_year, fiscal_period, period_end, period_problem)
             verified = sum(1 for record in records if record["validation_status"] == "verified")
             status = "processed" if verified else "needs_review" if records else "skipped"
-            unreported = [key for key in _unreported(spec, read)
-                          if not (located.annual and spec_kind(spec, key) == "metric")]  # not looked for in a year's report
+            # A line a reader found and a check refused is in the filing: never "not reported", so later readings
+            # look for it and the list keeps it (Caterpillar's Sales by Application, refused for a misread header).
+            refused = refused_lines(problems)
+            unreported = [key for key in _unreported(spec, read) if key not in refused
+                          and not (located.annual and spec_kind(spec, key) == "metric")]  # not looked for in a year's report
             reasons = {key: located.missing_reasons.get(key, "unstated") for key in unreported} if how == _READ_BY_AI else {}
             reasons.update(dict.fromkeys(self._left_out_naming(document, spec, list(reasons)), "left_out_names_it"))
             second = getattr(self._local, "second_read", None) if how == _READ_BY_AI else None
@@ -216,7 +220,7 @@ class ReleaseFlow:
                      *([_SECOND_READ + second] if second else []),
                      *([_GROUPS_NOT_READ + ", ".join(skipped)] if skipped else []), *problems[:20]]
             return FilingReading(ref, status, records=records, spec_version=version, period_end=period_end,
-                                 fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes)
+                                 fiscal_year=fiscal_year, fiscal_period=fiscal_period, notes=notes, unreported=unreported)
         except Exception as error:  # noqa: BLE001
             return failed_reading(ref, error, version)
 

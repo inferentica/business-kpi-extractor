@@ -151,11 +151,30 @@ _FULL_DATE = re.compile(r"\b(" + "|".join(sorted(_MONTHS, key=len, reverse=True)
 _YEAR = re.compile(r"(?<![\d$.,])(?:fy\s?)?['’]?((?:19|20)\d{2})(?![\d%]|[,.]\d)|\b[1-4]q['’]?(\d{2})\b|\bq[1-4]\s?['’]?(\d{2}|(?:19|20)\d{2})\b")
 
 
-def column_dates(table: Table, first_data_row: int, col: int) -> tuple[list[date], list[int]]:
-    """The dates and years a column's own header cells name, read from the header rows above the first data row
-    (the words column_header keeps, here with their dates): "Three Months Ended September 30," over "2026" gives
-    2026-09-30. A two-digit year ("3Q25", "Q3'25") counts as 20xx."""
-    cells = [_heading(row, col) for row in table.rows[:max(first_data_row, 1)][:6] if col < len(row)]
+_FIGURE = re.compile(r"[\s$€£¥(\-–—]*\d[\d.,]*\s*%?\)?[\s*]*")
+_BARE_YEAR = re.compile(r"(?:19|20)\d{2}")
+
+
+def _figure_row(cells: list[str]) -> bool:
+    return any(_FIGURE.fullmatch(cell) and not _BARE_YEAR.fullmatch(cell.strip()) for cell in cells[1:] if cell.strip())
+
+
+def restated_headers(table: Table, row: int) -> list[list[list[str]]]:
+    """The header rows a table restates above a row, nearest first: each run of rows with no figures that sits below
+    figures. Caterpillar's segment tables print a "Third Quarter 2025 | Sales Volume | … | Third Quarter 2026" bridge,
+    then "Sales by Application" headed "Third Quarter 2026 | Third Quarter 2025" in the same table."""
+    blocks, block = [], []
+    for index in range(min(row, len(table.rows)) - 1, -1, -1):
+        if not _figure_row(table.rows[index]):
+            block.append(table.rows[index])
+        elif block:
+            blocks.append(block[::-1][-HEADER_ROWS:])
+            block = []
+    return blocks  # the run left at the top is the table's own header
+
+
+def _dates_in(rows: list[list[str]], col: int) -> tuple[list[date], list[int]]:
+    cells = [_heading(row, col) for row in rows if col < len(row)]
     text = clean(" ".join(cell for cell in cells if cell)).lower()
     dates = []
     for month, day, year in _FULL_DATE.findall(text):
@@ -171,6 +190,18 @@ def column_dates(table: Table, first_data_row: int, col: int) -> tuple[list[date
     years = sorted({int(full) if full else 2000 + int(short or quarter[-2:]) for full, short, quarter in _YEAR.findall(text)
                     if (full or short or quarter)})
     return dates, years
+
+
+def column_dates(table: Table, first_data_row: int, col: int) -> tuple[list[date], list[int]]:
+    """The dates and years a column's own header cells name, read from the header rows above the first data row
+    (the words column_header keeps, here with their dates): "Three Months Ended September 30," over "2026" gives
+    2026-09-30. A two-digit year ("3Q25", "Q3'25") counts as 20xx. A header the table restates above the row, naming
+    a period, is the column's own (restated_headers)."""
+    for block in restated_headers(table, first_data_row):
+        found = _dates_in(block, col)
+        if found[0] or found[1]:
+            return found
+    return _dates_in(table.rows[:max(first_data_row, 1)][:6], col)
 
 
 def header_contradicts(table: Table, row: int, col: int, expected: date, *also: date) -> str | None:

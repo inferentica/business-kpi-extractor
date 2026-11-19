@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 from kpi_extractor.ai import Spec
 from kpi_extractor.pipeline import SymbolPipeline
-from kpi_extractor.quality.list_checks import REASON_SECTOR, REASON_UNREAD, sector_lines_missing, unread_lines
+from kpi_extractor.quality.list_checks import (REASON_SECTOR, REASON_UNREAD, noted_unreported, refused_lines,
+                                              sector_lines_missing, unread_lines)
 
 BANK = Spec.model_validate({"groups": [{"key": "ratios", "label": "Key Ratios", "kind": "metric", "kpis": [
     {"key": "nim", "label": "Net Interest Margin", "unit": "percent"}, {"key": "cet1", "label": "CET1 Ratio", "unit": "percent"}]}]})
@@ -19,12 +20,23 @@ def test_a_sector_line_the_filing_names_and_the_list_lacks_is_left_out():
     assert sector_lines_missing("software", text, BANK) == []
 
 
-def test_lines_every_newest_filing_notes_as_not_reported_are_unread():
-    notes = [["read by AI", "not reported: ratios.cet1"], ["read by AI", "not reported: ratios.cet1, ratios.nim"]]
-    assert unread_lines(BANK, notes) == {("ratios", "cet1")}
+def test_lines_no_newest_filing_has_are_unread():
+    assert unread_lines(BANK, [{"ratios.cet1"}, {"ratios.cet1", "ratios.nim"}]) == {("ratios", "cet1")}
     # A line one filing found is read (stored under a series' key or not), and a filing nothing read says nothing.
-    assert unread_lines(BANK, [["read by AI", "not reported: ratios.cet1"], ["read by AI"]]) == set()
-    assert unread_lines(BANK, [[], []]) == set()
+    assert unread_lines(BANK, [{"ratios.cet1"}, set()]) == set()
+    assert unread_lines(BANK, [None, None]) == set()
+    assert unread_lines(BANK, [None, {"ratios.cet1"}]) == {("ratios", "cet1")}
+
+
+def test_a_line_a_reader_found_and_a_check_refused_is_in_the_filing():
+    problems = ["flash ratios.cet1: column headed 2025, not the quarter ended 2026-09-30",
+                "pro ratios.cet1: column headed 2025, not the quarter ended 2026-09-30",
+                "ratios.nim: quote names another period", "breakdown reports the full year: stored as the fiscal year"]
+    assert refused_lines(problems) == {"ratios.cet1", "ratios.nim"}
+    # A filing read before: its note named the refused line as not reported, and its notes give the refusal.
+    notes = ["read by AI", "release reader 5", "not reported: ratios.cet1, ratios.nim", problems[0]]
+    assert noted_unreported(notes) == {"ratios.nim"}
+    assert noted_unreported(["read by AI"]) == set() and noted_unreported(["xbrl reader 50"]) is None
 
 
 def _pipeline():
@@ -71,3 +83,13 @@ def test_a_list_flagged_before_reads_its_whole_history_and_drops_its_flag():
     pipeline, releases, processed, stored = _pipeline()
     kept, done, spec = pipeline._settle_first_list({"spec": {"checks": []}}, releases, BANK, 2, False)
     assert len(processed) == 1 and stored == []
+
+
+def test_this_runs_readings_count_in_full_over_the_cut_note():
+    pipeline, releases, processed, stored = _pipeline()
+    for ref in releases:
+        # The stored note was cut before ratios.cet1; the reading itself gave it in full.
+        pipeline.store._filings[ref.accession] = {"accession": ref.accession, "notes": ["read by AI", "not reported: ratios.ni"]}
+        pipeline.store.unreported[ref.accession] = frozenset({"ratios.nim", "ratios.cet1"})
+    kept, done, spec = pipeline._settle_first_list({}, releases, BANK, 1, True)
+    assert pipeline.result.lines_not_found == ["ratios.cet1", "ratios.nim"] and spec.groups == []
