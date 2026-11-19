@@ -151,3 +151,18 @@ def test_a_year_on_ifrs_derives_its_fourth_quarter_from_its_regulators_forms_on_
                "period_end": "2014-06-30", "basis": "IFRS", "currency": "USD", "lines": served.lines}]
     [q4] = derive_fourth_quarters(chosen, [nine, year], {})
     assert (q4["basis"], q4["derived_from"]["year"], q4["lines"][0]["value"]) == ("IFRS (CPC)", "dfp", 60.0)
+
+
+def test_the_served_years_own_basis_pairs_before_a_national_ifrs():
+    # Ultrapar FY2018: its 6-K's IFRS year and nine months pair, though CVM's DFP and ITR on IFRS (CPC) are newer.
+    def item(accession, filed, period, basis, value, source="html"):
+        found = reading(accession, filed, period, "ytd" if period == "Q3" else "year", "income",
+                        [("c", "Net revenue", value)])
+        found.basis, found.source = basis, source
+        return found
+    nines = [item("6k-9m", date(2019, 1, 10), "Q3", "IFRS", 100.0), item("itr", date(2019, 1, 20), "Q3", "IFRS (CPC)", 100.0, "cvm")]
+    years = [item("6k-fy", date(2019, 2, 20), "FY", "IFRS", 160.0), item("dfp", date(2019, 2, 25), "FY", "IFRS (CPC)", 160.0, "cvm")]
+    chosen = [{"statement": "income", "fiscal_year": "2019", "fiscal_period": "FY", "duration": "year", "status": "kept",
+               "period_end": "2019-09-28", "basis": "IFRS", "currency": "USD", "lines": years[0].lines}]
+    [q4] = derive_fourth_quarters(chosen, nines + years, {})
+    assert (q4["basis"], q4["derived_from"]["year"], q4["derived_from"]["nine_months"]) == ("IFRS", "6k-fy", "6k-9m")

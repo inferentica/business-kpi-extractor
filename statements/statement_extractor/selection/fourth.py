@@ -174,8 +174,13 @@ def derive_fourth_quarters(chosen: list[dict], readings: list, keys: dict) -> li
         if not nines:
             continue
         prior = str(int(year) - 1) if year.isdigit() else ""
-        pair = _pair(nines, [reading for reading in kept if reading.key == (statement, year, "FY", "year")], keys,
-                     [reading for reading in kept if reading.key == (statement, prior, "FY", "year")])
+        years = [reading for reading in kept if reading.key == (statement, year, "FY", "year")]
+        earlier = [reading for reading in kept if reading.key == (statement, prior, "FY", "year")]
+        # The served year's own basis first; a national adoption of IFRS only where it gives no pair (BrasilAgro's
+        # FY2014 on the 20-F's IFRS, its year and nine months on IFRS (CPC) at CVM).
+        own = [reading for reading in nines if reading.basis == item.get("basis")]
+        pair = (_pair(own, years, keys, earlier) if own else None) or _pair(
+            [reading for reading in nines if reading.basis != item.get("basis")], years, keys, earlier)
         if pair is None:
             continue  # no year and nine months of one vintage: left underived rather than mixed
         nine, whole = pair
