@@ -25,10 +25,10 @@ on:
         type: boolean
         default: false
       store:
-        description: "After reading, write each company to Quotiva (main only): a dry run checks, a write serves"
+        description: "After reading, write each company to Quotiva (main only): a dry run checks, a write serves; a write allowing withdrawals confirms a reader change that ends many periods at once"
         required: false
         type: choice
-        options: ["no", "dry run", "write"]
+        options: ["no", "dry run", "write", "write, allowing withdrawals"]
         default: "no"
       incremental:
         description: "On main, build each company on its units in R2 (its last stored read): read only what is new"
@@ -239,7 +239,7 @@ jobs:
           failed=0
           for folder in out/*/; do
             [ -f "$folder/served.json" ] || { echo "::warning::$folder has no served.json"; continue; }
-            if [ "$MODE" = "dry run" ]; then flag=--dry-run; else flag=; fi
+            case "$MODE" in "dry run") flag=--dry-run ;; "write, allowing withdrawals") flag=--allow-withdraw ;; *) flag= ;; esac
             python -m statement_extractor store "$folder" $flag || { echo "::error::$folder failed"; failed=1; }
           done
           exit $failed
