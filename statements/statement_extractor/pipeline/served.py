@@ -1,6 +1,6 @@
 """The served snapshot of one company (Phase 7, s7-writes): what Quotiva serves, in the shape statements_store takes
-(statements/docs/storage.md). One row per kept statement period and basis, the chosen basis primary, the newest
-presentation on each other basis beside it; each row stamped with when its source became public (`available_from`,
+(statements/docs/storage.md). One row per kept statement period and basis, the chosen basis primary where it is the
+group's, the newest presentation on each other basis beside it; each row stamped with when its source became public (`available_from`,
 EDGAR's acceptance time), its lines with the schema's fields only. Written as served.json beside the run's files."""
 from __future__ import annotations
 
@@ -59,7 +59,9 @@ def served_snapshot(symbol: str, cik: int | None, chosen: list[dict], filings: l
     for record in chosen:
         if record.get("status") != "kept" or not record.get("lines"):
             continue
-        for row in [_row(record, record, True, accepted)] + [
+        # The group's statement is primary; a parent's own is served beside nothing, never as the company's (decision
+        # of 2026-11-19): TSMC's 1997-2006 parent quarters, Sabesp's individual CVM forms.
+        for row in [_row(record, record, record.get("scope") == "consolidated", accepted)] + [
                 _row(record, other, False, accepted) for other in record.get("other_bases") or []]:
             # A presentation whose currency its filing does not state is never served: Quotiva refuses it, and a
             # currency guessed would be worse than none. Listed in the read's summary instead.

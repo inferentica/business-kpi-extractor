@@ -22,8 +22,8 @@ def ifrs_family(basis: str | None) -> str | None:
     """IFRS for IFRS as issued and its national adoptions read alike (K-IFRS, CPC); Taiwan-IFRS stays apart (its
     statements differ from TSMC's IFRS 20-F by right)."""
     return IFRS if basis in (IFRS, K_IFRS, CPC_IFRS) else basis
-MEXICAN_FRS, MEXICAN_GAAP, CHILEAN_GAAP, BRAZILIAN_GAAP, KOREAN_GAAP, UK_GAAP = (
-    "Mexican FRS", "Mexican GAAP", "Chilean GAAP", "Brazilian GAAP", "Korean GAAP", "UK GAAP")
+MEXICAN_FRS, MEXICAN_GAAP, CHILEAN_GAAP, BRAZILIAN_GAAP, KOREAN_GAAP, UK_GAAP, SWISS_CO = (
+    "Mexican FRS", "Mexican GAAP", "Chilean GAAP", "Brazilian GAAP", "Korean GAAP", "UK GAAP", "Swiss CO")
 
 # Each basis by the words that name it, most specific first: IFRS "as endorsed" in Taiwan before IFRS as issued.
 _NAMES = (
@@ -70,6 +70,10 @@ _NAMES = (
                   r"financial\s+accounting\s+standards[^.;]{0,80}?(?:in|of)\s+the\s+Republic\s+of\s+Korea|"
                   r"\bKorean\s+GAAP\b|\bK-GAAP\b"),
     (UK_GAAP, r"accounting\s+principles\s+generally\s+accepted\s+in\s+the\s+United\s+Kingdom|\bU\.?K\.?\s+GAAP\b"),
+    # A Swiss company's own statements under Swiss law: UBS Group AG's standalone statements, "prepared in accordance
+    # with the principles of the Swiss Law on Accounting and Financial Reporting (32nd title of the Swiss Code of
+    # Obligations)".
+    (SWISS_CO, r"Swiss\s+Law\s+on\s+Accounting\s+and\s+Financial\s+Reporting|Swiss\s+Code\s+of\s+Obligations"),
     # ASML's statutory interim reports: "prepared in accordance with IAS 34", IFRS's standard for interim reports.
     # CEMEX's 2016 opinion: "International Reporting Standards as issued by the International Accounting Standards Board".
     # Gerdau's 2010 releases: "the international accounting practices issued by the International Accounting Standards

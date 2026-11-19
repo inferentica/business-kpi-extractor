@@ -140,7 +140,10 @@ def _release_bases(readings) -> None:
     stated = [reading for reading in readings if reading.own and reading.form == "6-K" and reading.basis]
     quarters = {}  # each release by its own period: the basis its quarter's own report states
     for own in (reading for reading in readings if reading.own and reading.form == "6-K" and reading.basis is None):
-        same = [other for other in stated if other.period_end == own.period_end and abs((other.filed - own.filed).days) <= 183]
+        # Of its own scope: UBS's standalone statements of June 2023 are not on the US GAAP of the Credit Suisse
+        # report it filed for the same quarter.
+        same = [other for other in stated if other.period_end == own.period_end and other.scope == own.scope
+                and abs((other.filed - own.filed).days) <= 183]
         if same and own.accession not in quarters:
             quarters[own.accession] = min(same, key=lambda other: abs((other.filed - own.filed).days)).basis
     for reading in readings:

@@ -296,11 +296,38 @@ def test_a_start_of_its_own_never_splits_a_period():
 
 
 def test_a_period_on_another_basis_keeps_its_own_end():
-    # KB's 2011 year-end balance sheet: on K-IFRS to December 31, 2011; its IFRS restatement opens January 1, 2012.
-    kifrs = reading("k", date(2012, 11, 29), 1, own=False, statement="balance", duration="instant")
-    kifrs.basis, kifrs.period_end = "K-IFRS", date(2011, 12, 31)
+    # A year-end balance sheet on one basis to December 31, 2011, beside its restatement on another opening January 1,
+    # 2012. A national adoption of IFRS beside IFRS is one family: the newest presentation, no other basis (KB's K-IFRS).
+    first = reading("k", date(2012, 11, 29), 1, own=False, statement="balance", duration="instant")
+    first.basis, first.period_end = "US GAAP", date(2011, 12, 31)
     ifrs = reading("i", date(2014, 4, 29), 2, own=False, statement="balance", duration="instant")
     ifrs.basis, ifrs.period_end = "IFRS", date(2012, 1, 1)
-    kifrs.checks = ifrs.checks = [Check("balance", "pass")]
-    [chosen] = choose([kifrs, ifrs])
+    first.checks = ifrs.checks = [Check("balance", "pass")]
+    [chosen] = choose([first, ifrs])
     assert chosen["period_end"] == "2012-01-01" and chosen["other_bases"][0]["period_end"] == "2011-12-31"
+    first.basis = "K-IFRS"
+    [chosen] = choose([first, ifrs])
+    assert chosen["source_accession"] == "i" and "other_bases" not in chosen
+
+
+def test_a_national_adoption_of_ifrs_is_no_other_basis():
+    # Woori 2022: its K-IFRS quarterly report and its 20-F's IFRS present one statement; a US GAAP year is another.
+    annual = reading("20-F", date(2023, 4, 28), 1, own=True)
+    annual.basis, annual.form = "IFRS", "20-F"
+    korean = reading("dart", date(2023, 3, 10), 1, own=True)
+    korean.basis, korean.source = "K-IFRS", "dart"
+    us = reading("us", date(2022, 4, 28), 1, own=False)
+    us.basis = "US GAAP"
+    [chosen] = choose([annual, korean, us])
+    assert chosen["basis"] == "IFRS" and [item["basis"] for item in chosen["other_bases"]] == ["US GAAP"]
+
+
+def test_another_basis_takes_the_winners_scope_before_a_newer_parents():
+    group = reading("group", date(2013, 4, 2), 1, own=True)
+    group.basis = "IFRS"
+    old = reading("old", date(2012, 4, 2), 1, own=False)
+    old.basis = "ROC GAAP"
+    parent = reading("parent", date(2012, 5, 2), 1, own=False)
+    parent.basis, parent.scope = "ROC GAAP", "parent"
+    [chosen] = choose([group, old, parent])
+    assert [(item["source_accession"], item["scope"]) for item in chosen["other_bases"]] == [("old", "consolidated")]
