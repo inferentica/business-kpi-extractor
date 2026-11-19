@@ -138,16 +138,22 @@ def _rank(reading: Reading, annual: str | None = None) -> int:
 
 def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:
     """The newest presentation of the period on each other basis: a change of basis restates the years before it
-    (TSMC's FY2013 20-F prints 2012 on IFRS), and the period as first reported on the old basis stays on record."""
+    (TSMC's FY2013 20-F prints 2012 on IFRS), and the period as first reported on the old basis stays on record. A
+    national adoption of IFRS is no other basis (ifrs_family): Woori's K-IFRS quarterly report and its 20-F's IFRS
+    present one statement, its witness. The winner's scope first, then the newest: a parent's statement stands for a
+    basis only where no group statement is on it."""
     newest: dict[str, Reading] = {}
     for reading in kept:
-        if reading.basis and reading.basis != winner.basis:
-            if reading.basis not in newest or reading.filed > newest[reading.basis].filed:
-                newest[reading.basis] = reading
-    return [{"basis": basis, "source_accession": reading.accession, "source_filed": reading.filed.isoformat(),
+        family = ifrs_family(reading.basis)
+        if reading.basis and family != ifrs_family(winner.basis):
+            rank = (reading.scope == winner.scope, reading.filed)
+            if family not in newest or rank > (newest[family].scope == winner.scope, newest[family].filed):
+                newest[family] = reading
+    return [{"basis": reading.basis, "source_accession": reading.accession, "source_filed": reading.filed.isoformat(),
              "source_form": reading.form, "from_comparative": not reading.own, "scope": reading.scope,
-             "witness": verdict(reading, [other for other in kept if other.basis == basis]), **_served_fields(reading),
-             "currency": reading.currency, "lines": reading.lines} for basis, reading in sorted(newest.items())]
+             "witness": verdict(reading, [other for other in kept if ifrs_family(other.basis) == family]),
+             **_served_fields(reading), "currency": reading.currency, "lines": reading.lines}
+            for family, reading in sorted(newest.items())]
 
 
 def _served_fields(reading: Reading) -> dict:

@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from datetime import timedelta
 
+from ..domain.basis import ifrs_family
 from ..domain.model import REGULATOR_SOURCES as REGULATORS
 from ..domain.printed_labels import CLOSING, DATED_CASH, OPENING, PER_SHARE, SHARE_COUNT
 from .identity import _same
@@ -169,7 +170,7 @@ def derive_fourth_quarters(chosen: list[dict], readings: list, keys: dict) -> li
         if (statement, year, "Q4", "quarter") in served and served[(statement, year, "Q4", "quarter")]["status"] == "kept":
             continue
         nines = [reading for reading in kept if reading.key == (statement, year, "Q3", "ytd")
-                 and reading.basis == item.get("basis") and reading.currency == item.get("currency")]
+                 and ifrs_family(reading.basis) == ifrs_family(item.get("basis")) and reading.currency == item.get("currency")]
         if not nines:
             continue
         prior = str(int(year) - 1) if year.isdigit() else ""

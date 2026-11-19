@@ -135,3 +135,19 @@ def test_a_balance_printed_without_cash_in_its_label_is_a_balance():
     nine = [{"label": "Balance at beginning of year", "unit": "USD", "value": 1_433.0}, {"label": "Balance at end of year", "unit": "USD", "value": 1_798.0}]
     opening, closing = {"label": "Balance at beginning of year", "unit": "USD", "value": 1_433.0}, {"label": "Balance at end of year", "unit": "USD", "value": 1_737.0}
     assert (_quarter(opening, 0, nine, "cash_flow"), _quarter(closing, 0, nine, "cash_flow")) == (1_798.0, 1_737.0)
+
+
+def test_a_year_on_ifrs_derives_its_fourth_quarter_from_its_regulators_forms_on_national_ifrs():
+    # BrasilAgro FY2014: the 20-F's IFRS year is served; CVM's year and nine months on IFRS (CPC) pair.
+    nine = reading("itr", date(2014, 5, 15), "Q3", "ytd", "income", [("cvm_3.01", "Receita", 100.0)])
+    year = reading("dfp", date(2014, 9, 20), "FY", "year", "income", [("cvm_3.01", "Receita", 160.0)])
+    for item in (nine, year):
+        item.basis, item.source, item.form = "IFRS (CPC)", "cvm", "ITR" if item is nine else "DFP"
+    nine.period_end = date(2014, 3, 31)
+    year.period_end = date(2014, 6, 30)
+    nine.fiscal_year = year.fiscal_year = "2014"
+    served = reading("20-F", date(2014, 10, 30), "FY", "year", "income", [("ifrs-full_Revenue", "Revenue", 160.0)])
+    chosen = [{"statement": "income", "fiscal_year": "2014", "fiscal_period": "FY", "duration": "year", "status": "kept",
+               "period_end": "2014-06-30", "basis": "IFRS", "currency": "USD", "lines": served.lines}]
+    [q4] = derive_fourth_quarters(chosen, [nine, year], {})
+    assert (q4["basis"], q4["derived_from"]["year"], q4["lines"][0]["value"]) == ("IFRS (CPC)", "dfp", 60.0)

@@ -4,8 +4,9 @@ from types import SimpleNamespace
 from statement_extractor.pipeline.company import _release_bases
 
 
-def _reading(year, form, basis, source="html", period="Q4", own=True, end=None, filed=None, accession=None):
-    return SimpleNamespace(fiscal_year=year, form=form, basis=basis, source=source, fiscal_period=period, own=own,
+def _reading(year, form, basis, source="html", period="Q4", own=True, end=None, filed=None, accession=None,
+             scope="consolidated"):
+    return SimpleNamespace(fiscal_year=year, form=form, basis=basis, source=source, fiscal_period=period, own=own, scope=scope,
                            period_end=end or date(int(year), 12, 31), filed=filed or date(int(year) + 1, 2, 1),
                            accession=accession or f"{form}-{year}-{period}-{basis}")
 
@@ -29,3 +30,14 @@ def test_a_release_stating_no_basis_takes_its_years_home_regulator_basis_before_
                 _reading("2010", "6-K", None), _reading("2008", "6-K", None)]
     _release_bases(readings)
     assert [reading.basis for reading in readings[2:]] == ["IFRS", "Chilean GAAP"]
+
+
+def test_a_release_takes_no_basis_from_another_scopes_report():
+    # UBS's June 2023 6-Ks: Credit Suisse's report on US GAAP, and UBS Group AG's standalone statements that state
+    # their own basis nowhere the reader finds; the standalone ones take the annual report's IFRS, not US GAAP.
+    readings = [_reading("2023", "20-F", "IFRS", period="FY"),
+                _reading("2023", "6-K", "US GAAP", period="Q2", end=date(2023, 6, 30), filed=date(2023, 8, 31), accession="cs"),
+                _reading("2023", "6-K", None, period="Q2", end=date(2023, 6, 30), filed=date(2023, 8, 31), accession="ubs",
+                         scope="parent")]
+    _release_bases(readings)
+    assert readings[2].basis == "IFRS"

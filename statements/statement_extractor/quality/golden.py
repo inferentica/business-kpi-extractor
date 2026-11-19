@@ -14,6 +14,9 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from ..domain.basis import ifrs_family
+
+
 def _golden_path() -> Path:
     """The golden set beside the package (an editable install), else in the checkout it runs from."""
     for path in (Path(__file__).resolve().parents[2] / "evals" / "golden.json", Path.cwd() / "statements" / "evals" / "golden.json",
@@ -62,10 +65,11 @@ def score(folders: list[Path], golden: Path = GOLDEN) -> dict:
             continue
         period = chosen[entry["symbol"]].get((entry["statement"], entry["fiscal_year"], entry["fiscal_period"], entry["duration"]))
         lines = period["lines"] if period else None
-        if period and entry.get("basis") and period.get("basis") and period["basis"] != entry["basis"]:
+        if period and entry.get("basis") and period.get("basis") and ifrs_family(period["basis"]) != ifrs_family(entry["basis"]):
             # An entry printed on another basis than the one served is checked against that basis's presentation:
             # TSMC's H1 2021 releases on Taiwan-IFRS, beside its IFRS 6-K XBRL that is served.
-            other = next((item for item in period.get("other_bases") or [] if item["basis"] == entry["basis"]), None)
+            other = next((item for item in period.get("other_bases") or []
+                          if ifrs_family(item["basis"]) == ifrs_family(entry["basis"])), None)
             lines = other["lines"] if other else None
         line = _line(entry, lines) if lines else None
         if entry.get("absent"):

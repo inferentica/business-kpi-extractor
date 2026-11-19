@@ -118,3 +118,10 @@ def test_the_groups_opinion_decides_over_the_parents_own():
                         "respects, the consolidated financial position of Braskem S.A. as at December 31, 2017 in accordance "
                         "with International Financial Reporting Standards (IFRS) issued by the IASB and accounting practices "
                         "adopted in Brazil.</p>") == IFRS
+
+
+def test_swiss_law_is_its_own_basis():
+    # UBS Group AG's standalone interim statements (6-K 0001610520-23-000174).
+    text = ("The UBS Group AG standalone financial statements are prepared in accordance with the principles of the Swiss "
+            "Law on Accounting and Financial Reporting (32nd title of the Swiss Code of Obligations).")
+    assert stated_basis(text) == "Swiss CO"

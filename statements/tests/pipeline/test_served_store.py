@@ -44,6 +44,13 @@ def test_the_snapshot_serves_kept_periods_and_their_other_bases():
         "duration": "year", "basis": "BR GAAP", "source_accession": "0001-25-1", "why": "no currency stated"}]
 
 
+def test_a_parents_own_statement_is_served_but_never_primary():
+    # TSMC's 2005 quarters: the parent company's statements where no group statement was read (decision 2026-11-19).
+    filings = [{"accession": "0000320193-24-000123", "filed": "2024-11-01", "accepted": "2024-11-01T10:01:36+00:00"}]
+    served = served_snapshot("TSM", 1046179, [_record(scope="parent")], filings, [], {"periods": 1})
+    assert [(row["scope"], row["is_primary"]) for row in served["periods"]] == [("parent", False)]
+
+
 def _folder(tmp_path):
     readings = [{"accession": "0000320193-24-000123", "statement": "income"},
                 {"accession": "archive:TSM:20-F:2000-12-31", "statement": "balance"}]
