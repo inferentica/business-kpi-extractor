@@ -182,7 +182,9 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             return releases, self._process_releases(releases, spec, version), spec
         first = [ref for ref in releases if ref.period_end in ends]
         processed = self._process_releases(first, spec, version)
-        unread = list_checks.unread_lines(spec, [(self.filings.get(ref.accession) or {}).get("notes") or [] for ref in first])
+        unread = list_checks.unread_lines(spec, [
+            self.store.unreported[ref.accession] if ref.accession in self.store.unreported
+            else list_checks.noted_unreported((self.filings.get(ref.accession) or {}).get("notes")) for ref in first])
         if unread or flagged:
             self._leave_out([left_out.entry(group, kpi, list_checks.REASON_UNREAD, "rule")
                              for group in spec.groups for kpi in group.kpis if (group.key, kpi.key) in unread])
