@@ -1,11 +1,14 @@
 """The printed statements of XBRL filings that need them: one whose own statement failed its checks in XBRL (JPM's
-Q2 2010 balance sheet, which edgartools maps wrongly), and one whose served figure differs in sign from another
-presentation (the printed sign decides, from the statement or any table of the filing). Each is a read unit
+Q2 2010 balance sheet, which edgartools maps wrongly), one whose served figure differs in sign from another
+presentation (the printed sign decides, from the statement or any table of the filing), and one with a per-share figure
+a thousand or a million times another presentation's (selection/pershare.py: PAC's earnings per share at its money
+scale). Each is a read unit
 (pipeline/units.py); which filings need one is decided over all the company's readings every read."""
 from __future__ import annotations
 
 from datetime import date
 
+from ..selection.pershare import scale_ties
 from ..selection.signs import sign_ties
 from ..sources.listing import filing_for
 from .printed import read_printed
@@ -17,7 +20,8 @@ def printed_second_look(symbol, reports, filings, readings, year_ends: dict[str,
     failed = {reading.accession for reading in readings
               if reading.source == "xbrl" and reading.own and reading.status != "kept"}
     ties = sign_ties(readings)
-    needed = failed | ties
+    scaled = scale_ties(readings)
+    needed = failed | ties | scaled
     by_accession = {ref.accession: ref for ref in reports}
     records = {record["accession"]: record for record in filings}
     found_all = []
@@ -43,7 +47,8 @@ def printed_second_look(symbol, reports, filings, readings, year_ends: dict[str,
             continue  # not kept: read again next time
         finally:
             ref.filing = None
-        records[accession]["second_look"] = {"why": "failed in XBRL" if accession in failed else "sign",
+        why = "failed in XBRL" if accession in failed else "sign" if accession in ties else "per-share scale"
+        records[accession]["second_look"] = {"why": why,
                                              "printed": kinds, "columns": len(found), "notes": notes[:5]}
         log(f"{symbol}: {ref.form} {ref.filed} printed second look ({records[accession]['second_look']['why']}): "
             f"{len(found)} columns")

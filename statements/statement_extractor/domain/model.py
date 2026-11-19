@@ -22,7 +22,7 @@ REGULATOR_SOURCES = ("cvm", "dart", "bmv", "cmf")
 
 @dataclass
 class Check:
-    name: str  # balance | cash | calc
+    name: str  # balance | cash | calc | per_share (a figure taken from print: selection/pershare.py)
     result: str  # pass | fail | none
     detail: str = ""
 
