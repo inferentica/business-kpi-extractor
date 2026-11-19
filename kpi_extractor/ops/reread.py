@@ -8,6 +8,8 @@ with the figure served before (CompanyStore.reread_disagreements), so a re-read 
 Add a selector with the rule change it serves; a learned rule's demotion will name the figures it read."""
 from __future__ import annotations
 
+import re
+
 from collections.abc import Callable
 
 from ..quality.reasons import has
@@ -218,15 +220,43 @@ SET_SELECTORS: dict[str, tuple[str, Callable[[dict], set[str]]]] = {
 }
 
 
+_NOT_A_PERCENT = re.compile(r"^(?:[a-z]+ )?([a-z0-9_]+)\.([a-z0-9_]+): '.*' is not a percentage$")
+
+
+def _bare_ratio_filings(values: dict, filings: dict) -> set[str]:
+    """Filings where a reading was refused as not a percentage and its line has no served figure for that quarter:
+    a ratio's row printed without its % sign, refused before rules.table read it as one (Wells Fargo's efficiency
+    ratio, 10 quarters, 2026-11-19). A quarter whose line is served elsewhere is not read again."""
+    served = {(value["group_key"], value["kpi_key"], str(value.get("period_end"))[:10]) for value in values.values()
+              if value.get("validation_status") == "verified"}
+    picked = set()
+    for accession, filing in filings.items():
+        end = str(filing.get("period_end") or "")[:10]
+        for note in filing.get("notes") or []:
+            if (match := _NOT_A_PERCENT.match(str(note))) and end \
+                    and (f"kpi_{match.group(1)}", match.group(2), end) not in served:
+                picked.add(accession)
+    return picked
+
+
+# Selectors that pick filings by their notes and the figures served.
+NOTE_SET_SELECTORS: dict[str, tuple[str, Callable[[dict, dict], set[str]]]] = {
+    "bare-ratios": ("filings where a ratio was refused as not a percentage and its quarter has no served figure",
+                    _bare_ratio_filings),
+}
+
+
 def picked_filings(name: str, values: dict, filings: dict | None = None) -> set[str]:
     """The accessions of the filings the selector picks: those holding figures it picks, or, for a filing selector, the
     filings themselves."""
+    if name in NOTE_SET_SELECTORS:
+        return NOTE_SET_SELECTORS[name][1](values, filings or {})
     if name in SET_SELECTORS:
         return SET_SELECTORS[name][1](values)
     if name in FILING_SELECTORS:
         picks = FILING_SELECTORS[name][1]
         return {accession for accession, filing in (filings or {}).items() if picks(filing)}
     if name not in SELECTORS:
-        raise ValueError(f"Unknown re-read selector {name!r}; one of {', '.join(sorted({*SELECTORS, *FILING_SELECTORS, *SET_SELECTORS}))}")
+        raise ValueError(f"Unknown re-read selector {name!r}; one of {', '.join(sorted({*SELECTORS, *FILING_SELECTORS, *SET_SELECTORS, *NOTE_SET_SELECTORS}))}")
     picks = SELECTORS[name][1]
     return {value["source_accession"] for value in values.values() if value.get("source_accession") and picks(value)}

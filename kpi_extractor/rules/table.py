@@ -47,7 +47,21 @@ def not_a_percent(table: Table, row: int, col: int, text: str) -> str | None:
                   and any(parse_number(cell) for cell in cells[1:])), 1)
     heading = " ".join(cells[index] for cells in table.rows[:max(first, 1)][:6] for index in {0, col} if index < len(cells))
     where = f"{' '.join(table.rows[row])} {heading} {_section_heading(table, row)}"
-    return None if re.search(r"%|\bpercent", where, re.I) else f"{text!r} is not a percentage"
+    if re.search(r"%|\bpercent", where, re.I) or _bare_ratio_row(table.rows[row]):
+        return None
+    return f"{text!r} is not a percentage"
+
+
+def _bare_ratio_row(cells: list[str]) -> bool:
+    """A ratio's row printed without its % sign: its label names a ratio and every figure in it lies between 0 and 100,
+    none a multiple ("1.2x"). Wells Fargo's summary prints "Efficiency ratio (7) | 66 | 81 | 73 | 75 | 78" with no % on
+    the page; its Q1 readings were refused while Q3's passed only through a "% Change" cell in the row."""
+    if not cells or not re.search(r"\bratios?\b", cells[0], re.I):
+        return False
+    figures = [cell.strip() for cell in cells[1:] if cell.strip()]
+    numbers = [parse_number(cell) for cell in figures]
+    return bool(figures) and not any(re.search(r"\d\s*x\b", cell, re.I) or re.search(r"\d,\d{3}", cell) for cell in figures) \
+        and all(number is not None and 0 < abs(number.value) <= 100 for number in numbers)
 
 
 def _shape_words(cell: str) -> str:
