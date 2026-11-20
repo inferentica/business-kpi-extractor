@@ -126,8 +126,10 @@ def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
             texts = " ".join(cell.text for cell in cells)
             quarters = [cell.text for cell in cells if cell.text.strip()][1 if cells and cells[0].text.strip() else 0:]
             quarters = [NOTE_MARK.sub("", text) for text in quarters]  # Copel's "1Q09 (1) | 4Q08 (2) | 1Q08 (3) | Var.% (1/2)"
+            # A change in percent beside the quarters, however long its words: Coca-Cola FEMSA's "Excluding M&A Effects Δ%".
             if COLUMN_TITLE.search(texts) or sum(bool(QUARTER_CELL.match(text)) for text in quarters) >= 2 and all(
-                    QUARTER_CELL.match(text) or MONTHS_CELL.match(text) or is_column_word(text) for text in quarters):
+                    QUARTER_CELL.match(text) or MONTHS_CELL.match(text) or is_column_word(text) or text.rstrip().endswith("%")
+                    for text in quarters):
                 header.append([cell for cell in cells if cell.text])
             elif row.label:
                 rows.append(Row(label=row.label, level=row.level, cells=cells))

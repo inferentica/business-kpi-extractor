@@ -225,3 +225,15 @@ def test_a_change_in_percent_is_no_reconciliation_step():
     from statement_extractor.readers.printed.find import _NOT_A_PERIOD
     assert not _NOT_A_PERIOD.search("Reported”%") and not _NOT_A_PERIOD.search("Reported %")  # Coca-Cola FEMSA
     assert _NOT_A_PERIOD.search("Reported Results") and _NOT_A_PERIOD.search("Operating Basis")  # Chase's steps
+    assert not _NOT_A_PERIOD.search("Reported Δ%")  # its 2013 releases print a delta before the percent
+
+
+def test_a_long_change_in_percent_leaves_the_quarters_a_header():
+    from statement_extractor.readers.html.parse import parse_html
+    row = "".join(f"<td>{text}</td>" for text in ("", "2Q 13", "% Rev", "2Q 12", "% Rev", "Reported Δ%",
+                                                  "Excluding M&A Effects Δ%(5)", "YTD 13", "YTD 12"))
+    lines = "".join(f"<tr><td>{label}</td><td>{a}</td><td></td><td>{b}</td><td></td><td>1.0%</td><td></td><td>{c}</td>"
+                    f"<td>{d}</td></tr>" for label, a, b, c, d in (("Net revenues", "36,088", "36,119", "70,461", "69,934"),
+                                                                  ("Gross profit", "16,826", "16,697", "32,812", "32,424")))
+    table = next(table for table in parse_html(f"<table><tr>{row}</tr>{lines}</table>") if table.rows)
+    assert any(cell.text == "2Q 13" for cells in table.header for cell in cells)  # Coca-Cola FEMSA's Q2 2013 release

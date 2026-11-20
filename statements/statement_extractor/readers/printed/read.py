@@ -8,8 +8,7 @@ span ("Three Months Ended"). Each line keeps its printed label, its indentation 
 
 It is kept only when its arithmetic holds on the printed figures (brackets for negatives): assets equal liabilities and
 equity; opening cash plus the change (or the three sections) equals closing cash; each printed total equals the lines
-above it; net income follows from income before taxes.
-"""
+above it; net income follows from income before taxes."""
 from __future__ import annotations
 
 import re
@@ -70,9 +69,10 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         # fuller balance sheet read first; Coca-Cola FEMSA's release in FEMSA's, round 84): it never takes the company's.
         seen = (kind, statement_scope(kind, group, form, found), group[0].audited_of, group[0].release_of)
         if seen in read_periods:
-            # A statement printed again gives only the periods it prints of its own: Chase's 1995 10-Qs print the three
-            # months and the six months as two income statements; TSMC's releases print the quarters and the year.
-            periods = {column: period for column, period in periods.items() if period.key not in read_periods[seen]}
+            # A statement printed again gives only the periods it prints of its own (Chase's 1995 10-Qs print the three
+            # months and the six months as two income statements), and none a printing rejected on its tables (IEP's).
+            periods = {column: period for column, period in periods.items() if period.key not in (done := read_periods[seen])
+                       and not any((period.key, id(table)) in done for table in group)}
             if not periods:
                 continue
         scale = statement_scale(group)
@@ -127,8 +127,8 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             # Untitled, the company the auditors' report before it names: Heineken's statements in FEMSA's 20-Fs.
             reading.audited_of = "" if reading.titled else group[0].audited_of
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
-            readings.append(reading)  # a printing its checks reject leaves the period to the next: Ultrapar's highlights
-            read_periods.setdefault(seen, set()).update([period.key] if reading.status != "rejected" else [])  # (round 162)
+            readings.append(reading)  # a printing its checks reject leaves the period to another table: Ultrapar's highlights
+            read_periods.setdefault(seen, set()).update([period.key] if reading.status != "rejected" else [(period.key, id(table)) for table in group])
     return readings, notes
 
 
