@@ -78,7 +78,12 @@ def income_check(figures) -> Check:
         return _from_a_subtotal(figures, net)
     if not pretax or not net:
         return Check("calc", NONE, "no income before taxes and net income")
-    between = _without_parts(figures[pretax[0] + 1:net[0]])
+    between = figures[pretax[0] + 1:net[0]]
+    if not _ATTRIBUTABLE.search(figures[net[0]][0]):
+        # A split between owners is no step to the group's own net income (Vale's Q2 2018 release: continuing income
+        # attributable to its stockholders, then the discontinued loss, before "Net income").
+        between = [line for line in between if not _ATTRIBUTABLE.search(line[0])]
+    between = _without_parts(between)
     starts = subtotals(between)
     covered = {position for end, start in starts.items() for position in range(start, end)}
     # Lines under a "Total …" only: Prudential's current and deferred tax under its total tax expense, while its income
@@ -190,6 +195,11 @@ def _totals(printed) -> Check:
                 break
         if not matched and plain_count == 1 and close(plain, value, 2):
             matched = True  # the only line under its heading, printed again as its total
+        if not matched and _COMPREHENSIVE.search(label):
+            # Net income and the other comprehensive income under its heading (Omega's 2000 10-Q: (65,093) and (1,745)).
+            net = next((earlier for name, _level, earlier in reversed(printed[:index]) if earlier is not None
+                        and _NET_INCOME.match(name)), None)
+            matched = net is not None and close(net + plain, value, plain_count + 2)
         while position >= 0 and count < 40 and not matched:
             earlier_label, _earlier_level, earlier_value = printed[position]
             if earlier_value is None:
@@ -217,6 +227,11 @@ def _totals(printed) -> Check:
     if failures:
         return Check("totals", FAIL, "; ".join(failures[:3]))
     return Check("totals", PASS if verified else NONE, f"{verified} totals")
+
+
+_ATTRIBUTABLE = re.compile(r"\battributable\s+to\b", re.I)
+_COMPREHENSIVE = re.compile(r"\bcomprehensive\b", re.I)
+_NET_INCOME = re.compile(r"^net\s+(\(?(loss|losses|income|earnings|profit)\)?[\s/]*)+$", re.I)
 
 
 def _a_part_of_the_next_total(printed, index: int) -> bool:

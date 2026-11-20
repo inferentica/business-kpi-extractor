@@ -175,3 +175,34 @@ def test_a_percent_a_bracket_or_n_a_between_figures_is_no_second_statement():
     paired = [[Cell(0, 1, f"Asset {index}"), Cell(2, 1, "1,000"), Cell(4, 1, "900"), Cell(6, 1, f"Liability {index}"),
                Cell(8, 1, "700"), Cell(10, 1, "600")] for index in range(8)]
     assert _side_by_side(paired) == 6
+
+
+def test_a_year_dated_from_a_bare_year_keeps_its_counted_start():
+    # Apple's "2005 | 2004": the years end on the fiscal year's usual day, a day off the printed ones; no week is missing.
+    from datetime import date, timedelta
+    from statement_extractor.domain.periods import Period
+    from statement_extractor.readers.printed.ranges import years_after_prior
+    periods = {(3,): Period(date(2005, 9, 24), date(2004, 9, 26)), (5,): Period(date(2004, 9, 24), date(2004, 9, 24) - timedelta(days=363))}
+    years_after_prior(periods)
+    assert periods[(3,)].start == date(2004, 9, 26)
+
+
+def test_total_comprehensive_income_is_net_income_and_the_lines_under_its_heading():
+    from statement_extractor.checks.printed import total_check
+    printed = [("Revenues", 0, 100.0), ("Expenses", 0, -165.093), ("Net (loss) earnings", 0, -65.093),
+               ("Preferred stock dividends", 0, -5.705), ("Net (loss) earnings available to common", 0, -70.798),
+               ("Other comprehensive income (loss):", 0, None), ("Unrealized gain (loss) on investments", 2, -1.745),
+               ("Total comprehensive (loss) income", 0, -66.838)]
+    assert total_check(printed).result == "pass"
+    printed[-1] = ("Total comprehensive (loss) income", 0, -60.0)
+    assert total_check(printed).result == "fail"
+
+
+def test_a_split_between_owners_is_no_step_to_the_groups_net_income():
+    from statement_extractor.checks.printed import income_check
+    figures = [("Income (loss) before income taxes", 0, -571.0), ("Current tax", 0, -127.0), ("Deferred tax", 0, 791.0),
+               ("", 0, 664.0), ("Net income from continuing operations", 0, 93.0),
+               ("Net income from continuing operations attributable to Vale's stockholders", 0, 86.0),
+               ("Loss from discontinued operations", 0, -10.0), ("Net income attributable to noncontrolling interests", 0, 0.0),
+               ("Loss from discontinued operations attributable to Vale's stockholders", 0, -10.0), ("Net income", 0, 83.0)]
+    assert income_check(figures).result == "pass"
