@@ -21,6 +21,7 @@ from ..quality.coverage import summarise
 from ..selection.choose import choose
 from ..selection.fourth import derive_fourth_quarters
 from ..selection.identity import apply_identity
+from ..selection.pershare import printed_per_share
 from ..selection.period_dates import align_dates
 from ..selection.splits import adjust_for_splits, split_ledger
 from ..selection.summaries import choose_summaries, summary_coverage
@@ -89,6 +90,7 @@ def read_company(symbol: str, since: date, out: Path, log=print, previous: Path 
     _release_bases(readings)
     settle_currencies(readings)  # pipeline/currencies.py
     finish_lines(readings)  # each line's unit, taxonomy, rounding and sign, its currency now known (domain/line_fields.py)
+    printed_per_share(readings)  # per-share figures tagged at the statement's money scale (selection/pershare.py)
     readings = align_dates(readings)
     cash_against_balances(readings)  # cash flows printed without their cash balances (releases)
     mark = _phase(phases, "second looks", mark)
