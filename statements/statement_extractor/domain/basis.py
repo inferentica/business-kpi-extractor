@@ -201,7 +201,7 @@ _CURRENCIES = (
     ("TWD", r"NT\$|\bNTD\b|New\s+Taiwan\s+dollars?|New\s+Taiwan\b"),
     # Embraer's "in millions of U.S.dollars": no space after the stop.
     ("USD", r"US\$|U\.S\.\$|\bUSDm?\b|U\.\s?S\.\s*dollars?|United\s+States\s+dollars?|US\s+dollars?"),
-    ("CAD", r"C\$|CDN\.?\$|\bCAD\b|Canadian\s+dollars?"),  # Brookfield's 2001 releases: "(CDN.$)"
+    ("CAD", r"(?<![A-Za-z])CA?\$|CDN\.?\$|\bCAD\b|Canadian\s+dollars?"),  # Brookfield's 2001 releases: "(CDN.$)"
     ("HKD", r"HK\$|\bHKD\b|Hong\s+Kong\s+dollars?"),
     ("EUR", r"€|\bEURm?\b|\beuros?\b"),
     ("NLG", r"\bNLG\b|\bguilders?\b|\bNfl\.?"),
@@ -209,7 +209,8 @@ _CURRENCIES = (
     ("JPY", r"¥|\bJPY\b|\byen\b"),
     ("CNY", r"\bRMB\b|\bCNY\b|renminbi"),
     # KEPCO's 20-Fs head their columns "Won" and "U.S. dollars (Note 2)".
-    ("KRW", r"₩|\bKRW\b|\bKorean\s+won\b|\bwon\b"),
+    # "won" alone where it closes its words ("(In millions of won)", a "Won" heading), never the verb ("won approval").
+    ("KRW", r"₩|\bKRW\b|\bKorean\s+won\b|\bwon\b(?=\s*(?:$|[),;|(]|in\s|and\s|\d))"),
     ("BRL", r"(?<![A-Z.])R\$|\bBRL\b|\bBrazilian\s+reais?\b|\breais\b"),
     ("CHF", r"\bCHF\b|\bSwiss\s+francs?\b"),
     # The other home currencies of US-listed foreign filers (Televisa's "In thousands of Mexican pesos", Enel Chile's
@@ -219,8 +220,8 @@ _CURRENCIES = (
     ("ARS", r"\bARS\b|\bArgentine\s+pesos?\b"),
     ("COP", r"\bCOP\b|\bColombian\s+pesos?\b"),
     ("PEN", r"\bPEN\b|\bPeruvian\s+soles\b|\bsoles\b"),
-    ("AUD", r"A\$|\bAUD\b|Australian\s+dollars?"),
-    ("SGD", r"S\$|\bSGD\b|Singapore\s+dollars?"),
+    ("AUD", r"(?<![A-Za-z])A\$|\bAUD\b|Australian\s+dollars?"),  # never CA$ or a word run into "$"
+    ("SGD", r"(?<![A-Za-z])S\$|\bSGD\b|Singapore\s+dollars?"),  # "Operations$" names none
     ("ILS", r"\bNIS\b|\bILS\b|\bshekels?\b"),
     ("INR", r"\bINR\b|\bIndian\s+rupees?\b|\brupees?\b"),
 )

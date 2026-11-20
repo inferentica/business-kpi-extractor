@@ -79,6 +79,20 @@ def mended_starts(periods: dict, ranged: set) -> None:
             periods[column] = swapped
 
 
+def years_after_prior(periods: dict) -> None:
+    """A year opens the day after the year before it closes, where the table prints that year too: a 53-week year
+    ending January 3, 2004 beside the one ending December 28, 2002 opens on December 29, 2002, not a week later as 364
+    days back gave (review C4). Only a start within a week of it moves."""
+    ends = {period.end for period in periods.values()}
+    for column, period in list(periods.items()):
+        if period.start is None or not 357 <= (period.end - period.start).days <= 372:
+            continue
+        prior = [end for end in ends if 357 <= (period.end - end).days <= 373]
+        opened = min(prior, key=lambda end: abs(end + timedelta(days=1) - period.start)) + timedelta(days=1) if prior else None
+        if opened is not None and opened != period.start and abs((opened - period.start).days) <= 7:
+            periods[column] = Period(period.end, opened)
+
+
 _MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 
 

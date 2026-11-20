@@ -21,6 +21,7 @@ _CURRENCY_SIGN = re.compile(r"(?:^|(?<=\s\s))(?:NT\$|R\$|US\$|W|£|€|¥|₩|KR
 # Dot leaders between a label and its figures, a single space before the first (Petrobras's 2002 20-F: "Sales of products
 # and services......... 34,145   23,467"): blanked, so the label and its figures part.
 _LEADERS = re.compile(r"(?<=[A-Za-z)\]:%])\s*\.{3,}(?=\s*[\d(\-$])")  # after a word, never after a number in the label
+_PADDED_BRACKET = re.compile(r"\((\s+)(?=\d[\d,]*(?:\.\d+)?\))")
 _MONTH_END = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?$", re.I)
 
 
@@ -57,9 +58,12 @@ def figures_apart(found: list[Chunk]) -> list[Chunk]:
 def split(line: str) -> Line | None:
     """A line's label and the run of figures that ends it ("Net sales  $ 9,188,748  $ 7,976,954")."""
     line = _LEADERS.sub(lambda match: " " * len(match.group(0)), line)  # dot leaders run into the first figure
-    parts = figures_apart(chunks(_CURRENCY_SIGN.sub(lambda match: " " * len(match.group(0)), line).replace("$", " ")))
-    for part in parts:  # a footnote mark on a figure: ASML's "(21,836)(3)"
-        bare = re.sub(r"(?<=[\d)])\(\d{1,2}\)$", "", part.text)
+    line = _CURRENCY_SIGN.sub(lambda match: " " * len(match.group(0)), line).replace("$", " ")
+    # A bracket padded away from its figure, "(  2,000)": moved to the figure, so the figure keeps its place and sign.
+    line = _PADDED_BRACKET.sub(lambda match: match.group(1) + "(", line)
+    parts = figures_apart(chunks(line))
+    for part in parts:  # a footnote mark on a figure: ASML's "(21,836)(3)", "975(a)", "1,234*"
+        bare = re.sub(r"(?<=[\d)])(?:\(\d{1,2}\)|\([a-z]\)|\*{1,3})$", "", part.text)
         if bare != part.text and FIGURE.match(bare):
             part.text, part.end = bare, part.end - (len(part.text) - len(bare))
     if not parts:

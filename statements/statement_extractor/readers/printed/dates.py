@@ -11,7 +11,7 @@ from ...sources.edgar import fiscal_year_end_for
 from .find import TITLE_PATTERNS
 from .named_years import QUARTER_NAME as _QUARTER_NAME, QUARTERLY as _QUARTERLY, named_quarter as _named_quarter, title_dates
 from .ranges import (dates_in_order, spans_over, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric,
-                     own_month, paired_spans, counted_start, slashed_day_first, off_title, YEAR_TO_DATE)
+                     own_month, paired_spans, counted_start, slashed_day_first, off_title, years_after_prior, YEAR_TO_DATE)
 from .tables import Table, figure_columns, header_text
 
 
@@ -257,6 +257,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         periods[column] = Period(end, counted_start(end, days, bool(span and span.group(2) and span.group(2).lower().startswith("week"))))
     paired_spans(periods, columns, title + " " + header_all, fiscal_year_end, first)
     mended_starts(periods, ranged)
+    years_after_prior(periods)
     return periods
 
 

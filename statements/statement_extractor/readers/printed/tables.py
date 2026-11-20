@@ -13,7 +13,8 @@ from ...domain.basis import currencies_named, is_currency_word
 _NUMBER = re.compile(r"^\(?\s*[-−–]?\s*\$?\s*(\d{1,3}(?:,\d{3})+|\d+|(?=\.\d))(\.\d+)?\s*\)?$")
 
 
-_DASH = re.compile(r"^[—–\-−]+$")
+_DASH = re.compile(r"^[—–\-−‐‑‒]+$")  # Ultrapar prints its blanks "‐" (U+2010)
+_GLUED_MARK = re.compile(r"(.*?[\d)])\s*(?:\([a-z]\)|\(\d{1,2}\)|\*{1,3}|[†‡])")
 
 
 NOTE_MARK = re.compile(r"\s*(\(\d{1,2}\)|\([a-z]\)|\*+)$")
@@ -71,6 +72,14 @@ def number(text: str) -> float | None:
         return None  # a scale, or a date written day first (UBS's "31.12.14")
     text = text.replace("$", "").strip()
     text = re.sub(r"^(\(?)\s*Ps\.?\s*(?=[\d.(\-−–])", r"\1", text)  # a peso sign in the figure's cell: FEMSA's "Ps. 35,497"
+    text = re.sub(r"^\(\s*(?:Won|W|₩)\s*\)\s*(?=[\d(\-−–])", "", text)  # KEPCO's 2005-06 "(Won)456,063"
+    pence = re.fullmatch(r"(\(?\s*[-−–]?\s*\d[\d,]*(?:\.\d+)?\s*\)?)\s?p", text)  # Lloyds' "2.9p": pence, a hundredth of a pound
+    if pence:
+        value = number(pence.group(1))
+        return None if value is None else round(value / 100, 12)
+    marked = _GLUED_MARK.fullmatch(text)  # a footnote mark glued to the figure: "975(a)", "1,234*", "(21,836)(3)"
+    if marked and not re.fullmatch(r"\(?\d{1,2}\)?|(19|20)\d{2}", marked.group(1)):
+        text = marked.group(1)  # never a note's own number ("12(a)") or a year over its column ("2007(1)")
     if _DASH.match(text):
         return 0.0
     match = _NUMBER.match(text)
@@ -79,6 +88,19 @@ def number(text: str) -> float | None:
     value = float((match.group(1) + (match.group(2) or "")).replace(",", ""))
     negative = text.startswith("(") or re.match(r"^\(?\s*[-−–]", text) is not None
     return -value if negative else value
+
+
+def printed_places(row: Row, position: int | None) -> int | None:
+    """The digits after the decimal point of the figure printed at a position, as printed: "1.90" has two, which its
+    value 1.9 cannot tell."""
+    text = next((cell.text for cell in row.cells if cell.start == position), None) if position is not None else None
+    if text is None or number(text) is None:
+        return None
+    decimal = re.search(r"\d\.(\d+)", _GLUED_MARK.sub(lambda match: match.group(1), text.strip()))
+    after = next((cell.text.strip() for cell in sorted(row.cells, key=lambda cell: cell.start) if cell.start > position
+                  and cell.text.strip()), "")
+    pence = 2 if text.strip().endswith("p") or after in ("p", ")p") else 0  # 2.9p is 0.029 pounds
+    return (len(decimal.group(1)) if decimal else 0) + pence
 
 
 YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
@@ -199,6 +221,15 @@ def figure_columns(table: Table) -> list[tuple[int, ...]]:
     sizes = [sum(counts.get(position, 0) for position in group) for group in groups]
     keep = max(sizes) * 0.3
     return [tuple(group) for group, size in zip(groups, sizes) if size >= keep]
+
+
+def side_positions(table: Table) -> set[int]:
+    """The physical columns under a "Note" or "%" heading: a note's number or a share of a total, never a dated figure,
+    even beside a dated cell left blank ("Assets held for sale | 12 | (blank) | 150", review C2)."""
+    positions = {position for row in table.rows for position in row.figures}
+    return {position for position in positions for cells in table.header for cell in cells
+            if cell.start <= position < cell.end and (re.fullmatch(r"notes?", cell.text.strip(), re.I)
+                                                       or PERCENT_WORD.search(cell.text))}
 
 
 def _notes_named(table: Table) -> bool:

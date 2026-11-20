@@ -130,7 +130,7 @@ def test_a_row_pushed_off_its_columns_by_dollar_cells_is_read():
     cell = lambda start, text: SimpleNamespace(start=start, text=text)
     row = SimpleNamespace(figures={12: 0.0, 27: -121692.0}, cells=[cell(6, "$"), cell(12, "-"), cell(21, "$"), cell(27, "(121,692")])
     assert _shifted(row, columns) == {(9,): 0.0, (24,): -121692.0}
-    assert _figure(row, (24,), columns) == -121692.0
+    assert _figure(row, (24,), columns)[0] == -121692.0
     # Crown's Q3 2009 10-Q: weighted-average share counts three cells left of the EPS columns, no "$", stay off them.
     shares = SimpleNamespace(figures={6: 159208879.0, 21: 160006745.0}, cells=[cell(6, "159,208,879"), cell(21, "160,006,745")])
     assert _shifted(shares, columns) is None

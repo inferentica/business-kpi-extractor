@@ -28,6 +28,9 @@ def _row(cells: list[Cell]) -> Row | None:
             del figures[last_figure]  # a percentage in a cell of its own: Andina's "Net margin 7.4 %", no figure
             last_figure = None
             continue
+        if text in ("p", ")p") and last_figure is not None:  # pence after the figure: Lloyds' "2.9 | p", a hundredth of a pound
+            figures[last_figure] = round((-abs(figures[last_figure]) if text == ")p" else figures[last_figure]) / 100, 12)
+            continue
         if text == ")" and last_figure is not None:
             figures[last_figure] = -abs(figures[last_figure])
             continue

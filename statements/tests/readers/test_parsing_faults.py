@@ -1,0 +1,162 @@
+"""Printed and plain-text parsing faults (s7-parsing; review C1, C2, C4)."""
+from statement_extractor.readers.printed.tables import number
+from statement_extractor.readers.text.lines import split
+
+
+def figures(line: str) -> tuple[str, list[float]]:
+    parsed = split(line)
+    return parsed.label, [number(chunk.text) for chunk in parsed.figures]
+
+
+def test_a_bracket_padded_away_from_its_figure_is_still_negative():
+    # 1990s plain-text tables pad a bracket away from its figure: "(  2,000)" and "( 1,234)" are -2,000 and -1,234.
+    assert figures("Capital expenditures   (  2,000)   (  1,500)") == ("Capital expenditures", [-2000.0, -1500.0])
+    assert figures("Net loss   ( 1,234)   2,000") == ("Net loss", [-1234.0, 2000.0])
+    assert figures("Repayment of debt   $(  1,000)   $(    734)") == ("Repayment of debt", [-1000.0, -734.0])
+    assert figures("Other (Note 3)   1,234   (12)") == ("Other (Note 3)", [1234.0, -12.0])
+
+
+def test_a_note_number_is_never_the_amount_of_a_blank_dated_cell():
+    # "Assets held for sale | 12 | (blank) | 150": the note's number is no figure for 2005 (review C2; CSN's 2017 20-F
+    # dividends line held its note number 20).
+    from datetime import date
+    from statement_extractor.readers.html.read import read_document
+
+    def row(*items):
+        return "<tr>" + "".join(f"<td>{item}</td>" for item in items) + "</tr>"
+
+    html = ("<p>CONSOLIDATED BALANCE SHEETS</p><p>(In thousands)</p><table>"
+            + row("December 31,", "Note", "2005", "2004")
+            + row("Cash", "4", "1,000", "900")
+            + row("Assets held for sale", "12", "", "150")
+            + row("Total assets", "", "1,000", "1,050")
+            + row("Liabilities", "", "400", "450")
+            + row("Equity", "", "600", "600")
+            + row("Total liabilities and equity", "", "1,000", "1,050") + "</table>")
+    readings, _ = read_document(html, accession="a", form="10-K", filed=date(2006, 3, 1), document_end=date(2005, 12, 31),
+                                fiscal_year_end="1231", year_offset=0)
+    year = next(r for r in readings if r.statement == "balance" and r.fiscal_year == "2005")
+    values = {line["label"]: line["value"] for line in year.lines}
+    assert values.get("Assets held for sale") in (None, 0.0) and values["Cash"] == 1_000_000.0
+
+
+def caption(text):
+    from statement_extractor.readers.printed.tables import Table
+    return [Table(rows=[], header=[], context=text, index=0)]
+
+
+def test_a_per_share_exception_leaves_share_counts_in_the_money_scale():
+    from statement_extractor.readers.printed.scales import share_scale
+    for text in ("(In millions, except per-share amounts)", "(In millions, except per common share data)",
+                 "(In millions, except per share data)"):
+        assert share_scale(caption(text), 1e6) == 1e6, text
+    assert share_scale(caption("(In millions, except share and per share amounts)"), 1e6) == 1.0
+    assert share_scale(caption("(In millions, except number of shares)"), 1e6) == 1.0
+
+
+def test_millions_written_as_zeros():
+    from statement_extractor.readers.printed.scales import statement_scale
+    assert statement_scale(caption("CONSOLIDATED STATEMENTS OF INCOME (000,000 omitted)")) == 1e6
+    assert statement_scale(caption("CONSOLIDATED STATEMENTS OF INCOME ($000,000 omitted, except per share)")) == 1e6
+    assert statement_scale(caption("CONSOLIDATED STATEMENTS OF INCOME (000 omitted)")) == 1e3
+    assert statement_scale(caption("CONSOLIDATED STATEMENTS OF INCOME ($000's)")) == 1e3
+
+
+def test_currency_signs_inside_words_name_no_currency():
+    from statement_extractor.domain.basis import currencies_named
+    assert currencies_named("(In millions of CA$)") == ["CAD"]
+    assert currencies_named("A$ millions") == ["AUD"]
+    assert currencies_named("Results of Operations$ in millions") == []
+    assert currencies_named("the company won approval for the merger") == []
+    assert currencies_named("(In millions of won)") == ["KRW"] and currencies_named("Won") == ["KRW"]
+    assert currencies_named("(Won)456,063") == ["KRW"]
+
+
+def test_a_footnote_mark_glued_to_a_figure_stays_off_it():
+    assert number("975(a)") == 975.0 and number("1,234*") == 1234.0 and number("(21,836)(3)") == -21836.0
+    assert number("1,234.5 (b)") == 1234.5
+    assert number("12(a)") is None and number("2007(1)") is None  # a note reference, a year over its column
+    assert figures("Other income   975(a)   1,234*") == ("Other income", [975.0, 1234.0])
+
+
+def test_decimals_come_from_the_printed_text():
+    from statement_extractor.domain.line_fields import printed_decimals
+    from statement_extractor.readers.printed.tables import Cell, Row, printed_places
+    row = Row(label="Diluted", level=0, figures={3: 1.9, 5: 1.95, 7: 242695.6},
+              cells=[Cell(0, 1, "Diluted"), Cell(3, 1, "$ 1.90"), Cell(5, 1, "1.95"), Cell(7, 1, "242,695.6")])
+    assert [printed_places(row, position) for position in (3, 5, 7, None)] == [2, 2, 1, None]
+    assert printed_decimals(1.9, 1.0, 2) == 2 and printed_decimals(242695.6, 1e6, 1) == -5
+
+
+def test_a_53_week_year_opens_the_day_after_the_year_before_it():
+    from datetime import date, timedelta
+    from statement_extractor.domain.periods import Period
+    from statement_extractor.readers.printed.ranges import years_after_prior
+    fy2003, fy2002 = date(2004, 1, 3), date(2002, 12, 28)
+    periods = {(3,): Period(fy2003, fy2003 - timedelta(days=363)), (5,): Period(fy2002, fy2002 - timedelta(days=363))}
+    years_after_prior(periods)
+    assert periods[(3,)].start == date(2002, 12, 29) and periods[(5,)].start == date(2001, 12, 30)
+    calendar_years = {(3,): Period(date(2005, 12, 31), date(2005, 1, 1)), (5,): Period(date(2004, 12, 31), date(2004, 1, 1))}
+    years_after_prior(calendar_years)
+    assert calendar_years[(3,)].start == date(2005, 1, 1)
+
+
+def test_a_blank_printed_as_a_hyphen_and_a_won_sign_in_brackets():
+    assert number("‐") == 0.0 and number("‒") == 0.0  # Ultrapar's U+2010 blanks
+    assert number("(Won)456,063") == 456063.0 and number("(Won)(159,251)") == -159251.0  # KEPCO's 2005-06 20-Fs
+
+
+def test_pence_are_a_hundredth_of_a_pound():
+    assert number("2.9p") == 0.029 and number("(1.2)p") == -0.012
+    from statement_extractor.readers.html.parse import _row
+    from statement_extractor.readers.printed.tables import Cell
+    row = _row([Cell(0, 1, "Basic earnings per share"), Cell(1, 1, "2.9"), Cell(2, 1, "p"), Cell(3, 1, "2.5"), Cell(4, 1, "p")])
+    assert row.figures == {1: 0.029, 3: 0.025}
+    from statement_extractor.readers.printed.tables import printed_places
+    assert printed_places(row, 1) == 3
+
+
+def test_per_basic_common_share_is_a_figure_a_share():
+    from statement_extractor.domain.printed_labels import PER_SHARE
+    assert PER_SHARE.search("Net earnings attributable to The Kroger Co. per basic common share")
+    assert PER_SHARE.search("Net earnings attributable to The Kroger Co. per diluted common share")
+
+
+def test_thousands_parted_by_dots_in_a_table_without_decimals():
+    from statement_extractor.readers.html.cells import dotted_thousands
+    from statement_extractor.readers.printed.tables import Cell
+
+    def table(*rows):
+        return [[Cell(index, 1, text) for index, text in enumerate(row)] for row in rows]
+
+    def texts(lines):
+        return [[cell.text for cell in cells] for cells in lines]
+    # Eletropaulo's 2005 statements: dots throughout, nothing in the millions.
+    assert texts(dotted_thousands(table(["Cash", "639.406", "512.003"], ["Receivables", "1.204.114", "998.250"][:1] + ["204.114", "998.250"])))[0] == ["Cash", "639,406", "512,003"]
+    # A dot among commas: Azul's Q2 2017 "144.505".
+    assert texts(dotted_thousands(table(["Passenger", "1,734,120", "144.505"], ["Cargo", "62,220", "51,004"])))[0][2] == "144,505"
+    # A table printing decimals keeps its points; so does a per-share row.
+    assert texts(dotted_thousands(table(["Revenue", "1,734", "144.505"], ["Exchange rate", "3.17", "3.10"])))[0][2] == "144.505"
+    assert texts(dotted_thousands(table(["Revenue", "1,734", "1,500"], ["Dividends per share", "1.250", "1.120"])))[1][1] == "1.250"
+    assert texts(dotted_thousands(table(["Cash", "639.406", "512.003"])))[0][1] == "639.406"  # two dotted figures prove nothing
+    assert texts(dotted_thousands(table(["Passenger", "1,734,120", "144.505"], ["Loss per share", "(0.57)", "(0.40)"])))[0][2] == "144,505"
+
+
+def test_a_row_of_dashes_is_never_a_sections_total():
+    # Eletropaulo's 2002 Q2 and Petrobras's 2011 Q2 releases: an unlabelled "-" row after a section's unlabelled total.
+    from datetime import date
+    from statement_extractor.readers.html.read import read_document
+
+    def row(*items):
+        return "<tr>" + "".join(f"<td>{item}</td>" for item in items) + "</tr>"
+    html = ("<p>CONSOLIDATED STATEMENTS OF CASH FLOWS</p><p>(In thousands)</p><table>" + row("Year ended December 31,", "2005", "2004")
+            + row("Operating activities", "", "") + row("Net income", "100", "90") + row("Depreciation", "50", "40")
+            + row("", "150", "130") + row("", "-", "-")
+            + row("Investing activities", "", "") + row("Capital expenditures", "(80)", "(70)") + row("", "(80)", "(70)")
+            + row("Financing activities", "", "") + row("Dividends paid", "(20)", "(10)") + row("", "(20)", "(10)")
+            + row("Net increase in cash", "50", "50") + row("Cash at beginning of year", "100", "50")
+            + row("Cash at end of year", "150", "100") + "</table>")
+    readings, _ = read_document(html, accession="a", form="10-K", filed=date(2006, 3, 1), document_end=date(2005, 12, 31),
+                                fiscal_year_end="1231", year_offset=0)
+    year = next(r for r in readings if r.statement == "cash_flow" and r.fiscal_year == "2005")
+    assert {check.name: check.result for check in year.checks}.get("sections") != "fail" and year.status == "kept"
