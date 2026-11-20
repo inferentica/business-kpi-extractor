@@ -15,8 +15,9 @@ from ..readers.extract import (ReadValue, describe, header_contradicts, locator_
                        read_values)
 from ..readers.replay import _same_place, _source_template, asked_of, missing_since
 from ..readers.trace import placed_elsewhere, stamp_call
-from ..quality.reasons import PRECISE_FIGURE, SEGMENT_TABLE
+from ..quality.reasons import PRECISE_FIGURE, SEGMENT_TABLE, STATEMENT_OTHER
 from ..rules.precise_figures import precise_cell
+from ..rules.statement_other import residual, statement_other_cell
 from ..rules.segment_tables import cell_figure, company_segments, names_segment, segment_page_of
 from .replay_reading import in_full_groups, left_for_ai
 from ..quality.stated import _names
@@ -454,7 +455,7 @@ class AiReading:
         except Exception:  # noqa: BLE001 - no fiscal quarter: a column's quarter name confirms nothing
             fiscal_year, quarter = None, None
         names = company_segments(list(getattr(self, "values", {}).values()))
-        kept = []
+        kept, history = [], None
         for item in read:
             found = precise_cell(document, item.locator, item.value, item.kpi.label, expected, quarter, names,
                                  fiscal_year) \
@@ -474,6 +475,19 @@ class AiReading:
                     # What read it (a replay's or a rule's marks, the reader's call) stays with the figure.
                     got[0].locator = {**{key: value for key, value in item.locator.items() if key not in _CELL_KEYS},
                                       **got[0].locator}
+                    item = got[0]
+            # The list's Other read from a detail table's "All other" is read from its series' income statement row.
+            series = (history := history if history is not None else self._ai_history(expected)).get(
+                f"{item.group.key}.{item.kpi.key}", {}).get("locator") if not item.is_total and residual(item.kpi.label) else None
+            if found := statement_other_cell(document, item.locator, series, item.kpi.label, expected):
+                cell = Locator(kpi=f"{item.group.key}.{item.kpi.key}", table=found[0], row=found[1], col=found[2],
+                               row_label=found[3], scale=series.get("scale") or item.locator.get("scale"))
+                got, _problems = read_values(document, spec, located.model_copy(update={"tables": [], "values": [cell]}), currency)
+                if got:
+                    got[0].locator = {**{key: value for key, value in item.locator.items() if key not in _CELL_KEYS}, **got[0].locator,
+                                      "moved_from": {key: item.locator.get(key) for key in ("table", "row", "col", "row_label")}}
+                    got[0].notes.append(f"{STATEMENT_OTHER}: {item.locator.get('table')}'s {item.locator.get('row_label')!r} "
+                                        f"is a part of the line")
                     item = got[0]
             kept.append(item)
         return kept

@@ -49,6 +49,7 @@ OFF_ROW = "read from another row than the group's other lines"
 IDENTITY_HOLDS = frozenset({RATE_COLUMN, PART_ROW, OFF_ROW, OUTSIDE_SEGMENT_ERA, METRIC_TOTAL})
 SEGMENT_TABLE = "read from a table headed for one segment"
 PRECISE_FIGURE = "the full figure, printed rounded elsewhere"
+STATEMENT_OTHER = "read from the income statement's Other row"
 OUTSIDE_REPORTED_PERIODS = "outside the KPI's reported periods"
 ANNUAL_REFILED = "full-year figures, re-filed from Q4"
 LABELS_CONTRADICTED = "member labels contradict later filings"
@@ -115,6 +116,7 @@ _REASONS = (
     Reason("reviewed", ASIDE, REVIEWED, "start"),
     Reason("settled", ASIDE, "settled by the checks", "start"),
     Reason("precise_figure", ASIDE, PRECISE_FIGURE, "start"),
+    Reason("statement_other", ASIDE, STATEMENT_OTHER, "start"),
     Reason("checked", ASIDE, "checked against ", "start"),
     Reason("explained", ASIDE, EXPLAINED, "start"),
     Reason("rescaled", ASIDE, RESCALED, "within"),
