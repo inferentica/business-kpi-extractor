@@ -34,8 +34,9 @@ def _row(cells: list[Cell]) -> Row | None:
         if text == ")" and last_figure is not None:
             figures[last_figure] = -abs(figures[last_figure])
             continue
-        # A currency sign in a cell of its own, KEPCO's won sign printed "W" included: no part of the label.
-        if text in ("$", "%", "€", "NT$", "US$", "£", "¥", "₩", "R$") or text == "W" and label_parts \
+        # A currency sign in a cell of its own, KEPCO's won sign printed "W" included, or an opening bracket (Crown's 2006
+        # 10-K: "( | 12 | )", its ")" makes the figure negative): no part of the label.
+        if text in ("$", "%", "€", "NT$", "US$", "£", "¥", "₩", "R$", "(", "($", "$(") or text == "W" and label_parts \
                 or text.endswith("%") and number(text.rstrip("%")) is not None:
             continue
         # A currency sign in the figure's own cell: POSCO's Q1 2026 6-K, "W   (4,465,247)" (round 132).
@@ -147,7 +148,9 @@ def _side_by_side(lines: list[list[Cell]]) -> int | None:
     figured = 0
     for cells in lines:
         texts = [cell for cell in cells if cell.text]
-        kinds = [(cell.start, number(cell.text) is not None or cell.text in ("$", ")", "-", "—")) for cell in texts]
+        # A label has a word in it: never a "%" after a share of the total (Suzano's 2018 horizontal analysis), a bracket in
+        # a cell of its own (Crown's 2006 10-K: "( | 12 | )") or a variance's "n.a." (Azul's Q4 2025 release).
+        kinds = [(cell.start, number(cell.text) is not None or not re.search(r"[^\W\d_]{3,}", cell.text)) for cell in texts]
         if not any(is_figure for _start, is_figure in kinds):
             continue
         figured += 1

@@ -160,3 +160,18 @@ def test_a_row_of_dashes_is_never_a_sections_total():
                                 fiscal_year_end="1231", year_offset=0)
     year = next(r for r in readings if r.statement == "cash_flow" and r.fiscal_year == "2005")
     assert {check.name: check.result for check in year.checks}.get("sections") != "fail" and year.status == "kept"
+
+
+def test_a_percent_a_bracket_or_n_a_between_figures_is_no_second_statement():
+    from statement_extractor.readers.html.parse import _side_by_side
+    from statement_extractor.readers.printed.tables import Cell
+
+    def lines(between):
+        return [[Cell(0, 1, f"Line {index}"), Cell(2, 1, "1,000"), Cell(4, 1, "8.1"), Cell(5, 1, between),
+                 Cell(6, 1, "900"), Cell(8, 1, "3.8"), Cell(9, 1, between), Cell(10, 1, "800")] for index in range(8)]
+    for between in ("%", "(", "n.a.", "($"):
+        assert _side_by_side(lines(between)) is None, between
+    # Assets on the left and liabilities on the right of each row (TSMC) still part.
+    paired = [[Cell(0, 1, f"Asset {index}"), Cell(2, 1, "1,000"), Cell(4, 1, "900"), Cell(6, 1, f"Liability {index}"),
+               Cell(8, 1, "700"), Cell(10, 1, "600")] for index in range(8)]
+    assert _side_by_side(paired) == 6
