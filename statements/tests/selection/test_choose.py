@@ -331,3 +331,14 @@ def test_another_basis_takes_the_winners_scope_before_a_newer_parents():
     parent.basis, parent.scope = "ROC GAAP", "parent"
     [chosen] = choose([group, old, parent])
     assert [(item["source_accession"], item["scope"]) for item in chosen["other_bases"]] == [("old", "consolidated")]
+
+
+def test_on_a_tie_the_finer_print_wins():
+    # Ambev's interim statements in thousands and its release of the same day in millions to one place (round 162).
+    release = reading("release", date(2025, 10, 30), 3_566.3e6, own=False)
+    statements = reading("statements", date(2025, 10, 30), 3_566_301e3, own=False)
+    release.lines[0] |= {"decimals": -5, "unit": "BRL"}
+    statements.lines[0] |= {"decimals": -3, "unit": "BRL"}
+    for order in ([release, statements], [statements, release]):
+        [chosen] = choose(order)
+        assert chosen["source_accession"] == "statements"

@@ -63,8 +63,8 @@ _RUNNING_LINK = re.compile(r"\b(index\s+to\s+(consolidated\s+)?financial\s+state
 # Column headings that are no period: a statement's columns are periods, a reconciliation's are its steps (Chase's
 # 1998 "Reported Results", "Credit Costs", "Special Items", "Operating Basis").
 # Or its changes: Lloyds' IFRS 17 transition tables, "As previously reported | Impact of IFRS 17 | IFRS 17 adjustments |
-# IFRS 17 2022 movements | Other changes | Restated".
-_NOT_A_PERIOD = re.compile(r"^(reported|operating|adjustments?|special|as\s+adjusted)\b|"
+# IFRS 17 2022 movements | Other changes | Restated". A change in percent is none: Coca-Cola FEMSA's "Reported %".
+_NOT_A_PERIOD = re.compile(r"^(reported|operating|adjustments?|special|as\s+adjusted)\b(?![\W_]*%)|"
                            r"\b(adjustments|movements|impact\s+of|other\s+changes|as\s+previously\s+reported)\b", re.I)
 # Or its steps wrapped into its first rows (Chase's 2000 10-K: "(in millions, except Reported Credit Special Operating …",
 # its adjustment columns once kept as years); restated columns "as adjusted" are a statement's own (Sabesp, Ambev).

@@ -92,7 +92,6 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         dropped = translations(dated, periods, by_column, currency, group)
         if dropped:
             notes.append(f"{kind}: {len(dropped)} convenience translation column(s) left out")
-        read_periods.setdefault(seen, set()).update(period.key for period in periods.values())
         kept = [index for index, column in enumerate(dated) if column not in dropped]
         scopes = column_scopes(group, dated, periods)
         if scopes is None:
@@ -128,7 +127,8 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             # Untitled, the company the auditors' report before it names: Heineken's statements in FEMSA's 20-Fs.
             reading.audited_of = "" if reading.titled else group[0].audited_of
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
-            readings.append(reading)
+            readings.append(reading)  # a printing its checks reject leaves the period to the next: Ultrapar's highlights
+            read_periods.setdefault(seen, set()).update([period.key] if reading.status != "rejected" else [])  # (round 162)
     return readings, notes
 
 

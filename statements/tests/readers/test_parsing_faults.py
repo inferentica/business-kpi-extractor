@@ -219,3 +219,9 @@ def test_months_to_date_named_beside_the_quarters():
     assert named_months("YTD 11", "1231", header="YTD 11 YTD 10") is None  # no quarter to run to
     assert named_months("2H25", "1231") is None and named_months("2Q19", "1231") is None
     assert all(MONTHS_CELL.match(text) for text in ("6M19", "1H25", "YTD 11", "9M 2020"))
+
+
+def test_a_change_in_percent_is_no_reconciliation_step():
+    from statement_extractor.readers.printed.find import _NOT_A_PERIOD
+    assert not _NOT_A_PERIOD.search("Reported”%") and not _NOT_A_PERIOD.search("Reported %")  # Coca-Cola FEMSA
+    assert _NOT_A_PERIOD.search("Reported Results") and _NOT_A_PERIOD.search("Operating Basis")  # Chase's steps
