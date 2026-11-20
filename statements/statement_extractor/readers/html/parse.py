@@ -11,7 +11,7 @@ import lxml.html
 from ...domain.basis import currencies_named, is_currency_word
 from .audited import audit_reports, audited_names
 from .cells import _cells, _spanned, dotted_thousands
-from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_column_word,
+from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, MONTHS_CELL, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_column_word,
                               is_header_figures, is_subheader, number)
 
 
@@ -127,7 +127,7 @@ def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
             quarters = [cell.text for cell in cells if cell.text.strip()][1 if cells and cells[0].text.strip() else 0:]
             quarters = [NOTE_MARK.sub("", text) for text in quarters]  # Copel's "1Q09 (1) | 4Q08 (2) | 1Q08 (3) | Var.% (1/2)"
             if COLUMN_TITLE.search(texts) or sum(bool(QUARTER_CELL.match(text)) for text in quarters) >= 2 and all(
-                    QUARTER_CELL.match(text) or is_column_word(text) for text in quarters):
+                    QUARTER_CELL.match(text) or MONTHS_CELL.match(text) or is_column_word(text) for text in quarters):
                 header.append([cell for cell in cells if cell.text])
             elif row.label:
                 rows.append(Row(label=row.label, level=row.level, cells=cells))

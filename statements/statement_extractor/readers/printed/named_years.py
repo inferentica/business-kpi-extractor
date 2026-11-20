@@ -34,6 +34,29 @@ def named_quarter(text: str, fiscal_year_end: str, year_offset: int = 0) -> date
     return date(end_year, end_month, last if day >= 28 else min(day, last))
 
 
+_MONTHS_NAMED = re.compile(r"\b(3|6|9|12|1)\s*([MH])\s*['’]?\s*((?:19|20)\d{2}|\d{2})\b", re.I)
+
+
+_YTD_NAMED = re.compile(r"\bYTD\s*['’]?\s*((?:19|20)\d{2}|\d{2})\b", re.I)
+
+
+def named_months(text: str, fiscal_year_end: str, year_offset: int = 0, header: str = "") -> tuple[date, int] | None:
+    """The end and length of the months to date a header names ("6M19", "1H19": the fiscal year 2019's first six
+    months); "YTD 11" runs to the one quarter the rest of the header names (Coca-Cola FEMSA's "3Q 11": nine months)."""
+    ytd = _YTD_NAMED.search(text)
+    if ytd is not None:
+        quarters = {int(found.group(1) or found.group(2)) for found in QUARTER_NAME.finditer(header) if found.group(1) or found.group(2)}
+        if len(quarters) != 1:
+            return None
+        number = quarters.pop()
+        return named_quarter(f"Q{number} {ytd.group(1)}", fiscal_year_end, year_offset), 3 * number
+    match = _MONTHS_NAMED.search(text)
+    if match is None or (match.group(2).upper() == "H") != (match.group(1) == "1"):
+        return None
+    months = 6 if match.group(2).upper() == "H" else int(match.group(1))
+    return named_quarter(f"Q{months // 3} {match.group(3)}", fiscal_year_end, year_offset), months
+
+
 def title_dates(text: str, fiscal_year_end: str, year_offset: int, over: set[str]) -> dict[str, tuple[str, str, str]]:
     """Each year the title dates, with its month, day and year: "June 29, 2014 and June 30, 2013" (ASML). Where the
     columns' years are the fiscal years those dates close and not the years the dates fall in, by the fiscal year:

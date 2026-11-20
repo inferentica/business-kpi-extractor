@@ -106,6 +106,10 @@ def printed_places(row: Row, position: int | None) -> int | None:
 YEAR_ONLY = re.compile(r"^(19|20)\d{2}$")
 # A quarter's name over a column: América Móvil's "3Q10 | 3Q09".
 QUARTER_CELL = re.compile(r"^\s*(?:[1-4]Q|Q[1-4])\s*['’]?\s*(?:19|20)?\d{2}\s*$", re.I)
+# Months to date beside them: Grupo Aeroportuario del Pacífico's "2Q19 | 2Q20 | Change | 6M19 | 6M20 | Change".
+# Azul's "2Q25 | 2Q24 | % Δ | 1H25 | 1H24 | % Δ": a first half too (a second half is no year to date).
+# Coca-Cola FEMSA's "3Q 11 | 3Q 10 | YTD 11 | YTD 10": the year to the quarter it names.
+MONTHS_CELL = re.compile(r"^\s*(?:(?:3|6|9|12)\s*M|1\s*H|YTD)\s*['’]?\s*(?:19|20)?\d{2}\s*$", re.I)
 
 
 # Words a header row prints over each column rather than a period: TSMC's management reports print "USD | NTD | % |

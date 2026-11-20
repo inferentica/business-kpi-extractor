@@ -206,3 +206,16 @@ def test_a_split_between_owners_is_no_step_to_the_groups_net_income():
                ("Loss from discontinued operations", 0, -10.0), ("Net income attributable to noncontrolling interests", 0, 0.0),
                ("Loss from discontinued operations attributable to Vale's stockholders", 0, -10.0), ("Net income", 0, 83.0)]
     assert income_check(figures).result == "pass"
+
+
+def test_months_to_date_named_beside_the_quarters():
+    from datetime import date
+    from statement_extractor.readers.printed.named_years import named_months
+    from statement_extractor.readers.printed.tables import MONTHS_CELL
+    assert named_months("6M19", "1231") == (date(2019, 6, 30), 6)  # Grupo Aeroportuario del Pacífico
+    assert named_months("1H25", "1231") == (date(2025, 6, 30), 6)  # Azul
+    assert named_months("9M20", "1231") == (date(2020, 9, 30), 9)
+    assert named_months("YTD 11", "1231", header="3Q 11 % Rev 3Q 10 % Rev YTD 11 YTD 10") == (date(2011, 9, 30), 9)  # KOF
+    assert named_months("YTD 11", "1231", header="YTD 11 YTD 10") is None  # no quarter to run to
+    assert named_months("2H25", "1231") is None and named_months("2Q19", "1231") is None
+    assert all(MONTHS_CELL.match(text) for text in ("6M19", "1H25", "YTD 11", "9M 2020"))
