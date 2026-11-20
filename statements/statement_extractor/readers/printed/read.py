@@ -8,8 +8,7 @@ span ("Three Months Ended"). Each line keeps its printed label, its indentation 
 
 It is kept only when its arithmetic holds on the printed figures (brackets for negatives): assets equal liabilities and
 equity; opening cash plus the change (or the three sections) equals closing cash; each printed total equals the lines
-above it; net income follows from income before taxes.
-"""
+above it; net income follows from income before taxes."""
 from __future__ import annotations
 
 import re
@@ -19,7 +18,7 @@ from ...checks.printed import balance_check, cash_check, income_check, total_che
 from ...checks.sections import section_check
 from ...domain.model import Reading
 from ...domain.periods import label_period
-from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA
+from ...domain.printed_labels import CASH_HEADING, KNOWN, OPERATING_DATA, SECTION_KINDS
 from .company_title import titled_company
 from .currency import column_currencies, reporting_currency, split_by_sign, translations
 from .ranges import without_repeats
@@ -33,7 +32,7 @@ from .scope import statement_scope
 from .side_by_side import column_scopes
 from .captions import caption_only as _caption_only
 from .line_kind import BARE_BASIS, COUNTS, continued_count, line_kind
-from .tables import Table, figure_columns, statement_rows
+from .tables import Table, figure_columns, printed_places, side_positions, statement_rows
 from .titled import titled_notes
 
 
@@ -70,9 +69,10 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         # fuller balance sheet read first; Coca-Cola FEMSA's release in FEMSA's, round 84): it never takes the company's.
         seen = (kind, statement_scope(kind, group, form, found), group[0].audited_of, group[0].release_of)
         if seen in read_periods:
-            # A statement printed again gives only the periods it prints of its own: Chase's 1995 10-Qs print the three
-            # months and the six months as two income statements; TSMC's releases print the quarters and the year.
-            periods = {column: period for column, period in periods.items() if period.key not in read_periods[seen]}
+            # A statement printed again gives only the periods it prints of its own (Chase's 1995 10-Qs print the three
+            # months and the six months as two income statements), and none a printing rejected on its tables (IEP's).
+            periods = {column: period for column, period in periods.items() if period.key not in (done := read_periods[seen])
+                       and not any((period.key, id(table)) in done for table in group)}
             if not periods:
                 continue
         scale = statement_scale(group)
@@ -92,7 +92,6 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
         dropped = translations(dated, periods, by_column, currency, group)
         if dropped:
             notes.append(f"{kind}: {len(dropped)} convenience translation column(s) left out")
-        read_periods.setdefault(seen, set()).update(period.key for period in periods.values())
         kept = [index for index, column in enumerate(dated) if column not in dropped]
         scopes = column_scopes(group, dated, periods)
         if scopes is None:
@@ -128,23 +127,24 @@ def read_tables(all_tables: list[Table], *, accession: str, form: str, filed: da
             # Untitled, the company the auditors' report before it names: Heineken's statements in FEMSA's 20-Fs.
             reading.audited_of = "" if reading.titled else group[0].audited_of
             reading.own = document_end is not None and abs(period.end - document_end) <= timedelta(days=7)
-            readings.append(reading)
+            readings.append(reading)  # a printing its checks reject leaves the period to another table: Ultrapar's highlights
+            read_periods.setdefault(seen, set()).update([period.key] if reading.status != "rejected" else [(period.key, id(table)) for table in group])
     return readings, notes
 
 
-def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]]) -> float | None:
-    """A row's figure in a column: at one of its positions, or a cell off them but nearer to it than to any other."""
+def _figure(row, column: tuple[int, ...], columns: list[tuple[int, ...]], side: set[int] = frozenset()) -> tuple:
+    """A row's figure and its cell: at one of the column's positions, else the nearest off them, never under "Note"/"%"."""
     for position in column:
         if position in row.figures:
-            return row.figures[position]
+            return row.figures[position], position
     shifted = _shifted(row, columns)
     if shifted is not None:
-        return shifted.get(column)
-    for position, value in row.figures.items():
+        return shifted.get(column), None
+    for position, value in ((position, value) for position, value in row.figures.items() if position not in side):
         nearest = min(columns, key=lambda other: min(abs(p - position) for p in other))
         if nearest == column and min(abs(p - position) for p in column) <= 2:
-            return value
-    return None
+            return value, position
+    return None, None
 
 
 def _shifted(row, columns: list[tuple[int, ...]]) -> dict | None:
@@ -171,8 +171,8 @@ _SECTION_HEADING = re.compile(r"^(?:cash\s+flows?\s+(?:from|used\s+in|provided\s
 
 
 def _close_section(printed: list, section: str | None, index: int | None) -> None:
-    """Names a cash flow section's unlabelled total as the section's net cash, for the checks."""
-    if section and index is not None and index < len(printed):
+    """Names a section's unlabelled total its net cash, unless the section prints its own after it (Eletropaulo, 2003)."""
+    if section and index is not None and index < len(printed) and not any(row[2] is not None and SECTION_KINDS.search(row[0]) for row in printed[index + 1:]):
         _label, level, value = printed[index]
         printed[index] = (f"Net cash from {section}ing activities", level, value)
 
@@ -196,7 +196,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
     heading, section, section_total = "", None, None
     counted_before = False  # the last figure row was a share count: BCBP's "…shares outstanding- basic" / "diluted"
     for table, column, columns in layout:
-        base = min((row.level for row in table.rows if row.label), default=0)
+        base, side = min((row.level for row in table.rows if row.label), default=0), side_positions(table)
         last_heading = None
         for row in statement_rows(table.rows):
             if not row.label and not row.figures:
@@ -225,7 +225,7 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
                 if opened or CASH_HEADING.match(row.label):
                     _close_section(printed, section, section_total)
                     section, section_total = (opened.group(1).lower() if opened else None), None
-            value = _figure(row, column, columns) if row.figures else None
+            value, at = _figure(row, column, columns, side) if row.figures else (None, None)
             if row.figures and (value is None or OPERATING_DATA.search(row.label)):
                 continue
             if value is not None and _YEAR_ROW_LABEL.search(row.label) and any(
@@ -244,11 +244,11 @@ def _read_column(kind, layout, period, scales, labelled) -> Reading | None:
             amount = None if value is None else value * factor
             lines.append({"line": len(lines), "concept": _concept(row.label, kind), "label": row.label[:300],
                           "level": max(0, min(20, row.level - base)), "is_heading": not row.figures, "value": amount,
-                          **({"code": row.code} if row.code else {}), **printed_fields(value, factor, per_share, shares)})
+                          **({"code": row.code} if row.code else {}), **printed_fields(value, factor, per_share, shares, printed_places(row, at))})
             meaning = named.get(id(row), row.label)
-            if kind == "cash_flow" and row.figures and not row.label and section:
-                # A section closed by an unlabelled total (Scotiabank, Brookfield): its last before the next section
-                # is the net cash of the section (Brookfield's operating section has a subtotal before it).
+            if kind == "cash_flow" and row.figures and not row.label and section and any(row.figures.values()):
+                # A section closed by an unlabelled total (Scotiabank, Brookfield): its last before the next section is
+                # its net cash (Brookfield's has a subtotal before it); never a row of dashes (Eletropaulo's 2002 Q2).
                 section_total = len(printed)
             if re.match(r"^(balance|net\s*\(?(increase|decrease)|increase|decrease|beginning|end|start)\b", row.label, re.I) \
                     and "cash" not in row.label.lower() and CASH_HEADING.match(heading):

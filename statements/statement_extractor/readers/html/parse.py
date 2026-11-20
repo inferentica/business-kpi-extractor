@@ -11,7 +11,7 @@ import lxml.html
 from ...domain.basis import currencies_named, is_currency_word
 from .audited import audit_reports, audited_names
 from .cells import _cells, _spanned, dotted_thousands
-from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_column_word,
+from ..printed.tables import (ACCOUNT_CODE, COLUMN_TITLE, MONTHS_CELL, NOTE_MARK, QUARTER_CELL, Cell, Row, Table, clean, is_column_word,
                               is_header_figures, is_subheader, number)
 
 
@@ -28,11 +28,15 @@ def _row(cells: list[Cell]) -> Row | None:
             del figures[last_figure]  # a percentage in a cell of its own: Andina's "Net margin 7.4 %", no figure
             last_figure = None
             continue
+        if text in ("p", ")p") and last_figure is not None:  # pence after the figure: Lloyds' "2.9 | p", a hundredth of a pound
+            figures[last_figure] = round((-abs(figures[last_figure]) if text == ")p" else figures[last_figure]) / 100, 12)
+            continue
         if text == ")" and last_figure is not None:
             figures[last_figure] = -abs(figures[last_figure])
             continue
-        # A currency sign in a cell of its own, KEPCO's won sign printed "W" included: no part of the label.
-        if text in ("$", "%", "€", "NT$", "US$", "£", "¥", "₩", "R$") or text == "W" and label_parts \
+        # A currency sign in a cell of its own, KEPCO's won sign printed "W" included, or an opening bracket (Crown's 2006
+        # 10-K: "( | 12 | )", its ")" makes the figure negative): no part of the label.
+        if text in ("$", "%", "€", "NT$", "US$", "£", "¥", "₩", "R$", "(", "($", "$(") or text == "W" and label_parts \
                 or text.endswith("%") and number(text.rstrip("%")) is not None:
             continue
         # A currency sign in the figure's own cell: POSCO's Q1 2026 6-K, "W   (4,465,247)" (round 132).
@@ -122,8 +126,10 @@ def _rows(lines: list[list[Cell]]) -> tuple[list[Row], list[list[Cell]], bool]:
             texts = " ".join(cell.text for cell in cells)
             quarters = [cell.text for cell in cells if cell.text.strip()][1 if cells and cells[0].text.strip() else 0:]
             quarters = [NOTE_MARK.sub("", text) for text in quarters]  # Copel's "1Q09 (1) | 4Q08 (2) | 1Q08 (3) | Var.% (1/2)"
+            # A change in percent beside the quarters, however long its words: Coca-Cola FEMSA's "Excluding M&A Effects Δ%".
             if COLUMN_TITLE.search(texts) or sum(bool(QUARTER_CELL.match(text)) for text in quarters) >= 2 and all(
-                    QUARTER_CELL.match(text) or is_column_word(text) for text in quarters):
+                    QUARTER_CELL.match(text) or MONTHS_CELL.match(text) or is_column_word(text) or text.rstrip().endswith("%")
+                    for text in quarters):
                 header.append([cell for cell in cells if cell.text])
             elif row.label:
                 rows.append(Row(label=row.label, level=row.level, cells=cells))
@@ -144,7 +150,9 @@ def _side_by_side(lines: list[list[Cell]]) -> int | None:
     figured = 0
     for cells in lines:
         texts = [cell for cell in cells if cell.text]
-        kinds = [(cell.start, number(cell.text) is not None or cell.text in ("$", ")", "-", "—")) for cell in texts]
+        # A label has a word in it: never a "%" after a share of the total (Suzano's 2018 horizontal analysis), a bracket in
+        # a cell of its own (Crown's 2006 10-K: "( | 12 | )") or a variance's "n.a." (Azul's Q4 2025 release).
+        kinds = [(cell.start, number(cell.text) is not None or not re.search(r"[^\W\d_]{3,}", cell.text)) for cell in texts]
         if not any(is_figure for _start, is_figure in kinds):
             continue
         figured += 1

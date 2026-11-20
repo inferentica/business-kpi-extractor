@@ -493,3 +493,25 @@ def test_a_currency_mark_ends_a_line_s_label_only_before_its_figures():
     # CSN's 2011 releases name their currency only at the end of the caption (its comparatives read without one).
     assert "CONSOLIDATED - Corporate Law - In Thousand of R$" in labels
     assert "Net income" in labels  # Televisa's peso sign before its figures is no part of the label
+
+
+
+def test_a_rejected_cash_flow_leaves_no_period_to_its_own_continued_page(monkeypatch):
+    # Icahn Enterprises' 2007 10-K: the statement fails a check over both pages, and its second page, found again as a
+    # statement of its own, is no statement: the period stays unread (round 163).
+    from statement_extractor.readers.html.parse import parse_html
+    from statement_extractor.readers.printed import read as printed_read
+    rows = lambda items: "".join(f"<tr><td>{label}</td><td>{a}</td><td>{b}</td></tr>" for label, a, b in items)
+    head = "<table><tr><td></td><td>2007</td><td>2006</td></tr>"
+    first = "<p>CONSOLIDATED STATEMENTS OF CASH FLOWS (in millions)</p>" + head + rows((
+        ("Cash flows from operating activities:", "", ""), ("Net income", "100", "90"), ("Depreciation", "20", "15"),
+        ("Net cash provided by operating activities", "150", "105"))) + "</table>"  # its lines give 120, not 150
+    second = "<p>CONSOLIDATED STATEMENTS OF CASH FLOWS (continued) (in millions)</p>" + head + rows((
+        ("Cash flows from financing activities:", "", ""), ("Dividends paid", "(30)", "(25)"),
+        ("Net cash used in financing activities", "(30)", "(25)"), ("Net increase in cash", "90", "80"),
+        ("Cash, beginning of year", "100", "20"), ("Cash, end of year", "190", "100"))) + "</table>"
+    tables = [table for table in parse_html(first + second) if table.rows]
+    monkeypatch.setattr(printed_read, "find_statements", lambda *_, **__: [("cash_flow", tables), ("cash_flow", tables[1:])])
+    readings, _ = printed_read.read_tables(tables, accession="a", form="10-K", filed=date(2030, 1, 1), document_end=None,
+                                           fiscal_year_end="1231", year_offset=0)
+    assert [r.status for r in readings if r.fiscal_year == "2007"] == ["rejected"]

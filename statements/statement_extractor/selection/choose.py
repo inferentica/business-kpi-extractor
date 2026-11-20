@@ -66,7 +66,7 @@ def choose(readings: list[Reading], printed: dict[str, dict[str, list[float]]] |
         eligible = [reading for reading in kept if id(reading) not in aside] or kept
         best = lambda item: (item.scope == "consolidated", _rank(item, annual), not _coded(item),  # noqa: E731
                              item.form != "6-K" or annual is None or ifrs_family(item.basis) == ifrs_family(annual),
-                             item.filed, item.own, item.source == "xbrl")
+                             item.filed, item.own, item.source == "xbrl", _places(item))
         winner = max(eligible, key=best) if eligible else None
         if winner is not None and winner.form == "6-K" and winner.source == "xbrl":
             # A 6-K presenting the period after the tagged one that won it restates it: the newest presentation wins
@@ -134,6 +134,15 @@ def _rank(reading: Reading, annual: str | None = None) -> int:
     tagged = reading.source == "xbrl" and reading.fiscal_period != "FY" and (
         annual is None or ifrs_family(reading.basis) == ifrs_family(annual))
     return 2 if tagged else 0
+
+
+def _places(reading: Reading) -> int:
+    """The places its coarsest money line prints to: on a tie the finer print wins, Ambev's statements in thousands
+    over its release of the same day in millions to one place (round 162)."""
+    places = [line["decimals"] for line in reading.lines if isinstance(line.get("decimals"), int)
+              and not line["is_heading"] and line["value"] and line.get("unit") and "/" not in line["unit"]
+              and line["unit"] != "shares"]
+    return min(places) if places else -99
 
 
 def _other_bases(winner: Reading, kept: list[Reading]) -> list[dict]:

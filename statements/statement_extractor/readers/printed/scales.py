@@ -23,13 +23,17 @@ _DOLLAR_UNIT = re.compile(r"(?:(?:US|C|CDN|NT|HK)?\$|£|€|¥)\s*" + _UNIT + r"
                           r"\(\s*" + _UNIT + r"\s*(?:,\s*except\b[^)]*)?\)", re.I)  # Brookfield's "(MILLIONS)"
 # Thousands written as zeros: Ross's "($000, except stores and per share data, unaudited)", Icahn's "(In $000s, except
 # unit amounts)" and "(In 000s ...)", "($000's)", "(000 omitted)"; Copel's releases "R$'000" over their labels.
-_ZEROS = re.compile(r"\(\s*(?:in\s+)?\$?\s*000(?:'?s)?(?:\s+omitted)?\s*[,)]|\bin\s+\$?\s*000'?s\b|\bR\$\s*['’]\s*000\b", re.I)
+_ZEROS = re.compile(r"\(\s*(?:in\s+)?\$?\s*000(?!,000)(?:'?s)?(?:\s+omitted)?\s*[,)]|\bin\s+\$?\s*000'?s\b|\bR\$\s*['’]\s*000\b", re.I)
+# Millions written as zeros: "(000,000 omitted)", "($000,000 omitted, except per share)".
+_MILLION_ZEROS = re.compile(r"\(\s*(?:in\s+)?\$?\s*000,000(?:'?s)?(?:\s+omitted)?\s*[,)]", re.I)
 # Words that put a scale on share counts rather than money.
 _SHARES_IN = re.compile(r"\bshares?(?:\s+(?:amounts?|data|counts?|outstanding))?(?:\s*,)?(?:\s+which\s+are)?"
                         r"(?:\s+(?:reflected|stated|presented|expressed))?\s+(?:are\s+)?in\s+" + _UNIT + r"\b|"
                         r"\b" + _UNIT + r"\s+of\s+shares\b", re.I)
 # "except share and per share amounts", "except share data", "except number of shares": share counts in units.
 _SHARES_EXCEPTED = re.compile(r"\bexcept\b[^)]*?\b(?<!per )(share|shares)\b(?!\s+(?:amounts?\s+)?which)", re.I)
+# "per share", "per-share", "per common share": a per-share figure, not share counts, in an exception.
+_PER_SHARE_WORDS = re.compile(r"\bper[\s-]+(?:(?:common|ordinary|basic|diluted)\s+)?shares?\b", re.I)
 _LINE_UNIT = re.compile(r"\(\s*(?:in\s+)?" + _UNIT + r"(?:\s+of\s+shares)?\s*\)|\bin\s+" + _UNIT + r"\s*\)?\s*:?$", re.I)
 
 
@@ -94,6 +98,8 @@ def statement_scale(group: list[Table]) -> float | None:
             found |= {_SCALES[unit.group(1).lower()] for unit in units}
     if _ZEROS.search(text):
         found.add(1e3)
+    if _MILLION_ZEROS.search(text):
+        found.add(1e6)
     if _UNITS_STATED.search(text):
         found.add(1.0)  # Gildan's 2003-05 statements: "(In US dollars)", every figure printed in full
     if len(found) == 2 and matches and len({word.lower() for word in _CURRENCY_WORDS.findall(raw)}) >= 2:
@@ -115,7 +121,7 @@ def share_scale(group: list[Table], money: float) -> float:
     stated = _SHARES_IN.search(text)
     if stated:
         return _SCALES[next(group for group in stated.groups() if group).lower()]
-    if _SHARES_EXCEPTED.search(text):
+    if _SHARES_EXCEPTED.search(_PER_SHARE_WORDS.sub("per_unit", text)):
         return 1.0
     return money
 

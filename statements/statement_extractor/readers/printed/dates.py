@@ -9,9 +9,9 @@ from datetime import date, timedelta
 from ...domain.periods import Period
 from ...sources.edgar import fiscal_year_end_for
 from .find import TITLE_PATTERNS
-from .named_years import QUARTER_NAME as _QUARTER_NAME, QUARTERLY as _QUARTERLY, named_quarter as _named_quarter, title_dates
+from .named_years import QUARTER_NAME as _QUARTER_NAME, QUARTERLY as _QUARTERLY, named_months, named_quarter as _named_quarter, title_dates
 from .ranges import (dates_in_order, spans_over, years_in_order, dotted_date as _dotted, mended_starts, numeric_date as _numeric,
-                     own_month, paired_spans, counted_start, slashed_day_first, off_title, YEAR_TO_DATE)
+                     own_month, paired_spans, counted_start, slashed_day_first, off_title, years_after_prior, YEAR_TO_DATE)
 from .tables import Table, figure_columns, header_text
 
 
@@ -153,6 +153,10 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
             end = date(year, month, calendar.monthrange(year, month)[1])
             periods[column] = Period(end) if kind == "balance" else Period(end, counted_start(end, 91))
             continue
+        to_date = named_months(above, fiscal_year_end, year_offset, header_all)
+        if to_date is not None and kind != "balance" and not _QUARTER_NAME.search(above):
+            periods[column] = Period(to_date[0], counted_start(to_date[0], {3: 91, 6: 182, 9: 273, 12: 364}[to_date[1]]))
+            continue
         named = _named_quarter(above, fiscal_year_end, year_offset)
         quarter_name = _QUARTER_NAME.search(above)  # a column's own year after a title's: "(Fourth Quarter 2011) 2010" (CCU)
         own_year = [int(year) for year in _YEAR.findall(above[quarter_name.end():])] if quarter_name and named else []
@@ -257,6 +261,7 @@ def column_periods(kind: str, group: list[Table], fiscal_year_end: str,
         periods[column] = Period(end, counted_start(end, days, bool(span and span.group(2) and span.group(2).lower().startswith("week"))))
     paired_spans(periods, columns, title + " " + header_all, fiscal_year_end, first)
     mended_starts(periods, ranged)
+    years_after_prior(periods)
     return periods
 
 

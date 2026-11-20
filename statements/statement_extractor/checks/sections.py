@@ -68,8 +68,10 @@ def section_check(printed) -> Check:
             continue  # among the lines of a total printed over them
         if section != kind:
             begin, kind, earlier = after, section, []
+        # A continuing operations' total leaves out the discontinued operations' net cash printed above it (FEMSA's 2018 20-F).
+        continuing = re.search(r"\bcontinuing\b", printed[index][0], re.I) is not None
         lines = [(position, label, value) for position, (label, _level, value) in enumerate(printed[begin:index], begin)
-                 if value is not None and not OPENING.search(label)]
+                 if value is not None and not OPENING.search(label) and not (continuing and re.search(r"discontinu", label, re.I))]
         inner = [(end, start) for end, start in starts.items() if begin <= start and end < index]
         same = {position for end, start in earlier for position in range(start, end)}  # a continuing total before it
         covered = {position for end, start in inner for position in range(start, end)} | same

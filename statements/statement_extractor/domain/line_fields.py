@@ -26,11 +26,12 @@ def places(printed: float) -> int:
     return 6
 
 
-def printed_decimals(printed: float | None, scale: float) -> int | None:
-    """A printed figure's rounding in whole units: 1,234 in millions is -6, 1,234.5 in millions -5, 2.97 a share 2."""
+def printed_decimals(printed: float | None, scale: float, digits: int | None = None) -> int | None:
+    """A printed figure's rounding in whole units: 1,234 in millions is -6, 1,234.5 in millions -5, 2.97 a share 2;
+    `digits` its places after the point as printed (1.90 has two), else as its value shows them."""
     if printed is None or not scale or scale <= 0:
         return None
-    return places(printed) - round(math.log10(scale))
+    return (places(printed) if digits is None else digits) - round(math.log10(scale))
 
 
 def fact_kind(unit_ref: str | None, currency: str | None, concept: str, label: str) -> str:
@@ -57,12 +58,12 @@ def _by_label(concept: str, label: str) -> str:
     return MONEY
 
 
-def printed_fields(printed: float | None, scale: float, per_share: bool, shares: bool) -> dict:
-    """A printed line's kind and rounding, from the scale its figure was read in."""
+def printed_fields(printed: float | None, scale: float, per_share: bool, shares: bool, digits: int | None = None) -> dict:
+    """A printed line's kind and rounding, from the scale its figure was read in and its places as printed."""
     if printed is None:
         return {}
     kind = PER_SHARE_KIND if per_share else SHARES if shares else MONEY
-    return {"unit_kind": kind, "decimals": printed_decimals(printed, scale)}
+    return {"unit_kind": kind, "decimals": printed_decimals(printed, scale, digits)}
 
 
 def unit_of(kind: str, currency: str | None) -> str | None:
