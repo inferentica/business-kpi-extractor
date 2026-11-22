@@ -3,7 +3,7 @@ from datetime import date
 
 import pandas as pd
 
-from kpi_extractor.readers.segment_income import line_key, segment_income
+from kpi_extractor.readers.segment_income import segment_income
 
 SEG, CONS = "dim_us-gaap_StatementBusinessSegmentsAxis", "dim_srt_ConsolidationItemsAxis"
 
@@ -25,16 +25,18 @@ LABELS = {"goog:GoogleServicesMember": "Google Services", "goog:GoogleCloudMembe
           "us-gaap:AllOtherSegmentsMember": "Other Bets", "us-gaap:CorporateNonSegmentMember": "Reconciling items"}
 
 
-def test_segments_and_the_activities_outside_them_add_up_to_operating_income():
+def test_only_the_business_segments_are_rows_and_they_add_up_to_their_own_sum():
+    # Alphabet-level activities (−7,655) are no segment: the rows are the three segments, and their total is their sum.
     rows = quarter(39_157e6, 11_121e6, -2_047e6, -7_655e6, 40_576e6) + quarter(33_527e6, 3_594e6, -1_426e6, -4_467e6, 31_228e6,
                                                                               "2025-07-01", "2025-09-30")
     income = segment_income(pd.DataFrame(rows), date(2026, 9, 30), False, LABELS.get)
     assert [(name, value) for _key, name, _element, value in income.current.rows] == [
-        ("Google Services", 39_157e6), ("Google Cloud", 11_121e6), ("Other Bets", -2_047e6), ("Reconciling items", -7_655e6)]
-    assert income.current.total == 40_576e6 and income.prior.total == 31_228e6
+        ("Google Services", 39_157e6), ("Google Cloud", 11_121e6), ("Other Bets", -2_047e6)]
+    assert income.current.total == 48_231e6 and income.prior.total == 35_695e6
+    assert income.current.lines == set()
 
 
-def test_a_tagged_item_that_does_not_close_the_gap_gives_way_to_the_gap_itself():
+def test_what_the_segments_leave_of_operating_income_is_no_row():
     # Nvidia tags its corporate item with the segments' own sum, and the segments' sum on the consolidation axis alone.
     start, end = "2026-04-27", "2026-07-26"
     rows = [fact(62_700e6, start, end, "nvda:ComputeAndNetworkingSegmentMember", "us-gaap:OperatingSegmentsMember"),
@@ -43,8 +45,8 @@ def test_a_tagged_item_that_does_not_close_the_gap_gives_way_to_the_gap_itself()
             fact(66_590e6, start, end, None, "us-gaap:CorporateNonSegmentMember"),
             fact(63_730e6, start, end)]
     income = segment_income(pd.DataFrame(rows), date(2026, 7, 26), False, {}.get)
-    assert [(name, round(value / 1e6)) for _key, name, _element, value in income.current.rows][-1] == ("Unallocated", -2_870)
-    assert income.current.total == 63_730e6
+    assert [round(value / 1e6) for *_rest, value in income.current.rows] == [62_700, 3_900]
+    assert income.current.total == 66_600e6
 
 
 def test_one_segment_is_no_breakdown():
@@ -62,14 +64,14 @@ def test_a_segment_that_adds_up_others_is_left_out():
             fact(-3_140e6, start, end)]
     income = segment_income(pd.DataFrame(rows), date(2026, 3, 28), False, {}.get)
     names = [name for _key, name, _element, _value in income.current.rows]
-    assert "Total Intel Products" not in names and sum(value for *_rest, value in income.current.rows) == -3_140e6
+    assert "Total Intel Products" not in names and sum(value for *_rest, value in income.current.rows) == income.current.total
     declared = segment_income(pd.DataFrame(rows), date(2026, 3, 28), False, {}.get,
                               {"intc:TotalIntelProductsMember": {"intc:CCPGMember", "intc:DCAIMember"}})
     assert len(declared.current.rows) == len(income.current.rows)
 
 
-def test_a_reconciling_item_on_the_segments_axis_keeps_its_name():
-    # AMD's Q2 2026 10-Q tags "All Other" as a corporate item on the segments axis.
+def test_a_reconciling_item_on_the_segments_axis_is_no_segment():
+    # AMD's Q2 2026 10-Q tags "All Other" as a corporate item on the segments axis: it is left out.
     start, end = "2026-03-29", "2026-06-27"
     rows = [fact(2_103e6, start, end, "amd:DataCenterMember", "us-gaap:OperatingSegmentsMember"),
             fact(582e6, start, end, "amd:ClientAndGamingMember", "us-gaap:OperatingSegmentsMember"),
@@ -77,7 +79,8 @@ def test_a_reconciling_item_on_the_segments_axis_keeps_its_name():
             fact(-1_081e6, start, end, "amd:AllOtherMember", "us-gaap:CorporateNonSegmentMember"),
             fact(1_990e6, start, end)]
     income = segment_income(pd.DataFrame(rows), date(2026, 6, 27), False, {"amd:AllOtherMember": "All Other"}.get)
-    assert income.current.rows[-1][1:] == ("All Other", "amd:AllOtherMember", -1_081e6)
+    assert [key for key, *_rest in income.current.rows] == ["datacenter", "clientandgaming", "embedded"]
+    assert income.current.total == 3_071e6
 
 
 def test_a_companys_own_segment_measures_stand_in_for_operating_income():
@@ -133,9 +136,9 @@ def test_a_companys_own_measure_without_its_total_is_its_segments_added_up():
     assert segment_income(pd.DataFrame(tagged), date(2026, 3, 31), False) is None
 
 
-def test_a_companys_own_contribution_adds_up_to_operating_income():
+def test_a_companys_own_contribution_is_its_segments_income():
     # Palantir's Q2 2026 10-Q tags each segment's contribution (pltr:Contribution, beside its margin) but no operating
-    # income by segment; its untagged operating income is what the segments and the costs they leave out add up to.
+    # income by segment; the costs between its contribution and its operating income are no segment.
     rows = []
     for (start, end), (government, commercial, total) in {("2026-04-01", "2026-06-30"): (701_106e3, 734_944e3, 912_004e3),
                                                           ("2025-04-01", "2025-06-30"): (350_412e3, 287_576e3, 269_317e3)}.items():
@@ -147,59 +150,27 @@ def test_a_companys_own_contribution_adds_up_to_operating_income():
     names = {"pltr:GovernmentOperatingSegmentMember": "Government", "pltr:CommercialOperatingSegmentMember": "Commercial"}
     income = segment_income(pd.DataFrame(rows), date(2026, 6, 30), False, names.get)
     assert income.concept == "pltr:Contribution" and income.label == "Operating Income by Segment"
-    assert income.current.total == 912_004e3
+    assert income.current.total == 1_436_050e3
     assert [(key, value) for key, _name, _element, value in income.current.rows] == [
-        ("commercial", 734_944e3), ("government", 701_106e3), ("unallocated", -524_046e3)]
-    assert income.prior.total == 269_317e3
+        ("commercial", 734_944e3), ("government", 701_106e3)]
+    assert income.prior.total == 637_988e3
     # Without the operating income it reconciles to, a contribution is no breakdown.
     assert segment_income(pd.DataFrame([row for row in rows if row["concept"] != "us-gaap:OperatingIncomeLoss"]),
                           date(2026, 6, 30), False) is None
 
 
-def test_a_reconciliations_tagged_lines_keep_the_filings_names():
-    # Palantir's Q3 2026 10-Q: its costs between total contribution and income from operations are tagged on the
-    # consolidation axis, and they add up to exactly what the segments leave.
-    start, end = "2026-07-01", "2026-09-30"
-    item = "us-gaap:MaterialReconcilingItemsMember"
-    rows = []
-    for member, value in (("pltr:GovernmentOperatingSegmentMember", 797_258e3), ("pltr:CommercialOperatingSegmentMember", 897_525e3)):
-        rows.append({**fact(value, start, end, member, "us-gaap:OperatingSegmentsMember"), "concept": "pltr:Contribution"})
-    rows.append(fact(1_084_845e3, start, end))
-    rows.append(fact(1_084_845e3, start, end, None, item))
-    costs = {"pltr:ResearchAndDevelopment": 154_506e3, "pltr:GeneralAndAdministrative": 136_543e3, "us-gaap:AllocatedShareBasedCompensationExpense": 318_889e3}
-    for concept, value in costs.items():
-        rows.append({**fact(value, start, end, None, item), "concept": concept})
-    names = {"pltr:GovernmentOperatingSegmentMember": "Government", "pltr:CommercialOperatingSegmentMember": "Commercial"}
-    shown = {"pltr:ResearchAndDevelopment": "Research and development expenses", "pltr:GeneralAndAdministrative": "General and administrative expenses",
-             "us-gaap:AllocatedShareBasedCompensationExpense": "Total stock-based compensation expense"}
-    income = segment_income(pd.DataFrame(rows), date(2026, 9, 30), False, names.get, None, shown.get)
-    assert [(key, name, value) for key, name, _element, value in income.current.rows] == [
-        ("commercial", "Commercial", 897_525e3), ("government", "Government", 797_258e3),
-        ("stockbasedcompensation", "Total stock-based compensation expense", -318_889e3),
-        ("researchanddevelopment", "Research and development expenses", -154_506e3),
-        ("generalandadministrative", "General and administrative expenses", -136_543e3)]
-    assert sum(value for *_rest, value in income.current.rows) == income.current.total
-    assert income.current.lines == {"stockbasedcompensation", "researchanddevelopment", "generalandadministrative"}
-
-
-def test_tagged_lines_that_do_not_close_the_gap_are_no_reconciliation():
-    # Coca-Cola tags revenue and capital spending on the same axis: nothing of them names the gap.
-    start, end = "2026-07-01", "2026-09-30"
-    rows = [fact(600e6, start, end, "ko:AMember", "us-gaap:OperatingSegmentsMember"), fact(500e6, start, end, "ko:BMember", "us-gaap:OperatingSegmentsMember"),
-            fact(1_000e6, start, end), {**fact(38e6, start, end, None, "us-gaap:CorporateNonSegmentMember"), "concept": "us-gaap:Revenues"}]
-    income = segment_income(pd.DataFrame(rows), date(2026, 9, 30), False, {}.get, None, {"us-gaap:Revenues": "Net operating revenues"}.get)
-    assert income.current.rows[-1][1] == "Unallocated" and income.current.rows[-1][3] == -100e6
-
-
-def test_one_item_that_is_the_gap_stands_beside_the_segments_own_sum():
-    # Coca-Cola tags its segments' sum as one reconciling item and Corporate as another.
-    start, end = "2026-07-01", "2026-10-02"
-    rows = [fact(600e6, start, end, "ko:AMember", "us-gaap:OperatingSegmentsMember"), fact(500e6, start, end, "ko:BMember", "us-gaap:OperatingSegmentsMember"),
-            fact(1_100e6, start, end, None, "us-gaap:MaterialReconcilingItemsMember"), fact(-100e6, start, end, None, "us-gaap:CorporateNonSegmentMember"),
-            fact(1_000e6, start, end)]
-    income = segment_income(pd.DataFrame(rows), date(2026, 10, 2), False, {}.get)
-    assert income.current.rows[-1][2:] == ("us-gaap:CorporateNonSegmentMember", -100e6)
-    assert "Unallocated" not in [row[1] for row in income.current.rows]
+def test_a_corporate_column_and_its_cost_lines_are_no_rows():
+    # Apple's Q1 FY2026 10-Q: the Corporate column's operating loss (12,982) and the research and development (10,887)
+    # and general and administrative (2,095) inside it are left out; the segments add up to 41,743.
+    start, end, item = "2025-09-28", "2025-12-27", "us-gaap:CorporateNonSegmentMember"
+    rows = [fact(23_953e6, start, end, "aapl:AmericasSegmentMember"), fact(17_790e6, start, end, "aapl:EuropeSegmentMember"),
+            fact(-12_982e6, start, end, None, item), fact(28_761e6, start, end),
+            {**fact(10_887e6, start, end, None, item), "concept": "us-gaap:ResearchAndDevelopmentExpense"},
+            {**fact(2_095e6, start, end, None, item), "concept": "us-gaap:GeneralAndAdministrativeExpense"}]
+    names = {"aapl:AmericasSegmentMember": "Americas", "aapl:EuropeSegmentMember": "Europe", item: "Corporate non-segment"}
+    income = segment_income(pd.DataFrame(rows), date(2025, 12, 27), False, names.get)
+    assert [(key, value) for key, _name, _element, value in income.current.rows] == [("americas", 23_953e6), ("europe", 17_790e6)]
+    assert income.current.total == 41_743e6
 
 
 def test_a_segments_operating_segment_suffix_is_not_part_of_its_name():
@@ -209,38 +180,6 @@ def test_a_segments_operating_segment_suffix_is_not_part_of_its_name():
     names = {"pltr:GovernmentOperatingSegmentMember": "Government Operating Segment", "pltr:CommercialOperatingSegmentMember": "Commercial"}
     income = segment_income(pd.DataFrame(rows), date(2025, 12, 31), True, names.get)
     assert [row[:2] for row in income.current.rows] == [("government", "Government"), ("commercial", "Commercial")]
-
-
-def test_a_reconciling_lines_names_over_the_years_are_one_series():
-    for name in ("Research and development", "Research and development expenses",
-                 "Research and Development Expense Excluding Stockbased Compensation Expense"):
-        assert line_key(name) == "researchanddevelopment"
-    for name in ("Stock-based compensation expense", "Total stock-based compensation expense"):
-        assert line_key(name) == "stockbasedcompensation"
-
-
-def test_the_one_set_of_lines_that_is_the_gap_is_found_among_others():
-    # Nvidia tags more than its reconciliation's lines on the corporate item.
-    start, end = "2026-01-26", "2026-04-26"
-    item = "us-gaap:CorporateNonSegmentMember"
-    rows = [fact(53_335e6, start, end, "nvda:C", "us-gaap:OperatingSegmentsMember"), fact(2_941e6, start, end, "nvda:G", "us-gaap:OperatingSegmentsMember"),
-            fact(53_536e6, start, end)]
-    lines = {"us-gaap:ShareBased": 1_928e6, "nvda:Unallocated": 565e6, "nvda:Acquisition": 247e6, "us-gaap:Depreciation": 391e6}
-    rows += [{**fact(value, start, end, None, item), "concept": concept} for concept, value in lines.items()]
-    names = {"us-gaap:ShareBased": "Stock-based compensation expense", "nvda:Unallocated": "Unallocated operating expenses",
-             "nvda:Acquisition": "Acquisition-related and other costs", "us-gaap:Depreciation": "Depreciation"}
-    income = segment_income(pd.DataFrame(rows), date(2026, 4, 26), False, {}.get, None, names.get)
-    assert [row[3] for row in income.current.rows[2:]] == [-1_928e6, -565e6, -247e6]
-
-
-def test_a_total_beside_its_parts_names_nothing():
-    start, end = "2026-01-01", "2026-03-31"
-    item = "us-gaap:CorporateNonSegmentMember"
-    rows = [fact(600e6, start, end, "x:A", "us-gaap:OperatingSegmentsMember"), fact(500e6, start, end, "x:B", "us-gaap:OperatingSegmentsMember"), fact(1_000e6, start, end)]
-    lines = {"x:One": 40e6, "x:Two": 60e6, "x:All": 100e6}
-    rows += [{**fact(value, start, end, None, item), "concept": concept} for concept, value in lines.items()]
-    income = segment_income(pd.DataFrame(rows), date(2026, 3, 31), False, {}.get, None, {"x:One": "One", "x:Two": "Two", "x:All": "All"}.get)
-    assert income.current.rows[-1][1] == "Unallocated"
 
 
 def test_a_banks_segments_on_a_tax_equivalent_basis_are_its_revenue_by_segment():

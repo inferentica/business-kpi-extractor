@@ -10,7 +10,7 @@ from ..sources.base import FilingRef
 from ..store import FilingReading, failed_reading
 from ..readers.segment_income import (GROUP_KEY as INCOME_GROUP, LEFT_OVER_KEY, REVENUE_GROUP_KEY as OWN_REVENUE_GROUP,
                               segment_income, segment_revenue)
-from ..xbrl import extract_breakdowns, member_children, member_key, official_labels, presented_labels
+from ..xbrl import extract_breakdowns, member_children, member_key, official_labels
 from ..xbrl.basis import report_basis
 from .shared import _XBRL_READER, value_key
 
@@ -142,8 +142,7 @@ class ReportReading:
                             **({"ytd": ytd, "ytd_total": group.year_to_date_total} if ytd is not None and group.year_to_date_total else {}),
                         },
                     ))
-            records += self._income_records(facts, labels, breakdowns, ref, fiscal_year, fiscal_period, groups, own_revenue,
-                                            presented_labels(getattr(xbrl, "element_catalog", None)))
+            records += self._income_records(facts, labels, breakdowns, ref, fiscal_year, fiscal_period, groups, own_revenue)
             if records:
                 # The release's figures for this quarter give way to the report's; a line the report does not give
                 # (renamed, or not broken out) stops being served.
@@ -184,11 +183,11 @@ class ReportReading:
                 for record in records]
 
     def _income_records(self, facts, labels, breakdowns, ref: FilingRef, fiscal_year: str, fiscal_period: str,
-                        groups, own_revenue=None, line_labels=None) -> list[dict]:
+                        groups, own_revenue=None) -> list[dict]:
         """Each segment's operating income, as tagged (see segment_income): its own breakdown, beside the revenue ones; and
         a company's own segment revenue measure, which its segment profit is measured against."""
         try:
-            income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children, line_labels)
+            income = segment_income(facts, breakdowns.period_end, breakdowns.annual, labels, self._member_children)
         except Exception as error:  # noqa: BLE001 - the revenue breakdowns stand without it
             self.log(f"{self.symbol}: segment income of {ref.form} {ref.filed} not read ({type(error).__name__}: {error})"[:300])
             return []
@@ -197,30 +196,10 @@ class ReportReading:
         if income is None:
             return records
         prior = {key: value for key, _name, _element, value in income.prior.rows} if income.prior else {}
-        # A year whose worked-out remainder is the one line its quarters name (AMD's 10-K tags "All Other" with the sign
-        # its 10-Qs give it reversed, so nothing tagged closes the gap) keeps that name.
-        keys = {key for key, *_rest in income.current.rows}
-        quarters = [v for v in self.values.values() if v["group_key"] == INCOME_GROUP and v["validation_status"] == "verified"
-                    and v["fiscal_year"] == fiscal_year and v["fiscal_period"] in ("Q1", "Q2", "Q3")]
-        quarter_names = {v["kpi_key"]: v["kpi_label"] for v in quarters}
-        # So does a year whose 10-K itemizes what its 10-Qs give as that one line (AMD's 2023 "All Other"): its Q4 is the
-        # year less the quarters, line by line.
-        apart = keys - set(quarter_names)
-        if breakdowns.annual and len({v["fiscal_period"] for v in quarters}) == 3 and apart and len(set(quarter_names) - keys) == 1 \
-                and apart <= {LEFT_OVER_KEY, *income.current.lines}:
-            other = next(iter(set(quarter_names) - keys))
-            whole = sum(value for key, _label, _element, value in income.current.rows if key in apart)
-            income.current.rows = [(key, label, element, value) for key, label, element, value in income.current.rows
-                                   if key not in apart] + [(other, quarter_names[other], None, whole)]
-            income.current.lines = set()
-            if apart <= set(prior):
-                prior = {key: value for key, value in prior.items() if key not in apart} | {other: sum(prior[key] for key in apart)}
         records += self._measure_records(income, INCOME_GROUP, INCOME_ORDER, groups, ref, fiscal_year, fiscal_period,
                                          breakdowns.period_end, prior=prior)
-        # The rows this report gives are the period's: one an earlier read stored under another name (a worked-out
-        # "Unallocated" whose lines are now named, Palantir's "Government Operating") would count twice.
-        # A remainder no tag names takes the report's own row first (Broadcom's "Unallocated expenses").
-        records = self._name_remainders(ref, records)
+        # The rows this report gives are the period's: one an earlier read stored beside them (a "Corporate" item, a
+        # worked-out "Unallocated", the cost lines of a reconciliation) is not a segment and is retired.
         fresh = {record["kpi_key"] for record in records if record["group_key"] == INCOME_GROUP}
         return records + [{**value, "validation_status": "rejected", "notes": ["replaced by the report's own lines"]}
                           for value in self.values.values()
