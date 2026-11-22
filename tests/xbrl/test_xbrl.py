@@ -554,3 +554,26 @@ def test_a_split_inside_a_segment_completes_with_the_segments_own_unnamed_figure
     # Without the segment's own figure the split is still refused, never closed by a worked-out gap alone.
     facts = facts[~((facts["concept"] == concept) & (facts["numeric_value"] == 4_354.0))]
     assert "products" not in {group.key for group in extract_breakdowns(facts, {"document_period_end_date": "2026-06-30"}, "10-Q").groups}
+
+
+def test_a_split_of_the_companys_revenue_beats_a_split_of_part_of_it():
+    # American Express's Q2 2022 10-Q: its segment table gives each segment's revenue from contracts with customers
+    # (8,771 in all) above its total revenues net of interest expense (13,395). Both are tagged by segment and both
+    # add up; the segments' revenue is the larger, whichever the filing lists first.
+    seg = "dim_us-gaap_StatementBusinessSegmentsAxis"
+    part, whole = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", "us-gaap:RevenuesNetOfInterestExpense"
+    members = ("axp:GlobalConsumerServicesGroupMember", "axp:GlobalCommercialServicesMember",
+               "axp:GlobalMerchantAndNetworkServicesMember")
+    def facts(first, second):
+        rows = []
+        for concept, values, total in (first, second):
+            rows.append(_fact(concept, total))
+            rows += [_fact(concept, value, member, axis=seg) for member, value in zip(members, values)]
+        return pd.DataFrame(rows)
+    contracts = (part, (4_155.0, 3_198.0, 1_418.0), 8_771.0)
+    revenues = (whole, (7_771.0, 4_007.0, 1_617.0), 13_395.0)
+    for frame in (facts(contracts, revenues), facts(revenues, contracts)):
+        result = extract_breakdowns(frame, {"document_period_end_date": "2026-06-30"}, "10-Q")
+        group = next(group for group in result.groups if group.key == "segments")
+        assert group.concept == whole and group.total == 13_395.0
+        assert sorted(value for _key, _label, value in group.members) == [1_617.0, 4_007.0, 7_771.0]

@@ -293,7 +293,14 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
         # A split joined with a fixed member's siblings comes after one that adds up as tagged: Adobe's subscription
         # revenue by segment, with Product and Services joined, beat its three segments for having five lines.
         # Lines with a figure: a line tagged at zero (KKR's Principal Activities fees) is no part of the split.
-        return (reconciles, own, sum(1 for value in leaves.values() if value), concept in totals)
+        # By segment, the split of the larger figure comes first: that figure is the company's revenue, the smaller a part
+        # of it. American Express's segment table gives each segment's revenue from contracts with customers above its
+        # total revenues net of interest expense, both tagged and both adding up; the part has Corporate & Other as a
+        # fourth segment where the whole tags it as a consolidation item, so counting lines (or taking whichever came
+        # first) stored the part in 33 of its 49 periods (2026-11-22). On other axes the size only settles a tie.
+        size = abs(total or 0.0)
+        return (reconciles, own, size if axis in _SEGMENT_AXES else 0.0, sum(1 for value in leaves.values() if value),
+                concept in totals, size)
 
     best_by_axis = {axis: max(options, key=lambda option, axis=axis: score(option, axis)) for axis, options in candidates.items()}
     for key in [key for key in siblings_for if id((best_by_axis.get(key[0]) or ("", {}))[1]) not in with_siblings]:
