@@ -172,6 +172,27 @@ def fact_lines(facts: pd.DataFrame, period_end: date) -> list[tuple[Tag, float, 
     return lines
 
 
+# A report's figures are sent in parts no longer than this: the control plane takes at most 450,000 characters a prompt,
+# and JPMorgan's 10-Q lists more figures than that ("user is too long", the weekly evaluation of 2026-11-23).
+FACT_PART_CHARS = 200_000
+
+
+def fact_parts(lines: list[tuple], limit: int | None = None) -> list[str]:
+    """The figures as prompt lines ("[F12] label | value | unit"), in parts of at most `limit` characters; each line
+    keeps the id of its place in `lines`, so a pick from any part names one figure."""
+    limit = limit or FACT_PART_CHARS
+    parts: list[list[str]] = [[]]
+    size = 0
+    for index, (_tag, value, label, unit) in enumerate(lines):
+        line = f"[F{index}] {label} | {value:,.15g} | {unit}"
+        if parts[-1] and size + len(line) + 1 > limit:
+            parts.append([])
+            size = 0
+        parts[-1].append(line)
+        size += len(line) + 1
+    return ["\n".join(part) for part in parts]
+
+
 def fact_unit(fact) -> str:
     """A fact's unit as unit_fits reads it: its resolved currency where it has one (a unit's id can be any name, as
     SAP's "Unit_Standard_EUR_…" are), per share where its unit says so; otherwise its unit id ("shares", "pure")."""

@@ -560,3 +560,20 @@ def test_a_reports_other_split_of_the_same_total_never_replaces_the_releases_lin
     q3 = [v for v in stored if v["fiscal_period"] == "Q3"]
     assert not [v for v in q3 if v["validation_status"] == "verified"]
     assert not [v for v in stored if v["value"] in (1_200_000e3, 330_000e3)]
+
+
+def test_a_report_too_long_for_one_prompt_is_asked_in_parts(monkeypatch):
+    # JPMorgan's 10-Q lists more figures than one prompt takes ("user is too long", 2026-11-23): each part is asked only
+    # for the KPIs no earlier part gave, and the picks are the same.
+    from kpi_extractor.readers import tagged_metrics
+    from kpi_extractor.readers.tagged_metrics import fact_parts
+    lines = [(None, 1.0, "A label", "usd"), (None, 2.0, "B label", "usd"), (None, 3.0, "C label", "usd")]
+    assert fact_parts(lines) == ["[F0] A label | 1 | usd\n[F1] B label | 2 | usd\n[F2] C label | 3 | usd"]
+    assert fact_parts(lines, limit=30) == ["[F0] A label | 1 | usd", "[F1] B label | 2 | usd", "[F2] C label | 3 | usd"]
+    monkeypatch.setattr(tagged_metrics, "FACT_PART_CHARS", 90)
+    stored, asked, *_ = _alphabet({
+        "backlog": "Revenue not yet recognized [RevenueRemainingPerformanceObligation] | 519",
+        "cloud_backlog": "Revenue not yet recognized [RevenueRemainingPerformanceObligation] | Google Cloud"})
+    by = {(v["kpi_key"], v["fiscal_period"], v["fiscal_year"]): v["value"] for v in stored}
+    assert by[("backlog", "Q2", "2026")] == 519.5e9 and by[("cloud_backlog", "Q2", "2026")] == 513.9e9
+    assert len(asked) == 2 and "- backlog:" in asked[0] and "- backlog:" not in asked[1] and "- cloud_backlog:" in asked[1]

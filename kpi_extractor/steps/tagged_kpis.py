@@ -12,7 +12,7 @@ from ..ai import AiResponseError, Spec
 from ..ops.control import ControlError
 from ..domain.fiscal import fiscal_label
 from ..sources.base import FilingRef
-from ..readers.tagged_metrics import (agrees, concept_units, refines, fact_lines, learn_tag, learn_tags, quarter_facts,
+from ..readers.tagged_metrics import (agrees, concept_units, refines, fact_lines, fact_parts, learn_tag, learn_tags, quarter_facts,
                                       tag_from_locator, unit_fits, year_ago_facts)
 from ..quality.reasons import UNANCHORED, without
 from .shared import AI_GROUP_ORDER, AI_GROUP_PREFIX, _rounding, value_key
@@ -170,22 +170,26 @@ class TaggedKpiReading:
             return dict(choice.split("=", 1) for choice in self._curations[cache_key] if "=" in choice)
         lines = fact_lines(self._xbrl(quarters[latest][0]).facts.to_dataframe(), quarters[latest][1])
         ids = {f"F{index}": line for index, line in enumerate(lines)}
-        document = "\n".join(f"[{id_}] {label} | {value:,.15g} | {unit}" for id_, (_tag, value, label, unit) in ids.items())
-        wanted = "\n".join(f"- {kpi.key}: {kpi.label} ({kpi.unit})" for _group, kpi, _key in unread)
-        try:
-            answer = self._ask(ai.prompt(self.company, document, ai.TAG_TASK, f"KPIs:\n{wanted}"), "tags", ai.TagPicks,
-                               thinking_first=True, model="flash")
-        except (AiResponseError, ControlError) as error:
-            self.result.errors.append(f"KPI tags: {error}"[:300])
-            return {}
         picked = {}
         earlier = next((quarter for quarter in newest_first[1:] if facts_of(quarter)), None)
-        for _group, kpi, _key in unread:
-            line = ids.get(answer.picks.get(kpi.key) or "")
-            if line is None or not unit_fits(kpi.unit, line[3], kpi.label, line[0].concept) or earlier is None \
-                    or line[0] not in facts_of(earlier) or not names_measure(line[0], kpi.label, _group.label, kpi.unit):
-                continue
-            picked[kpi.key] = line[0]
+        # A long report goes in parts; each part is asked only for the KPIs no earlier part gave.
+        for document in fact_parts(lines):
+            left = [(group, kpi, key) for group, kpi, key in unread if kpi.key not in picked]
+            if not left:
+                break
+            wanted = "\n".join(f"- {kpi.key}: {kpi.label} ({kpi.unit})" for _group, kpi, _key in left)
+            try:
+                answer = self._ask(ai.prompt(self.company, document, ai.TAG_TASK, f"KPIs:\n{wanted}"), "tags", ai.TagPicks,
+                                   thinking_first=True, model="flash")
+            except (AiResponseError, ControlError) as error:
+                self.result.errors.append(f"KPI tags: {error}"[:300])
+                return picked
+            for _group, kpi, _key in left:
+                line = ids.get(answer.picks.get(kpi.key) or "")
+                if line is None or not unit_fits(kpi.unit, line[3], kpi.label, line[0].concept) or earlier is None \
+                        or line[0] not in facts_of(earlier) or not names_measure(line[0], kpi.label, _group.label, kpi.unit):
+                    continue
+                picked[kpi.key] = line[0]
         if picked:
             self.log(f"{self.symbol}: tags picked for {', '.join(sorted(picked))}")
         chosen = [f"{key}={tag}"[:120] for key, tag in sorted(picked.items())]
