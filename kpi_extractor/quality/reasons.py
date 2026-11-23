@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from ..documents.image_pages import ONE_READER, SUMS_TO_AGREED_TOTAL
-from ..rules.identity import PLACE_NOT_NAMED, ROW_NAMED_TWICE
+from ..rules.identity import MEASURE_ROW, PLACE_NOT_NAMED, ROW_NAMED_TWICE
 from ..rules.scale import SCALE_HEADING_UNSURE, SCALE_NOT_STATED
 from ..rules.wording import SIGN_NOT_STATED
 
@@ -117,6 +117,7 @@ _REASONS = (
     Reason("settled", ASIDE, "settled by the checks", "start"),
     Reason("precise_figure", ASIDE, PRECISE_FIGURE, "start"),
     Reason("statement_other", ASIDE, STATEMENT_OTHER, "start"),
+    Reason("measure_row", ASIDE, MEASURE_ROW, "start"),
     Reason("checked", ASIDE, "checked against ", "start"),
     Reason("explained", ASIDE, EXPLAINED, "start"),
     Reason("rescaled", ASIDE, RESCALED, "within"),

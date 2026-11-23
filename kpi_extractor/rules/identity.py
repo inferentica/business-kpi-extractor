@@ -270,3 +270,45 @@ def _measure_not_named(label: str, table: Table, row: int, col: int) -> str | No
         return None
     return (f"{MEASURE_NOT_NAMED}: {_row_label(table.rows[row], col)!r} in {table.id} r{row} is the total of "
             f"{own[1].strip()[:80]!r}, not {label}")
+
+
+def locator_hint(locator: dict | None) -> str | None:
+    if not locator:
+        return None
+    if "quote" in locator:
+        return f"text like {locator['quote']!r}"
+    return f"table row {locator.get('row_label')!r}"
+
+
+# Measures named alike that are never one another. The allowance for credit losses (CECL, since 2020) is the allowance
+# for loan and lease losses plus the reserve for unfunded commitments: PNC prints both ratios to total loans side by
+# side (Q2 2025: 1.39% and 1.62%), and 40 quarters stored the first as the second. Before 2020 PNC prints only the
+# allowance for loan and lease losses ("allowance for loans and leases" in Q1 2020).
+_MEASURES = (("allowance for credit losses", re.compile(r"\ballowance for credit losses\b", re.I)),
+             ("allowance for loan and lease losses",
+              re.compile(r"\ballowance for (?:loan and lease losses|loans? and leases?|loan losses)\b", re.I)))
+MEASURE_ROW = "read from the row naming the metric's own measure"
+
+
+def _measure(text: str) -> tuple[str, list[str]] | None:
+    """The measure a label names and the rest of its words ("to total loans")."""
+    for name, pattern in _MEASURES:
+        if pattern.search(text or ""):
+            return name, _label_words(pattern.sub(" ", text))
+    return None
+
+
+def measure_row(table: Table, locator, row_label: str, kpi_label: str) -> tuple[object, list[str], str | None]:
+    """(locator, notes, refusal) for a cell whose row names another measure than the metric's: the reading moves to
+    the nearest row of the same table naming the metric's measure with the same remaining words, else it is refused.
+    Unchanged when either names none of the measures, or both the same one."""
+    wanted, named = _measure(kpi_label), _measure(row_label)
+    if wanted is None or named is None or wanted[0] == named[0]:
+        return locator, [], None
+    twins = [index for index, row in enumerate(table.rows) if index != locator.row
+             and (found := _measure(_row_label(row, locator.col))) and found[0] == wanted[0] and found[1] == named[1]]
+    if not twins:
+        return locator, [], f"{table.id} r{locator.row} is the {named[0]} {row_label!r}, not {kpi_label!r}"
+    twin = min(twins, key=lambda index: abs(index - locator.row))
+    moved = locator.model_copy(update={"row": twin, "row_label": _row_label(table.rows[twin], locator.col)})
+    return moved, [f"{MEASURE_ROW}: r{locator.row} {row_label!r} is the {named[0]}"], None

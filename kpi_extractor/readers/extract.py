@@ -33,7 +33,7 @@ from ..rules.identity import (  # noqa: F401 - re-exported for callers of extrac
     _combined_line, _FOOTNOTE, _identity, _label_words, _listed_kpi, kept_key, _NOT_THE_PLACE,
     _PLACE, _measure_not_named, _place_not_named, _places, _plain_label, _row_label, _row_named_twice,
     _SPACED_FOOTNOTE, _SUB_ROW, _tail, _TOTAL_LABEL, _TWIN_REACH, labels_agree,
-    PLACE_NOT_NAMED, row_key, ROW_NAMED_TWICE)
+    PLACE_NOT_NAMED, row_key, ROW_NAMED_TWICE, locator_hint, measure_row)
 
 
 class LocateError(ValueError):
@@ -80,6 +80,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
         if locator.kpi not in kpis or locator.kpi in seen:
             continue
         group, kpi = kpis[locator.kpi]
+        moved: list[str] = []
         try:
             if locator.table is not None and locator.table in document.tables:
                 table = document.tables[locator.table]
@@ -94,6 +95,9 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
                                       f"{kpi.label!r}: point at the row for {kpi.label} itself")
                 if other := net_gross_mismatch(row_label, kpi.label):
                     raise LocateError(f"{locator.table} r{locator.row} is the {other} figure {row_label!r}, not {kpi.label!r}")
+                locator, moved, refused = measure_row(table, locator, row_label, kpi.label)  # PNC's two allowances
+                if refused:
+                    raise LocateError(refused)
                 if not located.annual and (twin := earlier_twin(document, locator.table)):
                     raise LocateError(f"{locator.table} repeats {twin}'s columns and rows with other figures and names no "
                                       f"period: a release gives the quarter's first, so the quarter's is {twin}, not "
@@ -108,6 +112,7 @@ def read_values(document: Document, spec: Spec, located: Located, default_curren
                     and _column_currency(document.tables[locator.table], locator.row, locator.col, None)):
                 raise LocateError(f"{locator.table} c{locator.col} is a currency's column, not the count's")
             value, currency, notes, scale_from = _read(document, locator, kpi, default_currency)
+            notes += moved
             if locator.table is not None and locator.table in document.tables and group.kind == "metric":
                 if other := _measure_not_named(kpi.label, document.tables[locator.table], locator.row, locator.col):
                     raise LocateError(other)
@@ -577,14 +582,6 @@ def _locator_record(document: Document, locator: Locator, period_end: str | None
                 "row_numbers": row_numbers(table, locator.row, locator.col),
                 **(year_ago_record(table, locator.row, locator.col, period_end, value) if value is not None else {})}
     return {"block": locator.block, "quote": clean(locator.quote or "")[:160], "value_text": locator.value_text}
-
-
-def locator_hint(locator: dict | None) -> str | None:
-    if not locator:
-        return None
-    if "quote" in locator:
-        return f"text like {locator['quote']!r}"
-    return f"table row {locator.get('row_label')!r}"
 
 
 def describe(document: Document, item: ReadValue) -> str:
