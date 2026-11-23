@@ -722,5 +722,55 @@
   "unit": "currency",
   "absent": true,
   "source": "Before 2020 Wells Fargo prints brokerage advisory, commissions and other fees as one line: no figure of its own (owner decision 2026-11-20)"
+ },
+ {
+  "symbol": "PNC",
+  "period_end": "2019-12-31",
+  "fiscal_period": "Q4",
+  "label": "^Allowance for Loan and Lease Losses to Total Loans$",
+  "group": "^Operating Metrics$",
+  "unit": "percent",
+  "value": 1.14,
+  "source": "PNC 4Q19 release (q42019financialhighlig.htm). Before CECL PNC prints only the allowance for loan and lease losses to total loans; the owner keeps it on its own line until 2020-03-31 (owner decision 2026-11-23)"
+ },
+ {
+  "symbol": "PNC",
+  "period_end": "2020-03-31",
+  "fiscal_period": "Q1",
+  "label": "^Allowance for Loan and Lease Losses to Total Loans$",
+  "group": "^Operating Metrics$",
+  "unit": "percent",
+  "value": 1.49,
+  "source": "PNC 1Q20 release words it 'Allowance for loans and leases to total loans (k)' (q12020financialhighlig.htm). Before CECL PNC prints only the allowance for loan and lease losses to total loans; the owner keeps it on its own line until 2020-03-31 (owner decision 2026-11-23)"
+ },
+ {
+  "symbol": "PNC",
+  "period_end": "2019-12-31",
+  "fiscal_period": "Q4",
+  "label": "^Allowance for Credit Losses to Total Loans$",
+  "group": "^Operating Metrics$",
+  "unit": "percent",
+  "absent": true,
+  "source": "No credit-loss ratio before CECL. Before CECL PNC prints only the allowance for loan and lease losses to total loans; the owner keeps it on its own line until 2020-03-31 (owner decision 2026-11-23)"
+ },
+ {
+  "symbol": "PNC",
+  "period_end": "2020-03-31",
+  "fiscal_period": "Q1",
+  "label": "^Allowance for Credit Losses to Total Loans$",
+  "group": "^Operating Metrics$",
+  "unit": "percent",
+  "absent": true,
+  "source": "The 1Q20 release prints no credit-loss ratio. Before CECL PNC prints only the allowance for loan and lease losses to total loans; the owner keeps it on its own line until 2020-03-31 (owner decision 2026-11-23)"
+ },
+ {
+  "symbol": "PNC",
+  "period_end": "2020-06-30",
+  "fiscal_period": "Q2",
+  "label": "^Allowance for Credit Losses to Total Loans$",
+  "group": "^Operating Metrics$",
+  "unit": "percent",
+  "value": 2.55,
+  "source": "PNC 2Q20 release (q22020financialhighlightsa.htm), the first quarter printing the credit-loss ratio beside the loan-and-lease one (owner decision 2026-11-23)"
  }
 ]
