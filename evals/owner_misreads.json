@@ -445,9 +445,9 @@
   "label": "^Other$",
   "group": "Client Coverage",
   "unit": "currency",
-  "value": 24000000,
+  "value": 68000000,
   "currency": "USD",
-  "source": "Unclear: restated or misread (owner decision, 2026-10)"
+  "source": "JPM 1Q18 supplement: client coverage segments total 2,166 (owner decision 2026-11-23, Quotiva Review)"
  },
  {
   "symbol": "JPM",
@@ -456,9 +456,9 @@
   "label": "^Other$",
   "group": "Client Coverage",
   "unit": "currency",
-  "value": 31000000,
+  "value": 76000000,
   "currency": "USD",
-  "source": "Unclear: restated or misread (owner decision, 2026-10)"
+  "source": "JPM 2Q18 supplement: client coverage segments total 2,316 (owner decision 2026-11-23, Quotiva Review)"
  },
  {
   "symbol": "JPM",
@@ -508,23 +508,65 @@
   "symbol": "GS",
   "period_end": "2023-06-30",
   "fiscal_period": "Q2",
-  "label": "^Investments$",
   "group": "Asset & Wealth Management",
   "unit": "currency",
-  "value": -206000000,
   "currency": "USD",
-  "source": "Unclear: restated or misread (owner decision, 2026-10)"
+  "label": "^Debt investments$",
+  "value": 197000000,
+  "source": "GS release (d523443dex991.htm) prints debt and equity investments apart; the combined Investments row is rejected (owner decision 2026-11-23, Quotiva Review)"
+ },
+ {
+  "symbol": "GS",
+  "period_end": "2023-06-30",
+  "fiscal_period": "Q2",
+  "group": "Asset & Wealth Management",
+  "unit": "currency",
+  "currency": "USD",
+  "label": "^Equity investments$",
+  "value": -403000000,
+  "source": "GS release (d523443dex991.htm) prints debt and equity investments apart; the combined Investments row is rejected (owner decision 2026-11-23, Quotiva Review)"
+ },
+ {
+  "symbol": "GS",
+  "period_end": "2023-06-30",
+  "fiscal_period": "Q2",
+  "group": "Asset & Wealth Management",
+  "unit": "currency",
+  "label": "^Investments$",
+  "absent": true,
+  "source": "GS release (d523443dex991.htm) prints debt and equity investments apart; the combined Investments row is rejected (owner decision 2026-11-23, Quotiva Review)"
  },
  {
   "symbol": "GS",
   "period_end": "2024-06-30",
   "fiscal_period": "Q2",
-  "label": "^Investments$",
   "group": "Asset & Wealth Management",
   "unit": "currency",
-  "value": 589000000,
   "currency": "USD",
-  "source": "Unclear: restated or misread (owner decision, 2026-10)"
+  "label": "^Debt investments$",
+  "value": 297000000,
+  "source": "GS release (d839513dex991.htm) prints debt and equity investments apart; the combined Investments row is rejected (owner decision 2026-11-23, Quotiva Review)"
+ },
+ {
+  "symbol": "GS",
+  "period_end": "2024-06-30",
+  "fiscal_period": "Q2",
+  "group": "Asset & Wealth Management",
+  "unit": "currency",
+  "currency": "USD",
+  "label": "^Equity investments$",
+  "value": 292000000,
+  "source": "GS release (d839513dex991.htm) prints debt and equity investments apart; the combined Investments row is rejected (owner decision 2026-11-23, Quotiva Review)"
+ },
+ {
+  "symbol": "GS",
+  "period_end": "2024-06-30",
+  "fiscal_period": "Q2",
+  "group": "Asset & Wealth Management",
+  "unit": "currency",
+  "label": "^Investments$",
+  "absent": true,
+  "source": "GS release (d839513dex991.htm) prints debt and equity investments apart; the combined Investments row is rejected (owner decision 2026-11-23, Quotiva Review)"
  },
  {
   "symbol": "JPM",
@@ -533,8 +575,9 @@
   "label": "^Debit and Credit Card Sales Volume$",
   "group": "^Operating Metrics$",
   "unit": "currency",
-  "absent": true,
-  "source": "Rejected reading (owner decision, 2026-10)"
+  "source": "JPM 4Q16 supplement's 3Q16 column; the 1Q-3Q16 supplements print credit card sales only (owner decision 2026-11-23, Quotiva Review)",
+  "value": 207100000000,
+  "currency": "USD"
  },
  {
   "symbol": "AVGO",
@@ -573,8 +616,9 @@
   "label": "^Other Spread Products Inflows$",
   "group": "Retirement Services Flows",
   "unit": "currency",
-  "absent": true,
-  "source": "Rejected reading (owner decision, 2026-10)"
+  "source": "Apollo 2Q25 earnings release, agmearningsrelease2q2025.htm (owner decision 2026-11-23, Quotiva Review)",
+  "value": 237000000,
+  "currency": "USD"
  },
  {
   "symbol": "MSFT",
@@ -615,5 +659,68 @@
   "unit": "currency",
   "absent": true,
   "source": "Rejected reading (owner decision, 2026-10)"
+ },
+ {
+  "symbol": "PNC",
+  "period_end": "2025-06-30",
+  "fiscal_period": "Q2",
+  "label": "^Allowance for Credit Losses to Total Loans$",
+  "group": "^Operating Metrics$",
+  "unit": "percent",
+  "value": 1.62,
+  "source": "PNC 2Q25 release prints the allowance for loan and lease losses to total loans (1.39%) beside the allowance for credit losses to total loans (1.62%); the line is the credit-loss row (golden set, 2026-11-23)"
+ },
+ {
+  "symbol": "WFC",
+  "period_end": "2019-09-30",
+  "fiscal_period": "Q3",
+  "label": "^Other$",
+  "group": "^Noninterest Income by Type$",
+  "unit": "currency",
+  "value": 1528000000,
+  "currency": "USD",
+  "source": "Wells Fargo 3Q19 release: the income statement's Other (1,528), not the detail table's All other (1,355) (owner decision 2026-11-20)"
+ },
+ {
+  "symbol": "WFC",
+  "period_end": "2020-09-30",
+  "fiscal_period": "Q3",
+  "label": "^Investment Advisory and Other Asset-Based Fees$",
+  "group": "^Noninterest Income by Type$",
+  "unit": "currency",
+  "value": 2505000000,
+  "currency": "USD",
+  "source": "Wells Fargo 1Q21 supplement restates 3Q20 in these lines; the 3Q20 release prints only the combined brokerage line (owner decision 2026-11-20)"
+ },
+ {
+  "symbol": "WFC",
+  "period_end": "2020-09-30",
+  "fiscal_period": "Q3",
+  "label": "^Commissions and Brokerage Services Fees$",
+  "group": "^Noninterest Income by Type$",
+  "unit": "currency",
+  "value": 568000000,
+  "currency": "USD",
+  "source": "Wells Fargo 1Q21 supplement restates 3Q20 in these lines; the 3Q20 release prints only the combined brokerage line (owner decision 2026-11-20)"
+ },
+ {
+  "symbol": "WFC",
+  "period_end": "2018-03-31",
+  "fiscal_period": "Q1",
+  "label": "^Investment Advisory and Other Asset-Based Fees$",
+  "group": "^Noninterest Income by Type$",
+  "unit": "currency",
+  "absent": true,
+  "source": "Before 2020 Wells Fargo prints brokerage advisory, commissions and other fees as one line: no figure of its own (owner decision 2026-11-20)"
+ },
+ {
+  "symbol": "WFC",
+  "period_end": "2018-03-31",
+  "fiscal_period": "Q1",
+  "label": "^Commissions and Brokerage Services Fees$",
+  "group": "^Noninterest Income by Type$",
+  "unit": "currency",
+  "absent": true,
+  "source": "Before 2020 Wells Fargo prints brokerage advisory, commissions and other fees as one line: no figure of its own (owner decision 2026-11-20)"
  }
 ]

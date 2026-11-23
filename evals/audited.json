@@ -340,7 +340,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026065936/q32026financialhighlightsa.htm",
-    "audited": "audit2"
+    "audited": "audit2",
+    "optional": true
   },
   {
     "symbol": "MP",
@@ -512,7 +513,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialhighlightsa.htm",
-    "audited": "audit2"
+    "audited": "audit2",
+    "optional": true
   },
   {
     "symbol": "AUNA",
@@ -1301,7 +1303,8 @@
     "unit": "count",
     "value": 55333.0,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000006/q42025financialsupplement.htm",
-    "audited": "audit300"
+    "audited": "audit300",
+    "optional": true
   },
   {
     "symbol": "DLR",
@@ -2115,7 +2118,7 @@
     "symbol": "PNC",
     "period_end": "2026-09-30",
     "fiscal_period": "Q3",
-    "label": "^Discretionary\\ Client\\ AUM$",
+    "label": "^Discretionary\\ Client\\ (?:AUM|Assets\\ Under\\ Management)$",
     "unit": "currency",
     "value": 250000000000.0,
     "currency": "USD",
@@ -3949,7 +3952,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialsupplement.htm",
-    "audited": "audit300b"
+    "audited": "audit300b",
+    "optional": true
   },
   {
     "symbol": "DLTR",
@@ -4325,7 +4329,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000126/q32025financialhighlightsa.htm",
-    "audited": "audit300b"
+    "audited": "audit300b",
+    "optional": true
   },
   {
     "symbol": "PNC",
@@ -4568,7 +4573,7 @@
     "unit": "currency",
     "value": 769000000.0,
     "currency": "USD",
-    "group": "^Noninterest\\ Income\\ by\\ Type$",
+    "group": "^Revenue\\ by\\ Type$",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026065936/q32026financialhighlightsa.htm",
     "audited": "audit300b"
@@ -4883,7 +4888,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000126/q32025financialhighlightsa.htm",
-    "audited": "audit300b"
+    "audited": "audit300b",
+    "optional": true
   },
   {
     "symbol": "PNC",
@@ -7079,7 +7085,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000006/q42025financialhighlightsa.htm",
-    "audited": "audit300c"
+    "audited": "audit300c",
+    "optional": true
   },
   {
     "symbol": "MCBS",
@@ -7208,9 +7215,10 @@
     "fiscal_period": "Q3",
     "label": "^Leverage\\ Ratio$",
     "unit": "percent",
-    "value": 9.2,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000126/q32025financialhighlightsa.htm",
-    "audited": "audit300c"
+    "audited": "audit300c",
+    "absent": true,
+    "note": "Out of bank lists: only CET1, net interest margin and the efficiency ratio stay (owner rule)"
   },
   {
     "symbol": "PRU",
@@ -7463,8 +7471,8 @@
     "symbol": "PNC",
     "period_end": "2026-06-30",
     "fiscal_period": "Q2",
-    "label": "^Other$",
-    "group": "^Revenue\\ by\\ Fee\\ Type$",
+    "label": "^Other\\ Noninterest\\ Income$",
+    "group": "^Revenue\\ by\\ Type$",
     "unit": "currency",
     "value": 489000000.0,
     "currency": "USD",
@@ -7524,7 +7532,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000006/q42025financialhighlightsa.htm",
-    "audited": "audit300c"
+    "audited": "audit300c",
+    "optional": true
   },
   {
     "symbol": "FFBC",
@@ -7594,9 +7603,10 @@
     "fiscal_period": "Q3",
     "label": "^Total\\ Capital\\ Risk\\-Based\\ Ratio$",
     "unit": "percent",
-    "value": 13.6,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000126/q32025financialhighlightsa.htm",
-    "audited": "audit300c"
+    "audited": "audit300c",
+    "absent": true,
+    "note": "Out of bank lists: only CET1, net interest margin and the efficiency ratio stay (owner rule)"
   },
   {
     "symbol": "AXIA",
@@ -7884,9 +7894,10 @@
     "fiscal_period": "Q1",
     "label": "^Tier\\ 1\\ Risk\\-Based\\ Capital\\ Ratio$",
     "unit": "percent",
-    "value": 11.3,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000026/q12026financialhighlightsa.htm",
-    "audited": "audit300c"
+    "audited": "audit300c",
+    "absent": true,
+    "note": "Out of bank lists: only CET1, net interest margin and the efficiency ratio stay (owner rule)"
   },
   {
     "symbol": "FDX",
@@ -10331,7 +10342,7 @@
     "unit": "currency",
     "value": 144000000.0,
     "currency": "USD",
-    "group": "^Revenue\\ by\\ Fee\\ Type$",
+    "group": "^Revenue\\ by\\ Type$",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026048244/q22026financialhighlightsa.htm",
     "audited": "audit300d"
@@ -10576,7 +10587,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026065936/q32026financialhighlightsa.htm",
-    "audited": "audit300d"
+    "audited": "audit300d",
+    "optional": true
   },
   {
     "symbol": "UCB",
@@ -10729,7 +10741,7 @@
     "unit": "currency",
     "value": 577000000.0,
     "currency": "USD",
-    "group": "^Revenue\\ by\\ Fee\\ Type$",
+    "group": "^Revenue\\ by\\ Type$",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026048244/q22026financialhighlightsa.htm",
     "audited": "audit300d"
@@ -10985,7 +10997,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000026/q12026financialhighlightsa.htm",
-    "audited": "audit300d"
+    "audited": "audit300d",
+    "optional": true
   },
   {
     "symbol": "MCBS",
@@ -11394,7 +11407,8 @@
     "currency": "USD",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026048244/q22026financialhighlightsa.htm",
-    "audited": "audit300d"
+    "audited": "audit300d",
+    "optional": true
   },
   {
     "symbol": "COP",
@@ -13702,7 +13716,7 @@
     "unit": "currency",
     "value": 321000000.0,
     "currency": "USD",
-    "group": "^Noninterest\\ Income\\ by\\ Type$",
+    "group": "^Revenue\\ by\\ Type$",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialhighlightsa.htm",
     "audited": "audit3"
@@ -14274,7 +14288,7 @@
     "unit": "currency",
     "value": 128000000.0,
     "currency": "USD",
-    "group": "^Revenue\\ by\\ Product$",
+    "group": "^Revenue\\ by\\ Type$",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialhighlightsa.htm",
     "audited": "audit_sample"
@@ -14342,7 +14356,7 @@
     "unit": "currency",
     "value": 772000000.0,
     "currency": "USD",
-    "group": "^Revenue\\ by\\ Product$",
+    "group": "^Revenue\\ by\\ Type$",
     "tolerance": 0.005,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000162828026048244/q22026financialhighlightsa.htm",
     "audited": "audit_sample"
@@ -15712,7 +15726,8 @@
     "unit": "count",
     "value": 55047.0,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367625000048/q22025financialsupplement.htm",
-    "audited": "audit300e"
+    "audited": "audit300e",
+    "optional": true
   },
   {
     "symbol": "MCBS",
@@ -15786,7 +15801,7 @@
     "symbol": "PNC",
     "period_end": "2026-06-30",
     "fiscal_period": "Q2",
-    "label": "^Discretionary\\ Client\\ AUM$",
+    "label": "^Discretionary\\ Client\\ (?:AUM|Assets\\ Under\\ Management)$",
     "unit": "currency",
     "value": 247000000000.0,
     "currency": "USD",
@@ -15844,7 +15859,8 @@
     "unit": "count",
     "value": 57801.0,
     "source": "https://www.sec.gov/Archives/edgar/data/713676/000071367626000026/q12026financialsupplement.htm",
-    "audited": "audit300e"
+    "audited": "audit300e",
+    "optional": true
   },
   {
     "symbol": "COP",
