@@ -5,6 +5,8 @@ import re
 
 from datetime import date
 
+import pandas as pd
+
 from .. import ai
 from ..ai import AiResponseError, Spec
 from ..ops.control import ControlError
@@ -239,6 +241,10 @@ class TaggedKpiReading:
                 missing = [quarter for quarter in newest_first if quarter not in held
                            or (held[quarter]["validation_status"] == "needs_review" and not held[quarter].get("owner_decision"))]
                 if not missing:
+                    if tag is not None and tag.instant:
+                        template = next((v for v in held.values() if v["validation_status"] == "verified"), None)
+                        if template:
+                            records += self._before_first_report(tag, kpi, key, template, quarters, set(held), kpi.unit == "percent")
                     continue
                 how = "tagged as in the quarters the release states it"
                 if tag is None and kpi.key in picked:
@@ -299,10 +305,62 @@ class TaggedKpiReading:
                         locator={"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions),
                                  "instant": tag.instant},
                     ))
+                filled = set(held) | {(r["fiscal_year"], r["fiscal_period"]) for r in records
+                                      if r.get("group_key") == key and r.get("kpi_key") == kpi.key}
+                records += self._before_first_report(tag, kpi, key, template, quarters, filled, kpi.unit == "percent")
             if split:
                 records += self._year_ago_lines(group, key, quarters, records)
                 records += self._exact_periods(group, key, quarters, facts_of, records)
         return records
+
+    def _before_first_report(self, tag, kpi, key: str, template: dict, quarters, covered: set, percent: bool) -> list[dict]:
+        """A balance KPI (an instant: backlog, remaining performance obligations) at the dates a company's first reports
+        show beside their own, where it has no report of its own for them: GE Vernova, spun off in April 2024, gives its
+        RPO at March 31, 2023 and December 31, 2023 in its first 10-Q, at June 30 and September 30, 2023 in the next two.
+        Only for a company whose reports start inside the ten-year window (a spin-off or a new listing), so a long-listed
+        company's history never reaches past its window; each date is read from the first report that gives it."""
+        if not tag.instant or not quarters or len(quarters) >= 40:
+            return []
+        first_end = quarters[min(quarters)][1]
+        seen = set(covered) | set(quarters)
+        out: list[dict] = []
+        for quarter in sorted(quarters)[:5]:
+            ref, _end = quarters[quarter]
+            try:
+                frame = self._xbrl(ref).facts.to_dataframe()
+            except Exception:  # noqa: BLE001 - an unreadable report gives nothing
+                continue
+            if "period_instant" not in frame.columns:
+                continue
+            dates = {found.date() for found in pd.to_datetime(frame.loc[frame["concept"] == tag.concept, "period_instant"],
+                                                             errors="coerce").dropna()}
+            for when in sorted(dates):
+                if not (0 < (first_end - when).days <= 400):
+                    continue
+                try:
+                    target = fiscal_label(when, self.profile.fiscal_year_end, year_offset=self.offset)
+                except Exception:  # noqa: BLE001 - a date off the company's calendar is left out
+                    continue
+                if target in seen:
+                    continue
+                found = quarter_facts(frame, when)
+                value = (_percent_scale(found) if percent else found).get(tag)
+                if value is None:
+                    continue
+                seen.add(target)
+                out.append(self._record(
+                    group_key=key, group_label=template["group_label"], group_kind=template["group_kind"],
+                    group_order=template["group_order"], kpi_key=kpi.key, kpi_label=template["kpi_label"],
+                    kpi_order=template["kpi_order"], unit=template["unit"], value=value, currency=template.get("currency"),
+                    method="ai", validation_status="verified", reconciliation_error_pct=None,
+                    notes=[f"from the {ref.form}'s XBRL: its comparative column for {target[1]} {target[0]}, a date before the company's first report"],
+                    ref=ref, fiscal_year=target[0], fiscal_period=target[1], period_end=when,
+                    locator={"tagged": True, "concept": tag.concept, "dimensions": dict(tag.dimensions), "instant": True,
+                             "year_ago": True},
+                ))
+        if out:
+            self.log(f"{self.symbol}: {len(out)} {kpi.key} values from the first reports' comparative columns")
+        return out
 
     def _exact_periods(self, group, key: str, quarters, facts_of, fresh: list[dict]) -> list[dict]:
         """A flagged breakdown quarter whose every line is its report's exact tagged figure (for a Q4, the 10-K's year less

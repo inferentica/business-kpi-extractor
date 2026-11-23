@@ -8,7 +8,7 @@ import re
 
 from .labels import _as_date, _axis_name, _fiscal_year, _member_labels, _snake, _title, drop_declared_parents, humanize, local_name
 from .members import _by_key, _PRODUCT_OR_SERVICE, _two_partitions, drop_overlaps, member_key, remove_subtotals, subtotal_tree
-from .frames import _plain_total, _single_axis_members
+from .frames import _plain_total, _single_axis_members, printed_segment_revenues
 from .rounding import refined_rest as _refined_rest
 from .model import _CONSOLIDATION_NAMES, _IGNORED_AXES, _NEUTRAL_MEMBERS, _PART_AXES, _RECONCILING, _SEGMENT_AXES, _STANDARD_AXES, _UNALLOCATED, MAX_RECONCILIATION_ERROR, MAX_UNALLOCATED, REVENUE_CONCEPTS, XbrlBreakdowns, XbrlCandidate, XbrlGroup
 
@@ -20,6 +20,7 @@ def extract_breakdowns(facts: pd.DataFrame, entity: dict, form: str,
     if period_end is None:
         return None
     annual = form.upper().startswith(("10-K", "20-F", "40-F"))
+    facts = printed_segment_revenues(facts)
     frame = facts[facts["concept"].isin(REVENUE_CONCEPTS) & (facts["period_type"] == "duration")].copy()
     if frame.empty:
         return XbrlBreakdowns(period_end, annual, _fiscal_year(entity), [], None)
@@ -596,3 +597,4 @@ def _plain_revenue_figures(facts: pd.DataFrame, period_end, annual: bool, label:
         name = own if isinstance(own, str) and own.strip() else label(str(fact["concept"])) or humanize(str(fact["concept"]))
         figures.append((float(fact["numeric_value"]), name.strip()))
     return figures
+

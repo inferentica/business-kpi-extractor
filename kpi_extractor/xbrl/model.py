@@ -28,6 +28,7 @@ _NEUTRAL_MEMBERS = {("ConsolidationItemsAxis", "OperatingSegmentsMember"), ("Con
 # Each item on the consolidation axis is its own row under the filing's name (JPMorgan's "Corporate", UnitedHealth's
 # "Optum Eliminations"); these names stand in for the taxonomy's own long labels.
 _CONSOLIDATION_NAMES = {"IntersegmentEliminationMember": "Eliminations", "CorporateNonSegmentMember": "Corporate",
+                        "EliminationsAndOtherMember": "Eliminations and other",
                         "MaterialReconcilingItemsMember": "Reconciling items",
                         "SegmentReconcilingItemsMember": "Reconciling items"}
 

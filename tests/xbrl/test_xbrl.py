@@ -577,3 +577,23 @@ def test_a_split_of_the_companys_revenue_beats_a_split_of_part_of_it():
         group = next(group for group in result.groups if group.key == "segments")
         assert group.concept == whole and group.total == 13_395.0
         assert sorted(value for _key, _label, value in group.members) == [1_617.0, 4_007.0, 7_771.0]
+
+
+def test_segment_revenue_as_the_summary_prints_it_with_eliminations_and_other():
+    # GE Vernova's Q1 2024 10-Q tags each segment's external revenue on the operating-segments member (Power 4,007) and
+    # its segment revenue with intersegment sales on a member of its own (Power 4,035). Its summary of reportable
+    # segments prints the second and one "Eliminations and other" line (-65) to total revenue (7,260).
+    seg, concept = "dim_us-gaap_StatementBusinessSegmentsAxis", "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+    gross = "gev:OperatingSegmentsExcludingIntersegmentEliminationMember"
+    rows = [_fact(concept, 7_260.0)]
+    for member, external, printed in (("gev:PowerSegmentMember", 4_007.0, 4_035.0), ("gev:WindSegmentMember", 1_634.0, 1_639.0),
+                                      ("gev:ElectrificationSegmentMember", 1_606.0, 1_651.0)):
+        rows.append(_fact(concept, external, member, axis=seg, consolidation="us-gaap:OperatingSegmentsMember"))
+        rows.append(_fact(concept, printed, member, axis=seg, consolidation=gross))
+    rows += [_fact(concept, 7_325.0, axis=seg, consolidation=gross), _fact(concept, 12.0, axis=seg, consolidation="us-gaap:CorporateNonSegmentMember"),
+             _fact(concept, 78.0, axis=seg, consolidation="us-gaap:IntersegmentEliminationMember")]
+    group = next(g for g in extract_breakdowns(pd.DataFrame(rows), {"document_period_end_date": "2026-06-30"}, "10-Q").groups
+                 if g.key == "segments")
+    assert {key: value for key, _label, value in group.members} == {
+        "power": 4_035.0, "wind": 1_639.0, "electrification": 1_651.0, "eliminationsandother": -65.0}
+    assert group.total == 7_260.0
