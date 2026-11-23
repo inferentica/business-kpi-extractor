@@ -81,3 +81,16 @@ def test_a_quarters_own_report_figure_joins_its_year_ago_reading():
         "googlenetwork", "googlenetworkmembersproperties"]
     differs = [rows[0], {**rows[2], "value": 4_826e6}]
     assert run(differs)._merge_own_report_duplicates() == []
+
+
+def test_a_series_name_drops_a_footnote_marker_its_latest_label_was_stored_with():
+    # BAM: the newest quarter, owner-locked before labels lost their markers, kept "Infrastructure(a)" and every run
+    # gave it back to the other periods.
+    old = value("segments", "infrastructure", "Infrastructure", "2026-03-31", group_label="Revenue by product", year="2026")
+    new = value("segments", "infrastructure", "Infrastructure(a)", "2026-09-30", group_label="Revenue by product", year="2026")
+    renamed = run([old, new])._harmonize_labels()
+    assert [(v["period_end"], v["kpi_label"]) for v in renamed] == [("2026-09-30", "Infrastructure")]
+    # A name the owner's list gives with a marker is shown without it; a label already right is left alone.
+    named = run([new], names={"segments": {"members": {"infrastructure": "Infrastructure (1)"}}})._harmonize_labels()
+    assert [v["kpi_label"] for v in named] == ["Infrastructure"]
+    assert run([old], names={"segments": {"members": {"infrastructure": "Infrastructure (1)"}}})._harmonize_labels() == []

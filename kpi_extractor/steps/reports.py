@@ -12,6 +12,7 @@ from ..readers.segment_income import (GROUP_KEY as INCOME_GROUP, LEFT_OVER_KEY, 
                               segment_income, segment_revenue)
 from ..xbrl import extract_breakdowns, member_children, member_key, official_labels
 from ..xbrl.basis import report_basis
+from ..xbrl.labels import without_footnote
 from .shared import _XBRL_READER, value_key
 
 _AI_PENDING = "AI review unavailable; retried next run"
@@ -108,7 +109,7 @@ class ReportReading:
                 for order, (member, (reported, label, value, ytd, prior_ytd)) in enumerate(merged.items()):
                     records.append(self._record(
                         group_key=group.key, group_label=named.get("label") or group.label, group_kind="revenue_breakdown",
-                        group_order=group.order, kpi_key=member, kpi_label=(named.get("members") or {}).get(member) or label,
+                        group_order=group.order, kpi_key=member, kpi_label=without_footnote((named.get("members") or {}).get(member) or label),
                         kpi_order=order, unit="currency", value=value, currency=group.currency, method="xbrl",
                         validation_status="verified", reconciliation_error_pct=group.reconciliation_error,
                         notes=extra_notes, ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
@@ -133,7 +134,7 @@ class ReportReading:
                     records.append(self._record(
                         group_key=f"{group.key}_levels", group_label=f"{named.get('label') or group.label} subtotals",
                         group_kind="metric", group_order=group.order, kpi_key=member,
-                        kpi_label=(named.get("members") or {}).get(member) or label, kpi_order=order, unit="currency",
+                        kpi_label=without_footnote((named.get("members") or {}).get(member) or label), kpi_order=order, unit="currency",
                         value=value, currency=group.currency, method="xbrl", validation_status="verified",
                         reconciliation_error_pct=None, notes=extra_notes, ref=ref, fiscal_year=fiscal_year,
                         fiscal_period=fiscal_period, period_end=breakdowns.period_end, locator={
@@ -234,7 +235,7 @@ class ReportReading:
         for order, (key, label, element, value) in enumerate(measure.current.rows):
             records.append(self._record(
                 group_key=group_key, group_label=named.get("label") or measure.label, group_kind="revenue_breakdown",
-                group_order=group_order, kpi_key=key, kpi_label=(named.get("members") or {}).get(key) or label,
+                group_order=group_order, kpi_key=key, kpi_label=without_footnote((named.get("members") or {}).get(key) or label),
                 kpi_order=order, unit="currency", value=value, currency=currency, method="xbrl", validation_status="verified",
                 reconciliation_error_pct=0, notes=[], ref=ref, fiscal_year=fiscal_year, fiscal_period=fiscal_period,
                 period_end=period_end, locator={

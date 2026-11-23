@@ -8,6 +8,7 @@ from ..domain.derive import balancing
 from ..sources.base import FilingRef
 from ..readers.segment_income import GROUP_KEY as INCOME_GROUP
 from ..quality.reasons import ANNUAL_REFILED, LABELS_CONTRADICTED, has, without
+from ..xbrl.labels import without_footnote
 from .shared import (AI_GROUP_PREFIX, _ANNUAL_HEADER, _QUARTER_HEADER, _annual_header, _days, _same,
                      _year_ago_cells)
 
@@ -46,8 +47,10 @@ class SeriesIdentity:
                 continue
             named = self.names.get(value["group_key"]) or {}
             label = named.get("label") or group_latest[value["group_key"]]["group_label"]
-            member = ((named.get("members") or {}).get(value["kpi_key"])
-                      or latest[(value["group_key"], value["kpi_key"])]["kpi_label"])
+            # A footnote marker is no part of the name, even where the latest label was stored before labels lost it
+            # (BAM's "Infrastructure(a)", owner-locked in its newest quarter, came back to every other period).
+            member = without_footnote((named.get("members") or {}).get(value["kpi_key"])
+                                      or latest[(value["group_key"], value["kpi_key"])]["kpi_label"])
             if (label, member) != (value["group_label"], value["kpi_label"]):
                 renamed.append({**value, "group_label": label, "kpi_label": member})
         return renamed
