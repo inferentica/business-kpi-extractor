@@ -329,21 +329,39 @@
     "symbol": "MSFT",
     "period_end": "2026-06-30",
     "fiscal_period": "Q4",
-    "label": "server products",
+    "label": "^Productivity and server licensing$",
     "unit": "currency",
-    "value": 37096000000,
+    "value": 11033000000,
     "currency": "USD",
-    "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4)"
+    "source": "Microsoft FY2026 Q4 earnings release (d291965dex991.htm); the FY2026 restructure retired the old product lines (owner decision 2026-11-23, Quotiva Review)"
   },
   {
     "symbol": "MSFT",
     "period_end": "2026-06-30",
     "fiscal_period": "Q4",
-    "label": "linkedin",
+    "label": "^Microsoft 365 cloud$",
     "unit": "currency",
-    "value": 5189000000,
+    "value": 26721000000,
     "currency": "USD",
-    "source": "Microsoft FY2026 10-K XBRL less the three FY2026 10-Qs (derived Q4)"
+    "source": "Microsoft FY2026 Q4 earnings release (d291965dex991.htm); the FY2026 restructure retired the old product lines (owner decision 2026-11-23, Quotiva Review)"
+  },
+  {
+    "symbol": "MSFT",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q4",
+    "label": "^server products",
+    "unit": "currency",
+    "absent": true,
+    "source": "Retired product line after the FY2026 restructure (owner decision 2026-11-23, Quotiva Review)"
+  },
+  {
+    "symbol": "MSFT",
+    "period_end": "2026-06-30",
+    "fiscal_period": "Q4",
+    "label": "^linkedin$",
+    "unit": "currency",
+    "absent": true,
+    "source": "Retired product line after the FY2026 restructure (owner decision 2026-11-23, Quotiva Review)"
   },
   {
     "symbol": "AMD",
@@ -579,6 +597,14 @@
     "unit": "currency",
     "value": 270000000,
     "source": "Brookfield Asset Management 10-Q, segment revenues, period ended 2026-06-30, checked 2026-11-05"
+  },
+  {
+    "symbol": "BAM",
+    "period_end": "2026-06-30",
+    "label": "\\((?:[a-z]|\\d{1,2})\\)$",
+    "unit": "currency",
+    "absent": true,
+    "source": "A footnote marker is not part of a line's name (BAM's Infrastructure(a), owner decision 2026-11-23, Quotiva Review)"
   },
   {
     "symbol": "CRM",

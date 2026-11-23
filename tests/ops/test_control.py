@@ -153,7 +153,7 @@ def test_the_quick_set_scores_one_company_for_each_way_of_reading():
     quick = quick_set(golden)
     # Every quick-set company has golden values, and the set stays well under the full set.
     assert {item["symbol"] for item in quick} == set(QUICK_SET)
-    assert len(quick) == 53 and len(golden) == 92
+    assert len(quick) == 54 and len(golden) == 95
 
 
 def test_an_evaluation_asks_again_only_when_told(monkeypatch):
