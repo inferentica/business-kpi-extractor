@@ -1,0 +1,299 @@
+{
+  "version": 1,
+  "lines": {
+    "segment_income.grooming": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "ProfitLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "GroomingSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.beauty": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BeautySegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.grooming": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "GroomingSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.health_care": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "HealthCareSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.baby_feminine_family_care": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BabyFeminineFamilyCareSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.corporate": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "CorporateNonSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.beauty": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "ProfitLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BeautySegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.health_care": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "ProfitLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "HealthCareSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.fabric_home_care": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "ProfitLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "FabricHomeCareSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.baby_feminine_family_care": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "ProfitLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BabyFeminineFamilyCareSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.organic_sales_growth_beauty": {
+      "release": {
+        "kind": "table",
+        "anchor": "THE\\ PROCTER\\ \\&\\ GAMBLE\\ COMPANY\\ AND\\ SUBSIDIARIESReconciliation\\ of\\ Non\\-GAAP\\ Measures",
+        "row": "Currency\\ impact\\ to\\ Core\\ gross\\ margin",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NumberOfReportableSegments"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.organic_sales_growth_grooming": {
+      "release": {
+        "kind": "table",
+        "anchor": "THE\\ PROCTER\\ \\&\\ GAMBLE\\ COMPANY\\ AND\\ SUBSIDIARIESReconciliation\\ of\\ Non\\-GAAP\\ Measures",
+        "row": "Currency\\ impact\\ to\\ Core\\ gross\\ margin",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NumberOfReportableSegments"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.organic_sales_growth_fabric_home_care": {
+      "release": {
+        "kind": "table",
+        "anchor": "THE\\ PROCTER\\ \\&\\ GAMBLE\\ COMPANY\\ AND\\ SUBSIDIARIESReconciliation\\ of\\ Non\\-GAAP\\ Measures",
+        "row": "Currency\\ impact\\ to\\ Core\\ gross\\ margin",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NumberOfReportableSegments"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "geography.united_states": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "US"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.international": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "NonUsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "geography": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": false
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

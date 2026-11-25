@@ -391,9 +391,11 @@ class OwnerRefresh:
             members = {key: line for key, line in lines.items() if line.group == group
                        and (key in chosen or key in missing or key in waiting)}
             if any(key in chosen or key in missing for key in members):
-                self._group(plan, period, group, members, chosen, missing, waiting, existing, readonly, docs, duration, hand)
+                self._group(plan, period, group, members, chosen, missing, waiting, existing, readonly, docs, duration, hand,
+                            readings)
 
-    def _group(self, plan, period, group, members, chosen, missing, waiting, existing, readonly, docs, duration, hand) -> None:
+    def _group(self, plan, period, group, members, chosen, missing, waiting, existing, readonly, docs, duration, hand,
+               readings_of) -> None:
         breakdown = next(iter(members.values())).breakdown
         basis = [f"{key}: {chosen[key].found.reason}" for key in members if key in chosen and chosen[key].found.basis]
         basis += [f"{key}: {missing[key][0]}" for key in members if key in missing and missing[key][1]]
@@ -449,6 +451,13 @@ class OwnerRefresh:
                          f"({missing[key][0]}); read it by hand or mark it not reported")
                 continue
             reading = chosen[key]
+            line_held = held_why
+            if tie is None and line_held is None:
+                # With no total to tie to, a release and a report that disagree prove neither.
+                others = [r for r in readings_of.get(key, []) if r is not reading and r.found.status == ONE]
+                if reading.found.status == ONE and any(differs(r.found.value, reading.found.value) for r in others):
+                    line_held = (f"held: the release gives {others[0].found.value:,.0f}, the report "
+                                 f"{reading.found.value:,.0f}, and no total ties either")
             if readonly or (stored and stored.get("owner_decision")):
                 if reading.found.status == ONE and stored is not None and differs(reading.found.value, float(stored["value"])):
                     hand(line.group, line.kpi, "differs", f"{reading.where} gives {reading.found.value:,.0f}; the "
@@ -463,7 +472,7 @@ class OwnerRefresh:
                 hand(line.group, line.kpi, "differs", f"the owner rejected the {period.label} figure for {label} before; "
                      f"{reading.where} gives {reading.found.value if reading.found.value is not None else '?'}", reading.ref)
                 continue
-            plan.rows.append(self._row(line, period, reading, stored, tie, held_why))
+            plan.rows.append(self._row(line, period, reading, stored, tie, line_held))
 
     def _gives_way(self, stored: dict, reading: Reading, docs: _Docs) -> bool:
         """Whether a figure this refresh stored earlier for the newest period gives way to this reading: only a release's,

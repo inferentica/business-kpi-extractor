@@ -77,6 +77,9 @@ def test_quarters_missing_inside_a_line_are_listed_and_the_window_is_not_extende
                                 "owner_decision": "confirmed", "validation_status": "verified"}
     found = missing_quarters([row("2025", "Q1"), row("2025", "Q2"), row("2025", "Q4"), row("2026", "Q1")])
     assert [(f.fiscal_year, f.fiscal_period, f.kind) for f in found] == [("2025", "Q3", "missing_quarter")]
+    # A quarter the owner marked not reported is no gap.
+    rows = [row("2025", "Q1"), row("2025", "Q2"), row("2025", "Q4")]
+    assert missing_quarters(rows, [{"group_key": "segments", "kpi_key": "a", "fiscal_year": "2025", "fiscal_period": "Q3"}]) == []
 
 
 def test_the_finder_writes_nothing():

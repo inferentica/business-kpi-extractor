@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "lines": {
+    "revenue_type.freight": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "CargoAndFreightMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "revenue_type.other_rev": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ProductAndServiceOtherMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "business_groups.bulk": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ReportableSegmentMember",
+          "ProductOrServiceAxis": "BulkMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "business_groups.industrial": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ReportableSegmentMember",
+          "ProductOrServiceAxis": "IndustrialMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "business_groups.premium": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ReportableSegmentMember",
+          "ProductOrServiceAxis": "PremiumMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.op_ratio": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Operating\\ ratio\\ \\(%\\)",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.gtm": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Gross\\ ton\\-miles\\ \\(GTMs\\)\\ \\(billions\\)",
+        "scale": 1000000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.velocity": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Freight\\ car\\ velocity\\ \\(daily\\ miles\\ per\\ car\\)",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.speed": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Average\\ train\\ speed\\ \\(miles\\ per\\ hour\\)\\ \\[a\\]",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.dwell": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Average\\ terminal\\ dwell\\ time\\ \\(hours\\)\\ \\[a\\]",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.loco": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Locomotive\\ productivity\\ \\(GTMs\\ per\\ horsepower\\ day\\)",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.train_len": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Train\\ length\\ \\(feet\\)",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.workforce": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Workforce\\ productivity\\ \\(car\\ miles\\ per\\ employee\\)",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.employees": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Total\\ employees\\ \\(average\\)",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.isp": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Intermodal\\ service\\ performance\\ index\\ \\(%\\)",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.msp": {
+      "report": {
+        "kind": "table",
+        "anchor": "Railroad\\ performance\\ measures\\ are\\ included\\ in\\ the\\ table\\ below",
+        "row": "Manifest\\ service\\ performance\\ index\\ \\(%\\)",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.fuel_rate": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "CommonStockDividendsPerShareDeclared"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    }
+  },
+  "groups": {
+    "bulk_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "business_groups.bulk"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "business_groups.bulk"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "business_groups": {
+      "release_total": {
+        "kind": "line",
+        "line": "revenue_type.freight"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "revenue_type.freight"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "industrial_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "business_groups.industrial"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "business_groups.industrial"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_arpc": {
+      "known_members": [],
+      "fy_rows": false
+    },
+    "kpi_carloads": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_rtm": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "premium_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "business_groups.premium"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "business_groups.premium"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "revenue_type": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

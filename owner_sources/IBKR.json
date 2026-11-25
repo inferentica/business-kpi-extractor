@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "lines": {
+    "products.commissions": {
+      "release": {
+        "kind": "table",
+        "anchor": "AND\\ SUBSIDIARIES\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME",
+        "row": "Commissions",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "BrokerageCommissionsRevenue"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "products.other_fees_and_services": {
+      "release": {
+        "kind": "table",
+        "anchor": "AND\\ SUBSIDIARIES\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME",
+        "row": "Other\\ fees\\ and\\ services",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OtherFeesAndServices"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.united_states": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenuesNetOfInterestExpense"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "US"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.international": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenuesNetOfInterestExpense"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "NonUsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "products.other_income": {
+      "release": {
+        "kind": "table",
+        "anchor": "AND\\ SUBSIDIARIES\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME",
+        "row": "Other\\ income",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OtherIncomeLoss"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "products.net_interest_income": {
+      "release": {
+        "kind": "table",
+        "anchor": "AND\\ SUBSIDIARIES\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME",
+        "row": "Total\\ net\\ interest\\ income",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "InterestIncomeExpenseNet"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "geography": {
+      "release_total": {
+        "kind": "table",
+        "anchor": "AND\\ SUBSIDIARIES\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME",
+        "row": "Total\\ net\\ revenues",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenuesNetOfInterestExpense"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": false
+    },
+    "products": {
+      "release_total": {
+        "kind": "table",
+        "anchor": "AND\\ SUBSIDIARIES\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME",
+        "row": "Total\\ net\\ revenues",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenuesNetOfInterestExpense"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

@@ -1,0 +1,521 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.epd": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EstablishedPharmaceuticalProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.nutrition": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "NutritionalProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.diagnostics": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "DiagnosticProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.devices": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "CorporateNonSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.epd": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EstablishedPharmaceuticalProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.nutrition": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "NutritionalProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.diagnostics": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "DiagnosticProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.devices": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "devices_lines.diabetes": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember",
+          "SubsegmentsAxis": "DiabetesCareMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "devices_lines.ep": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "ElectrophysiologyMember",
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "devices_lines.vascular": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "VascularMember",
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "devices_lines.sh": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember",
+          "SubsegmentsAxis": "StructuralHeartMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "devices_lines.rhythm": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "RhythmManagementMember",
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "devices_lines.hf": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "HeartFailureMember",
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "devices_lines.neuro": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "NeuromodulationMember",
+          "StatementBusinessSegmentsAxis": "MedicalDevicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "diagnostics_lines.core_lab": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "CoreLaboratoryMember",
+          "StatementBusinessSegmentsAxis": "DiagnosticProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "diagnostics_lines.cancer_dx": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "CancerDiagnosticsMember",
+          "StatementBusinessSegmentsAxis": "DiagnosticProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "diagnostics_lines.rapid_molecular": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "RapidAndMolecularMember",
+          "StatementBusinessSegmentsAxis": "DiagnosticProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "epd_lines.kem": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EstablishedPharmaceuticalProductsMember",
+          "SubsegmentsAxis": "KeyEmergingMarketsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "epd_lines.epd_other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EstablishedPharmaceuticalProductsMember",
+          "SubsegmentsAxis": "OtherEmergingMarketsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "nutrition_lines.pediatric": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "PediatricNutritionalsMember",
+          "StatementBusinessSegmentsAxis": "NutritionalProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "nutrition_lines.adult": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "SubsegmentsAxis": "AdultNutritionalsMember",
+          "StatementBusinessSegmentsAxis": "NutritionalProductsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "region.us": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "US"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "region.intl": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "NonUsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "devices_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.devices"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.devices"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "diagnostics_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.diagnostics"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.diagnostics"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "epd_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.epd"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.epd"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "nutrition_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.nutrition"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.nutrition"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "region": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

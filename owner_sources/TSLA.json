@@ -1,0 +1,248 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.automotive": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AutomotiveSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.energy_generation_storage": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "EnergyGenerationAndStorageMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.united_states": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "US"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.china": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "CN"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.automotive": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "GrossProfit"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AutomotiveSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.energy_generation_storage": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "GrossProfit"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EnergyGenerationAndStorageSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.other_international": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "NonUsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "products.automotive_sales": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "AutomotiveSalesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "products.automotive_regulatory_credits": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "AutomotiveRegulatoryCreditsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "products.automotive_leasing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "AutomotiveLeasingMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "products.energy_generation_storage": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "EnergyGenerationAndStorageMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "products.services_and_other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ServicesAndOtherMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "geography": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": false
+    },
+    "products": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "GrossProfit"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

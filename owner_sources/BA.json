@@ -1,0 +1,236 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.ca": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "CommercialAirplanesSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.bds": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BoeingDefenseSpaceSecuritySegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.bgs": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "GlobalServicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.ca": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "CommercialAirplanesSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.bds": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BoeingDefenseSpaceSecuritySegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.bgs": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "GlobalServicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "bds_cust.bds_us": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "US",
+          "StatementBusinessSegmentsAxis": "BoeingDefenseSpaceSecuritySegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "bds_cust.bds_nonus": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "NonUsMember",
+          "StatementBusinessSegmentsAxis": "BoeingDefenseSpaceSecuritySegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "bgs_cust.bgs_com": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "MajorCustomersAxis": "CommercialCustomersMember",
+          "StatementBusinessSegmentsAxis": "GlobalServicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "bgs_cust.bgs_gov": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "MajorCustomersAxis": "GovernmentCustomersMember",
+          "StatementBusinessSegmentsAxis": "GlobalServicesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "type.products": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ProductMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "type.services": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ServiceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "bds_cust": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "bgs_cust": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "type": {
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

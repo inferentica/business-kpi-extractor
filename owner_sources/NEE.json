@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.fpl": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RegulatedAndUnregulatedOperatingRevenue"
+        ],
+        "members": {
+          "LegalEntityAxis": "FloridaPowerLightCompanyMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.fpl": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "ProfitLoss"
+        ],
+        "members": {
+          "LegalEntityAxis": "FloridaPowerLightCompanyMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.neer": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RegulatedAndUnregulatedOperatingRevenue"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "NEERSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.neer": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "NEERSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.corporate": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RegulatedAndUnregulatedOperatingRevenue"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "CorporateAndEliminationsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RegulatedAndUnregulatedOperatingRevenue"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

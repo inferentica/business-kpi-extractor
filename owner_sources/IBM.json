@@ -1,0 +1,452 @@
+{
+  "version": 1,
+  "lines": {
+    "consulting_lines.strategy_technology": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "StrategyAndTechnologyMember",
+          "StatementBusinessSegmentsAxis": "ConsultingMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "consulting_lines.intelligent_operations": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ConsultingMember",
+          "ProductOrServiceAxis": "IntelligentOperationsMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.americas": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "AmericasMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.emea": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "EMEAMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.asia_pacific": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "AsiaPacificMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "infrastructure_lines.hybrid_infrastructure": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "HybridInfrastructureMember",
+          "StatementBusinessSegmentsAxis": "InfrastructureMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "infrastructure_lines.infrastructure_support": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "InfrastructureMember",
+          "ProductOrServiceAxis": "InfrastructureSupportMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.software": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "SoftwareMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.consulting": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ConsultingMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.infrastructure": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "InfrastructureMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.financing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "FinancingMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.software": {
+      "release": {
+        "kind": "table",
+        "anchor": "INTERNATIONAL\\ BUSINESS\\ MACHINES\\ CORPORATION\\ COMPARATIVE\\ FINANCIAL\\ RESULTS",
+        "row": "Software",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "SoftwareMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.consulting": {
+      "release": {
+        "kind": "table",
+        "anchor": "INTERNATIONAL\\ BUSINESS\\ MACHINES\\ CORPORATION\\ COMPARATIVE\\ FINANCIAL\\ RESULTS",
+        "row": "Consulting",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ConsultingMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.infrastructure": {
+      "release": {
+        "kind": "table",
+        "anchor": "INTERNATIONAL\\ BUSINESS\\ MACHINES\\ CORPORATION\\ COMPARATIVE\\ FINANCIAL\\ RESULTS",
+        "row": "Infrastructure",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "InfrastructureMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.financing": {
+      "release": {
+        "kind": "table",
+        "anchor": "INTERNATIONAL\\ BUSINESS\\ MACHINES\\ CORPORATION\\ COMPARATIVE\\ FINANCIAL\\ RESULTS",
+        "row": "Financing",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "FinancingMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.other": {
+      "release": {
+        "kind": "table",
+        "anchor": "INTERNATIONAL\\ BUSINESS\\ MACHINES\\ CORPORATION\\ COMPARATIVE\\ FINANCIAL\\ RESULTS",
+        "row": "Other",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "MaterialReconcilingItemsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "software_lines.hybrid_cloud": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "HybridCloudMember",
+          "StatementBusinessSegmentsAxis": "SoftwareMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "software_lines.automation": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "AutomationMember",
+          "StatementBusinessSegmentsAxis": "SoftwareMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "software_lines.data": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "DataMember",
+          "StatementBusinessSegmentsAxis": "SoftwareMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "software_lines.transaction_processing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "TransactionProcessingMember",
+          "StatementBusinessSegmentsAxis": "SoftwareMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "consulting_lines": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "geography": {
+      "release_total": {
+        "kind": "table",
+        "anchor": "INTERNATIONAL\\ BUSINESS\\ MACHINES\\ CORPORATION\\ COMPARATIVE\\ FINANCIAL\\ RESULTS",
+        "row": "TOTAL\\ REVENUE",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "infrastructure_lines": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "release_total": {
+        "kind": "table",
+        "anchor": "INTERNATIONAL\\ BUSINESS\\ MACHINES\\ CORPORATION\\ COMPARATIVE\\ FINANCIAL\\ RESULTS",
+        "row": "TOTAL\\ REVENUE",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "software_lines": {
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

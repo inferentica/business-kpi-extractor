@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.adv_conn": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AdvancedConnectivitySegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.legacy": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "LegacySegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.latam": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "LatinAmericaSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.adv_conn": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AdvancedConnectivitySegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.legacy": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "LegacySegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.latam": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "LatinAmericaSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "ac_cust": {
+      "known_members": [],
+      "fy_rows": false
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

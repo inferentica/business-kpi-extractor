@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.analog": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AnalogSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.embedded_processing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EmbeddedProcessingSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AllOtherSegmentsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.analog": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AnalogSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.embedded_processing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EmbeddedProcessingSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.united_states": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "US",
+          "ConcentrationRiskByTypeAxis": "GeographicConcentrationRiskMember",
+          "ConcentrationRiskByBenchmarkAxis": "RevenueFromContractWithCustomerProductAndServiceBenchmarkMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.china": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "CN",
+          "ConcentrationRiskByTypeAxis": "GeographicConcentrationRiskMember",
+          "ConcentrationRiskByBenchmarkAxis": "RevenueFromContractWithCustomerProductAndServiceBenchmarkMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.rest_of_asia": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ConcentrationRiskByTypeAxis": "GeographicConcentrationRiskMember",
+          "ConcentrationRiskByBenchmarkAxis": "RevenueFromContractWithCustomerProductAndServiceBenchmarkMember",
+          "StatementGeographicalAxis": "RestOfAsiaMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.emea": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ConcentrationRiskByTypeAxis": "GeographicConcentrationRiskMember",
+          "ConcentrationRiskByBenchmarkAxis": "RevenueFromContractWithCustomerProductAndServiceBenchmarkMember",
+          "StatementGeographicalAxis": "EMEAMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.japan": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ConcentrationRiskByTypeAxis": "GeographicConcentrationRiskMember",
+          "StatementGeographicalAxis": "JP",
+          "ConcentrationRiskByBenchmarkAxis": "RevenueFromContractWithCustomerProductAndServiceBenchmarkMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.rest_of_world": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ConcentrationRiskByTypeAxis": "GeographicConcentrationRiskMember",
+          "StatementGeographicalAxis": "RestOfWorldMember",
+          "ConcentrationRiskByBenchmarkAxis": "RevenueFromContractWithCustomerProductAndServiceBenchmarkMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "geography": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

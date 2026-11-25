@@ -68,8 +68,10 @@ def _index(row: dict) -> int:
     return int(row["fiscal_year"]) * 4 + _QUARTERS.index(row["fiscal_period"])
 
 
-def missing_quarters(values: list[dict]) -> list[GapFinding]:
-    """Quarters missing inside each owner line's stored run (between its first and last owner-decided quarter)."""
+def missing_quarters(values: list[dict], marks: list[dict] = ()) -> list[GapFinding]:
+    """Quarters missing inside each owner line's stored run (between its first and last owner-decided quarter), less the
+    ones the owner marked not reported (business_kpi_missing_marks; kpi_key '' marks the whole table)."""
+    marked = {(m["group_key"], m.get("kpi_key") or "", str(m["fiscal_year"]), m["fiscal_period"]) for m in marks}
     runs: dict[tuple[str, str], dict[int, dict]] = {}
     for row in values:
         if row.get("owner_decision") and row.get("validation_status") != "rejected" and row["fiscal_period"] in _QUARTERS \
@@ -78,7 +80,8 @@ def missing_quarters(values: list[dict]) -> list[GapFinding]:
     found = []
     for (group, kpi), rows in sorted(runs.items()):
         for index in range(min(rows), max(rows)):
-            if index not in rows:
+            year, quarter = str(index // 4), _QUARTERS[index % 4]
+            if index not in rows and not {(group, kpi, year, quarter), (group, "", year, quarter)} & marked:
                 found.append(GapFinding("missing_quarter", group, kpi, str(index // 4), _QUARTERS[index % 4], None,
                                         note="a quarter missing inside the line's stored run"))
     return found
@@ -236,7 +239,8 @@ def main(argv: list[str] | None = None) -> int:
         rows = [r for r in state["values"] if r["symbol"] == symbol]
         path = Path("owner_sources") / f"{symbol}.json"
         spec = {**spec, "sources": spec.get("sources") or (json.loads(path.read_text()) if path.exists() else {})}
-        finder, found = GapFinder(symbol, spec, rows), missing_quarters(rows)
+        marks = [m for m in state.get("marks") or [] if m.get("symbol") == symbol]
+        finder, found = GapFinder(symbol, spec, rows), missing_quarters(rows, marks)
         try:
             newest = max(_day(r["period_end"]) for r in rows)
             filings = Filings(symbol, newest - timedelta(days=92 * args.quarters + 60))

@@ -1,0 +1,396 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.geico": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "UnderwritingMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayInsuranceGroupMember",
+          "SubsegmentsAxis": "GeicoMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.geico": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "UnderwritingMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayInsuranceGroupMember",
+          "SubsegmentsAxis": "GeicoMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.bhrg": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "UnderwritingMember",
+          "SubsegmentsAxis": "BerkshireHathawayReinsuranceGroupMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayInsuranceGroupMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.bh_primary": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "UnderwritingMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayInsuranceGroupMember",
+          "SubsegmentsAxis": "BerkshireHathawayPrimaryGroupMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.insurance_investment_income": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentsSegmentMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayInsuranceGroupMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.bnsf": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BurlingtonNorthernSantaFeCorporationMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.bhe": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayEnergyCompanyMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.pilot": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "PilotTravelCentersLLCMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.manufacturing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ManufacturingBusinessesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.mclane": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "McLaneCompanyMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.service_retailing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ServiceAndRetailingBusinessesMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.bhrg": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "UnderwritingMember",
+          "SubsegmentsAxis": "BerkshireHathawayReinsuranceGroupMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayInsuranceGroupMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.bh_primary": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "UnderwritingMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayInsuranceGroupMember",
+          "SubsegmentsAxis": "BerkshireHathawayPrimaryGroupMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.insurance_investment_income": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentsSegmentMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayInsuranceGroupMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.bnsf": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "BurlingtonNorthernSantaFeCorporationMember",
+          "ConsolidationItemsAxis": "OperatingSegmentsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.bhe": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsMember",
+          "StatementBusinessSegmentsAxis": "BerkshireHathawayEnergyCompanyMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.pilot": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsMember",
+          "StatementBusinessSegmentsAxis": "PilotTravelCentersLLCMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.manufacturing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsMember",
+          "StatementBusinessSegmentsAxis": "ManufacturingBusinessesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.mclane": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsMember",
+          "StatementBusinessSegmentsAxis": "McLaneCompanyMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.service_retailing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsMember",
+          "StatementBusinessSegmentsAxis": "ServiceAndRetailingBusinessesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "kpi_capital": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

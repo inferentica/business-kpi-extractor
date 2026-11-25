@@ -201,6 +201,12 @@ def main(argv: list[str] | None = None) -> int:
         unmapped = {key: r.problem for key, r in results.items() if r.mapping is None}
         candidate = {**spec, "sources": json.loads(sources.model_dump_json(exclude_none=True))}
         check = replay(symbol, candidate, rows, filings)
+        # A source the newest quarter disproves is no source: the line goes to the owner's list (Chevron's release gives
+        # international production rounded; ISRG's report tables matched a footnote's figure in earlier quarters).
+        for entry in check.get("different", []):
+            key = entry.split(":", 1)[0]
+            sources.lines.pop(key, None)
+            unmapped[key] = f"the replay of {check['period']} gives{entry.split(':', 1)[1]} (stored): source dropped"
         text = sources.model_dump_json(indent=2, exclude_none=True)
         path.write_text(text + "\n")
         statements.append(f"-- {symbol}: {len(results) - len(unmapped)} of {len(results)} lines mapped; replay "

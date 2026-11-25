@@ -1,0 +1,327 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.consumer": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "VerizonConsumerGroupSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.business": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "VerizonBusinessGroupSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.consumer": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "VerizonConsumerGroupSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.business": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "VerizonBusinessGroupSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.w_postpaid_phone_net": {
+      "report": {
+        "kind": "table",
+        "anchor": "September\\ 30,",
+        "section": "Net\\ Additions\\ \\(‘000\\)",
+        "row": "Wireless\\ retail\\ postpaid\\ phone",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.w_postpaid_phone_churn": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "EarningsPerShareBasic"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.w_postpaid_arpa": {
+      "report": {
+        "kind": "table",
+        "anchor": "September\\ 30,",
+        "row": "Wireless\\ retail\\ postpaid\\ ARPA",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.broadband_net": {
+      "report": {
+        "kind": "table",
+        "anchor": "September\\ 30,",
+        "section": "Net\\ Additions\\ \\(‘000\\)",
+        "row": "Total\\ broadband",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.fiber_net": {
+      "report": {
+        "kind": "table",
+        "anchor": "September\\ 30,",
+        "section": "Net\\ Additions\\ \\(‘000\\)",
+        "row": "Fiber\\ broadband",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.fwa_net": {
+      "report": {
+        "kind": "table",
+        "anchor": "September\\ 30,",
+        "section": "Net\\ Additions\\ \\(‘000\\)",
+        "row": "FWA\\ broadband",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.w_postpaid_net": {
+      "report": {
+        "kind": "table",
+        "anchor": "September\\ 30,",
+        "section": "Net\\ Additions\\ \\(‘000\\)",
+        "row": "Wireless\\ retail\\ postpaid",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.w_core_prepaid_net": {
+      "report": {
+        "kind": "table",
+        "anchor": "September\\ 30,",
+        "section": "Net\\ Additions\\ \\(‘000\\)",
+        "row": "Wireless\\ retail\\ core\\ prepaid",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.w_core_prepaid_arpu": {
+      "report": {
+        "kind": "table",
+        "anchor": "September\\ 30,",
+        "row": "Wireless\\ retail\\ core\\ prepaid\\ ARPU",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "business_lines.b_equipment": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "VerizonBusinessGroupSegmentMember",
+          "ConsolidationItemsAxis": "OperatingSegmentsExcludingIntersegmentEliminationMember",
+          "ProductOrServiceAxis": "ProductMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "business_lines.b_other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsExcludingIntersegmentEliminationMember",
+          "StatementBusinessSegmentsAxis": "VerizonBusinessGroupSegmentMember",
+          "ProductOrServiceAxis": "ProductAndServiceOtherMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "consumer_lines.c_equipment": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsExcludingIntersegmentEliminationMember",
+          "ProductOrServiceAxis": "ProductMember",
+          "StatementBusinessSegmentsAxis": "VerizonConsumerGroupSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "consumer_lines.c_other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "OperatingSegmentsExcludingIntersegmentEliminationMember",
+          "StatementBusinessSegmentsAxis": "VerizonConsumerGroupSegmentMember",
+          "ProductOrServiceAxis": "ProductAndServiceOtherMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.corporate_other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "CorporateAndReconcilingItemsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.eliminations": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ConsolidationItemsAxis": "ConsolidationEliminationsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "business_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.business"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.business"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "consumer_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.consumer"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.consumer"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

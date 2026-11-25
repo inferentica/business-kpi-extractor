@@ -78,7 +78,10 @@ Each finding keeps the filed value, concept, members, accession and period. A fi
 for the same period, under any key, is a repeat and is not listed. Operating income counts only by reportable segment.
 Nothing found is added until you check it against its filing and allow it.
 
-A one-off sweep across all hand-built companies reads SEC only and writes two local files:
+A one-off sweep across all hand-built companies reads SEC only and writes two local files. Its state file is the export
+above plus `'marks', (select json_agg(m) from (select s.symbol, m.group_key, m.kpi_key, m.fiscal_year, m.fiscal_period from
+business_kpi_missing_marks m join business_kpi_specs s on s.company_id = m.company_id and s.status = 'active'
+and s.model = 'owner') m)`, so quarters you marked not reported are not listed as gaps:
 
 ```bash
 python -m kpi_extractor.owner.finder --state owner_state.json --out findings.json --sql findings.sql
