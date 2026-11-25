@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "lines": {
+    "segment_income.upstream_us": {
+      "release": {
+        "kind": "table",
+        "anchor": "\\-MORE\\-\\ \\-7\\-\\ \\-MORE\\-\\ \\-8\\-\\ \\-MORE\\-\\ \\-9\\-\\ \\-MORE\\-\\ \\-10\\-",
+        "row": "U\\.S\\.\\ Upstream",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "US",
+          "StatementBusinessSegmentsAxis": "UpstreamSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.upstream_intl": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "NonUsMember",
+          "StatementBusinessSegmentsAxis": "UpstreamSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.downstream_us": {
+      "release": {
+        "kind": "table",
+        "anchor": "\\-MORE\\-\\ \\-7\\-\\ \\-MORE\\-\\ \\-8\\-\\ \\-MORE\\-\\ \\-9\\-\\ \\-MORE\\-\\ \\-10\\-",
+        "row": "U\\.S\\.\\ Downstream",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "DownstreamSegmentMember",
+          "StatementGeographicalAxis": "US"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.downstream_intl": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementGeographicalAxis": "NonUsMember",
+          "StatementBusinessSegmentsAxis": "DownstreamSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.us_production": {
+      "report": {
+        "kind": "table",
+        "anchor": "Unit\\ \\*",
+        "row": "Net\\ Oil\\-Equivalent\\ Production",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.total_production": {
+      "report": {
+        "kind": "table",
+        "anchor": "Selected\\ Operating\\ Data\\ \\(1\\)\\ \\(2\\)",
+        "row": "Total\\ net\\ oil\\-equivalent\\ production",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.all_other_geo": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AllOtherSegmentsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.us_refinery_crude_unit_inputs": {
+      "report": {
+        "kind": "table",
+        "anchor": "Unit\\ \\*",
+        "row": "Refinery\\ Crude\\ Unit\\ Inputs",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.intl_refinery_crude_unit_inputs": {
+      "report": {
+        "kind": "table",
+        "anchor": "35\\ Table\\ of\\ Contents",
+        "row": "Refinery\\ Crude\\ Unit\\ Inputs",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.all_other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AllOtherSegmentsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "geography": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ReportableSegmentAggregationBeforeOtherOperatingSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

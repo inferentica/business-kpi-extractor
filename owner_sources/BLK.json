@@ -1,0 +1,449 @@
+{
+  "version": 1,
+  "lines": {
+    "revenue_type.base_fees": {
+      "release": {
+        "kind": "table",
+        "anchor": "2\\ CONDENSED\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME\\ AND\\ SUPPLEMENTAL\\ INFORMATION",
+        "row": "Total\\ investment\\ advisory,\\ administration\\ fees\\ and\\ securities\\ lending\\ revenue",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentAdviceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "revenue_type.perf_fees": {
+      "release": {
+        "kind": "table",
+        "anchor": "2\\ CONDENSED\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME\\ AND\\ SUPPLEMENTAL\\ INFORMATION",
+        "row": "Investment\\ advisory\\ performance\\ fees",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentPerformanceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "revenue_type.tech": {
+      "release": {
+        "kind": "table",
+        "anchor": "2\\ CONDENSED\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME\\ AND\\ SUPPLEMENTAL\\ INFORMATION",
+        "row": "Technology\\ services\\ and\\ subscription\\ revenue",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "TechnologyServicesAndSubscriptionRevenueMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "revenue_type.dist": {
+      "release": {
+        "kind": "table",
+        "anchor": "2\\ CONDENSED\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME\\ AND\\ SUPPLEMENTAL\\ INFORMATION",
+        "row": "Distribution\\ fees",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "DistributionAndShareholderServiceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "revenue_type.adv_other": {
+      "release": {
+        "kind": "table",
+        "anchor": "2\\ CONDENSED\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME\\ AND\\ SUPPLEMENTAL\\ INFORMATION",
+        "row": "Advisory\\ and\\ other\\ revenue",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ServiceOtherMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_eq_active": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentAdviceMember",
+          "InvestmentTypeAxis": "EquityActiveProductMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_eq_etf": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentAdviceMember",
+          "InvestmentTypeAxis": "EquityETFsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_fi_active": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentAdviceMember",
+          "InvestmentTypeAxis": "FixedIncomeActiveProductsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_fi_etf": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "InvestmentTypeAxis": "FixedIncomeETFsMember",
+          "ProductOrServiceAxis": "InvestmentAdviceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_active_ma": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "InvestmentTypeAxis": "MultiAssetMember",
+          "ProductOrServiceAxis": "InvestmentAdviceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_private_markets": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentAdviceMember",
+          "InvestmentTypeAxis": "AlternativeInvestmentsProductsMember",
+          "CoreAndNonCoreStatusAxis": "PrivateMarketsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_liquid_alts": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentAdviceMember",
+          "InvestmentTypeAxis": "AlternativeInvestmentsProductsMember",
+          "CoreAndNonCoreStatusAxis": "LiquidAlternativesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_non_etf_index": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InvestmentAdviceMember",
+          "InvestmentTypeAxis": "Non-ETFIndexMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_digital_etfs": {
+      "release": {
+        "kind": "table",
+        "anchor": "2\\ CONDENSED\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME\\ AND\\ SUPPLEMENTAL\\ INFORMATION",
+        "row": "Diluted\\ \\(including\\ Subco\\ Units\\)",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "InvestmentTypeAxis": "DigitalAssetsCommoditiesAndMulti-AssetETFsMember",
+          "ProductOrServiceAxis": "InvestmentAdviceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "base_fees.bf_cash": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "InvestmentTypeAxis": "CashManagementMember",
+          "ProductOrServiceAxis": "InvestmentAdviceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_aum.aum_total": {
+      "release": {
+        "kind": "table",
+        "anchor": "\\(in\\ millions\\),\\ \\(unaudited\\)",
+        "section": "Alternatives",
+        "row": "Total",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_long_term": {
+      "release": {
+        "kind": "table",
+        "anchor": "\\(in\\ millions\\),\\ \\(unaudited\\)",
+        "section": "Alternatives",
+        "row": "Long\\-term",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_cash": {
+      "release": {
+        "kind": "table",
+        "anchor": "\\(in\\ millions\\),\\ \\(unaudited\\)",
+        "section": "Alternatives",
+        "row": "Cash\\ management",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_private_markets": {
+      "release": {
+        "kind": "table",
+        "anchor": "Amounts\\ include\\ commodity\\ ETFs\\ and\\ ETPs",
+        "section": "Active",
+        "row": "Private\\ markets",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_liquid_alts": {
+      "release": {
+        "kind": "table",
+        "anchor": "Amounts\\ include\\ commodity\\ ETFs\\ and\\ ETPs",
+        "row": "Liquid\\ alternatives",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_digital": {
+      "release": {
+        "kind": "table",
+        "anchor": "\\(in\\ millions\\),\\ \\(unaudited\\)",
+        "row": "Digital\\ assets",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_cc": {
+      "release": {
+        "kind": "table",
+        "anchor": "\\(in\\ millions\\),\\ \\(unaudited\\)",
+        "row": "Currency\\ and\\ commodities",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_retail": {
+      "release": {
+        "kind": "table",
+        "anchor": "4\\ ASSETS\\ UNDER\\ MANAGEMENT",
+        "row": "Retail\\ subtotal",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_etfs": {
+      "release": {
+        "kind": "table",
+        "anchor": "4\\ ASSETS\\ UNDER\\ MANAGEMENT",
+        "row": "ETFs\\ subtotal",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_aum.aum_institutional": {
+      "release": {
+        "kind": "table",
+        "anchor": "\\(in\\ millions\\),\\ \\(unaudited\\)",
+        "row": "Institutional\\ subtotal",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    }
+  },
+  "groups": {
+    "base_fees": {
+      "release_total": {
+        "kind": "line",
+        "line": "revenue_type.base_fees"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "revenue_type.base_fees"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_aum": {
+      "known_members": [],
+      "fy_rows": false
+    },
+    "kpi_flows": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "revenue_type": {
+      "release_total": {
+        "kind": "table",
+        "anchor": "2\\ CONDENSED\\ CONSOLIDATED\\ STATEMENTS\\ OF\\ INCOME\\ AND\\ SUPPLEMENTAL\\ INFORMATION",
+        "row": "Total\\ revenue",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

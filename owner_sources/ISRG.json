@@ -1,0 +1,246 @@
+{
+  "version": 1,
+  "lines": {
+    "rev_type.ia": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "InstrumentsandAccessoriesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "rev_type.systems": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "SystemsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "rev_type.services": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ServicesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.dv_lease": {
+      "report": {
+        "kind": "table",
+        "anchor": "amounts\\ in\\ ones",
+        "row": "Total\\ da\\ Vinci\\ surgical\\ system\\ placements\\ under\\ operating\\ lease\\ arrangements",
+        "scale": 1.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "ous_lines.ous_ia": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "GeographicDistributionAxis": "GeographicDistributionForeignMember",
+          "ProductOrServiceAxis": "InstrumentsandAccessoriesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "ous_lines.ous_systems": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "GeographicDistributionAxis": "GeographicDistributionForeignMember",
+          "ProductOrServiceAxis": "SystemsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "ous_lines.ous_services": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "GeographicDistributionAxis": "GeographicDistributionForeignMember",
+          "ProductOrServiceAxis": "ServicesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "region.us": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "GeographicDistributionAxis": "GeographicDistributionDomesticMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "region.ous": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "GeographicDistributionAxis": "GeographicDistributionForeignMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "us_lines.us_ia": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "GeographicDistributionAxis": "GeographicDistributionDomesticMember",
+          "ProductOrServiceAxis": "InstrumentsandAccessoriesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "us_lines.us_systems": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "GeographicDistributionAxis": "GeographicDistributionDomesticMember",
+          "ProductOrServiceAxis": "SystemsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "us_lines.us_services": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "GeographicDistributionAxis": "GeographicDistributionDomesticMember",
+          "ProductOrServiceAxis": "ServicesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "ous_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "region.ous"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "region.ous"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "region": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "rev_type": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "us_lines": {
+      "release_total": {
+        "kind": "line",
+        "line": "region.us"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "region.us"
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

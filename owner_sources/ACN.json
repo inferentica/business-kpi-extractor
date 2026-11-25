@@ -1,0 +1,344 @@
+{
+  "version": 1,
+  "lines": {
+    "segment_income.emea": {
+      "release": {
+        "kind": "table",
+        "anchor": "11\\ Accenture\\ plc\\ Operating\\ Income\\ by\\ Geographic\\ Market",
+        "row": "EMEA",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EMEASegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.emea": {
+      "release": {
+        "kind": "table",
+        "anchor": "PercentIncrease\\ U\\.S\\.Dollars",
+        "row": "EMEA",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EMEASegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.am": {
+      "release": {
+        "kind": "table",
+        "anchor": "PercentIncrease\\ U\\.S\\.Dollars",
+        "row": "Americas",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AmericasSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "geography.ap": {
+      "release": {
+        "kind": "table",
+        "anchor": "PercentIncrease\\ U\\.S\\.Dollars",
+        "row": "Asia\\ Pacific",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AsiaPacificSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "industry.cmt": {
+      "release": {
+        "kind": "table",
+        "anchor": "10\\ Accenture\\ plc\\ Summary\\ of\\ Revenues",
+        "row": "Communications,\\ Media\\ \\&\\ Technology",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "EquitySecuritiesByIndustryAxis": "CommunicationsMediaAndTechnologyMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "industry.fs": {
+      "release": {
+        "kind": "table",
+        "anchor": "10\\ Accenture\\ plc\\ Summary\\ of\\ Revenues",
+        "row": "Financial\\ Services",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "EquitySecuritiesByIndustryAxis": "FinancialServicesSectorMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "industry.hps": {
+      "release": {
+        "kind": "table",
+        "anchor": "10\\ Accenture\\ plc\\ Summary\\ of\\ Revenues",
+        "row": "Health\\ \\&\\ Public\\ Service",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "EquitySecuritiesByIndustryAxis": "HealthAndPublicServiceMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "industry.prod": {
+      "release": {
+        "kind": "table",
+        "anchor": "10\\ Accenture\\ plc\\ Summary\\ of\\ Revenues",
+        "row": "Products",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "EquitySecuritiesByIndustryAxis": "ProductsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "industry.res": {
+      "release": {
+        "kind": "table",
+        "anchor": "10\\ Accenture\\ plc\\ Summary\\ of\\ Revenues",
+        "row": "Resources",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "EquitySecuritiesByIndustryAxis": "ResourcesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.bk_ms": {
+      "report": {
+        "kind": "table",
+        "anchor": "2\\ billion",
+        "row": "Geographic\\ Markets",
+        "scale": 1000000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.am": {
+      "release": {
+        "kind": "table",
+        "anchor": "11\\ Accenture\\ plc\\ Operating\\ Income\\ by\\ Geographic\\ Market",
+        "row": "Americas",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AmericasSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.ap": {
+      "release": {
+        "kind": "table",
+        "anchor": "11\\ Accenture\\ plc\\ Operating\\ Income\\ by\\ Geographic\\ Market",
+        "row": "Asia\\ Pacific",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AsiaPacificSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "type.cons": {
+      "release": {
+        "kind": "table",
+        "anchor": "10\\ Accenture\\ plc\\ Summary\\ of\\ Revenues",
+        "row": "Consulting",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ConsultingRevenueMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "type.ms": {
+      "release": {
+        "kind": "table",
+        "anchor": "10\\ Accenture\\ plc\\ Summary\\ of\\ Revenues",
+        "row": "Managed\\ Services",
+        "scale": 1000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ManagedServicesRevenueMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "geography": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "industry": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "type": {
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

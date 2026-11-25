@@ -47,6 +47,14 @@ The AI decides and points; code reads and proves. No number typed by an AI is ev
 Prompts share one system message and put the document first, so every task on the same document after the first
 hits DeepSeek's context cache.
 
+## Owner-built companies
+
+A company whose list the owner built by hand (`business_kpi_specs.model = 'owner'`) is never read by the steps above.
+Its run takes the owner-locked path (`kpi_extractor/owner/`): a new filing fills only its new period into the owner's
+existing lines, each read by code from the line's stored source (`business_kpi_specs.sources`: an XBRL fact or a table
+cell), with no AI at all; periods the owner decided are read-only, and what code cannot place goes to the owner's
+hand-reading queue. See `owner_sources/README.md`.
+
 ## Accuracy
 
 `evals/golden.json` holds hand-verified values (XBRL, derived Q4, TSMC's quarterly report tables, release KPIs). The

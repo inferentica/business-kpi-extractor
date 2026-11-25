@@ -12,15 +12,21 @@ from __future__ import annotations
 
 import os
 import re
+import string
 import threading
 import time
+from collections import Counter
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from .sources.archive import Archive
 from .ops.control import ControlError
-from .documents.document import Document
+from .documents.document import Document, parse_document
+from .owner.finder import GapFinder, run_findings
+from .owner.guard import NoAi
+from .owner.refresh import OwnerRefresh, is_owner_spec
+from .owner.resolve import facts_of
 from .domain.fiscal import with_first_year
 from .sources import source as filing_source
 from .sources.base import FilingRef, FilingSource
@@ -82,6 +88,10 @@ class SymbolResult:
     # Values read from earnings documents that are not rejected, and how many of them are verified (shown to users).
     release_values: int = 0
     release_verified: int = 0
+    # An owner-built company (owner/refresh.py): read by code from its lines' sources, and what it left to read by hand.
+    owner_locked: bool = False
+    hand_reads: int = 0
+    gap_findings: int = 0
     # KPIs the list cap took off (operating metrics only), so a lost metric is never silent.
     trimmed_kpis: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -246,6 +256,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         listed = listed + _before_first(listed, [ref for filer, archive in earlier for ref in self.source.periodic_reports(
             filer, self.reports_since - timedelta(days=300), known_urls, archive)])
         reports = sorted(with_first_year(listed, self.reports_since, self.profile.fiscal_year_end), key=lambda ref: ref.filed)
+        if is_owner_spec(state.get("spec")):
+            return self._run_owner(state, company, earlier, known_urls, reports)
         pending = [ref for ref in reports if self.force or self._pending(ref)]
         for ref in reversed(reports):
             if ref not in pending and not self._archive_of(ref).has(_folder(ref), "xbrl.json"):
@@ -360,6 +372,70 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.log(f"{self.symbol}: filing archive {self.archive.reads} read ({self.archive.submissions} full submissions "
                  f"and {self.archive.lists} filing list instead of SEC), {self.archive.writes} added")
         return self.result
+
+    def _run_owner(self, state: dict, company, earlier: list, known_urls: dict, reports: list[FilingRef]) -> SymbolResult:
+        """An owner-built company: a new filing fills only its new period into the owner's lines, by code from each line's
+        stored source (owner/refresh.py). No KPI list, no AI, no re-read: no other step of the run touches it."""
+        self.control = self.store.control = NoAi(self.control)
+        self.result.owner_locked = True
+        for ref in reports:
+            # A report's period is known before its XBRL is read: the filing's own period of report.
+            if ref.period_end is None and (reported := getattr(ref.filing, "period_of_report", None)):
+                ref.period_end = date.fromisoformat(str(reported)[:10])
+        # Only 8-K Item 2.02 releases: telling any other furnished filing apart from a release takes the AI.
+        releases = [ref for ref in self._earnings_releases(company, earlier, self.since - timedelta(days=300), [], known_urls)
+                    if ref.confirmed]
+        rejected = {(row["group_key"], row["kpi_key"], row["fiscal_year"], row["fiscal_period"])
+                    for row in state.get("ownerRejected") or []}
+        refresh = OwnerRefresh(self.symbol, state["spec"], state.get("values") or [], self.filings, rejected=rejected,
+                               facts=self._owner_facts, document=self._owner_document)
+        fresh = [ref for ref in reports if ref.period_end and refresh._pending(ref)]
+        plan = refresh.plan(reports, releases)
+        for line in plan.log:
+            self.log(line)
+        self.store.write(plan.rows)
+        self.store.file([FilingReading(outcome.ref, outcome.status, period_end=outcome.period_end,
+                                       fiscal_year=outcome.fiscal_year, fiscal_period=outcome.fiscal_period,
+                                       spec_version=state["spec"].get("version"), notes=outcome.notes)
+                         for outcome in plan.filings], Counter(row["source_accession"] for row in plan.rows))
+        self.store.hand_reads([entry.record() for entry in plan.hand])
+        self.result.hand_reads = len(plan.hand)
+        # The finder: what the new reports give beyond the owner tables, for the owner to check. It writes no figure.
+        findings = run_findings(GapFinder(self.symbol, state["spec"], state.get("values") or []), reports, fresh,
+                                refresh._facts_of)
+        self.store.gap_findings([finding.record() for finding in findings])
+        self.result.gap_findings = len(findings)
+        self.result.needs_review = sum(1 for row in plan.rows if row["validation_status"] == "needs_review")
+        self.result.served_changes = self.store.served_changes()
+        return self.result
+
+    def _owner_facts(self, ref: FilingRef):
+        try:
+            xbrl = self._xbrl(ref)
+        except Exception as error:  # noqa: BLE001 - an unreadable report gives no facts; its lines are flagged
+            self.log(f"{self.symbol}: {ref.form} {ref.accession} XBRL not read ({type(error).__name__}: {error})"[:300])
+            return None
+        return None if xbrl is None else facts_of(xbrl.facts.to_dataframe())
+
+    def _owner_document(self, ref: FilingRef) -> Document | None:
+        """A release's exhibits, or a report's own document, parsed as they are: no OCR of picture pages (that is AI)."""
+        try:
+            if ref.role != "earnings_release":
+                return parse_document(self.source.report_html(ref, self._archive_of(ref)), ref.source_url)
+            combined = None
+            for index, exhibit in enumerate(ref.exhibits[:6]):
+                raw = self.source.exhibit_html(exhibit)
+                if not raw:
+                    continue
+                part = parse_document(raw, exhibit.url, prefix=f"{string.ascii_uppercase[index]}_")
+                if combined is None:
+                    combined = part
+                else:
+                    combined.extend(part)
+            return combined
+        except Exception as error:  # noqa: BLE001 - an unreadable document places nothing; its lines are flagged
+            self.log(f"{self.symbol}: {ref.form} {ref.accession} not read ({type(error).__name__}: {error})"[:300])
+            return None
 
     def _cross_period(self, releases, spec) -> None:
         """The steps across periods, while the store holds their writes in memory."""

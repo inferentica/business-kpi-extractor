@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "lines": {
+    "segments.alaska": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AlaskaSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.l48": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "LowerFortyEightMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.canada": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "CanadaOperatingSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.emena": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EuropeMiddleEastAndNorthAfricaSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.ap": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AsiaPacificOperatingSegmentMember"
+        },
+        "ignore": [
+          "OperatingSegmentsMember"
+        ],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.alaska": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AlaskaSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.l48": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "LowerFortyEightMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.canada": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "CanadaOperatingSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.emena": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EuropeMiddleEastAndNorthAfricaSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.ap": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "NetIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "AsiaPacificOperatingSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.gas": {
+      "report": {
+        "kind": "table",
+        "anchor": "Consolidated\\ Results\\ Summary\\ Operating\\ Statistics",
+        "row": "Total\\ natural\\ gas",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "segments.corporate": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "CorporateSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": false
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

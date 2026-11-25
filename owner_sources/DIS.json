@@ -1,0 +1,445 @@
+{
+  "version": 1,
+  "lines": {
+    "ent_types.en_sub_aff": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EntertainmentSegmentMember",
+          "ProductOrServiceAxis": "SubscriptionAndAffiliateFeesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "ent_types.en_advertising": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "AdvertisingMember",
+          "StatementBusinessSegmentsAxis": "EntertainmentSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "ent_types.en_content": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EntertainmentSegmentMember",
+          "ProductOrServiceAxis": "ContentSalesMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "exp_business.consumer_products": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "SellingGeneralAndAdministrativeExpense"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ExperiencesSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "exp_types.admissions": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "AdmissionMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "exp_types.resorts": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "ResortandvacationsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "exp_types.parks_licensing": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "OtherRevenueMember",
+          "StatementBusinessSegmentsAxis": "ExperiencesSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.pk_global_guests": {
+      "report": {
+        "kind": "table",
+        "anchor": "NFL\\ RedZone\\ through\\ 2033",
+        "row": "Foreign\\ exchange",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "segment_income.entertainment": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EntertainmentSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.sports": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "SportsSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.experiences": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "OperatingIncomeLoss"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ExperiencesSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.entertainment": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "EntertainmentSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.sports": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "SportsSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.experiences": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "ExperiencesSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.eliminations": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "ProgrammingAndProductionCosts"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "SegmentEliminationsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "sports_types.sp_sub_aff": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "SubscriptionAndAffiliateFeesMember",
+          "StatementBusinessSegmentsAxis": "SportsSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "sports_types.sp_advertising": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "AdvertisingMember",
+          "StatementBusinessSegmentsAxis": "SportsSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "sports_types.sp_other": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "OtherRevenueMember",
+          "StatementBusinessSegmentsAxis": "SportsSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.pk_dom_att": {
+      "report": {
+        "kind": "table",
+        "anchor": "CONSOLIDATED\\ FINANCIAL\\ STATEMENTS",
+        "row": "Interest\\ rate",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.pk_int_att": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "AmortizationofIntangibleAssetsHeldbyEquityInvestees"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.pk_dom_pc": {
+      "report": {
+        "kind": "table",
+        "anchor": "CONSOLIDATED\\ FINANCIAL\\ STATEMENTS",
+        "row": "Interest\\ rate",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.pk_int_pc": {
+      "report": {
+        "kind": "table",
+        "anchor": "CONSOLIDATED\\ FINANCIAL\\ STATEMENTS",
+        "row": "Interest\\ rate",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.pk_dom_occ": {
+      "report": {
+        "kind": "table",
+        "anchor": "CONSOLIDATED\\ FINANCIAL\\ STATEMENTS",
+        "row": "Interest\\ rate",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.pk_int_occ": {
+      "report": {
+        "kind": "table",
+        "anchor": "CONSOLIDATED\\ FINANCIAL\\ STATEMENTS",
+        "row": "Interest\\ rate",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.pk_dom_prgs_chg": {
+      "report": {
+        "kind": "table",
+        "anchor": "CONSOLIDATED\\ FINANCIAL\\ STATEMENTS",
+        "row": "Interest\\ rate",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.pk_int_prgs_chg": {
+      "report": {
+        "kind": "table",
+        "anchor": "CONSOLIDATED\\ FINANCIAL\\ STATEMENTS",
+        "row": "Interest\\ rate",
+        "scale": 1000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    }
+  },
+  "groups": {
+    "ent_types": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.entertainment"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.entertainment"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "exp_business": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.experiences"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.experiences"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "exp_business_oi": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "exp_types": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.experiences"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.experiences"
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "Revenues"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "sports_types": {
+      "release_total": {
+        "kind": "line",
+        "line": "segments.sports"
+      },
+      "report_total": {
+        "kind": "line",
+        "line": "segments.sports"
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}

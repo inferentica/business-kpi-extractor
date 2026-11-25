@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "lines": {
+    "products.combustible": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "CombustibleTobaccoProductsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.us": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "U.S.SegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.intl_combustibles": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "InternationalCombustiblesSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segments.intl_smoke_free": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "InternationalSmokeFreeSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.intl_combustibles": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "GrossProfit"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "InternationalCombustiblesSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.intl_smoke_free": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "GrossProfit"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "InternationalSmokeFreeSegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "segment_income.us": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "GrossProfit"
+        ],
+        "members": {
+          "StatementBusinessSegmentsAxis": "U.S.SegmentMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    },
+    "kpi_operating.oral_sfp": {
+      "report": {
+        "kind": "table",
+        "anchor": "Shipment\\ Volume\\ \\(equivalent\\ units\\ in\\ billions\\)",
+        "row": "Oral\\ SFP",
+        "scale": 1000000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.evapor": {
+      "report": {
+        "kind": "table",
+        "anchor": "Shipment\\ Volume\\ \\(equivalent\\ units\\ in\\ billions\\)",
+        "row": "E\\-vapor",
+        "scale": 1000000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "kpi_operating.cigarettes": {
+      "report": {
+        "kind": "table",
+        "anchor": "Shipment\\ Volume\\ \\(equivalent\\ units\\ in\\ billions\\)",
+        "row": "Cigarettes",
+        "scale": 1000000000.0,
+        "sign": 1,
+        "instant": false
+      },
+      "balance": true
+    },
+    "products.smoke_free": {
+      "report": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {
+          "ProductOrServiceAxis": "SmokeFreeProductsMember"
+        },
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "balance": false
+    }
+  },
+  "groups": {
+    "kpi_operating": {
+      "known_members": [],
+      "fy_rows": false
+    },
+    "products": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segment_income": {
+      "known_members": [],
+      "fy_rows": true
+    },
+    "segments": {
+      "report_total": {
+        "kind": "xbrl",
+        "concepts": [
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
+        "members": {},
+        "ignore": [],
+        "sign": 1,
+        "instant": false
+      },
+      "known_members": [],
+      "fy_rows": true
+    }
+  },
+  "derived_from": "derived 2026-11-25 by kpi_extractor.owner.backfill from the owner's stored figures and their filings"
+}
