@@ -1,0 +1,689 @@
+{
+"entity": {
+"document_period_end_date": "2026-07-31",
+"fiscal_year": "2027",
+"fiscal_period": "Q2"
+},
+"facts": [
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 41112000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "us-gaap:ProductMember",
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 23935000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "us-gaap:ProductMember",
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 79217000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "us-gaap:ProductMember",
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 41534000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "us-gaap:ProductMember",
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 5859000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "us-gaap:ServiceMember",
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 5841000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "us-gaap:ServiceMember",
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 11596000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "us-gaap:ServiceMember",
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 11620000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "us-gaap:ServiceMember",
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 46816000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 29303000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 90434000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 52129000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 155000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:CorporateNonSegmentMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 473000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:CorporateNonSegmentMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 379000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:CorporateNonSegmentMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 1025000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:CorporateNonSegmentMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 46971000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 29776000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 90813000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 53154000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 4781000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 1470000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 7836000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 2468000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 1142000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 803000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 2312000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 1456000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 5923000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 2273000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 10148000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 3924000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 6000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:CorporateNonSegmentMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 11000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:CorporateNonSegmentMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 16000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:CorporateNonSegmentMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 26000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:CorporateNonSegmentMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 5385000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 1773000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 9041000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:OperatingIncomeLoss",
+"numeric_value": 2938000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": null,
+"dim_us-gaap_StatementBusinessSegmentsAxis": null
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 16401000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:AIOptimizedServersAndNetworkingMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 8208000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:AIOptimizedServersAndNetworkingMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 32533000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:AIOptimizedServersAndNetworkingMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 10090000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:AIOptimizedServersAndNetworkingMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 10531000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:TraditionalServersAndNetworkingMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 4736000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:TraditionalServersAndNetworkingMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 19074000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:TraditionalServersAndNetworkingMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 9175000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:TraditionalServersAndNetworkingMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 4850000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:StorageMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 3856000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:StorageMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 9184000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:StorageMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 7852000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:StorageMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 31782000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 16800000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 60791000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 27117000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:InfrastructureSolutionsGroupMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 13192000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:CommercialMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 10781000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:CommercialMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 26212000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:CommercialMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 21827000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:CommercialMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 1842000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:ConsumerMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 1722000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:ConsumerMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 3431000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": "dell:ConsumerMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 3185000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": "dell:ConsumerMember",
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 15034000000.0,
+"period_type": "duration",
+"period_start": "2026-05-02",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 12503000000.0,
+"period_type": "duration",
+"period_start": "2025-05-03",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 29643000000.0,
+"period_type": "duration",
+"period_start": "2026-01-31",
+"period_end": "2026-07-31",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+},
+{
+"concept": "us-gaap:Revenues",
+"numeric_value": 25012000000.0,
+"period_type": "duration",
+"period_start": "2025-02-01",
+"period_end": "2025-08-01",
+"dim_srt_ProductOrServiceAxis": null,
+"dim_srt_ConsolidationItemsAxis": "us-gaap:OperatingSegmentsMember",
+"dim_us-gaap_StatementBusinessSegmentsAxis": "dell:ClientSolutionsMember"
+}
+]
+}

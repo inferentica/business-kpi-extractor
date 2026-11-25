@@ -156,14 +156,7 @@ class CompanyStore:
                 and value["group_key"].removeprefix(AI_GROUP_PREFIX) not in (unread_groups or set())
             ]
         records = cell_copies(records, self.windows)
-        filing = {
-            "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(), "document_role": ref.role,
-            "period_end": reading.period_end.isoformat() if reading.period_end else None, "fiscal_year": reading.fiscal_year,
-            "fiscal_period": reading.fiscal_period, "status": reading.status, "spec_version": reading.spec_version,
-            "value_count": sum(1 for record in records if record["validation_status"] != "rejected"), "attempts": min(_STORED_ATTEMPTS, previous.get("attempts", 0) + 1) if previous else 1,
-            "notes": [note[:300] for note in reading.notes][:30], "source_url": ref.source_url,
-            "accounting_standard": reading.accounting_standard, "currency": reading.currency, "language": self.language,
-        }
+        filing = self._filing_record(reading, sum(1 for record in records if record["validation_status"] != "rejected"))
         self._send(filings=[filing], values=records)
         self._filings[ref.accession] = filing
         if reading.unreported is not None:
@@ -173,6 +166,32 @@ class CompanyStore:
         self.result.filings += 1
         self.result.needs_review += sum(1 for record in records if record["validation_status"] == "needs_review")
         self.log(f"{self.symbol}: {ref.form} {ref.filed} {reading.status} ({filing['value_count']} values)")
+
+    def _filing_record(self, reading: FilingReading, value_count: int) -> dict:
+        ref, previous = reading.ref, self._filings.get(reading.ref.accession)
+        return {
+            "accession": ref.accession, "form": ref.form, "filed_at": ref.filed.isoformat(), "document_role": ref.role,
+            "period_end": reading.period_end.isoformat() if reading.period_end else None, "fiscal_year": reading.fiscal_year,
+            "fiscal_period": reading.fiscal_period, "status": reading.status, "spec_version": reading.spec_version,
+            "value_count": value_count, "attempts": min(_STORED_ATTEMPTS, previous.get("attempts", 0) + 1) if previous else 1,
+            "notes": [note[:300] for note in reading.notes][:30], "source_url": ref.source_url,
+            "accounting_standard": reading.accounting_standard, "currency": reading.currency, "language": self.language,
+        }
+
+    def file(self, readings: list[FilingReading], value_counts: dict[str, int] | None = None) -> None:
+        """Filings recorded as read whose rows went out through write() (an owner-built company's, owner/refresh.py). Unlike
+        record(), nothing the filing gave before is withdrawn: an owner-built period is never changed by a reading."""
+        filings = [self._filing_record(reading, (value_counts or {}).get(reading.ref.accession, 0)) for reading in readings]
+        for start in range(0, len(filings), 40):
+            self._send(filings=filings[start:start + 40])
+        for filing in filings:
+            self._filings[filing["accession"]] = filing
+        self.result.filings += len(filings)
+
+    def hand_reads(self, entries: list[dict]) -> None:
+        """The owner's "new quarter to read by hand" queue (business_kpi_hand_reads): lines no code reader could place."""
+        for start in range(0, len(entries), 200):
+            self.control.call("store", symbol=self.symbol, filings=[], values=[], handReads=entries[start:start + 200])
 
     def _still_stated(self, value, read_again: set[tuple]) -> bool:
         """A verified figure the new reading of its filing did not produce, kept: its filing states it where it was read,
