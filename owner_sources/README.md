@@ -59,3 +59,29 @@ select json_build_object(
 ```
 
 A hand fix to an owner list's groups or names sets `owner_edited_at = now()` in the same statement, or the guard refuses it.
+
+## The gap finder
+
+The refresh's second job finds; it never writes a figure (`kpi_extractor/owner/finder.py`, no AI). For each new 10-Q or
+10-K of a hand-built company it compares the filing's XBRL with the stored owner tables and lists, in
+`business_kpi_gap_findings` (not in the figures, not in Review):
+
+| kind | meaning |
+| --- | --- |
+| untracked | an axis's figures no owner table carries (Dell's Products/Services, its revenue by country) |
+| missing_line | a member of an owner table's own axes the table has no line for |
+| missing_quarter | a quarter missing inside an owner line's stored run (the window is never extended before its first quarter) |
+| differs | a filed figure for a stored line and period that is not the stored one, with both |
+| q4_basis | a 10-K's lines and its Q3 report's nine months differ, so Q4 = FY less nine months would mix bases |
+
+Each finding keeps the filed value, concept, members, accession and period. A filed figure equal to one already stored
+for the same period, under any key, is a repeat and is not listed. Operating income counts only by reportable segment.
+Nothing found is added until you check it against its filing and allow it.
+
+A one-off sweep across all hand-built companies reads SEC only and writes two local files:
+
+```bash
+python -m kpi_extractor.owner.finder --state owner_state.json --out findings.json --sql findings.sql
+```
+
+`findings.sql` inserts the findings into `business_kpi_gap_findings`; run it only with your Allow.

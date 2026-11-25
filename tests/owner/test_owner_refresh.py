@@ -135,6 +135,9 @@ def test_the_pipeline_runs_an_owner_company_with_no_ai_and_changes_no_earlier_ro
         assert dict(pipeline.store.values[key]) == row  # every earlier row exactly as it was
     queued = [h for operation, payload in control.calls if operation == "store" for h in payload.get("handReads", [])]
     assert [(h["kpi_key"], h["kind"], h["fiscal_period"]) for h in queued] == [("backlog", "hand", "Q3")]
+    # The finder ran on the new report and found nothing beyond the owner's two segments; it sent no figure.
+    assert result.gap_findings == 0
+    assert not any(payload.get("gapFindings") and payload.get("values") for _, payload in control.calls)
 
 
 def test_a_new_segment_is_a_basis_change_flagged_for_the_owner_not_built():

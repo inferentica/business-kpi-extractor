@@ -193,6 +193,12 @@ class CompanyStore:
         for start in range(0, len(entries), 200):
             self.control.call("store", symbol=self.symbol, filings=[], values=[], handReads=entries[start:start + 200])
 
+    def gap_findings(self, entries: list[dict]) -> None:
+        """What an owner-built company's new reports give beyond its owner tables (owner/finder.py), for the owner to
+        check: kept apart in business_kpi_gap_findings, never in the figures or Review."""
+        for start in range(0, len(entries), 200):
+            self.control.call("store", symbol=self.symbol, filings=[], values=[], gapFindings=entries[start:start + 200])
+
     def _still_stated(self, value, read_again: set[tuple]) -> bool:
         """A verified figure the new reading of its filing did not produce, kept: its filing states it where it was read,
         the new reading put that figure under no other key, and its KPI is still listed. A later reading missing a figure

@@ -23,6 +23,7 @@ from datetime import date, timedelta
 from .sources.archive import Archive
 from .ops.control import ControlError
 from .documents.document import Document, parse_document
+from .owner.finder import GapFinder, run_findings
 from .owner.guard import NoAi
 from .owner.refresh import OwnerRefresh, is_owner_spec
 from .owner.resolve import facts_of
@@ -90,6 +91,7 @@ class SymbolResult:
     # An owner-built company (owner/refresh.py): read by code from its lines' sources, and what it left to read by hand.
     owner_locked: bool = False
     hand_reads: int = 0
+    gap_findings: int = 0
     # KPIs the list cap took off (operating metrics only), so a lost metric is never silent.
     trimmed_kpis: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -385,8 +387,10 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
                     if ref.confirmed]
         rejected = {(row["group_key"], row["kpi_key"], row["fiscal_year"], row["fiscal_period"])
                     for row in state.get("ownerRejected") or []}
-        plan = OwnerRefresh(self.symbol, state["spec"], state.get("values") or [], self.filings, rejected=rejected,
-                            facts=self._owner_facts, document=self._owner_document).plan(reports, releases)
+        refresh = OwnerRefresh(self.symbol, state["spec"], state.get("values") or [], self.filings, rejected=rejected,
+                               facts=self._owner_facts, document=self._owner_document)
+        fresh = [ref for ref in reports if ref.period_end and refresh._pending(ref)]
+        plan = refresh.plan(reports, releases)
         for line in plan.log:
             self.log(line)
         self.store.write(plan.rows)
@@ -396,6 +400,11 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
                          for outcome in plan.filings], Counter(row["source_accession"] for row in plan.rows))
         self.store.hand_reads([entry.record() for entry in plan.hand])
         self.result.hand_reads = len(plan.hand)
+        # The finder: what the new reports give beyond the owner tables, for the owner to check. It writes no figure.
+        findings = run_findings(GapFinder(self.symbol, state["spec"], state.get("values") or []), reports, fresh,
+                                refresh._facts_of)
+        self.store.gap_findings([finding.record() for finding in findings])
+        self.result.gap_findings = len(findings)
         self.result.needs_review = sum(1 for row in plan.rows if row["validation_status"] == "needs_review")
         self.result.served_changes = self.store.served_changes()
         return self.result
