@@ -265,6 +265,15 @@ def periodic_reports(company: Company, since: date, known_urls: dict[str, str] |
     return refs
 
 
+def interim_reports(company: Company, since: date, known_urls: dict[str, str] | None = None, archive=None) -> list[FilingRef]:
+    """A foreign filer's quarterly financial statements furnished on a 6-K of their own, with XBRL (Arm's): read like a
+    10-Q by owner-built companies only (owner/foreign.py tells them apart by code)."""
+    from ..owner.foreign import interim_ref, is_interim_report
+    filings = _with_retries(lambda: company.get_filings(form="6-K", filing_date=f"{since.isoformat()}:"))
+    return [interim_ref(filing, _document_url(filing, known_urls, archive))
+            for filing in sorted(filings, key=lambda item: item.filing_date) if is_interim_report(filing)]
+
+
 def report_period_ends(company: Company, since: date) -> tuple[date, ...]:
     """The period each 10-Q and 10-K covers, from the filing index (no document is read): the company's own quarter
     ends, which a week-based calendar puts weeks before month end. Empty for a foreign filer or when the index says none."""
@@ -477,6 +486,10 @@ class SecSource:
     def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,
                          archive=None) -> list[FilingRef]:
         return periodic_reports(company.handle, since, known_urls, archive)
+
+    def interim_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,
+                        archive=None) -> list[FilingRef]:
+        return interim_reports(company.handle, since, known_urls, archive) if company.profile.foreign else []
 
     def earnings_releases(self, company: SourceCompany, since: date, archive=None, passed: list[FilingRef] | None = None,
                           known_urls: dict[str, str] | None = None) -> list[FilingRef]:

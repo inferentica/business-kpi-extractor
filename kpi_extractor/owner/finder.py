@@ -248,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
             for report in reports:
                 nine = None
                 if report.form.upper().startswith("10-K"):
-                    q3 = next((r for r in reports if r.form.upper() == "10-Q" and r.period_end
+                    q3 = next((r for r in reports if r.form.upper() in ("10-Q", "6-K") and r.period_end
                                and 80 <= (report.period_end - r.period_end).days <= 100), None)
                     nine = filings.facts(q3) if q3 else None
                 found += finder.find(report, filings.facts(report), nine)
