@@ -112,6 +112,9 @@ def test_the_pipeline_runs_an_owner_company_with_no_ai_and_changes_no_earlier_ro
         def earnings_releases(self, *args, **kwargs):
             return []
 
+        def interim_reports(self, *args, **kwargs):
+            return []
+
         def tagged_facts(self, ref, archive=None):
             return SimpleNamespace(facts=SimpleNamespace(to_dataframe=lambda: pd.DataFrame([
                 _fact(700.0, "2026-07-01", "2026-09-30", seg="fake:AlphaMember"),

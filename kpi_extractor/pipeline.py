@@ -25,6 +25,7 @@ from .ops.control import ControlError
 from .documents.document import Document, parse_document
 from .owner.finder import GapFinder, run_findings
 from .owner.guard import NoAi
+from .owner.foreign import plain_text, results_releases
 from .owner.refresh import OwnerRefresh, is_owner_spec
 from .owner.resolve import facts_of
 from .domain.fiscal import with_first_year
@@ -382,9 +383,13 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             # A report's period is known before its XBRL is read: the filing's own period of report.
             if ref.period_end is None and (reported := getattr(ref.filing, "period_of_report", None)):
                 ref.period_end = date.fromisoformat(str(reported)[:10])
-        # Only 8-K Item 2.02 releases: telling any other furnished filing apart from a release takes the AI.
-        releases = [ref for ref in self._earnings_releases(company, earlier, self.since - timedelta(days=300), [], known_urls)
-                    if ref.confirmed]
+        # A foreign filer's interim 6-K reports, then its results 6-Ks, both told apart by code (owner/foreign.py); any
+        # other furnished filing would take the AI, so only 8-K Item 2.02 releases besides.
+        reports = sorted(reports + self.source.interim_reports(company, self.reports_since - timedelta(days=300),
+                                                               known_urls, self.archive), key=lambda ref: ref.filed)
+        listed = self._earnings_releases(company, earlier, self.since - timedelta(days=300), [], known_urls)
+        releases = sorted([ref for ref in listed if ref.confirmed] + results_releases(
+            listed, reports, self._owner_facts, self._owner_text), key=lambda ref: ref.filed)
         rejected = {(row["group_key"], row["kpi_key"], row["fiscal_year"], row["fiscal_period"])
                     for row in state.get("ownerRejected") or []}
         refresh = OwnerRefresh(self.symbol, state["spec"], state.get("values") or [], self.filings, rejected=rejected,
@@ -416,6 +421,13 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             self.log(f"{self.symbol}: {ref.form} {ref.accession} XBRL not read ({type(error).__name__}: {error})"[:300])
             return None
         return None if xbrl is None else facts_of(xbrl.facts.to_dataframe())
+
+    def _owner_text(self, ref: FilingRef) -> str:
+        try:
+            return " ".join(plain_text(raw) for exhibit in ref.exhibits[:6] if (raw := self.source.exhibit_html(exhibit)))
+        except Exception as error:  # noqa: BLE001 - an unreadable 6-K is not confirmed as a release
+            self.log(f"{self.symbol}: {ref.form} {ref.accession} not read ({type(error).__name__})"[:300])
+            return ""
 
     def _owner_document(self, ref: FilingRef) -> Document | None:
         """A release's exhibits, or a report's own document, parsed as they are: no OCR of picture pages (that is AI)."""

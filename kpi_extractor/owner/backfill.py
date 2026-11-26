@@ -19,6 +19,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from ..documents.document import parse_document
+from .foreign import plain_text, results_releases
 from .derive import CHECKED, Evidence, LineResult, derive_line, derive_total, sources_from
 from .refresh import OwnerRefresh, _day, differs
 from .resolve import facts_of
@@ -36,14 +37,17 @@ class Filings:
         configure_identity()
         self.source, self.log = source(), log
         self.company = self.source.open_company(symbol)
-        self.reports = self.source.periodic_reports(self.company, since)
+        self._facts: dict = {}
+        self._documents: dict = {}
+        self.reports = sorted(self.source.periodic_reports(self.company, since)
+                              + self.source.interim_reports(self.company, since), key=lambda ref: ref.filed)
         for ref in self.reports:
             reported = getattr(ref.filing, "period_of_report", None)
             if ref.period_end is None and reported:
                 ref.period_end = _day(reported)
-        self.releases = [ref for ref in self.source.earnings_releases(self.company, since) if ref.confirmed]
-        self._facts: dict = {}
-        self._documents: dict = {}
+        listed = self.source.earnings_releases(self.company, since)
+        self.releases = sorted([ref for ref in listed if ref.confirmed] + results_releases(
+            listed, self.reports, self.facts, self.text), key=lambda ref: ref.filed)
 
     def by_accession(self, accession: str):
         return next((ref for ref in [*self.reports, *self.releases] if ref.accession == accession), None)
@@ -81,6 +85,14 @@ class Filings:
                 document = None
             self._documents[ref.accession] = document
         return self._documents[ref.accession]
+
+    def text(self, ref) -> str:
+        """A release's exhibits as plain text, for telling a foreign filer's results 6-K apart (owner/foreign.py)."""
+        try:
+            return " ".join(plain_text(raw) for exhibit in ref.exhibits[:6] if (raw := self.source.exhibit_html(exhibit)))
+        except Exception as error:  # noqa: BLE001
+            self.log(f"  {ref.accession}: not read ({type(error).__name__})")
+            return ""
 
     def evidence(self, row: dict, ref) -> Evidence:
         return Evidence(row, ref, lambda: self.facts(ref), lambda: self.document(ref))

@@ -59,6 +59,9 @@ class FilingSource(Protocol):
     def periodic_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,
                          archive=None) -> list[FilingRef]: ...
 
+    def interim_reports(self, company: SourceCompany, since: date, known_urls: dict[str, str] | None = None,
+                        archive=None) -> list[FilingRef]: ...
+
     def earnings_releases(self, company: SourceCompany, since: date, archive=None, passed: list[FilingRef] | None = None,
                           known_urls: dict[str, str] | None = None) -> list[FilingRef]: ...
 

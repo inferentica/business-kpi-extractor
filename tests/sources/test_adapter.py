@@ -41,6 +41,10 @@ class FakeSource:
         self.asked.append("periodic_reports")
         return []
 
+    def interim_reports(self, company, since, known_urls=None, archive=None):
+        self.asked.append("interim_reports")
+        return []
+
     def earnings_releases(self, company, since, archive=None, passed=None, known_urls=None):
         self.asked.append("earnings_releases")
         return []
@@ -70,7 +74,7 @@ class FakeSource:
 
 def test_sec_implements_every_method_a_source_needs():
     wanted = {name for name, member in inspect.getmembers(FilingSource) if inspect.isfunction(member) and not name.startswith("_")}
-    assert wanted == {"open_company", "open_filer", "periodic_reports", "earnings_releases", "prospectus", "report_html", "exhibit_html",
+    assert wanted == {"open_company", "open_filer", "periodic_reports", "interim_reports", "earnings_releases", "prospectus", "report_html", "exhibit_html",
                       "is_own_document", "classification_excerpt", "tagged_facts", "archive_tagged_facts"}
     for name in wanted:
         assert callable(getattr(source("sec"), name)), name
