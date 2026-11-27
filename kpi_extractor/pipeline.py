@@ -25,7 +25,7 @@ from .ops.control import ControlError
 from .documents.document import Document, parse_document
 from .owner.finder import GapFinder, run_findings
 from .owner.guard import NoAi
-from .owner.foreign import plain_text, results_releases
+from .owner.foreign import interim_reviews, plain_text, results_releases
 from .owner.refresh import OwnerRefresh, is_owner_spec
 from .owner.resolve import facts_of
 from .domain.fiscal import with_first_year
@@ -122,6 +122,7 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         self.reread = reread or ("untraced" if retrace else None)
         # Where the company's filings come from (SEC EDGAR); every listing, download and XBRL read goes through it.
         self.source = source or filing_source()
+        self._owner_text_cache: dict[str, list[str]] = {}
         self.symbol = symbol
         self.force = force
         self.quarters = quarters
@@ -388,6 +389,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         reports = sorted(reports + self.source.interim_reports(company, self.reports_since - timedelta(days=300),
                                                                known_urls, self.archive), key=lambda ref: ref.filed)
         listed = self._earnings_releases(company, earlier, self.since - timedelta(days=300), [], known_urls)
+        # Interim reports without XBRL (Nebius's operating and financial review): their quarter's report, not a release.
+        reports = sorted(reports + interim_reviews(listed, reports, self._owner_texts), key=lambda ref: ref.filed)
         releases = sorted([ref for ref in listed if ref.confirmed] + results_releases(
             listed, reports, self._owner_facts, self._owner_text), key=lambda ref: ref.filed)
         rejected = {(row["group_key"], row["kpi_key"], row["fiscal_year"], row["fiscal_period"])
@@ -415,6 +418,8 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
         return self.result
 
     def _owner_facts(self, ref: FilingRef):
+        if ref.exhibits and not getattr(ref.filing, "is_xbrl", True):
+            return None  # an interim 6-K report without XBRL (Nebius's review): read from its tables only
         try:
             xbrl = self._xbrl(ref)
         except Exception as error:  # noqa: BLE001 - an unreadable report gives no facts; its lines are flagged
@@ -422,17 +427,26 @@ class SymbolPipeline(FilingLoading, ReportReading, StatementReading, ChartReadin
             return None
         return None if xbrl is None else facts_of(xbrl.facts.to_dataframe())
 
+    def _owner_texts(self, ref: FilingRef) -> list[str]:
+        """A 6-K's exhibits as plain text, each once per run."""
+        cache = self._owner_text_cache
+        if ref.accession not in cache:
+            try:
+                cache[ref.accession] = [plain_text(raw) for exhibit in ref.exhibits[:6]
+                                        if (raw := self.source.exhibit_html(exhibit))]
+            except Exception as error:  # noqa: BLE001 - an unreadable 6-K is neither a report nor a release
+                self.log(f"{self.symbol}: {ref.form} {ref.accession} not read ({type(error).__name__})"[:300])
+                cache[ref.accession] = []
+        return cache[ref.accession]
+
     def _owner_text(self, ref: FilingRef) -> str:
-        try:
-            return " ".join(plain_text(raw) for exhibit in ref.exhibits[:6] if (raw := self.source.exhibit_html(exhibit)))
-        except Exception as error:  # noqa: BLE001 - an unreadable 6-K is not confirmed as a release
-            self.log(f"{self.symbol}: {ref.form} {ref.accession} not read ({type(error).__name__})"[:300])
-            return ""
+        return " ".join(self._owner_texts(ref))
 
     def _owner_document(self, ref: FilingRef) -> Document | None:
-        """A release's exhibits, or a report's own document, parsed as they are: no OCR of picture pages (that is AI)."""
+        """A release's or an interim 6-K report's exhibits, or a report's own document, parsed as they are: no OCR of
+        picture pages (that is AI)."""
         try:
-            if ref.role != "earnings_release":
+            if ref.role != "earnings_release" and not ref.exhibits:
                 return parse_document(self.source.report_html(ref, self._archive_of(ref)), ref.source_url)
             combined = None
             for index, exhibit in enumerate(ref.exhibits[:6]):

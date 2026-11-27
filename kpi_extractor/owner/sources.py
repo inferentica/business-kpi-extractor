@@ -5,6 +5,9 @@ A line has up to two code sources, and the refresh follows nothing else:
   the quarter is in, and the table's scale.
 - `report`: its 10-Q / 10-K, either an XBRL fact (concepts, the exact member set, wrapper members to ignore) or a cell
   of a table in the report (as `release`).
+- `interim`: a foreign filer's interim 6-K report, where it differs from `report`: Nebius's quarters are a table of
+  its "Operating and Financial Review" 6-K, its 20-F years XBRL facts. Without one, an interim report is read by
+  `report` (Arm's 6-Ks carry the same XBRL as its 20-F).
 A line with neither (`hand` says why: Dell's AI orders are a sentence in the CEO's comment, not a table cell) goes to
 the hand-reading queue each new quarter. So does a line with no mapping at all.
 
@@ -85,6 +88,7 @@ TotalSource = Annotated[Union[XbrlSource, TableSource, LineRef], Field(discrimin
 class LineMapping(_Strict):
     release: TableSource | None = None
     report: LineSource | None = None
+    interim: LineSource | None = None
     # Why the line has no code source: it is read by hand every quarter (the hand-reading queue).
     hand: str | None = None
     # A point-in-time figure (backlog, subscribers): no FY row, and its Q4 is read at the year's end, not derived.
@@ -97,6 +101,8 @@ class GroupMapping(_Strict):
     # unchecked.
     release_total: TotalSource | None = None
     report_total: TotalSource | None = None
+    # The total in a foreign filer's interim 6-K report, where it differs from `report_total` (as a line's `interim`).
+    interim_total: TotalSource | None = None
     # Members of the lines' axes the filing may tag beside them that are not lines (eliminations, a subtotal): never
     # taken for a new segment.
     known_members: list[str] = Field(default_factory=list)
