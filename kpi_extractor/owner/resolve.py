@@ -151,12 +151,21 @@ _QUARTER = re.compile(r"\b(three|13|thirteen|fourteen|14)[- ](months|weeks)\b|\b
 _YEAR = re.compile(r"\b(twelve|12|52|53|fifty-two|fifty-three)[- ](months|weeks)\b|\b(fiscal )?years? ended\b|\bfull[- ]year\b|\bfy\b", re.I)
 
 
+# Characters a cell can hold that print nothing: Nebius's empty cells are zero-width spaces, which made them headers.
+_INVISIBLE = re.compile(r"[\u200b-\u200d\u2060\ufeff]")
+
+
+def _text(cell: str | None) -> str:
+    return clean(_INVISIBLE.sub(" ", cell or ""))
+
+
 def row_label(text: str) -> str:
-    return _FOOTNOTE.sub("", clean(text or "")).rstrip(":").strip()
+    return _FOOTNOTE.sub("", _text(text)).rstrip(":").strip()
 
 
 def _amount(text: str | None) -> float | None:
-    if not text or not text.strip():
+    text = _INVISIBLE.sub("", text or "")
+    if not text.strip():
         return None
     if _DASH.match(text.strip().lstrip("$").strip()):
         return 0.0
@@ -200,21 +209,36 @@ def _first_data_row(table: Table) -> int:
     return len(table.rows)
 
 
+def _spans_right(cell: str) -> bool:
+    """Whether a header cell reaches over the blank cells to its right: a duration or a caption, not a date or a year of
+    its own column."""
+    return bool(cell) and bool(_duration(cell) or not _dates(cell)) and not _YEAR_ONLY.fullmatch(cell)
+
+
 def _columns(table: Table) -> dict[int, tuple[list[date], str | None, str]]:
-    """Each column's header: the dates in its own cells, the duration its spanning header names, and its text."""
-    header = table.rows[:_first_data_row(table)]
+    """Each column's header: the dates in its own cells, the duration its spanning header names, and its text. A blank
+    cell of a header row takes the nearest cell to its left that spans over it, so a header split over rows reads in
+    their order: "Three months ended September 30," over the columns, "2025 | 2026" in each (Chevron's 10-Q, Nebius's
+    6-K review), and a units row after the years ("(in millions of U.S. dollars)") does not come between them."""
+    header = [[_text(cell) for cell in row] for row in table.rows[:_first_data_row(table)]]
     width = max((len(row) for row in table.rows), default=0)
     columns = {}
     for col in range(1, width):
-        own = " ".join(row[col] for row in header if col < len(row) and row[col])
-        spanning = []
-        for row in header:
-            cell = next((row[index] for index in range(min(col, len(row) - 1), 0, -1) if row[index]), "")
-            if cell and (_duration(cell) or not _dates(cell)) and not _YEAR_ONLY.fullmatch(cell):
-                spanning.append(cell)
+        own_cells = [row[col] if col < len(row) else "" for row in header]
+        own = " ".join(cell for cell in own_cells if cell)
+        ordered, spanning = [], []
+        for row, cell in zip(header, own_cells):
+            if cell:
+                ordered.append(cell)
+                continue
+            spanned = next((row[index] for index in range(min(col, len(row) - 1), 0, -1) if row[index]), "")
+            if _spans_right(spanned):
+                spanning.append(spanned)
+                ordered.append(spanned)
         spans = " ".join(cell for cell in dict.fromkeys(spanning) if cell not in own)
-        # The date may be split: "Three Months Ended September 30" over the columns, "2026" in each (Chevron's 10-Q).
-        columns[col] = (_dates(own) or _dates(f"{spans} {own}"), _duration(f"{spans} {own}"), clean(f"{spans} {own}"))
+        text = " ".join(ordered)
+        columns[col] = (_dates(own) or _dates(text) or _dates(f"{spans} {own}"), _duration(f"{spans} {own}"),
+                        clean(f"{spans} {own}"))
     return columns
 
 

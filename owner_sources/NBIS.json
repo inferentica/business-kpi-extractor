@@ -1,0 +1,231 @@
+{
+ "derived_from": "derived 2026-11-27 by kpi_extractor.owner.backfill from the owner's stored figures and their 20-Fs; removed by hand: the two Toloka lines (deconsolidated May 2025, no further periods); 2026-11-27: segment and segment Adjusted EBITDA quarters read from the interim 6-K reviews (exhibit 99.1 tables, `interim`), years from the 20-F's XBRL (`report`); Q4 = FY less the Q3 review's nine months",
+ "groups": {
+  "geography": {
+   "fy_rows": true,
+   "known_members": []
+  },
+  "segment_income": {
+   "fy_rows": true,
+   "interim_total": {
+    "anchor": "adjusted ebitda\\W+(?:\\(loss\\)\\W+)?of the (?:operating|reportable) segments",
+    "kind": "table",
+    "row": "Total adjusted EBITDA\\W*(?:/\\s*)?\\(loss\\)",
+    "scale": 1000000.0
+   },
+   "known_members": [],
+   "report_total": {
+    "concepts": [
+     "AdjustedEbitda"
+    ],
+    "ignore": [],
+    "kind": "xbrl",
+    "members": {}
+   }
+  },
+  "segments": {
+   "fy_rows": true,
+   "interim_total": {
+    "anchor": "revenues by (?:the )?(?:operating|reportable) segments?",
+    "kind": "table",
+    "row": "Total revenues",
+    "scale": 1000000.0
+   },
+   "known_members": [],
+   "report_total": {
+    "concepts": [
+     "Revenues"
+    ],
+    "ignore": [],
+    "kind": "xbrl",
+    "members": {}
+   }
+  }
+ },
+ "lines": {
+  "geography.row": {
+   "balance": false,
+   "report": {
+    "concepts": [
+     "Revenues"
+    ],
+    "ignore": [],
+    "instant": false,
+    "kind": "xbrl",
+    "members": {
+     "StatementGeographicalAxis": "SegmentGeographicalAreaOtherThanUnitesStatesAndUnitedKingdomMember"
+    },
+    "sign": 1
+   }
+  },
+  "geography.uk": {
+   "balance": false,
+   "report": {
+    "concepts": [
+     "Revenues"
+    ],
+    "ignore": [],
+    "instant": false,
+    "kind": "xbrl",
+    "members": {
+     "StatementGeographicalAxis": "GB"
+    },
+    "sign": 1
+   }
+  },
+  "geography.us": {
+   "balance": false,
+   "report": {
+    "concepts": [
+     "Revenues"
+    ],
+    "ignore": [],
+    "instant": false,
+    "kind": "xbrl",
+    "members": {
+     "StatementGeographicalAxis": "US"
+    },
+    "sign": 1
+   }
+  },
+  "segment_income.avride_e": {
+   "interim": {
+    "anchor": "adjusted ebitda\\W+(?:\\(loss\\)\\W+)?of the (?:operating|reportable) segments",
+    "kind": "table",
+    "row": "Avride",
+    "scale": 1000000.0
+   },
+   "report": {
+    "concepts": [
+     "AdjustedEbitda"
+    ],
+    "ignore": [
+     "OperatingSegmentsMember"
+    ],
+    "kind": "xbrl",
+    "members": {
+     "StatementBusinessSegmentsAxis": "AvrideSegmentMember"
+    }
+   }
+  },
+  "segment_income.nebius_e": {
+   "interim": {
+    "anchor": "adjusted ebitda\\W+(?:\\(loss\\)\\W+)?of the (?:operating|reportable) segments",
+    "kind": "table",
+    "row": "Nebius(?: AI cloud)?",
+    "scale": 1000000.0
+   },
+   "report": {
+    "concepts": [
+     "AdjustedEbitda"
+    ],
+    "ignore": [
+     "OperatingSegmentsMember"
+    ],
+    "kind": "xbrl",
+    "members": {
+     "StatementBusinessSegmentsAxis": "NebiusSegmentMember"
+    }
+   }
+  },
+  "segment_income.tripleten_e": {
+   "interim": {
+    "anchor": "adjusted ebitda\\W+(?:\\(loss\\)\\W+)?of the (?:operating|reportable) segments",
+    "kind": "table",
+    "row": "TripleTen",
+    "scale": 1000000.0
+   },
+   "report": {
+    "concepts": [
+     "AdjustedEbitda"
+    ],
+    "ignore": [
+     "OperatingSegmentsMember"
+    ],
+    "kind": "xbrl",
+    "members": {
+     "StatementBusinessSegmentsAxis": "TripleTenSegmentMember"
+    }
+   }
+  },
+  "segments.avride": {
+   "interim": {
+    "anchor": "revenues by (?:the )?(?:operating|reportable) segments?",
+    "kind": "table",
+    "row": "Avride",
+    "scale": 1000000.0
+   },
+   "report": {
+    "concepts": [
+     "Revenues"
+    ],
+    "ignore": [
+     "OperatingSegmentsMember"
+    ],
+    "kind": "xbrl",
+    "members": {
+     "StatementBusinessSegmentsAxis": "AvrideSegmentMember"
+    }
+   }
+  },
+  "segments.elim": {
+   "interim": {
+    "anchor": "revenues by (?:the )?(?:operating|reportable) segments?",
+    "kind": "table",
+    "row": "Eliminations",
+    "scale": 1000000.0
+   },
+   "report": {
+    "concepts": [
+     "Revenues"
+    ],
+    "ignore": [],
+    "kind": "xbrl",
+    "members": {
+     "ConsolidationItemsAxis": "IntersegmentEliminationMember"
+    }
+   }
+  },
+  "segments.nebius": {
+   "interim": {
+    "anchor": "revenues by (?:the )?(?:operating|reportable) segments?",
+    "kind": "table",
+    "row": "Nebius(?: AI cloud)?",
+    "scale": 1000000.0
+   },
+   "report": {
+    "concepts": [
+     "Revenues"
+    ],
+    "ignore": [
+     "OperatingSegmentsMember"
+    ],
+    "kind": "xbrl",
+    "members": {
+     "StatementBusinessSegmentsAxis": "NebiusSegmentMember"
+    }
+   }
+  },
+  "segments.tripleten": {
+   "interim": {
+    "anchor": "revenues by (?:the )?(?:operating|reportable) segments?",
+    "kind": "table",
+    "row": "TripleTen",
+    "scale": 1000000.0
+   },
+   "report": {
+    "concepts": [
+     "Revenues"
+    ],
+    "ignore": [
+     "OperatingSegmentsMember"
+    ],
+    "kind": "xbrl",
+    "members": {
+     "StatementBusinessSegmentsAxis": "TripleTenSegmentMember"
+    }
+   }
+  }
+ },
+ "version": 1
+}

@@ -14,6 +14,9 @@ that already exist; every existing period stays as the owner left it. So, for ea
 - A line missing from the filing is flagged, never marked N/A. Only the newest period's release figures may be replaced,
   by its 10-Q/10-K where the two differ, with a note.
 - A 10-K adds the year's FY rows and Q4 = FY less the Q3 report's nine months; a balance (backlog) is read at year end.
+- A foreign filer's interim 6-K report is its quarter's report (a line's `interim` source, else its `report`), and
+  its Q3 one gives Q4's nine months. A line read only from a report waits for it only where one will come (a 10-Q
+  after its 8-K, a 20-F after the fourth quarter's 6-K, a filer's interim 6-K report); otherwise it is read by hand.
 """
 from __future__ import annotations
 
@@ -122,6 +125,9 @@ class _Docs:
     release: FilingRef | None = None
     report: FilingRef | None = None
     nine_months: FilingRef | None = None  # the year's Q3 report, for Q4 = FY less nine months
+    # Whether the period's report is still to come when only its release is here: a U.S. filer's 10-Q or 10-K, a
+    # foreign filer's 20-F after its fourth quarter or its interim 6-K report; not a foreign filer's other quarters.
+    report_expected: bool = True
 
     @property
     def annual(self) -> bool:
@@ -133,6 +139,16 @@ class _Docs:
 
 def _day(text) -> date:
     return date.fromisoformat(str(text)[:10])
+
+
+def is_interim(ref: FilingRef | None) -> bool:
+    """A foreign filer's interim report: a 6-K read as its quarter's report (owner/foreign.py)."""
+    return ref is not None and ref.role == "periodic_report" and ref.form.upper() == "6-K"
+
+
+def report_source(mapping: LineMapping, ref: FilingRef | None):
+    """The line's source in this report: its `interim` one in an interim 6-K report, where it has one."""
+    return mapping.interim if is_interim(ref) and mapping.interim is not None else mapping.report
 
 
 def differs(a: float, b: float) -> bool:
@@ -238,6 +254,8 @@ class OwnerRefresh:
                 for ref in cluster:
                     plan.filings.append(FilingOutcome(ref, "needs_review", [f"owner-locked refresh: {reason}"], period_end=end))
                 continue
+            if docs.report is None and docs.release is not None and docs.release.form.upper() == "6-K":
+                docs.report_expected = period.fiscal_period == "Q4" or any(is_interim(r) for r in reports)
             if period.fiscal_period == "Q4" and docs.annual:
                 q3 = self._rows_in(period.fiscal_year, "Q3", lines)
                 q3_end = max((_day(v["period_end"]) for v in q3.values()), default=None)
@@ -258,7 +276,7 @@ class OwnerRefresh:
             dates = [r.found.locator["column_date"] for got in readings.values() for r in got if r.found.locator.get("column_date")]
             if dates:
                 period = Period(period.fiscal_year, period.fiscal_period, _day(max(set(dates), key=dates.count)))
-        self._settle(plan, period, readings, lines, existing, readonly, docs, "quarter")
+        waiting = self._settle(plan, period, readings, lines, existing, readonly, docs, "quarter")
         if docs.annual and docs.report.period_end:
             year = Period(period.fiscal_year, "FY", docs.report.period_end)
             fy_existing = self._rows_in(year.fiscal_year, "FY", lines)
@@ -275,6 +293,8 @@ class OwnerRefresh:
         notes = [f"owner-locked refresh, {period.label}: {rows} figures written ({held} held), {hand} to read by hand"]
         if readonly:
             notes.append("the period is owner-decided: nothing in it was changed")
+        if waiting:
+            notes.append(f"{len(waiting)} lines wait for the {period.label} report: {', '.join(sorted(waiting))}")
         refs = [ref for ref in (docs.release, docs.report) if ref is not None]
         for ref in refs:
             plan.filings.append(FilingOutcome(ref, "needs_review" if hand or held else "processed", notes,
@@ -313,21 +333,23 @@ class OwnerRefresh:
         out = []
         if docs.release is not None and mapping.release is not None:
             out.append(self._read(mapping.release, docs.release, period.end, "quarter", "release"))
-        if docs.report is not None and mapping.report is not None:
-            balance = mapping.balance or getattr(mapping.report, "instant", False)
+        source = report_source(mapping, docs.report)
+        if docs.report is not None and source is not None:
+            balance = mapping.balance or getattr(source, "instant", False)
             if not docs.annual or balance:
-                out.append(self._read(mapping.report, docs.report, period.end, "quarter", "report"))
+                out.append(self._read(source, docs.report, period.end, "quarter", "report"))
             else:
                 out.append(self._fourth(mapping, period, docs))
         return out
 
     def _fourth(self, mapping: LineMapping, period: Period, docs: _Docs) -> Reading:
-        """Q4 = the 10-K's year less the Q3 report's nine months."""
+        """Q4 = the 10-K's year less the Q3 report's nine months (a foreign filer's: its Q3 interim 6-K report's)."""
         year = self._read(mapping.report, docs.report, docs.report.period_end, "fy", "report")
-        if docs.nine_months is None:
+        nine_source = report_source(mapping, docs.nine_months) if docs.nine_months is not None else None
+        if docs.nine_months is None or nine_source is None:
             return Reading(Found(NONE, reason="the year's Q3 report is not listed, so its nine months cannot be read"),
                            "derived", docs.report, year.where)
-        nine = self._read(mapping.report, docs.nine_months, docs.nine_months.period_end, "ytd", "report")
+        nine = self._read(nine_source, docs.nine_months, docs.nine_months.period_end, "ytd", "report")
         where = f"{year.where} less nine months from {nine.where}"
         if year.found.status != ONE or nine.found.status != ONE:
             bad = year.found if year.found.status != ONE else nine.found
@@ -347,6 +369,8 @@ class OwnerRefresh:
                duration: str) -> Reading | None:
         mapping = self.sources.group(group)
         source = mapping.report_total if origin in ("report", "derived") else mapping.release_total
+        if origin == "report" and is_interim(docs.report) and mapping.interim_total is not None:
+            source = mapping.interim_total
         if source is None:
             return None
         if isinstance(source, LineRef):
@@ -355,13 +379,15 @@ class OwnerRefresh:
         if ref is None:
             return None
         if origin == "derived":
-            return self._fourth(LineMapping(report=source), period, docs)
+            nine = mapping.interim_total if not isinstance(mapping.interim_total, LineRef) else None
+            return self._fourth(LineMapping(report=source, interim=nine), period, docs)
         return self._read(source, ref, period.end if duration == "quarter" else ref.period_end, duration, origin)
 
     # --- settling a period ------------------------------------------------------------------------------------------
 
     def _settle(self, plan: OwnerPlan, period: Period, readings: dict[str, list[Reading]], lines: dict[str, OwnerLine],
-                existing: dict[str, dict], readonly: bool, docs: _Docs, duration: str, quiet: set[str] = frozenset()) -> None:
+                existing: dict[str, dict], readonly: bool, docs: _Docs, duration: str, quiet: set[str] = frozenset()) -> set[str]:
+        """Settles the period's lines; returns those waiting for its report."""
         def hand(group, kpi, kind, reason, ref=None):
             ref = ref or docs.newest()
             plan.hand.append(HandRead(group, kpi, period.fiscal_year, period.fiscal_period, period.end.isoformat(),
@@ -370,9 +396,10 @@ class OwnerRefresh:
         chosen: dict[str, Reading] = {}
         missing: dict[str, tuple[str, bool]] = {}  # why, and whether it is the document's (a basis change)
         waiting: set[str] = set()  # lines whose source is in a filing not here yet (the report after its release)
+        unread: set[str] = set()  # lines whose only source is a report that never comes for this period: read by hand
         for key, line in lines.items():
             mapping = self.sources.line(line.group, line.kpi)
-            if mapping is None or (mapping.release is None and mapping.report is None):
+            if mapping is None or (mapping.release is None and mapping.report is None and mapping.interim is None):
                 # A quarterly line's own quarter queues it once; its FY row then waits with it.
                 if not readonly and key not in existing and key not in quiet:
                     reason = mapping.hand if mapping and mapping.hand else "no source is mapped for this line"
@@ -385,17 +412,25 @@ class OwnerRefresh:
                 chosen[key] = usable[-1]  # the report, the filing of record, over its release
             elif got:
                 missing[key] = ("; ".join(r.found.reason for r in got), any(r.found.basis for r in got))
+            elif docs.report is None and not docs.report_expected:
+                # Read only from a report, and none comes for this quarter (a foreign filer's results 6-K alone): not left
+                # waiting where nothing would ever read it.
+                unread.add(key)
+                if not readonly and key not in existing and key not in quiet:
+                    hand(line.group, line.kpi, "hand", f"its source is the quarter's report, and none is filed for "
+                         f"{period.label}: read {line.template.get('kpi_label') or line.kpi} by hand")
             else:
                 waiting.add(key)
         for group in sorted({line.group for line in lines.values()}):
             members = {key: line for key, line in lines.items() if line.group == group
-                       and (key in chosen or key in missing or key in waiting)}
+                       and (key in chosen or key in missing or key in waiting or key in unread)}
             if any(key in chosen or key in missing for key in members):
                 self._group(plan, period, group, members, chosen, missing, waiting, existing, readonly, docs, duration, hand,
-                            readings)
+                            readings, unread)
+        return waiting
 
     def _group(self, plan, period, group, members, chosen, missing, waiting, existing, readonly, docs, duration, hand,
-               readings_of) -> None:
+               readings_of, unread=frozenset()) -> None:
         breakdown = next(iter(members.values())).breakdown
         basis = [f"{key}: {chosen[key].found.reason}" for key in members if key in chosen and chosen[key].found.basis]
         basis += [f"{key}: {missing[key][0]}" for key in members if key in missing and missing[key][1]]
@@ -414,6 +449,9 @@ class OwnerRefresh:
         elif waiting & set(members):
             held_why = (f"held: {', '.join(sorted(waiting & set(members)))} come with the report, so the lines are tied "
                         "when it is read")
+        elif unread & set(members):
+            held_why = (f"held: {', '.join(sorted(unread & set(members)))} are read by hand, so the lines are not tied "
+                        "until they are")
         else:
             total = self._total(group, origin, period, docs, chosen, duration)
             # Members no line maps are a basis change only where nothing else proves the lines whole: an owner list is
@@ -441,7 +479,7 @@ class OwnerRefresh:
                     return
                 tie = total.found.value
         for key, line in members.items():
-            if key in waiting:
+            if key in waiting or key in unread:
                 continue
             label = line.template.get("kpi_label") or line.kpi
             stored = existing.get(key)
@@ -486,8 +524,8 @@ class OwnerRefresh:
     def _new_members(self, group, members, docs, period, duration) -> list[str]:
         if docs.report is None:
             return []
-        sources = [m.report for key in members if (m := self.sources.lines.get(key)) and isinstance(m.report, XbrlSource)
-                   and not m.report.instant]
+        sources = [source for key in members if (m := self.sources.lines.get(key))
+                   and isinstance(source := report_source(m, docs.report), XbrlSource) and not source.instant]
         facts = self._facts_of(docs.report) if sources else None
         if not facts:
             return []

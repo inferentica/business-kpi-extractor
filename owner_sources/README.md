@@ -19,6 +19,13 @@ scheduled refresh reaches one, it takes the owner-locked path (`kpi_extractor/ow
 6. **Release first, then the report.** The release fills the quarter the day it is filed; when the 10-Q/10-K follows, it
    replaces only the release figures the refresh wrote for that newest quarter, only where the two differ, with a note.
    An owner-decided figure the report gives differently is never changed: it goes to the hand pass as "differs".
+7. **A foreign filer's interim 6-K is its quarter's report.** A 6-K with XBRL dated at a quarter end (Arm's), or one
+   whose exhibits open as an operating and financial review beside its condensed financial statements (Nebius's), is
+   read like a 10-Q, never as the results 6-K filed beside it. A line's `interim` source reads it where the 20-F's
+   source differs (Nebius: review tables for quarters, 20-F XBRL for years; a group's `interim_total` likewise), and the
+   Q3 one gives Q4's nine months. A line only a report gives waits for one only where one will come (a 10-Q, a 20-F
+   after the fourth quarter, a filer of interim 6-Ks); otherwise it goes to the hand queue, and a filing whose lines
+   wait says which.
 
 ## The hand-reading queue
 

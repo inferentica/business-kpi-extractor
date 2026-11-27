@@ -19,7 +19,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from ..documents.document import parse_document
-from .foreign import plain_text, results_releases
+from .foreign import interim_reviews, plain_text, results_releases
 from .derive import CHECKED, Evidence, LineResult, derive_line, derive_total, sources_from
 from .refresh import OwnerRefresh, _day, differs
 from .resolve import facts_of
@@ -39,6 +39,7 @@ class Filings:
         self.company = self.source.open_company(symbol)
         self._facts: dict = {}
         self._documents: dict = {}
+        self._texts: dict = {}
         self.reports = sorted(self.source.periodic_reports(self.company, since)
                               + self.source.interim_reports(self.company, since), key=lambda ref: ref.filed)
         for ref in self.reports:
@@ -46,6 +47,7 @@ class Filings:
             if ref.period_end is None and reported:
                 ref.period_end = _day(reported)
         listed = self.source.earnings_releases(self.company, since)
+        self.reports = sorted(self.reports + interim_reviews(listed, self.reports, self.texts), key=lambda ref: ref.filed)
         self.releases = sorted([ref for ref in listed if ref.confirmed] + results_releases(
             listed, self.reports, self.facts, self.text), key=lambda ref: ref.filed)
 
@@ -71,7 +73,7 @@ class Filings:
     def document(self, ref):
         if ref.accession not in self._documents:
             try:
-                if ref.role == "earnings_release":
+                if ref.role == "earnings_release" or ref.exhibits:
                     document = None
                     for index, exhibit in enumerate(ref.exhibits[:6]):
                         raw = self.source.exhibit_html(exhibit)
@@ -86,13 +88,19 @@ class Filings:
             self._documents[ref.accession] = document
         return self._documents[ref.accession]
 
+    def texts(self, ref) -> list[str]:
+        """A 6-K's exhibits as plain text, for telling a foreign filer's reports and results 6-Ks apart (owner/foreign.py)."""
+        if ref.accession not in self._texts:
+            try:
+                self._texts[ref.accession] = [plain_text(raw) for exhibit in ref.exhibits[:6]
+                                              if (raw := self.source.exhibit_html(exhibit))]
+            except Exception as error:  # noqa: BLE001
+                self.log(f"  {ref.accession}: not read ({type(error).__name__})")
+                self._texts[ref.accession] = []
+        return self._texts[ref.accession]
+
     def text(self, ref) -> str:
-        """A release's exhibits as plain text, for telling a foreign filer's results 6-K apart (owner/foreign.py)."""
-        try:
-            return " ".join(plain_text(raw) for exhibit in ref.exhibits[:6] if (raw := self.source.exhibit_html(exhibit)))
-        except Exception as error:  # noqa: BLE001
-            self.log(f"  {ref.accession}: not read ({type(error).__name__})")
-            return ""
+        return " ".join(self.texts(ref))
 
     def evidence(self, row: dict, ref) -> Evidence:
         return Evidence(row, ref, lambda: self.facts(ref), lambda: self.document(ref))
